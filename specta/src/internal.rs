@@ -7,49 +7,11 @@
 #[cfg(feature = "function")]
 pub use paste::paste;
 
-/// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
-/// We intentionally keep their fields private so we can modify them without a major version bump.
-/// As this module is `#[doc(hidden)]` we allowed to make breaking changes within a minor version as it's only used by the macros.
-pub mod construct {
-    use std::borrow::Cow;
-
-    use crate::datatype::*;
-
-    pub const fn field(
-        optional: bool,
-        deprecated: Option<DeprecatedType>,
-        docs: Cow<'static, str>,
-        inline: bool,
-        attributes: Vec<RuntimeAttribute>,
-        ty: Option<DataType>,
-    ) -> Field {
-        Field {
-            optional,
-            deprecated,
-            docs,
-            inline,
-            attributes,
-            ty,
-        }
-    }
-
-    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<RuntimeAttribute>) -> Fields {
-        Fields::Unnamed(UnnamedFields { fields, attributes })
-    }
-
-    pub const fn fields_named(
-        fields: Vec<(Cow<'static, str>, Field)>,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> Fields {
-        Fields::Named(NamedFields { fields, attributes })
-    }
-}
-
 #[cfg(feature = "function")]
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{Types, datatype::Deprecated, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
@@ -58,10 +20,10 @@ mod functions {
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,
-        types: &mut TypeCollection,
+        types: &mut Types,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
+        deprecated: Option<Deprecated>,
         no_return_type: bool,
     ) -> Function {
         T::to_datatype(

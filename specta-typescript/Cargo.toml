@@ -1,12 +1,12 @@
 [package]
 name = "specta-typescript"
 description = "Export your Rust types to TypeScript"
-version = "0.0.10"
+version = "0.0.11"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/specta-rs/specta"
-documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+documentation = "https://docs.rs/specta-typescript/latest/specta-typescript"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 readme = "../README.md"
@@ -22,15 +22,15 @@ workspace = true
 [features]
 default = []
 
-# TODO: Docs
+# Implement `serde::Serialize` and `serde::Deserialize` for Typescript-specific types (Any, Unknown, Never)
 serde = ["dep:serde"]
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta" }
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.24", path = "../specta" }
 serde = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive", "collect"] }
+specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive", "collect"] }
+specta-serde = { path = "../specta-serde" }
 specta-util = { path = "../specta-util", features = ["serde"] }

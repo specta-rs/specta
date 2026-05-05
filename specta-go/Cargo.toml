@@ -1,12 +1,12 @@
 [package]
 name = "specta-go"
 description = "Export your Rust types to Go"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/specta-rs/specta"
-documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+documentation = "https://docs.rs/specta-go/latest/specta-go"
 keywords = ["async", "specta", "rspc", "go", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 readme = "../README.md"
@@ -20,4 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta" }
+specta = { version = "=2.0.0-rc.24", path = "../specta" }
+
+[dev-dependencies]
+specta_serde = { package = "specta-serde", version = "=0.0.11", path = "../specta-serde" }

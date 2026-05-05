@@ -9,3 +9,9 @@
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod selection;
+
+mod array;
+mod remapper;
+
+pub use array::FixedArray;
+pub use remapper::Remapper;

@@ -1,4 +1,6 @@
-use specta::{Type, TypeCollection};
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Advanced example showcasing complex enum unions and their Swift representations
@@ -165,7 +167,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResult<String, String>>()
         .register::<Shape>()
         .register::<Point>()
@@ -180,14 +182,18 @@ fn main() {
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/AdvancedUnions.swift", &types)
+        .export_to(
+            "./examples/generated/AdvancedUnions.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("✅ Advanced unions exported to AdvancedUnions.swift");
 

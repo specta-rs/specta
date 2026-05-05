@@ -24,18 +24,19 @@ A Rust crate for exporting Rust types to Swift, built on top of [Specta](https:/
 
 ## Quick Start
 
-Add `specta-swift` to your `Cargo.toml`:
+Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
+specta-serde = "0.0.11"
 specta-swift = "0.1"
 ```
 
 Define your Rust types:
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -65,13 +66,15 @@ Generate Swift code:
 
 ```rust
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
 
     let swift = Swift::default();
-    swift.export_to("./Types.swift", &types).unwrap();
+    swift
+        .export_to("./Types.swift", &types, specta_serde::format)
+        .unwrap();
 }
 ```
 
@@ -243,8 +246,9 @@ let swift = Swift::new()
 
 ```rust
 let swift = Swift::new()
-    .with_serde()  // Adds import Codable and validation
     .add_protocol("CustomDebugStringConvertible");
+
+let output = swift.export(&types, specta_serde::format).unwrap();
 ```
 
 ## Type Mapping

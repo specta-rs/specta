@@ -1,230 +1,131 @@
 //! Field types are used by both enums and structs.
 
-use super::{DataType, DeprecatedType, RuntimeAttribute};
+use crate::datatype::Struct;
+
+use super::{Attributes, DataType, Deprecated};
 use std::borrow::Cow;
 
-/// A non-skipped field with its type information.
-pub type NonSkipField<'a> = (&'a Field, &'a DataType);
-
-/// Filter out skipped fields from a collection of fields.
-///
-/// Returns an iterator of tuples containing the field and its type, excluding fields with `None` type.
-pub fn skip_fields<'a>(
-    fields: impl IntoIterator<Item = &'a Field>,
-) -> impl Iterator<Item = NonSkipField<'a>> {
-    fields
-        .into_iter()
-        .filter_map(|field| field.ty().map(|ty| (field, ty)))
-}
-
-/// Filter out skipped fields from a collection of named fields.
-///
-/// Returns an iterator of tuples containing the field name, the field, and its type, excluding fields with `None` type.
-pub fn skip_fields_named<'a>(
-    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
-) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
-    fields
-        .into_iter()
-        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
-}
-
-/// Data stored within an enum variant or struct.
+/// Field layout for a struct or enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Fields {
-    /// A unit struct.
+    /// Unit struct.
     ///
     /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
     Unit,
-    /// A struct with unnamed fields.
+    /// Struct with unnamed fields.
     ///
     /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
     Unnamed(UnnamedFields),
-    /// A struct with named fields.
+    /// Struct with named fields.
     ///
     /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
     Named(NamedFields),
 }
 
-/// Field metadata for a struct field or enum variant field.
+/// Metadata for a struct field or enum variant field.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Field {
-    /// Did the user apply a `#[specta(optional)]` attribute.
-    pub(crate) optional: bool,
+    /// Whether the field was marked optional, for example with
+    /// `#[specta(optional)]`.
+    pub optional: bool,
     /// Deprecated attribute for the field.
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub deprecated: Option<Deprecated>,
     /// Documentation comments for the field.
-    pub(crate) docs: Cow<'static, str>,
-    /// Should we inline the definition of this type.
-    pub(crate) inline: bool,
-    /// Runtime attributes for this field (e.g., serde attributes)
-    pub(crate) attributes: Vec<RuntimeAttribute>,
-    /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
+    pub docs: Cow<'static, str>,
+    /// Runtime attributes for this field.
+    pub attributes: Attributes,
+    /// Type for the field.
+    ///
+    /// This is `None` when the field was skipped with an attribute such as
+    /// `#[serde(skip)]` or `#[specta(skip)]`. Exporters should preserve enough
+    /// information to distinguish skipped fields from absent fields because some
+    /// serialization formats still let skipped fields affect layout.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
-    pub(crate) ty: Option<DataType>,
+    pub ty: Option<DataType>,
 }
 
 impl Field {
-    /// Construct a new field with the given type.
+    /// Constructs a new non-optional field with the given type.
     ///
-    /// You can skip the requirement on providing a [`DataType`] by using [`Field::default`]
+    /// Use [`Field::default`] to construct skipped-field metadata where `ty` is
+    /// initially `None`.
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
             deprecated: None,
             docs: "".into(),
-            inline: false,
             ty: Some(ty),
-            attributes: Vec::new(),
+            attributes: Attributes::default(),
         }
     }
-
-    /// Has the Serde or Specta optional attribute been applied to this field?
-    pub fn optional(&self) -> bool {
-        self.optional
-    }
-
-    /// Set the optional attribute for this field.
-    pub fn set_optional(&mut self, optional: bool) {
-        self.optional = optional;
-    }
-
-    /// Has the Serde inline attribute been applied to this field?
-    pub fn inline(&self) -> bool {
-        self.inline
-    }
-
-    /// Set the inline attribute for this field.
-    pub fn set_inline(&mut self, inline: bool) {
-        self.inline = inline;
-    }
-
-    /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
-        self.deprecated.as_ref()
-    }
-
-    /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
-        self.deprecated.as_mut()
-    }
-
-    /// Set the deprecated attribute for this field.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
-        self.deprecated = deprecated;
-    }
-
-    /// Get an immutable reference to the documentation attribute for this field.
-    pub fn docs(&self) -> &Cow<'static, str> {
-        &self.docs
-    }
-
-    /// Mutable reference to the documentation attribute for this field.
-    pub fn docs_mut(&mut self) -> &mut Cow<'static, str> {
-        &mut self.docs
-    }
-
-    /// Set the documentation attribute for this field.
-    pub fn set_docs(&mut self, docs: Cow<'static, str>) {
-        self.docs = docs;
-    }
-
-    /// Get an immutable reference to the type of this field.
-    pub fn ty(&self) -> Option<&DataType> {
-        self.ty.as_ref()
-    }
-
-    /// Mutable reference to the type of this field.
-    pub fn ty_mut(&mut self) -> Option<&mut DataType> {
-        self.ty.as_mut()
-    }
-
-    /// Set the type of this field.
-    pub fn set_ty(&mut self, ty: DataType) {
-        self.ty = Some(ty);
-    }
-
-    /// Get an immutable reference to the runtime attributes for this field.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
-        &self.attributes
-    }
-
-    /// Mutable reference to the runtime attributes for this field.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
-        &mut self.attributes
-    }
-
-    /// Set the runtime attributes for this field.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
-        self.attributes = attrs;
-    }
 }
 
-/// The fields of an unnamed enum variant.
+/// Fields for an unnamed tuple struct or tuple enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct UnnamedFields {
-    pub(crate) fields: Vec<Field>,
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    /// Field metadata in source order.
+    pub fields: Vec<Field>,
 }
 
-impl UnnamedFields {
-    /// Get an immutable reference to the fields of this unnamed enum variant.
-    pub fn fields(&self) -> &[Field] {
-        &self.fields
-    }
-
-    /// Mutable reference to the fields of this unnamed enum variant.
-    pub fn fields_mut(&mut self) -> &mut Vec<Field> {
-        &mut self.fields
-    }
-
-    /// Get an immutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
-        &self.attributes
-    }
-
-    /// Mutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
-        &mut self.attributes
-    }
-
-    /// Set the runtime attributes for this unnamed fields.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
-        self.attributes = attrs;
-    }
-}
-
-/// The fields of an named enum variant or a struct.
+/// Fields for a named struct or struct enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct NamedFields {
-    pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    /// Field names and metadata in source order.
+    pub fields: Vec<(Cow<'static, str>, Field)>,
 }
 
-impl NamedFields {
-    /// Get an immutable reference to the fields.
-    pub fn fields(&self) -> &[(Cow<'static, str>, Field)] {
-        &self.fields
+#[derive(Debug, Clone)]
+/// Builder for constructing [`DataType::Struct`] values.
+///
+/// The type parameter tracks whether the builder is currently collecting named
+/// or unnamed fields.
+pub struct StructBuilder<F = ()> {
+    pub(crate) fields: F,
+}
+
+impl StructBuilder<NamedFields> {
+    /// Adds a named field and returns the updated builder.
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.fields.fields.push((name.into(), field));
+        self
     }
 
-    /// Mutable reference to the fields.
-    pub fn fields_mut(&mut self) -> &mut Vec<(Cow<'static, str>, Field)> {
-        &mut self.fields
+    /// Adds a named field in-place.
+    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
+        self.fields.fields.push((name.into(), field));
     }
 
-    /// Get an immutable reference to the runtime attributes for this named fields.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
-        &self.attributes
+    /// Finalizes this builder into a [`DataType::Struct`] with named fields.
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Named(self.fields),
+            attributes: Default::default(),
+        })
+    }
+}
+
+impl StructBuilder<UnnamedFields> {
+    /// Adds an unnamed field and returns the updated builder.
+    pub fn field(mut self, field: Field) -> Self {
+        self.fields.fields.push(field);
+        self
     }
 
-    /// Mutable reference to the runtime attributes for this named fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
-        &mut self.attributes
+    /// Adds an unnamed field in-place.
+    pub fn field_mut(&mut self, field: Field) {
+        self.fields.fields.push(field);
     }
 
-    /// Set the runtime attributes for this named fields.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
-        self.attributes = attrs;
+    /// Finalizes this builder into a [`DataType::Struct`] with unnamed fields.
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
+        })
     }
 }

@@ -1,12 +1,12 @@
 [package]
 name = "specta-swift"
 description = "Export your Rust types to Swift"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Jamie Pine <hello@jamiepine.com>", "Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/specta-rs/specta"
-documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+documentation = "https://docs.rs/specta-swift/latest/specta-swift"
 keywords = ["async", "specta", "rspc", "swift", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
@@ -19,15 +19,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive", "uuid", "chrono"] }
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive", "uuid", "chrono"] }
 thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-insta = "1.46"
+insta = "1.47"
 trybuild = "1.0"
-uuid = "1.21.0"
+specta-serde = { version = "=0.0.11", path = "../specta-serde" }
+uuid = "1.23.1"
 chrono = { version = "0.4.44", features = ["clock"] }
 
 [[example]]

@@ -4,85 +4,76 @@ use std::{
     sync::Arc,
 };
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::datatype::Generic;
 
-use super::{DataType, Generic};
+use super::DataType;
 
-/// A reference to another type.
-/// This can either an [NamedReference] or [OpaqueReference].
+/// Reference to another datatype.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// A reference to a named type collected in a [`TypeCollection`].
+    /// Reference to a named type collected in a [`Types`](crate::Types).
+    ///
+    /// This can either render as a named reference, such as `TypeName<T>`, or as
+    /// an inlined datatype depending on [`NamedReference::inner`].
     Named(NamedReference),
-    /// A reference to an opaque exporter-specific type.
+    /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// A reference to a [NamedDataType].
+/// Reference to a [`NamedDataType`](crate::datatype::NamedDataType).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    // TODO: Should this be a map-type???
-    pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
-    pub(crate) inline: bool,
+    /// How this named type should be referenced at the use site.
+    pub inner: NamedReferenceType,
 }
 
-impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [TypeCollection].
+/// Use-site representation for a [`NamedReference`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum NamedReferenceType {
+    /// Recursive reference encountered while resolving an inline type.
     ///
-    /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
-    /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref()
-    }
-
-    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &[(Generic, DataType)] {
-        &self.generics
-    }
-
-    /// Get whether this reference should be inlined
-    pub fn inline(&self) -> bool {
-        self.inline
-    }
+    /// Exporters can use this marker to avoid infinitely expanding recursive
+    /// inline definitions that they would stack overflow resolving.
+    Recursive,
+    /// Inline the contained datatype at the reference site.
+    /// These are emitted when `#[specta(inline)]` is used on a field or container.
+    #[non_exhaustive]
+    Inline {
+        /// Datatype to render in place of the named reference.
+        dt: Box<DataType>,
+    },
+    /// Render a reference to the named datatype.
+    #[non_exhaustive]
+    Reference {
+        /// Concrete generic arguments for this use site.
+        generics: Vec<(Generic, DataType)>,
+    },
 }
 
-/// A reference to an opaque type which is understood by the type exporter.
-/// This powers [specta_typescript::branded], [specta_typescript::define] and more.
+/// Reference to a type not understood by Specta's core datatype model.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided.
+/// These are implemented by the language exporter to implement cool features like
+/// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
+/// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
+///
+/// # Invariants
+///
+/// Equality and hashing are delegated to the stored opaque state. If two opaque
+/// references should be distinct, their state values must compare and hash
+/// distinctly.
+///
+/// This is an advanced feature designed for language exporters and framework
+/// integrations. Most end users should prefer ordinary [`DataType`] variants.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
-
-pub(crate) fn tauri() -> Reference {
-    Reference::Opaque(OpaqueReference(Arc::new(TauriChannelReferenceInner)))
-}
 
 trait DynOpaqueReference: Any + Send + Sync {
     fn type_name(&self) -> &'static str;
     fn hash(&self, hasher: &mut dyn hash::Hasher);
     fn eq(&self, other: &dyn Any) -> bool;
     fn as_any(&self) -> &dyn Any;
-}
-
-#[derive(PartialEq, Eq)]
-struct TauriChannelReferenceInner;
-impl DynOpaqueReference for TauriChannelReferenceInner {
-    fn type_name(&self) -> &'static str {
-        "tauri::ipc::Channel"
-    }
-    fn hash(&self, hasher: &mut dyn hash::Hasher) {
-        hasher.write_u64(0);
-    }
-    fn eq(&self, other: &dyn Any) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .map(|other| self == other)
-            .unwrap_or_default()
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 #[derive(Debug)]
@@ -128,52 +119,45 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
-    /// Get the Rust type name of the stored opaque state.
+    /// Returns the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
-    /// Get the [`TypeId`] of the stored opaque state.
+    /// Returns the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
-    /// Attempt to downcast the opaque state to `T`.
+    /// Attempts to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
 }
 
 impl Reference {
-    /// Construct a new reference to an opaque type.
+    /// Constructs a new reference to an opaque type.
     ///
-    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    /// An opaque type cannot be represented with the core [`DataType`] model and
+    /// requires specific exporter integration.
     ///
-    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
+    /// Opaque [`Reference`]s are compared using the state's [`PartialEq`]
+    /// implementation. For example, `Reference::opaque(()) ==
+    /// Reference::opaque(())`, so unique references need unique state.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
         Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
     }
 
-    /// Compare if two references point to the same type.
+    /// Returns whether two references point to the same underlying type.
     ///
-    /// This is different from using `Eq`, `PartialEq`, or `Hash` as those compare the [Reference].
-    /// A [Reference] contains generics, inline and other attributes which this ignores.
+    /// This differs from [`Eq`], [`PartialEq`], and [`Hash`] because those compare
+    /// the full [`Reference`] which includes generic arguments and inline state.
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
-    }
-
-    /// Convert an existing [Reference] into an inlined one.
-    ///
-    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
-    pub fn inline(mut self) -> Reference {
-        if let Reference::Named(n) = &mut self {
-            n.inline = true;
-        }
-        self
     }
 }
 
@@ -183,7 +167,7 @@ impl From<Reference> for DataType {
     }
 }
 
-/// A unique identifier for a [NamedDataType].
+/// Unique identifier for a [NamedDataType].
 ///
 /// For static types (from derive macros), we use a unique string based on the
 /// type's module path and name. For dynamic types, we use an Arc pointer.

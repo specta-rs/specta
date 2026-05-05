@@ -1,106 +1,64 @@
-use core::fmt;
-use std::{
-    borrow::{Borrow, Cow},
-    fmt::Display,
-    marker::PhantomData,
-};
+use std::borrow::Cow;
 
-use crate::Type;
+use crate::datatype::DataType;
 
-use super::DataType;
-
-/// A generic ("placeholder") argument to a Specta-enabled type.
+/// Reference to a named generic parameter.
 ///
-/// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.
+/// Exporters usually render this as the generic name, such as `T`.
 ///
-/// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct Generic(pub(crate) Cow<'static, str>);
+/// # Invariants
+///
+/// A `Generic` should only appear inside the canonical `ty` field of the
+/// [`NamedDataType`](crate::datatype::NamedDataType) that declares it. Ordinary
+/// [`Type::definition`](crate::Type::definition) results should use concrete
+/// datatypes or references with instantiated generics.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Generic(Cow<'static, str>);
 
 impl Generic {
-    /// Construct a generic placeholder by name.
-    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
-        Self(Into::into(name))
+    /// Builds a new generic parameter reference with the given source-level name.
+    ///
+    /// The same name must appear in the parent [`GenericDefinition`] list.
+    pub const fn new(name: Cow<'static, str>) -> Self {
+        Self(name)
     }
-}
 
-impl Display for Generic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-// TODO: Deref instead?
-impl Borrow<str> for Generic {
-    fn borrow(&self) -> &str {
+    /// The source-level name of this generic parameter.
+    pub fn name(&self) -> &Cow<'static, str> {
         &self.0
     }
-}
 
-impl From<Cow<'static, str>> for Generic {
-    fn from(value: Cow<'static, str>) -> Self {
-        Self(value)
+    /// Get a stable reference identifier for this generic parameter.
+    pub fn reference(&self) -> Self {
+        self.clone()
     }
 }
 
 impl From<Generic> for DataType {
-    fn from(t: Generic) -> Self {
-        Self::Generic(t)
+    fn from(v: Generic) -> Self {
+        DataType::Generic(v)
     }
 }
 
-/// A generic placeholder.
-pub trait ConstGenericPlaceholder {
-    /// Static identifier used when rendering this generic placeholder.
-    const PLACEHOLDER: &'static str;
+/// Metadata describing a generic parameter declared by a
+/// [`NamedDataType`](crate::datatype::NamedDataType).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct GenericDefinition {
+    /// The source-level name of the generic parameter.
+    pub name: Cow<'static, str>,
+    /// An optional default type for the generic parameter.
+    pub default: Option<DataType>,
 }
 
-/// A placeholder for a generic type.
-///
-/// # How this works?
-///
-/// When you use the [`Type`](crate::Type) derive macro on a type we transform all generics to be a `Generic<T>` before resolving the types.
-/// This ensures we have placeholders to the correct generic when exporting.
-///
-/// This major downside to this approach is that if you have custom generic bounds, they might not be implemented by `Generic<T>`.
-///
-/// TODO: Show detailed transformation.
-///
-// TODO: We should replace the `Generic `trait with `const P: &'static str` if we do a Specta v3.
-pub struct GenericPlaceholder<T: ConstGenericPlaceholder>(PhantomData<T>);
-
-impl<T: ConstGenericPlaceholder> fmt::Debug for GenericPlaceholder<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(T::PLACEHOLDER)
+impl GenericDefinition {
+    /// Constructs metadata for a generic parameter.
+    pub const fn new(name: Cow<'static, str>, default: Option<DataType>) -> Self {
+        Self { name, default }
     }
-}
 
-impl<T: ConstGenericPlaceholder> Default for GenericPlaceholder<T> {
-    fn default() -> Self {
-        unreachable!("Can't construct a generic type without a placeholder");
-    }
-}
-
-impl<T: ConstGenericPlaceholder> Clone for GenericPlaceholder<T> {
-    fn clone(&self) -> Self {
-        unreachable!();
-    }
-}
-
-impl<T: ConstGenericPlaceholder> PartialEq for GenericPlaceholder<T> {
-    fn eq(&self, _: &Self) -> bool {
-        unreachable!();
-    }
-}
-
-impl<T: ConstGenericPlaceholder> std::hash::Hash for GenericPlaceholder<T> {
-    fn hash<H: std::hash::Hasher>(&self, _: &mut H) {
-        unreachable!();
-    }
-}
-
-impl<T: ConstGenericPlaceholder> Type for GenericPlaceholder<T> {
-    fn definition(_: &mut crate::TypeCollection) -> DataType {
-        DataType::Generic(Generic(Cow::Borrowed(T::PLACEHOLDER)))
+    /// Get a stable reference identifier for this generic parameter.
+    pub fn reference(&self) -> Generic {
+        Generic::new(self.name.clone())
     }
 }

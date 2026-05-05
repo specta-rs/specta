@@ -1,4 +1,6 @@
-use specta::{Type, TypeCollection};
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Comprehensive example showcasing basic Rust types and their Swift equivalents
@@ -108,7 +110,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Primitives>()
         .register::<Status>()
         .register::<ApiResponse<String, String>>()
@@ -119,14 +121,18 @@ fn main() {
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/BasicTypes.swift", &types)
+        .export_to(
+            "./examples/generated/BasicTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("✅ Basic types exported to BasicTypes.swift");
 

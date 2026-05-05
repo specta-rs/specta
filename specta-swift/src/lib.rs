@@ -4,18 +4,18 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-swift` to your project:
+//! Add `specta`, `specta-serde`, and `specta-swift` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.23 --features derive,export
-//! cargo add specta-swift@0.0.1
-//! cargo add specta-serde@0.0.10
+//! cargo add specta@2.0.0-rc.24 --features derive,collect
+//! cargo add specta-serde@0.0.11
+//! cargo add specta-swift@0.0.2
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_swift::Swift;
 //!
 //! #[derive(Type)]
@@ -28,12 +28,12 @@
 //!     pub other_field: String,
 //! }
 //!
-//! let mut types = TypeCollection::default()
+//! let types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &types)
+//!     .export_to("./Types.swift", &types, specta_serde::Format)
 //!     .unwrap();
 //! ```
 //!
@@ -52,6 +52,3 @@ mod swift;
 
 pub use error::Error;
 pub use swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
-
-// Re-export SerdeMode from specta-serde for convenience
-pub use specta_serde::SerdeMode;

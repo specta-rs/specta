@@ -1,28 +1,26 @@
 //! Primitives provide building blocks for Specta-based libraries.
 //!
-//! These are for advanced usecases, you should generally use [Typescript] or [JSDoc] in end-user applications.
+//! These are for advanced usecases, you should generally use [crate::Typescript] or
+//! [crate::JSDoc] in end-user applications.
 
-use std::{
-    borrow::{Borrow, Cow},
-    fmt::Write as _,
-    iter,
-};
+use std::{borrow::Cow, fmt::Write as _};
 
 use specta::{
-    TypeCollection,
+    Format, Types,
     datatype::{
-        DataType, DeprecatedType, Enum, Fields, Generic, List, Map, NamedDataType, NamedReference,
-        OpaqueReference, Primitive, Reference, Tuple,
+        DataType, Deprecated, Enum, Fields, GenericDefinition, GenericReference, List, Map,
+        NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
+        Tuple, Variant,
     },
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout,
+    Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
     },
-    opaque,
+    map_keys, opaque,
 };
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -34,24 +32,32 @@ use crate::{
 ///
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
+/// If you are using a custom format such as `serde::format` with the high-level exporter,
+/// these primitive helpers do not apply that mapping automatically. Standalone primitive usage
+/// should map both the full [`Types`] graph and any top-level [`DataType`] values with matching
+/// helpers first.
+///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types, ndts, indent)?;
+    export_internal(&mut s, exporter.as_ref(), None, types, ndts, indent)?;
     Ok(s)
 }
 
 pub(crate) fn export_internal<'a>(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<(), Error> {
+    let ndts = ndts.filter(|ndt| ndt.ty.is_some());
+
     if exporter.jsdoc {
         let mut ndts = ndts.peekable();
         if ndts.peek().is_none() {
@@ -67,7 +73,7 @@ pub(crate) fn export_internal<'a>(
                 s.push_str("\t*\n");
             }
 
-            append_typedef_body(s, exporter, types, ndt, indent)?;
+            append_typedef_body(s, exporter, format, types, ndt, indent)?;
         }
 
         s.push_str(indent);
@@ -80,7 +86,7 @@ pub(crate) fn export_internal<'a>(
             s.push('\n');
         }
 
-        export_single_internal(s, exporter, types, ndt, indent)?;
+        export_single_internal(s, exporter, format, types, ndt, indent)?;
     }
 
     Ok(())
@@ -89,13 +95,14 @@ pub(crate) fn export_internal<'a>(
 fn export_single_internal(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     ndt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
     if exporter.jsdoc {
         let mut typedef = String::new();
-        typedef_internal(&mut typedef, exporter, types, ndt)?;
+        typedef_internal(&mut typedef, exporter, format, types, ndt)?;
         for line in typedef.lines() {
             s.push_str(indent);
             s.push_str(line);
@@ -103,15 +110,6 @@ fn export_single_internal(
         }
         return Ok(());
     }
-
-    let generics = (!ndt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(ndt.generics().iter().map(|g| g.borrow()), ", "))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
 
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
@@ -121,17 +119,17 @@ fn export_single_internal(
         },
         &match exporter.layout {
             Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
-                s.push_str(ndt.name());
+                s.push_str(&ndt.name);
                 Cow::Owned(s)
             }
-            _ => ndt.name().clone(),
+            _ => ndt.name.clone(),
         },
     )?;
 
     let mut comments = String::new();
-    js_doc(&mut comments, ndt.docs(), ndt.deprecated(), !exporter.jsdoc);
+    js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref());
     if !comments.is_empty() {
         for line in comments.lines() {
             s.push_str(indent);
@@ -143,18 +141,17 @@ fn export_single_internal(
     s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
-    for part in generics {
-        s.push_str(part);
-    }
+    write_generic_parameters(s, exporter, types, &ndt.generics)?;
     s.push_str(" = ");
 
     datatype(
         s,
         exporter,
+        format,
         types,
-        ndt.ty(),
-        vec![ndt.name().clone()],
-        Some(ndt.name()),
+        ndt.ty.as_ref().expect("named datatype must have a body"),
+        vec![ndt.name.clone()],
+        Some(ndt.name.as_ref()),
         indent,
         Default::default(),
     )?;
@@ -170,15 +167,19 @@ fn export_single_internal(
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
+/// You are responsible for apply Serde or other format mapping to the top-level datatype in the
+/// same way as the [`Types`] graph before calling this helper.
+///
 pub fn inline(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
     inline_datatype(
         &mut s,
         exporter.as_ref(),
+        None,
         types,
         dt,
         vec![],
@@ -195,11 +196,12 @@ pub fn inline(
 pub(crate) fn typedef_internal(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &NamedDataType,
 ) -> Result<(), Error> {
     s.push_str("/**\n");
-    append_typedef_body(s, exporter, types, dt, "")?;
+    append_typedef_body(s, exporter, format, types, dt, "")?;
 
     s.push_str("\t*/");
 
@@ -209,16 +211,18 @@ pub(crate) fn typedef_internal(
 fn append_jsdoc_properties(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
-    dt: &NamedDataType,
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt_name: &str,
+    dt: &DataType,
     indent: &str,
 ) -> Result<(), Error> {
-    match dt.ty() {
-        DataType::Struct(strct) => match strct.fields() {
+    match dt {
+        DataType::Struct(strct) => match &strct.fields {
             Fields::Unit => {}
             Fields::Unnamed(unnamed) => {
-                for (idx, field) in unnamed.fields().iter().enumerate() {
-                    let Some(ty) = field.ty() else {
+                for (idx, field) in unnamed.fields.iter().enumerate() {
+                    let Some(ty) = field.ty.as_ref() else {
                         continue;
                     };
 
@@ -227,10 +231,11 @@ fn append_jsdoc_properties(
                     datatype(
                         &mut ty_str,
                         exporter,
+                        format,
                         types,
                         ty,
-                        vec![dt.name().clone(), idx.to_string().into()],
-                        Some(dt.name()),
+                        vec![Cow::Owned(dt_name.to_owned()), idx.to_string().into()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -239,16 +244,16 @@ fn append_jsdoc_properties(
                         s,
                         &ty_str,
                         &idx.to_string(),
-                        field.optional(),
-                        field.docs(),
-                        field.deprecated(),
+                        field.optional,
+                        &field.docs,
+                        field.deprecated.as_ref(),
                         indent,
                     );
                 }
             }
             Fields::Named(named) => {
-                for (name, field) in named.fields() {
-                    let Some(ty) = field.ty() else {
+                for (name, field) in &named.fields {
+                    let Some(ty) = field.ty.as_ref() else {
                         continue;
                     };
 
@@ -257,10 +262,11 @@ fn append_jsdoc_properties(
                     datatype(
                         &mut ty_str,
                         exporter,
+                        format,
                         types,
                         ty,
-                        vec![dt.name().clone(), name.clone()],
-                        Some(dt.name()),
+                        vec![Cow::Owned(dt_name.to_owned()), name.clone()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -269,19 +275,19 @@ fn append_jsdoc_properties(
                         s,
                         &ty_str,
                         name,
-                        field.optional(),
-                        field.docs(),
-                        field.deprecated(),
+                        field.optional,
+                        &field.docs,
+                        field.deprecated.as_ref(),
                         indent,
                     );
                 }
             }
         },
         DataType::Enum(enm) => {
-            for (variant_name, variant) in enm.variants().iter().filter(|(_, v)| !v.skip()) {
+            for (variant_name, variant) in enm.variants.iter().filter(|(_, v)| !v.skip) {
                 let mut one_variant_enum = enm.clone();
                 one_variant_enum
-                    .variants_mut()
+                    .variants
                     .retain(|(name, _)| name == variant_name);
 
                 let mut variant_ty = String::new();
@@ -302,10 +308,15 @@ fn append_jsdoc_properties(
                     &variant_ty,
                     variant_name,
                     false,
-                    variant.docs(),
-                    variant.deprecated(),
+                    &variant.docs,
+                    variant.deprecated.as_ref(),
                     indent,
                 );
+            }
+        }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                append_jsdoc_properties(s, exporter, format, types, dt_name, ty, indent)?;
             }
         }
         _ => {}
@@ -320,7 +331,7 @@ fn push_jsdoc_property(
     name: &str,
     optional: bool,
     docs: &str,
-    deprecated: Option<&DeprecatedType>,
+    deprecated: Option<&Deprecated>,
     indent: &str,
 ) {
     s.push_str(indent);
@@ -372,40 +383,31 @@ fn jsdoc_property_name(name: &str, optional: bool) -> String {
 fn append_typedef_body(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    let generics = (!dt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
-
-    let name = dt.name();
-    let type_name = iter::empty()
-        .chain([name.as_ref()])
-        .chain(generics)
-        .collect::<String>();
+    let name = &dt.name;
+    let mut type_name = String::from(name.as_ref());
+    write_generic_parameters(&mut type_name, exporter, types, &dt.generics)?;
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
     datatype(
         &mut typedef_ty,
         exporter,
+        format,
         types,
-        dt.ty(),
-        vec![dt.name().clone()],
-        Some(dt.name()),
+        dt.ty.as_ref().expect("named datatype must have a body"),
+        vec![dt.name.clone()],
+        Some(dt.name.as_ref()),
         &datatype_prefix,
         Default::default(),
     )?;
 
-    if !dt.docs().is_empty() {
-        for line in dt.docs().lines() {
+    if !dt.docs.is_empty() {
+        for line in dt.docs.lines() {
             s.push_str(indent);
             s.push_str("\t* ");
             s.push_str(&escape_jsdoc_text(line));
@@ -415,7 +417,7 @@ fn append_typedef_body(
         s.push_str("\t*\n");
     }
 
-    if let Some(deprecated) = dt.deprecated() {
+    if let Some(deprecated) = dt.deprecated.as_ref() {
         s.push_str(indent);
         s.push_str("\t* @deprecated");
         if let Some(details) = deprecated_details(deprecated) {
@@ -432,12 +434,54 @@ fn append_typedef_body(
     s.push_str(&type_name);
     s.push('\n');
 
-    append_jsdoc_properties(s, exporter, types, dt, indent)?;
+    if let Some(ty) = &dt.ty {
+        append_jsdoc_properties(s, exporter, format, types, dt.name.as_ref(), ty, indent)?;
+    }
 
     Ok(())
 }
 
-fn jsdoc_description(docs: &str, deprecated: Option<&DeprecatedType>) -> Option<String> {
+fn write_generic_parameters(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &Types,
+    generics: &[GenericDefinition],
+) -> Result<(), Error> {
+    if generics.is_empty() {
+        return Ok(());
+    }
+
+    s.push('<');
+    for (index, generic) in generics.iter().enumerate() {
+        if index != 0 {
+            s.push_str(", ");
+        }
+
+        s.push_str(generic.name.as_ref());
+
+        if let Some(default) = &generic.default {
+            let mut rendered_default = String::new();
+            shallow_inline_datatype(
+                &mut rendered_default,
+                exporter,
+                None,
+                types,
+                default,
+                Vec::new(),
+                None,
+                "",
+                Default::default(),
+            )?;
+            s.push_str(" = ");
+            s.push_str(&rendered_default);
+        }
+    }
+    s.push('>');
+
+    Ok(())
+}
+
+fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<String> {
     let docs = docs
         .lines()
         .map(str::trim)
@@ -470,29 +514,41 @@ fn jsdoc_description(docs: &str, deprecated: Option<&DeprecatedType>) -> Option<
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], "", &[])?;
+    datatype(
+        &mut s,
+        exporter.as_ref(),
+        None,
+        types,
+        &DataType::Reference(r.clone()),
+        vec![],
+        None,
+        "",
+        &[],
+    )?;
     Ok(s)
 }
 
 pub(crate) fn datatype_with_inline_attr(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
     inline: bool,
 ) -> Result<(), Error> {
     if inline {
         return shallow_inline_datatype(
             s,
             exporter,
+            format,
             types,
             dt,
             location,
@@ -505,6 +561,7 @@ pub(crate) fn datatype_with_inline_attr(
     datatype(
         s,
         exporter,
+        format,
         types,
         dt,
         location,
@@ -514,36 +571,120 @@ pub(crate) fn datatype_with_inline_attr(
     )
 }
 
-fn merged_generics(
-    parent: &[(Generic, DataType)],
-    child: &[(Generic, DataType)],
-) -> Vec<(Generic, DataType)> {
-    child
+fn write_generic_reference(s: &mut String, generic: &GenericReference) {
+    s.push_str(generic.name());
+}
+
+fn scoped_reference_generics(
+    parent_generics: &[(GenericReference, DataType)],
+    reference_generics: &[(GenericReference, DataType)],
+) -> Vec<(GenericReference, DataType)> {
+    parent_generics
         .iter()
-        .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
-        .chain(parent.iter().cloned())
+        .filter(|(parent_generic, _)| {
+            !reference_generics
+                .iter()
+                .any(|(child_generic, _)| child_generic == parent_generic)
+        })
+        .cloned()
         .collect()
+}
+
+fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { generics, .. } => Ok(generics),
+        NamedReferenceType::Inline { .. } => Ok(&[]),
+        NamedReferenceType::Recursive => Ok(&[]),
+    }
+}
+
+fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a DataType, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
+        NamedReferenceType::Inline { dt, .. } => Ok(dt),
+        NamedReferenceType::Recursive => types
+            .get(r)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .ok_or_else(|| Error::infinite_recursive_inline_type(format!("{r:?}"))),
+    }
+}
+
+fn resolve_scoped_generic_default(
+    default: &DataType,
+    scoped_generics: &[(GenericReference, DataType)],
+) -> DataType {
+    match default {
+        DataType::Generic(default) => scoped_generics
+            .iter()
+            .find_map(|(reference, dt)| (reference == default).then_some(dt.clone()))
+            .unwrap_or_else(|| DataType::Generic(default.clone())),
+        default => default.clone(),
+    }
+}
+
+fn resolved_reference_generics(
+    ndt: &specta::datatype::NamedDataType,
+    r: &NamedReference,
+    parent_generics: &[(GenericReference, DataType)],
+) -> Option<(Vec<DataType>, bool, Vec<(GenericReference, DataType)>)> {
+    let reference_generics = named_reference_generics(r).ok()?;
+    let mut scoped_generics = scoped_reference_generics(parent_generics, reference_generics);
+    let mut all_default = true;
+    let mut rendered_generics = Vec::with_capacity(ndt.generics.len());
+
+    for generic in ndt.generics.iter() {
+        let explicit = reference_generics
+            .iter()
+            .find(|(reference, _)| *reference == generic.reference())
+            .map(|(_, dt)| dt.clone());
+
+        let resolved_default = generic
+            .default
+            .as_ref()
+            .map(|default| resolve_scoped_generic_default(default, &scoped_generics));
+
+        let resolved = explicit.or_else(|| resolved_default.clone()).or_else(|| {
+            Some(DataType::Reference(Reference::opaque(
+                crate::opaque::Unknown,
+            )))
+        });
+
+        let resolved = resolved?;
+        all_default &= resolved_default
+            .as_ref()
+            .is_some_and(|default| default == &resolved);
+        scoped_generics.push((generic.reference(), resolved.clone()));
+        rendered_generics.push(resolved);
+    }
+
+    Some((rendered_generics, all_default, scoped_generics))
 }
 
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
+        DataType::Generic(g) => write_generic_reference(s, g),
         DataType::List(list) => {
             let mut inner = String::new();
             shallow_inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
-                list.ty(),
+                &list.ty,
                 location,
                 parent_name,
                 prefix,
@@ -558,7 +699,7 @@ fn shallow_inline_datatype(
                 inner
             };
 
-            if let Some(length) = list.length() {
+            if let Some(length) = list.length {
                 s.push('[');
                 for i in 0..length {
                     if i != 0 {
@@ -572,30 +713,36 @@ fn shallow_inline_datatype(
             }
         }
         DataType::Map(map) => {
-            fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+            let path = map_key_path(&location);
+            map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
+            let rendered_key = map_key_render_type(map.key_ty().clone());
+
+            fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
-                    DataType::Enum(e) => {
-                        e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0
+                    DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
+                    DataType::Reference(Reference::Named(r)) => {
+                        match named_reference_ty(types, r) {
+                            Ok(ty) => is_exhaustive(ty, types),
+                            Err(_) => false,
+                        }
                     }
-                    DataType::Reference(Reference::Named(r)) => r
-                        .get(types)
-                        .is_some_and(|ndt| is_exhaustive(ndt.ty(), types)),
                     DataType::Reference(Reference::Opaque(_)) => false,
                     _ => true,
                 }
             }
 
-            let exhaustive = is_exhaustive(map.key_ty(), types);
+            let exhaustive = is_exhaustive(&rendered_key, types);
             if !exhaustive {
                 s.push_str("Partial<");
             }
 
             s.push_str("{ [key in ");
-            shallow_inline_datatype(
+            map_key_datatype(
                 s,
                 exporter,
+                format,
                 types,
-                map.key_ty(),
+                &rendered_key,
                 location.clone(),
                 parent_name,
                 prefix,
@@ -605,6 +752,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 s,
                 exporter,
+                format,
                 types,
                 map.value_ty(),
                 location,
@@ -623,6 +771,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
                 dt,
                 location,
@@ -636,13 +785,24 @@ fn shallow_inline_datatype(
                 s.push_str(" | null");
             }
         }
+        DataType::Intersection(types_) => intersection_dt(
+            s,
+            exporter,
+            format,
+            types,
+            types_,
+            location,
+            parent_name,
+            prefix,
+            generics,
+            shallow_intersection_part_datatype,
+        )?,
         DataType::Struct(st) => {
             crate::legacy::struct_datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
                 },
-                parent_name,
                 st,
                 types,
                 s,
@@ -663,7 +823,7 @@ fn shallow_inline_datatype(
                 generics,
             )?;
         }
-        DataType::Tuple(tuple) => match tuple.elements() {
+        DataType::Tuple(tuple) => match tuple.elements.as_slice() {
             [] => s.push_str("null"),
             elements => {
                 s.push('[');
@@ -674,6 +834,7 @@ fn shallow_inline_datatype(
                     shallow_inline_datatype(
                         s,
                         exporter,
+                        format,
                         types,
                         dt,
                         location.clone(),
@@ -687,142 +848,115 @@ fn shallow_inline_datatype(
         },
         DataType::Reference(r) => match r {
             Reference::Named(r) => {
-                let ndt = r
-                    .get(types)
-                    .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-                let combined_generics = merged_generics(generics, r.generics());
-                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-                datatype(
+                let ty = named_reference_ty(types, r)?;
+                let reference_generics = named_reference_generics(r)?;
+                shallow_inline_datatype(
                     s,
                     exporter,
+                    format,
                     types,
-                    &resolved,
+                    ty,
                     location,
                     parent_name,
                     prefix,
-                    &combined_generics,
+                    reference_generics,
                 )
             }
-            Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
-        }?,
-        DataType::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-                    s.push_str(g.borrow());
-                } else {
-                    shallow_inline_datatype(
-                        s,
-                        exporter,
-                        types,
-                        resolved_dt,
-                        location,
-                        parent_name,
-                        prefix,
-                        generics,
-                    )?;
-                }
-            } else {
-                s.push_str(g.borrow());
+            Reference::Opaque(_) => {
+                reference_dt(s, exporter, format, types, r, location, prefix, generics)
             }
-        }
+        }?,
     }
 
     Ok(())
 }
 
-fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)]) -> DataType {
+type DatatypeRenderer = fn(
+    &mut String,
+    &Exporter,
+    Option<&dyn Format>,
+    &Types,
+    &DataType,
+    Vec<Cow<'static, str>>,
+    Option<&str>,
+    &str,
+    &[(GenericReference, DataType)],
+) -> Result<(), Error>;
+
+fn shallow_intersection_part_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
     match dt {
-        DataType::Primitive(_) | DataType::Reference(_) => dt.clone(),
-        DataType::List(l) => {
-            let mut out = l.clone();
-            out.set_ty(resolve_generics_in_datatype(l.ty(), generics));
-            DataType::List(out)
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)
         }
-        DataType::Map(m) => {
-            let mut out = m.clone();
-            out.set_key_ty(resolve_generics_in_datatype(m.key_ty(), generics));
-            out.set_value_ty(resolve_generics_in_datatype(m.value_ty(), generics));
-            DataType::Map(out)
-        }
-        DataType::Nullable(def) => {
-            DataType::Nullable(Box::new(resolve_generics_in_datatype(def, generics)))
-        }
-        DataType::Struct(st) => {
-            let mut out = st.clone();
-            match out.fields_mut() {
-                specta::datatype::Fields::Unit => {}
-                specta::datatype::Fields::Unnamed(unnamed) => {
-                    for field in unnamed.fields_mut() {
-                        if let Some(ty) = field.ty_mut() {
-                            *ty = resolve_generics_in_datatype(ty, generics);
-                        }
-                    }
-                }
-                specta::datatype::Fields::Named(named) => {
-                    for (_, field) in named.fields_mut() {
-                        if let Some(ty) = field.ty_mut() {
-                            *ty = resolve_generics_in_datatype(ty, generics);
-                        }
-                    }
-                }
-            }
-            DataType::Struct(out)
-        }
-        DataType::Enum(en) => {
-            let mut out = en.clone();
-            for (_, variant) in out.variants_mut() {
-                match variant.fields_mut() {
-                    specta::datatype::Fields::Unit => {}
-                    specta::datatype::Fields::Unnamed(unnamed) => {
-                        for field in unnamed.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
-                                *ty = resolve_generics_in_datatype(ty, generics);
-                            }
-                        }
-                    }
-                    specta::datatype::Fields::Named(named) => {
-                        for (_, field) in named.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
-                                *ty = resolve_generics_in_datatype(ty, generics);
-                            }
-                        }
-                    }
-                }
-            }
-            DataType::Enum(out)
-        }
-        DataType::Tuple(t) => {
-            let mut out = t.clone();
-            for element in out.elements_mut() {
-                *element = resolve_generics_in_datatype(element, generics);
-            }
-            DataType::Tuple(out)
-        }
-        DataType::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-                    dt.clone()
-                } else {
-                    resolve_generics_in_datatype(resolved_dt, generics)
-                }
-            } else {
-                dt.clone()
-            }
-        }
+        _ => shallow_inline_datatype(
+            s,
+            exporter,
+            format,
+            types,
+            dt,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        ),
     }
+}
+
+fn intersection_dt(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    parts: &[DataType],
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+    render: DatatypeRenderer,
+) -> Result<(), Error> {
+    let mut rendered = Vec::with_capacity(parts.len());
+    for part in parts {
+        let mut out = String::new();
+        render(
+            &mut out,
+            exporter,
+            format,
+            types,
+            part,
+            location.clone(),
+            parent_name,
+            prefix,
+            generics,
+        )?;
+        rendered.push(format!("({out})"));
+    }
+
+    s.push_str(&rendered.join(" & "));
+    Ok(())
 }
 
 // Internal function to handle inlining without cloning DataType nodes
 fn inline_datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
     depth: usize,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // Prevent infinite recursion
     if depth == 25 {
@@ -833,7 +967,8 @@ fn inline_datatype(
     }
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
+        DataType::Generic(g) => write_generic_reference(s, g),
         DataType::List(l) => {
             // Inline the list element type
             let mut dt_str = String::new();
@@ -842,7 +977,7 @@ fn inline_datatype(
                     cfg: exporter,
                     path: vec![],
                 },
-                &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+                &l.ty,
                 types,
                 &mut dt_str,
                 generics,
@@ -856,7 +991,7 @@ fn inline_datatype(
                 dt_str
             };
 
-            if let Some(length) = l.length() {
+            if let Some(length) = l.length {
                 s.push('[');
                 for n in 0..length {
                     if n != 0 {
@@ -869,12 +1004,13 @@ fn inline_datatype(
                 write!(s, "{dt_str}[]")?;
             }
         }
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
             let mut inner = String::new();
             inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
                 def,
                 location,
@@ -893,14 +1029,14 @@ fn inline_datatype(
             // If we have generics to resolve, handle the struct inline to preserve context
             if !generics.is_empty() {
                 use specta::datatype::Fields;
-                match st.fields() {
+                match &st.fields {
                     Fields::Unit => s.push_str("null"),
                     Fields::Named(named) => {
                         s.push('{');
                         let mut has_field = false;
-                        for (key, field) in named.fields() {
+                        for (key, field) in &named.fields {
                             // Skip fields without a type (e.g., flattened or skipped fields)
-                            let Some(field_ty) = field.ty() else {
+                            let Some(field_ty) = field.ty.as_ref() else {
                                 continue;
                             };
 
@@ -913,6 +1049,7 @@ fn inline_datatype(
                             inline_datatype(
                                 s,
                                 exporter,
+                                format,
                                 types,
                                 field_ty,
                                 location.clone(),
@@ -938,7 +1075,6 @@ fn inline_datatype(
                                 cfg: exporter,
                                 path: vec![],
                             },
-                            parent_name,
                             st,
                             types,
                             s,
@@ -954,7 +1090,6 @@ fn inline_datatype(
                         cfg: exporter,
                         path: vec![],
                     },
-                    parent_name,
                     st,
                     types,
                     s,
@@ -963,53 +1098,39 @@ fn inline_datatype(
                 )?
             }
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
+        DataType::Intersection(types_) => intersection_dt(
+            s,
+            exporter,
+            format,
+            types,
+            types_,
+            location,
+            parent_name,
+            prefix,
+            generics,
+            datatype,
+        )?,
         DataType::Reference(r) => {
-            // Always inline references when in inline mode
             if let Reference::Named(r) = r
-                && let Some(ndt) = r.get(types)
+                && let Ok(ty) = named_reference_ty(types, r)
             {
-                let combined_generics = merged_generics(generics, r.generics());
+                let reference_generics = named_reference_generics(r)?;
                 inline_datatype(
                     s,
                     exporter,
+                    format,
                     types,
-                    ndt.ty(),
+                    ty,
                     location,
                     parent_name,
                     prefix,
                     depth + 1,
-                    &combined_generics,
+                    reference_generics,
                 )?;
             } else {
-                // Fallback to regular reference if type not found
-                reference_dt(s, exporter, types, r, location, prefix, generics)?;
-            }
-        }
-        DataType::Generic(g) => {
-            // Try to resolve the generic from the generics map
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-                    s.push_str(<Generic as Borrow<str>>::borrow(g));
-                    return Ok(());
-                }
-                // Recursively inline the resolved type
-                inline_datatype(
-                    s,
-                    exporter,
-                    types,
-                    resolved_dt,
-                    location,
-                    parent_name,
-                    prefix,
-                    depth + 1,
-                    generics,
-                )?;
-            } else {
-                // Fallback to placeholder name if not found in the generics map
-                // This can happen for unsubstituted generic types
-                s.push_str(<Generic as Borrow<str>>::borrow(g));
+                reference_dt(s, exporter, format, types, r, location, prefix, generics)?;
             }
         }
     }
@@ -1020,19 +1141,20 @@ fn inline_datatype(
 pub(crate) fn datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    parent_name: Option<&str>,
+    _parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
+        DataType::List(l) => list_dt(s, exporter, types, l, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
             let mut inner = String::new();
@@ -1041,7 +1163,7 @@ pub(crate) fn datatype(
                     cfg: exporter,
                     path: vec![],
                 },
-                &specta::datatype::FunctionReturnType::Value((**def).clone()),
+                def,
                 types,
                 &mut inner,
                 generics,
@@ -1060,14 +1182,13 @@ pub(crate) fn datatype(
         }
         DataType::Struct(st) => {
             // location.push(st.name().clone());
-            // fields_dt(s, ts, types, st.name(), &st.fields(), location, state)?
+            // fields_dt(s, ts, types, st.name(), &&st.fields, location, state)?
 
             crate::legacy::struct_datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
                 },
-                parent_name,
                 st,
                 types,
                 s,
@@ -1075,63 +1196,54 @@ pub(crate) fn datatype(
                 generics,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
-        DataType::Reference(r) => reference_dt(s, exporter, types, r, location, prefix, generics)?,
-        DataType::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-                    s.push_str(g.borrow());
-                    return Ok(());
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
+        DataType::Intersection(types_) => {
+            for (idx, ty) in types_.iter().enumerate() {
+                if idx != 0 {
+                    s.push_str(" & ");
                 }
                 datatype(
                     s,
                     exporter,
+                    format,
                     types,
-                    resolved_dt,
-                    location,
-                    parent_name,
+                    ty,
+                    location.clone(),
+                    _parent_name,
                     prefix,
                     generics,
                 )?;
-            } else {
-                s.push_str(g.borrow());
             }
+        }
+        DataType::Generic(g) => write_generic_reference(s, g),
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)?
         }
     };
 
     Ok(())
 }
 
-fn primitive_dt(
-    b: &BigIntExportBehavior,
-    p: &Primitive,
-    location: Vec<Cow<'static, str>>,
-) -> Result<&'static str, Error> {
+fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f32 | f16 | f64 => "number",
-        usize | isize | i64 | u64 | i128 | u128 => match b {
-            BigIntExportBehavior::String => "string",
-            BigIntExportBehavior::Number => "number",
-            BigIntExportBehavior::BigInt => "bigint",
-            BigIntExportBehavior::Fail => {
-                return Err(Error::bigint_forbidden(location.join(".")));
-            }
-        },
+        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 /* this looks wrong but `f64` is the direct equivalent of `number` */ => "number",
+        usize | isize | i64 | u64 | i128 | u128 | f128 => {
+            return Err(Error::bigint_forbidden(location.join(".")));
+        }
         Primitive::bool => "boolean",
-        String | char => "string",
+        str | char => "string",
     })
 }
 
 fn list_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     l: &List,
-    _location: Vec<Cow<'static, str>>,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: This is the legacy stuff
     {
@@ -1141,7 +1253,7 @@ fn list_dt(
                 cfg: exporter,
                 path: vec![],
             },
-            &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+            &l.ty,
             types,
             &mut dt,
             generics,
@@ -1157,7 +1269,7 @@ fn list_dt(
             dt
         };
 
-        if let Some(length) = l.length() {
+        if let Some(length) = l.length {
             s.push('[');
 
             for n in 0..length {
@@ -1177,7 +1289,7 @@ fn list_dt(
     //     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 
     //     let mut result = String::new();
-    //     datatype(&mut result, ts, types, &l.ty(), location, state)?;
+    //     datatype(&mut result, ts, types, &&l.ty, location, state)?;
     //     let result = if (result.contains(' ') && !result.ends_with('}'))
     //         // This is to do with maintaining order of operations.
     //         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
@@ -1188,7 +1300,7 @@ fn list_dt(
     //         result
     //     };
 
-    //     match l.length() {
+    //     match l.length {
     //         Some(len) => {
     //             s.push_str("[");
     //             iter_with_sep(
@@ -1211,31 +1323,62 @@ fn list_dt(
     Ok(())
 }
 
+fn map_key_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    key_ty: &DataType,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match key_ty {
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)
+        }
+        key_ty => shallow_inline_datatype(
+            s,
+            exporter,
+            format,
+            types,
+            key_ty,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        ),
+    }
+}
+
 fn map_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     m: &Map,
-    _location: Vec<Cow<'static, str>>,
-    generics: &[(Generic, DataType)],
+    location: Vec<Cow<'static, str>>,
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    let path = map_key_path(&location);
+    map_keys::validate_map_key(m.key_ty(), types, format!("{path}.<map_key>"))?;
+
     {
-        fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+        fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
             match dt {
-                DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
-                DataType::Reference(Reference::Named(r)) => {
-                    if let Some(ndt) = r.get(types) {
-                        is_exhaustive(ndt.ty(), types)
-                    } else {
-                        false
-                    }
-                }
+                DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
+                DataType::Reference(Reference::Named(r)) => match named_reference_ty(types, r) {
+                    Ok(ty) => is_exhaustive(ty, types),
+                    Err(_) => false,
+                },
                 DataType::Reference(Reference::Opaque(_)) => false,
                 _ => true,
             }
         }
 
-        let is_exhaustive = is_exhaustive(m.key_ty(), types);
+        let resolved_key = map_key_render_type(m.key_ty().clone());
+        let is_exhaustive = is_exhaustive(&resolved_key, types);
 
         // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
         // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
@@ -1243,14 +1386,15 @@ fn map_dt(
             s.push_str("Partial<");
         }
         s.push_str("{ [key in ");
-        crate::legacy::datatype_inner(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
-            types,
+        map_key_datatype(
             s,
+            exporter,
+            format,
+            types,
+            &resolved_key,
+            location,
+            None,
+            "",
             generics,
         )?;
         s.push_str("]: ");
@@ -1259,7 +1403,7 @@ fn map_dt(
                 cfg: exporter,
                 path: vec![],
             },
-            &specta::datatype::FunctionReturnType::Value(m.value_ty().clone()),
+            m.value_ty(),
             types,
             s,
             generics,
@@ -1281,14 +1425,40 @@ fn map_dt(
     Ok(())
 }
 
+fn map_key_path(location: &[Cow<'static, str>]) -> String {
+    if location.is_empty() {
+        return "HashMap".to_string();
+    }
+
+    location.join(".")
+}
+
+fn map_key_render_type(dt: DataType) -> DataType {
+    if matches!(dt, DataType::Primitive(Primitive::bool)) {
+        return bool_key_literal_datatype();
+    }
+
+    dt
+}
+
+fn bool_key_literal_datatype() -> DataType {
+    let mut bool_enum = Enum::default();
+    bool_enum
+        .variants
+        .push((Cow::Borrowed("true"), Variant::unit()));
+    bool_enum
+        .variants
+        .push((Cow::Borrowed("false"), Variant::unit()));
+    DataType::Enum(bool_enum)
+}
+
 fn enum_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     e: &Enum,
-    _location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: Drop legacy stuff
     {
@@ -1309,18 +1479,7 @@ fn enum_dt(
 
     //     location.push(e.name().clone());
 
-    //     let mut _ts = None;
-    //     if e.skip_bigint_checks() {
-    //         _ts = Some(Typescript {
-    //             bigint: BigIntExportBehavior::Number,
-    //             ..ts.clone()
-    //         });
-    //         _ts.as_ref().expect("set above")
-    //     } else {
-    //         ts
-    //     };
-
-    //     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
+    //     let variants = &e.variants.iter().filter(|(_, variant)| !variant.skip);
 
     //     if variants.clone().next().is_none()
     //     /* is_empty */
@@ -1337,8 +1496,8 @@ fn enum_dt(
     //             location.push(variant_name.clone());
 
     //             // TODO
-    //             // variant.deprecated()
-    //             // variant.docs()
+    //             // variant.deprecated.as_ref()
+    //             // &variant.docs
 
     //             match &e.repr() {
     //                 EnumRepr::Untagged => {
@@ -1399,7 +1558,7 @@ fn enum_dt(
     //                                 let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
     //                                 if let (Some(v), None) = (fields.next(), fields.next()) {
     //                                     if let Some(DataType::Tuple(tuple)) = &v.ty() {
-    //                                         skip_join = tuple.elements().len() == 0;
+    //                                         skip_join = &tuple.elements.len() == 0;
     //                                     }
     //                                 }
     //                             }
@@ -1467,7 +1626,7 @@ fn enum_dt(
 // fn fields_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: &Cow<'static, str>,
 //     f: &Fields,
 //     location: Vec<Cow<'static, str>>,
@@ -1558,7 +1717,7 @@ fn enum_dt(
 // fn flattened_fields_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: &Cow<'static, str>,
 //     f: &Fields,
 //     location: Vec<Cow<'static, str>>,
@@ -1638,7 +1797,7 @@ fn enum_dt(
 // fn field_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     key: Option<&Cow<'static, str>>,
 //     f: &Field,
 //     location: Vec<Cow<'static, str>>,
@@ -1650,8 +1809,8 @@ fn enum_dt(
 //     };
 
 //     // TODO
-//     // field.deprecated(),
-//     // field.docs(),
+//     // field.deprecated.as_ref(),
+//     // &field.docs,
 
 //     let ty = if f.inline() {
 //         specta::datatype::inline_dt(types, ty.clone())
@@ -1683,7 +1842,7 @@ fn enum_dt(
 //         //         DataType::Nullable(data_type) => todo!(),
 //         //         DataType::Struct(st) => {
 //         //             // location.push(st.name().clone()); // TODO
-//         //             flattened_fields_dt(s, ts, types, st.name(), &st.fields(), location)?
+//         //             flattened_fields_dt(s, ts, types, st.name(), &&st.fields, location)?
 //         //         }
 
 //         //         // flattened_fields_dt(s, ts, types, &ty, location)?,
@@ -1719,10 +1878,9 @@ fn enum_dt(
 fn tuple_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     t: &Tuple,
-    _location: Vec<Cow<'static, str>>,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     {
         s.push_str(&crate::legacy::tuple_datatype(
@@ -1760,24 +1918,32 @@ fn tuple_dt(
 fn reference_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match r {
-        Reference::Named(r) => {
-            reference_named_dt(s, exporter, types, r, location, prefix, generics)
-        }
-        Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
+        Reference::Named(r) => match &r.inner {
+            NamedReferenceType::Reference { .. } => {
+                reference_named_dt(s, exporter, types, r, generics)
+            }
+            NamedReferenceType::Inline { dt, .. } => inline_datatype(
+                s, exporter, format, types, dt, location, None, prefix, 0, generics,
+            ),
+            NamedReferenceType::Recursive => reference_named_dt(s, exporter, types, r, generics),
+        },
+        Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r),
     }
 }
 
 fn reference_opaque_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    format: Option<&dyn Format>,
+    types: &Types,
     r: &OpaqueReference,
 ) -> Result<(), Error> {
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
@@ -1792,11 +1958,23 @@ fn reference_opaque_dt(
     } else if r.downcast_ref::<opaque::Never>().is_some() {
         s.push_str("never");
         return Ok(());
+    } else if r.downcast_ref::<opaque::Number>().is_some() {
+        s.push_str("number");
+        return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
-            .map(|builder| (builder.0)(BrandedTypeExporter { exporter, types }, def))
+            .map(|builder| {
+                (builder.0)(
+                    BrandedTypeExporter {
+                        exporter,
+                        format,
+                        types,
+                    },
+                    def,
+                )
+            })
             .transpose()?
         {
             s.push_str(branded_type.as_ref());
@@ -1804,10 +1982,10 @@ fn reference_opaque_dt(
         }
 
         // TODO: Build onto `s` instead of appending a separate string
-        s.push_str(&match def.ty() {
-            DataType::Reference(r) => reference(exporter, types, r),
-            ty => inline(exporter, types, ty),
-        }?);
+        match def.ty() {
+            DataType::Reference(r) => reference_dt(s, exporter, format, types, r, vec![], "", &[])?,
+            ty => inline_datatype(s, exporter, format, types, ty, vec![], None, "", 0, &[])?,
+        }
         s.push_str(r#" & { { readonly __brand: ""#);
         s.push_str(def.brand());
         s.push_str("\" }");
@@ -1820,57 +1998,38 @@ fn reference_opaque_dt(
 fn reference_named_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     r: &NamedReference,
-    location: Vec<Cow<'static, str>>,
-    prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
-        let ndt = r
-            .get(types)
+        let ndt = types
+            .get(r)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-
-        // Check if this reference should be inlined
-        if r.inline() {
-            let combined_generics = merged_generics(generics, r.generics());
-            let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-            return datatype(
-                s,
-                exporter,
-                types,
-                &resolved,
-                location,
-                None,
-                prefix,
-                &combined_generics,
-            );
-        }
-
         // We check it's valid before tracking
         crate::references::track_nr(r);
 
         let name = match exporter.layout {
             Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
-                s.push_str(ndt.name());
+                s.push_str(&ndt.name);
                 Cow::Owned(s)
             }
             Layout::Namespaces => {
-                if ndt.module_path().is_empty() {
-                    ndt.name().clone()
+                if ndt.module_path.is_empty() {
+                    ndt.name.clone()
                 } else {
                     let mut path =
-                        ndt.module_path()
+                        ndt.module_path
                             .split("::")
                             .fold("$s$.".to_string(), |mut s, segment| {
                                 s.push_str(segment);
                                 s.push('.');
                                 s
                             });
-                    path.push_str(ndt.name());
+                    path.push_str(&ndt.name);
                     Cow::Owned(path)
                 }
             }
@@ -1878,23 +2037,27 @@ fn reference_named_dt(
                 let current_module_path =
                     crate::references::current_module_path().unwrap_or_default();
 
-                if ndt.module_path() == &current_module_path {
-                    ndt.name().clone()
+                if ndt.module_path == current_module_path {
+                    ndt.name.clone()
                 } else {
-                    let mut path = crate::exporter::module_alias(ndt.module_path());
+                    let mut path = crate::exporter::module_alias(&ndt.module_path);
                     path.push('.');
-                    path.push_str(ndt.name());
+                    path.push_str(&ndt.name);
                     Cow::Owned(path)
                 }
             }
-            _ => ndt.name().clone(),
+            _ => ndt.name.clone(),
         };
 
+        let (rendered_generics, omit_generics, scoped_generics) =
+            resolved_reference_generics(ndt, r, generics)
+                .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+
         s.push_str(&name);
-        if !r.generics().is_empty() {
+        if !omit_generics && !rendered_generics.is_empty() {
             s.push('<');
 
-            for (i, (_, v)) in r.generics().iter().enumerate() {
+            for (i, dt) in rendered_generics.iter().enumerate() {
                 if i != 0 {
                     s.push_str(", ");
                 }
@@ -1904,10 +2067,10 @@ fn reference_named_dt(
                         cfg: exporter,
                         path: vec![],
                     },
-                    &specta::datatype::FunctionReturnType::Value(v.clone()),
+                    dt,
                     types,
                     s,
-                    generics,
+                    &scoped_generics,
                 )?;
             }
 
@@ -1918,15 +2081,15 @@ fn reference_named_dt(
     //     let ndt = types
     //         .get(r.sid())
     //         // Should be impossible without a bug in Specta.
-    //         .unwrap_or_else(|| panic!("Missing {:?} in `TypeCollection`", r.sid()));
+    //         .unwrap_or_else(|| panic!("Missing {:?} in `Types`", r.sid()));
 
     //     if r.inline() {
     //         todo!("inline reference!");
     //     }
 
-    //     s.push_str(ndt.name());
+    //     s.push_str(&ndt.name);
     //     // TODO: We could possible break this out, the root `export` function also has to emit generics.
-    //     match r.generics() {
+    //     match r.generics()() {
     //         [] => {}
     //         generics => {
     //             s.push('<');
@@ -2026,14 +2189,3 @@ fn reference_named_dt(
 //     }
 //     Ok(())
 // }
-
-// A smaller helper until this is stablised into the Rust standard library.
-fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {
-    iter.enumerate().flat_map(move |(i, item)| {
-        if i == 0 {
-            vec![item]
-        } else {
-            vec![sep.clone(), item]
-        }
-    })
-}

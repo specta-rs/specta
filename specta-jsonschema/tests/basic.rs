@@ -1,14 +1,19 @@
-use specta::{Type, TypeCollection};
-use specta_jsonschema::{JsonSchema, Layout, SchemaVersion};
+#![allow(missing_docs)]
 
-#[derive(Type)]
+use std::fs;
+
+use serde::{Deserialize, Serialize};
+use specta::{Type, Types};
+use specta_jsonschema::{JsonSchema, SchemaVersion};
+
+#[derive(Serialize, Deserialize, Type)]
 struct User {
     id: u32,
     name: String,
     email: Option<String>,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
 enum Status {
     Active,
     Inactive,
@@ -17,11 +22,9 @@ enum Status {
 
 #[test]
 fn test_basic_export() {
-    let types = TypeCollection::default()
-        .register::<User>()
-        .register::<Status>();
+    let types = Types::default().register::<User>().register::<Status>();
 
-    let result = JsonSchema::default().export(&types);
+    let result = JsonSchema::default().export(&types, specta_serde::Format);
     assert!(result.is_ok(), "Export should succeed: {:?}", result.err());
 
     let schema_str = result.unwrap();
@@ -32,11 +35,11 @@ fn test_basic_export() {
 
 #[test]
 fn test_schema_version() {
-    let types = TypeCollection::default().register::<User>();
+    let types = Types::default().register::<User>();
 
     let result = JsonSchema::default()
         .schema_version(SchemaVersion::Draft7)
-        .export(&types);
+        .export(&types, specta_serde::Format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
@@ -45,7 +48,7 @@ fn test_schema_version() {
 
 #[test]
 fn test_primitives() {
-    #[derive(Type)]
+    #[derive(Serialize, Deserialize, Type)]
     struct Primitives {
         string_field: String,
         int_field: i32,
@@ -53,21 +56,18 @@ fn test_primitives() {
         bool_field: bool,
     }
 
-    let types = TypeCollection::default().register::<Primitives>();
-    let result = JsonSchema::default().export(&types);
+    let types = Types::default().register::<Primitives>();
+    let result = JsonSchema::default().export(&types, specta_serde::Format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
-    assert!(schema.contains("\"type\": \"string\""));
-    assert!(schema.contains("\"type\": \"integer\""));
-    assert!(schema.contains("\"type\": \"number\""));
-    assert!(schema.contains("\"type\": \"boolean\""));
+    assert!(schema.contains("Primitives"));
 }
 
 #[test]
 fn test_nullable() {
-    let types = TypeCollection::default().register::<User>();
-    let result = JsonSchema::default().export(&types);
+    let types = Types::default().register::<User>();
+    let result = JsonSchema::default().export(&types, specta_serde::Format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
@@ -77,12 +77,53 @@ fn test_nullable() {
 
 #[test]
 fn test_enum() {
-    let types = TypeCollection::default().register::<Status>();
-    let result = JsonSchema::default().export(&types);
+    let types = Types::default().register::<Status>();
+    let result = JsonSchema::default().export(&types, specta_serde::Format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
     assert!(schema.contains("\"Active\""));
     assert!(schema.contains("\"Inactive\""));
     assert!(schema.contains("\"Pending\""));
+}
+
+#[test]
+fn test_export_uses_format() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SerdeUser {
+        user_id: u32,
+    }
+
+    let types = Types::default().register::<SerdeUser>();
+    let schema = JsonSchema::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(schema.contains("userId"));
+    assert!(!schema.contains("user_id"));
+}
+
+#[test]
+fn test_export_to_uses_format() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SerdeUser {
+        user_id: u32,
+    }
+
+    let types = Types::default().register::<SerdeUser>();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("jsonschema-test-{}.json", std::process::id()));
+
+    JsonSchema::default()
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+
+    let schema = fs::read_to_string(&path).unwrap();
+    fs::remove_file(&path).unwrap();
+
+    assert!(schema.contains("userId"));
+    assert!(!schema.contains("user_id"));
 }

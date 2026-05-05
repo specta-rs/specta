@@ -1,0 +1,32 @@
+[package]
+name = "specta-tags"
+description = "Analyze Specta datatypes and generate inline JavaScript transforms"
+version = "0.0.0"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-tags/latest/specta-tags"
+keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
+categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
+
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.24", path = "../specta" }
+serde = "1"
+serde_json = "1"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+bytes = "1.11.1"
+chrono = "0.4.44"
+specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive", "chrono", "bytes"] }
+specta-serde = { version = "0.0.11", path = "../specta-serde" }

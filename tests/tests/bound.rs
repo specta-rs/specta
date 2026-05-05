@@ -1,4 +1,5 @@
-use specta::Type;
+use specta::{Type, Types};
+use specta_typescript::Typescript;
 
 #[derive(Type)]
 #[specta(bound = "T: Clone + Type", collect = false)]
@@ -115,4 +116,30 @@ fn requires_clone_bound() {
     let _: RequiresClone<CloneAndType> = RequiresClone {
         value: CloneAndType,
     };
+}
+
+#[test]
+fn associated_type_bound_issue_138() {
+    // Regression test for https://github.com/specta-rs/specta/issues/138
+    trait MyTrait {
+        type A: Type;
+    }
+
+    struct AssocIsI32;
+
+    impl MyTrait for AssocIsI32 {
+        type A = i32;
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo<T: MyTrait> {
+        value: T::A,
+    }
+
+    let types = Types::default().register::<Demo<AssocIsI32>>();
+    let output = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    insta::assert_snapshot!("bound-associated-type-issue-138", output);
 }

@@ -1,0 +1,10 @@
+[package]
+name = "example-collect"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive", "collect"] }
+specta-typescript = { path = "../../specta-typescript" }
+specta-serde = { path = "../../specta-serde" }

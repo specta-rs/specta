@@ -1,20 +1,21 @@
-use specta::{Type, TypeCollection};
+//! Integration tests for Swift UUID and chrono support.
+
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
-// Test with UUID - this should work if the uuid feature is enabled
-#[cfg(feature = "uuid")]
 #[derive(Type)]
 struct WithUuid {
     id: uuid::Uuid,
     name: String,
 }
 
-#[cfg(feature = "uuid")]
 #[test]
 fn test_uuid_support() {
-    let types = TypeCollection::default().register::<WithUuid>();
+    let types = Types::default().register::<WithUuid>();
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -23,15 +24,6 @@ fn test_uuid_support() {
     assert!(output.contains("let name: String"));
 }
 
-#[cfg(not(feature = "uuid"))]
-#[test]
-fn test_uuid_not_available() {
-    println!("UUID feature not enabled - this is expected");
-    // This test passes when UUID feature is not enabled
-}
-
-// Test with chrono - this should work if the chrono feature is enabled
-#[cfg(feature = "chrono")]
 #[derive(Type)]
 struct WithChrono {
     created_at: chrono::DateTime<chrono::Utc>,
@@ -39,12 +31,11 @@ struct WithChrono {
     name: String,
 }
 
-#[cfg(feature = "chrono")]
 #[test]
 fn test_chrono_support() {
-    let types = TypeCollection::default().register::<WithChrono>();
+    let types = Types::default().register::<WithChrono>();
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Chrono support test:\n{}", output);
 
@@ -52,11 +43,4 @@ fn test_chrono_support() {
     assert!(output.contains("let createdAt: String"));
     assert!(output.contains("let updatedAt: String"));
     assert!(output.contains("let name: String"));
-}
-
-#[cfg(not(feature = "chrono"))]
-#[test]
-fn test_chrono_not_available() {
-    println!("Chrono feature not enabled - this is expected");
-    // This test passes when chrono feature is not enabled
 }

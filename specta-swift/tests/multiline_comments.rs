@@ -1,4 +1,6 @@
-use specta::{Type, TypeCollection};
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// A path within the Spacedrive Virtual Distributed File System
@@ -37,12 +39,11 @@ struct SimpleStruct {
 
 #[test]
 fn test_multiline_comments() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<SdPath>()
         .register::<SimpleStruct>();
-
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code with comments:\n{}", output);
 

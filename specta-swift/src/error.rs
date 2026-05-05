@@ -25,14 +25,22 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// Serde validation error.
-    #[error("Serde validation error: {0}")]
-    SerdeValidation(#[from] specta_serde::Error),
-
     /// Invalid configuration.
     #[error("Configuration error: {0}")]
     Configuration(String),
+
+    /// Custom format callback failed.
+    #[error("Format error: {message}: {source}")]
+    Format {
+        /// Context describing which format callback failed.
+        message: &'static str,
+        /// The underlying format error.
+        source: specta::FormatError,
+    },
 }
 
-/// Result type alias for Swift export operations.
-pub type Result<T> = std::result::Result<T, Error>;
+impl Error {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
+        Self::Format { message, source }
+    }
+}

@@ -1,9 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
-use specta_serde::SerdeMode;
+use specta::{Format, Types};
 
-use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -44,11 +43,6 @@ impl JSDoc {
         Self(self.0.header(header))
     }
 
-    /// Configure the BigInt handling behaviour
-    pub fn bigint(self, bigint: BigIntExportBehavior) -> Self {
-        Self(self.0.bigint(bigint))
-    }
-
     /// Configure the layout of the generated file
     pub fn layout(self, layout: Layout) -> Self {
         Self(self.0.layout(layout))
@@ -67,26 +61,11 @@ impl JSDoc {
         Self(self.0.branded_type_impl(builder))
     }
 
-    /// Configure the exporter to use specta-serde with the specified mode
-    pub fn with_serde(self, mode: SerdeMode) -> Self {
-        Self(self.0.with_serde(mode))
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
-    pub fn with_serde_serialize(self) -> Self {
-        Self(self.0.with_serde_serialize())
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
-    pub fn with_serde_deserialize(self) -> Self {
-        Self(self.0.with_serde_deserialize())
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        self.0.export(types)
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
+        self.0.export(types, format)
     }
 
     /// Export the types to a specific file/folder.
@@ -94,8 +73,13 @@ impl JSDoc {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
-        self.0.export_to(path, types)
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl Format,
+    ) -> Result<(), Error> {
+        self.0.export_to(path, types, format)
     }
 }
 

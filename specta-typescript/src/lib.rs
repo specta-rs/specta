@@ -2,18 +2,18 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-typescript` to your project:
+//! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.23 --features derive,export
-//! cargo add specta-typescript@0.0.10
-//! cargo add specta-serde@0.0.10
+//! cargo add specta@2.0.0-rc.24 --features derive,collect
+//! cargo add specta-serde@0.0.11
+//! cargo add specta-typescript@0.0.11
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
 //!
 //! #[derive(Type)]
@@ -27,12 +27,15 @@
 //!     pub other_field: String,
 //! }
 //!
-//! let mut types = TypeCollection::default()
+//! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &types)
+//!     .export_to(
+//!         "./bindings.ts",
+//!         &types,
+//!         specta_serde::Format,
+//!     )
 //!     .unwrap();
 //! ```
 //!
@@ -51,6 +54,7 @@ mod error;
 mod exporter;
 mod jsdoc;
 mod legacy; // TODO: Remove this
+mod map_keys;
 mod opaque;
 pub mod primitives;
 mod references;
@@ -60,14 +64,9 @@ mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{
-    BigIntExportBehavior, BrandedTypeExporter, Exporter, FrameworkExporter, Layout,
-};
+pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;
-pub use types::{Any, Never, Unknown};
+pub use types::{Any, Never, Number, Unknown};
 pub use typescript::Typescript;
-
-// Re-export SerdeMode from specta-serde for convenience
-pub use specta_serde::SerdeMode;

@@ -1,4 +1,6 @@
-use specta::{Type, TypeCollection};
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 // Simple user management types
@@ -27,7 +29,7 @@ enum ApiResult<T> {
 
 fn main() {
     // Create a type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
@@ -35,7 +37,11 @@ fn main() {
     // Export to Swift with default settings
     let swift = Swift::default();
     swift
-        .export_to("./examples/generated/SimpleTypes.swift", &types)
+        .export_to(
+            "./examples/generated/SimpleTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
 
     println!("Simple types exported to SimpleTypes.swift");
@@ -47,7 +53,11 @@ fn main() {
         .optionals(specta_swift::OptionalStyle::Optional);
 
     custom_swift
-        .export_to("./examples/generated/CustomTypes.swift", &types)
+        .export_to(
+            "./examples/generated/CustomTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
 
     println!("Custom types exported to CustomTypes.swift");

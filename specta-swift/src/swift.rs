@@ -1,18 +1,17 @@
 //! Swift language exporter configuration and main export functionality.
 
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, fmt, path::Path};
 
 use specta::{
-    TypeCollection,
+    Format, Types,
     datatype::{DataType, Fields, Reference},
 };
-use specta_serde::SerdeMode;
 
-use crate::error::Result;
+use crate::Error;
 use crate::primitives::{export_type, is_duration_struct};
 
 /// Swift language exporter.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Swift {
     /// Header comment for generated files.
     pub header: Cow<'static, str>,
@@ -26,8 +25,19 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    /// Serde mode for type transformations.
-    pub serde: Option<SerdeMode>,
+}
+
+impl fmt::Debug for Swift {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Swift")
+            .field("header", &self.header)
+            .field("indent", &self.indent)
+            .field("naming", &self.naming)
+            .field("generics", &self.generics)
+            .field("optionals", &self.optionals)
+            .field("protocols", &self.protocols)
+            .finish()
+    }
 }
 
 /// Indentation style for generated Swift code.
@@ -86,7 +96,6 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
-            serde: Some(SerdeMode::Both),
         }
     }
 }
@@ -127,28 +136,6 @@ impl Swift {
         self
     }
 
-    /// Enable Serde validation with specified mode.
-    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.serde = Some(mode);
-        self
-    }
-
-    /// Enable Serde validation for serialization only.
-    pub fn with_serde_serialize(self) -> Self {
-        self.with_serde(SerdeMode::Serialize)
-    }
-
-    /// Enable Serde validation for deserialization only.
-    pub fn with_serde_deserialize(self) -> Self {
-        self.with_serde(SerdeMode::Deserialize)
-    }
-
-    /// Disable Serde validation.
-    pub fn without_serde(mut self) -> Self {
-        self.serde = None;
-        self
-    }
-
     /// Add a protocol that all types should conform to.
     pub fn add_protocol(mut self, protocol: impl Into<Cow<'static, str>>) -> Self {
         self.protocols.push(protocol.into());
@@ -156,56 +143,60 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &TypeCollection) -> Result<String> {
-        // Apply Serde transformations if enabled
-        let processed_types = if let Some(mode) = self.serde {
-            let mut types_clone = types.clone();
-            specta_serde::apply(&mut types_clone, mode)?;
-            types_clone
-        } else {
-            types.clone()
-        };
-
-        let types = &processed_types;
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
+        let exporter = self.clone();
+        let formatted_types = format_types(types, &format)?.into_owned();
+        let raw_types = &formatted_types;
 
         let mut result = String::new();
 
         // Add header
-        if !self.header.is_empty() {
-            result.push_str(&self.header);
+        if !exporter.header.is_empty() {
+            result.push_str(&exporter.header);
             result.push('\n');
         }
 
         // Add imports
         result.push_str("import Foundation\n");
-        if self.serde.is_some() {
-            result.push_str("import Codable\n");
-        }
-        for protocol in &self.protocols {
+        for protocol in &exporter.protocols {
             result.push_str(&format!("import {}\n", protocol));
         }
         result.push('\n');
 
         // Check if we need to inject Duration helper
-        if needs_duration_helper(types) {
+        if needs_duration_helper(raw_types) {
             result.push_str(&generate_duration_helper());
         }
 
         // Export types
-        for ndt in types.into_sorted_iter() {
-            result.push_str(&export_type(self, types, ndt)?);
-            result.push_str("\n\n");
+        for ndt in raw_types.into_sorted_iter() {
+            let exported = export_type(&exporter, Some(&format), raw_types, ndt)?;
+            if !exported.is_empty() {
+                result.push_str(&exported);
+                result.push_str("\n\n");
+            }
         }
 
         Ok(result)
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<()> {
-        let content = self.export(types)?;
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl Format,
+    ) -> Result<(), Error> {
+        let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
     }
+}
+
+fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
+    format
+        .map_types(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 impl NamingConvention {
@@ -270,6 +261,14 @@ impl NamingConvention {
             }
             result
         } else {
+            if name.chars().any(|c| c.is_ascii_alphabetic())
+                && name
+                    .chars()
+                    .all(|c| !c.is_ascii_alphabetic() || c.is_ascii_uppercase())
+            {
+                return name.to_ascii_lowercase();
+            }
+
             // Handle PascalCase - convert to camelCase
             let mut chars = name.chars();
             match chars.next() {
@@ -318,20 +317,20 @@ impl NamingConvention {
 }
 
 /// Check if the type collection contains any Duration types that need the helper
-fn needs_duration_helper(types: &TypeCollection) -> bool {
+fn needs_duration_helper(types: &Types) -> bool {
     for ndt in types.into_sorted_iter() {
-        if ndt.name() == "Duration" {
+        if ndt.name == "Duration" {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let DataType::Struct(s) = ndt.ty()
-            && let Fields::Named(fields) = s.fields()
+        if let Some(DataType::Struct(s)) = &ndt.ty
+            && let Fields::Named(fields) = &s.fields
         {
-            for (_, field) in fields.fields() {
-                if let Some(ty) = field.ty() {
+            for (_, field) in &fields.fields {
+                if let Some(ty) = field.ty.as_ref() {
                     if let DataType::Reference(Reference::Named(r)) = ty
-                        && let Some(referenced_ndt) = r.get(types)
-                        && referenced_ndt.name() == "Duration"
+                        && let Some(referenced_ndt) = types.get(r)
+                        && referenced_ndt.name == "Duration"
                     {
                         return true;
                     }

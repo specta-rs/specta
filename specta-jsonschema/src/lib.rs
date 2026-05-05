@@ -8,7 +8,7 @@
 //!
 //! - **Bidirectional conversion**: Export to JSON Schema and import from JSON Schema
 //! - **Multiple schema versions**: Support for Draft 7 (default), Draft 2019-09, and Draft 2020-12
-//! - **Serde integration**: Respect `#[serde(...)]` attributes via `specta-serde`
+//! - **Serde integration**: Use `specta-serde` in userspace before export
 //! - **Flexible layouts**: Single file with `$defs` or separate files per type
 //! - **schemars ecosystem**: Compatible with the schemars crate for interoperability
 //!
@@ -17,10 +17,12 @@
 //! ## Exporting to JSON Schema
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use serde::{Deserialize, Serialize};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::{JsonSchema, SchemaVersion};
 //!
-//! #[derive(Type)]
+//! #[derive(Serialize, Deserialize, Type)]
+//! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub id: u32,
 //!     pub name: String,
@@ -28,13 +30,13 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default()
+//!     let types = Types::default()
 //!         .register::<User>();
 //!
 //!     // Export to JSON Schema
 //!     let schema = JsonSchema::default()
 //!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types)
+//!         .export(&types, specta_serde::Format)
 //!         .unwrap();
 //!
 //!     println!("{}", schema);
@@ -44,10 +46,11 @@
 //! ## With Serde Integration
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use serde::{Deserialize, Serialize};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
-//! #[derive(Type, serde::Serialize)]
+//! #[derive(Serialize, Deserialize, Type)]
 //! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub user_id: u32,
@@ -56,12 +59,10 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default().register::<User>();
+//!     let types = Types::default().register::<User>();
 //!
-//!     // Export with serde transformations
 //!     JsonSchema::default()
-//!         .with_serde_serialize()
-//!         .export_to("./schema.json", &types)
+//!         .export_to("./schema.json", &types, specta_serde::Format)
 //!         .unwrap();
 //! }
 //! ```
@@ -92,13 +93,21 @@
 //! // Single file with all types in $defs
 //! JsonSchema::default()
 //!     .layout(Layout::SingleFile)
-//!     .export_to("./schema.json", &types)
+//!     .export_to(
+//!         "./schema.json",
+//!         &types,
+//!         specta_serde::Format,
+//!     )
 //!     .unwrap();
 //!
 //! // Separate file per type, organized by module
 //! JsonSchema::default()
 //!     .layout(Layout::Files)
-//!     .export_to("./schemas/", &types)
+//!     .export_to(
+//!         "./schemas/",
+//!         &types,
+//!         specta_serde::Format,
+//!     )
 //!     .unwrap();
 //! ```
 
@@ -120,9 +129,6 @@ pub use error::Error;
 pub use json_schema::JsonSchema;
 pub use layout::Layout;
 pub use schema_version::SchemaVersion;
-
-// Re-export commonly used types
-pub use specta_serde::SerdeMode;
 
 // Legacy function - kept for backward compatibility
 #[deprecated(note = "Use import::from_schema instead")]

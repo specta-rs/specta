@@ -1,7 +1,11 @@
-use specta::{Type, TypeCollection};
+#![allow(missing_docs)]
+
+use serde::{Deserialize, Serialize};
+use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: u32,
     pub name: String,
@@ -9,14 +13,15 @@ pub struct User {
     pub role: Role,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
 pub enum Role {
     Admin,
     User,
     Guest,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct Post {
     pub id: u32,
     pub title: String,
@@ -27,7 +32,7 @@ pub struct Post {
 
 fn main() {
     // Create a type collection with all the types we want to export
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<Role>()
         .register::<Post>();
@@ -37,7 +42,7 @@ fn main() {
         .schema_version(SchemaVersion::Draft7)
         .title("My API Types")
         .description("JSON Schema for my API types")
-        .export(&types)
+        .export(&types, specta_serde::Format)
         .unwrap();
 
     println!("{}", schema);

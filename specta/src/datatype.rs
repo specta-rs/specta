@@ -1,7 +1,6 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
-mod attrs;
-mod builders;
+mod attributes;
 mod r#enum;
 mod fields;
 mod function;
@@ -14,19 +13,17 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use attrs::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, RuntimeValue};
-pub use builders::{NamedDataTypeBuilder, StructBuilder, VariantBuilder};
-pub use r#enum::{Enum, EnumVariant};
-pub use fields::{
-    Field, Fields, NamedFields, NonSkipField, UnnamedFields, skip_fields, skip_fields_named,
-};
-pub use function::{Function, FunctionReturnType};
-pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
+pub use attributes::Attributes;
+pub use r#enum::{Enum, Variant, VariantBuilder};
+pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
+pub use function::Function;
+pub use generic::{Generic, Generic as GenericReference, GenericDefinition};
 pub use list::List;
+// pub use literal::Literal;
 pub use map::Map;
-pub use named::{DeprecatedType, NamedDataType};
+pub use named::{Deprecated, NamedDataType, inline};
 pub use primitive::Primitive;
-pub use reference::{NamedReference, OpaqueReference, Reference};
+pub use reference::{NamedReference, NamedReferenceType, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
@@ -43,16 +40,19 @@ pub enum DataType {
     List(List),
     /// A map/dictionary type.
     Map(Map),
-    /// A nullable wrapper around another type.
-    Nullable(Box<DataType>),
     /// A struct type with named, unnamed, or unit fields.
     Struct(Struct),
     /// An enum type.
     Enum(Enum),
     /// A tuple type.
     Tuple(Tuple),
+    /// A nullable wrapper around another type.
+    Nullable(Box<DataType>),
+    /// A structural intersection of multiple object-like types.
+    Intersection(Vec<DataType>),
+    /// A placeholder for a generic type defined on the parent [`NamedDataType`].
+    /// Rendered as `T`. These should never be returned from [`Type::definition`](crate::Type::definition), they should only appear in [`NamedDataType`]'s `ty` field.
+    Generic(Generic),
     /// A reference to another named or opaque type.
     Reference(Reference),
-    /// A generic placeholder type parameter.
-    Generic(Generic),
 }

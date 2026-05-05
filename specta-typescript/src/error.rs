@@ -7,21 +7,59 @@ use crate::Layout;
 use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
+///
+/// ## BigInt Forbidden
+///
+/// Specta Typescript intentionally forbids exporting BigInt-style Rust integer types.
+/// This includes [usize], [isize], [i64], [u64], [u128], [i128] and [f128].
+///
+/// This guard exists because `JSON.parse` will truncate large integers to fit into a JavaScript `number` type so we explicitly forbid exporting them.
+///
+/// We take the stance that correctness matters more than developer experience as people using Rust generally strive for correctness.
+///
+/// If you encounter this error, there are a few common migration paths (in order of preference):
+///
+/// 1. Use a Specta-based framework
+///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
+///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+///
+/// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
+///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
+///    - This approach forces your application code to handle overflow/underflow values explicitly
+///    - Downside is that it can introduce annoying glue code and doesn't actually work if your need large values.
+///
+/// 3. Serialize the value as a string
+///     - This can be done using `#[specta(type = String)]` for the type combined with a Serde `#[serde(with = "...")]` attribute for runtime.
+///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS but this will support numbers of any size losslessly.
+///
+/// 4. **UNSAFE:** Accept precision loss on per-field basis
+///     - Accept that large numbers may be deserialized differently than they are in Rust and use `#[specta(type = specta_typescript::Number)]` to bypass this warning on a per-field basis.
+///     - Marking each field explicitly encodes the decision similar to an `unsafe` block, ensuring everyone working on your codebase is aware of the risk and where it exists within the codebase.
+///     - This doesn't work for external implementations like `serde_json::Value` which contain `BigInt`'s as you don't control the definition.
+///
+/// 5. **UNSAFE:** Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
+///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
+///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
+///
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,
 }
 
 type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
+const BIGINT_DOCS_URL: &str =
+    "https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden";
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
         path: String,
     },
-    /// Failed to validate a type is Serde compatible.
-    Serde(specta_serde::Error),
     /// A type's name conflicts with a reserved keyword in Typescript.
     ForbiddenName {
         path: String,
@@ -67,8 +105,13 @@ enum ErrorKind {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
-    /// Found a named reference that cannot be resolved from the provided [`TypeCollection`](specta::TypeCollection).
+    /// Found a named reference that cannot be resolved from the provided
+    /// [`Types`](specta::Types).
     DanglingNamedReference {
+        reference: String,
+    },
+    /// Found a recursive named reference while expanding an inline type.
+    InfiniteRecursiveInlineType {
         reference: String,
     },
     /// An error occurred in your exporter framework.
@@ -76,7 +119,11 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
-
+    /// An error occurred in a format callback.
+    Format {
+        message: Cow<'static, str>,
+        source: FrameworkSource,
+    },
     //
     //
     // TODO: Break
@@ -85,12 +132,23 @@ enum ErrorKind {
     BigIntForbiddenLegacy(ExportPath),
     ForbiddenNameLegacy(ExportPath, &'static str),
     InvalidNameLegacy(ExportPath, String),
-    InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
     FmtLegacy(std::fmt::Error),
     UnableToExport(Layout),
 }
 
 impl Error {
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     /// Construct an error for framework-specific logic.
     pub fn framework(
         message: impl Into<Cow<'static, str>>,
@@ -98,6 +156,19 @@ impl Error {
     ) -> Self {
         Self {
             kind: ErrorKind::Framework {
+                message: message.into(),
+                source: source.into(),
+            },
+        }
+    }
+
+    /// Construct an error for custom format callbacks.
+    pub(crate) fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::Format {
                 message: message.into(),
                 source: source.into(),
             },
@@ -169,6 +240,12 @@ impl Error {
         }
     }
 
+    pub(crate) fn infinite_recursive_inline_type(reference: String) -> Self {
+        Self {
+            kind: ErrorKind::InfiniteRecursiveInlineType { reference },
+        }
+    }
+
     pub(crate) fn forbidden_name_legacy(path: ExportPath, name: &'static str) -> Self {
         Self {
             kind: ErrorKind::ForbiddenNameLegacy(path, name),
@@ -178,12 +255,6 @@ impl Error {
     pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
         Self {
             kind: ErrorKind::InvalidNameLegacy(path, name),
-        }
-    }
-
-    pub(crate) fn invalid_tagged_variant_containing_tuple_struct_legacy(path: ExportPath) -> Self {
-        Self {
-            kind: ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path),
         }
     }
 
@@ -202,14 +273,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<specta_serde::Error> for Error {
-    fn from(error: specta_serde::Error) -> Self {
-        Self {
-            kind: ErrorKind::Serde(error),
-        }
-    }
-}
-
 impl From<std::fmt::Error> for Error {
     fn from(error: std::fmt::Error) -> Self {
         Self {
@@ -221,11 +284,13 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!"
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
             ),
-            ErrorKind::Serde(err) => write!(f, "Detect invalid Serde type: {err}"),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
@@ -270,7 +335,11 @@ impl fmt::Display for Error {
             ),
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
-                "Found dangling named reference {reference}. The referenced type is missing from `TypeCollection`."
+                "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
+            ),
+            ErrorKind::InfiniteRecursiveInlineType { reference } => write!(
+                f,
+                "Found infinitely recursive inline named reference {reference}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();
@@ -282,9 +351,19 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
+            ErrorKind::Format { message, source } => {
+                let source = source.to_string();
+                if message.is_empty() && source.is_empty() {
+                    write!(f, "Format error")
+                } else if source.is_empty() {
+                    write!(f, "Format error: {message}")
+                } else {
+                    write!(f, "Format error: {message}: {source}")
+                }
+            }
             ErrorKind::BigIntForbiddenLegacy(path) => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
             ),
             ErrorKind::ForbiddenNameLegacy(path, name) => write!(
                 f,
@@ -293,10 +372,6 @@ impl fmt::Display for Error {
             ErrorKind::InvalidNameLegacy(path, name) => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
-            ),
-            ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path) => write!(
-                f,
-                "Attempted to export {path:?} with tagging but the variant is a tuple struct."
             ),
             ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
@@ -316,13 +391,14 @@ impl fmt::Debug for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::Serde(error) => Some(error),
             ErrorKind::Io(error) => Some(error),
             ErrorKind::ReadDir { source, .. }
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
             | ErrorKind::RemoveDir { source, .. } => Some(source),
-            ErrorKind::Framework { source, .. } => Some(source.as_ref()),
+            ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
+                Some(source.as_ref())
+            }
             ErrorKind::FmtLegacy(error) => Some(error),
             _ => None,
         }

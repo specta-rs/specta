@@ -1,4 +1,6 @@
-use specta::{Type, TypeCollection};
+#![allow(dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 // Test with common types that might not have Type implementations
@@ -22,12 +24,11 @@ enum TestEnum {
 
 #[test]
 fn test_common_types() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<TestStruct>()
         .register::<TestEnum>();
-
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -50,7 +51,7 @@ fn test_unsupported_types() {
         id: uuid::Uuid,
     }
 
-    let types = TypeCollection::default().register::<WithUuid>();
+    let types = Types::default().register::<WithUuid>();
     let swift = Swift::default();
     let output = swift.export(&types).unwrap();
     println!("UUID support: {}", output);

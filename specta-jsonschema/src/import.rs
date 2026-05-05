@@ -33,25 +33,25 @@ fn value_to_datatype(value: &Value) -> Result<DataType, Error> {
 fn schema_object_to_datatype(obj: &JsonMap<String, Value>) -> Result<DataType, Error> {
     // Handle $ref
     if let Some(reference) = obj.get("$ref").and_then(Value::as_str) {
-        // We use an opaque reference since we do not have a TypeCollection context here.
+        // We use an opaque reference since we do not have a Types context here.
         return Ok(DataType::Reference(Reference::opaque(reference.to_owned())));
     }
 
     // Handle const values (literals)
     if obj.get("const").is_some() {
         // Specta does not currently expose a direct literal DataType variant.
-        return Ok(DataType::Primitive(Primitive::String));
+        return Ok(DataType::Primitive(Primitive::str));
     }
 
     // Handle enum values (for string enums)
     if let Some(enum_values) = obj.get("enum").and_then(Value::as_array)
         && enum_values.iter().all(|v| v.is_string())
     {
-        let mut e = Enum::new();
+        let mut e = Enum::default();
         for value in enum_values {
             if let Some(s) = value.as_str() {
-                let variant = EnumVariant::unit();
-                e.variants_mut().push((Cow::Owned(s.to_string()), variant));
+                let variant = Variant::unit();
+                e.variants.push((Cow::Owned(s.to_string()), variant));
             }
         }
         return Ok(DataType::Enum(e));
@@ -83,13 +83,13 @@ fn instance_type_to_datatype(
         Value::String(t) => instance_type_name_to_datatype(t, obj),
         Value::Array(types) => {
             // Multiple types - create a union (enum with unnamed variants)
-            let mut e = Enum::new();
+            let mut e = Enum::default();
 
             for (i, item) in types.iter().enumerate() {
                 if let Value::String(t) = item {
                     let dt = instance_type_name_to_datatype(t, obj)?;
-                    let variant = EnumVariant::unnamed().field(Field::new(dt)).build();
-                    e.variants_mut()
+                    let variant = Variant::unnamed().field(Field::new(dt)).build();
+                    e.variants
                         .push((Cow::Owned(format!("Variant{}", i)), variant));
                 }
             }
@@ -112,7 +112,7 @@ fn instance_type_name_to_datatype(
             Ok(DataType::Tuple(Tuple::new(vec![])))
         }
         "boolean" => Ok(DataType::Primitive(Primitive::bool)),
-        "string" => Ok(DataType::Primitive(Primitive::String)),
+        "string" => Ok(DataType::Primitive(Primitive::str)),
         "number" => {
             if let Some(format) = obj.get("format").and_then(Value::as_str) {
                 match format {
@@ -177,7 +177,7 @@ fn instance_type_name_to_datatype(
                     let is_optional = !required.contains(&name.as_str());
 
                     let mut field = Field::new(dt);
-                    field.set_optional(is_optional);
+                    field.optional = is_optional;
 
                     builder.field_mut(Cow::Owned(name.clone()), field);
                 }
@@ -190,13 +190,13 @@ fn instance_type_name_to_datatype(
                     Value::Object(_) => {
                         let value_dt = value_to_datatype(additional)?;
                         return Ok(DataType::Map(Map::new(
-                            DataType::Primitive(Primitive::String),
+                            DataType::Primitive(Primitive::str),
                             value_dt,
                         )));
                     }
                     Value::Bool(true) => {
                         return Ok(DataType::Map(Map::new(
-                            DataType::Primitive(Primitive::String),
+                            DataType::Primitive(Primitive::str),
                             Struct::named().build(),
                         )));
                     }
@@ -238,11 +238,11 @@ fn handle_any_of(schemas: &[Value]) -> Result<DataType, Error> {
     }
 
     // General anyOf - create enum with unnamed variants
-    let mut e = Enum::new();
+    let mut e = Enum::default();
     for (i, schema) in schemas.iter().enumerate() {
         let dt = value_to_datatype(schema)?;
-        let variant = EnumVariant::unnamed().field(Field::new(dt)).build();
-        e.variants_mut()
+        let variant = Variant::unnamed().field(Field::new(dt)).build();
+        e.variants
             .push((Cow::Owned(format!("Variant{}", i)), variant));
     }
 

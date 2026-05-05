@@ -1,0 +1,1665 @@
+---
+source: tests/tests/jsdoc.rs
+expression: output
+---
+Issue374: /**
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {Issue374_Serialize | Issue374_Deserialize} Issue374
+	* @property {Issue374_Serialize} Serialize
+	* @property {Issue374_Deserialize} Deserialize
+	*/
+
+Optional: /**
+	* @typedef {Optional_Serialize | Optional_Deserialize} Optional
+	* @property {Optional_Serialize} Serialize
+	* @property {Optional_Deserialize} Deserialize
+	*/
+
+StructPhaseSpecificRename: /**
+	* @typedef {StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize} StructPhaseSpecificRename
+	* @property {StructPhaseSpecificRenameSerialize} Serialize
+	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
+	*/
+
+Range<i32>: /**
+	* @typedef {{
+	*		start: T,
+	*		end: T,
+	*	}} Range<T>
+	* @property {T} start
+	* @property {T} end
+	*/
+
+RangeInclusive<i32>: /**
+	* @typedef {{
+	*		start: T,
+	*		end: T,
+	*	}} RangeInclusive<T>
+	* @property {T} start
+	* @property {T} end
+	*/
+
+String: 
+PathBuf: 
+IpAddr: 
+Ipv4Addr: 
+Ipv6Addr: 
+SocketAddr: 
+SocketAddrV4: 
+SocketAddrV6: 
+Cow<'static, str>: 
+Cow<'static, i32>: 
+Vec<i32>: 
+Vec<MyEnum>: 
+Result<String, i32>: /**
+	* @typedef {{
+	*		ok: T,
+	*		err: E,
+	*	}} Result<T, E>
+	* @property {T} ok
+	* @property {E} err
+	*/
+
+Vec<Option<Cow<'static, i32>>>: 
+PhantomData<()>: 
+PhantomData<String>: 
+Infallible: 
+Unit1: /**
+	* @typedef {null} Unit1
+	*/
+
+Unit2: /**
+	* @typedef {Record<string, never>} Unit2
+	*/
+
+Unit3: /**
+	* @typedef {[]} Unit3
+	*/
+
+Unit4: /**
+	* @typedef {null} Unit4
+	* @property {null} "0"
+	*/
+
+Unit5: /**
+	* @typedef {"A"} Unit5
+	* @property {"A"} A
+	*/
+
+Unit6: /**
+	* @typedef {{ A: null }} Unit6
+	* @property {{ A: null }} A
+	*/
+
+Unit7: /**
+	* @typedef {{ A: Record<string, never> }} Unit7
+	* @property {{ A: Record<string, never> }} A
+	*/
+
+SimpleStruct: /**
+	* @typedef {{
+	*		a: number,
+	*		b: string,
+	*		c: [number, string, number],
+	*		d: string[],
+	*		e: string | null,
+	*	}} SimpleStruct
+	* @property {number} a
+	* @property {string} b
+	* @property {[number, string, number]} c
+	* @property {string[]} d
+	* @property {string | null} e
+	*/
+
+TupleStruct1: /**
+	* @typedef {number} TupleStruct1
+	* @property {number} "0"
+	*/
+
+TupleStruct3: /**
+	* @typedef {[number, boolean, string]} TupleStruct3
+	* @property {number} "0"
+	* @property {boolean} "1"
+	* @property {string} "2"
+	*/
+
+TestEnum: /**
+	* @typedef {"Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: {
+	* 	a: number,
+	* } }) & { Multiple?: never; Single?: never }} TestEnum
+	* @property {"Unit"} Unit
+	* @property {{ Single: number }} Single
+	* @property {{ Multiple: [number, number] }} Multiple
+	* @property {{ Struct: {
+	* 	a: number,
+	* } }} Struct
+	*/
+
+RefStruct: /**
+	* @typedef {TestEnum} RefStruct
+	* @property {TestEnum} "0"
+	*/
+
+InlinerStruct: /**
+	* @typedef {{
+	*		inline_this: {
+	*			ref_struct: SimpleStruct,
+	*			val: number,
+	*		},
+	*		dont_inline_this: RefStruct,
+	*	}} InlinerStruct
+	* @property {{
+	*		ref_struct: SimpleStruct,
+	*		val: number,
+	*	}} inline_this
+	* @property {RefStruct} dont_inline_this
+	*/
+
+GenericStruct<i32>: /**
+	* @typedef {{
+	*		arg: T,
+	*	}} GenericStruct<T>
+	* @property {T} arg
+	*/
+
+GenericStruct<String>: /**
+	* @typedef {{
+	*		arg: T,
+	*	}} GenericStruct<T>
+	* @property {T} arg
+	*/
+
+FlattenEnumStruct: /**
+	* @typedef {{
+	*		outer: string,
+	*	} & FlattenEnum} FlattenEnumStruct
+	* @property {string} outer
+	*/
+
+OverridenStruct: /**
+	* @typedef {{
+	*		overriden_field: string,
+	*	}} OverridenStruct
+	* @property {string} overriden_field
+	*/
+
+HasGenericAlias: /**
+	* @typedef {{ [key in number]: string }} HasGenericAlias
+	* @property {{ [key in number]: string }} "0"
+	*/
+
+EnumMacroAttributes: /**
+	* @typedef {({ A: string }) & { D?: never; bbb?: never; cccc?: never } | ({ bbb: number }) & { A?: never; D?: never; cccc?: never } | ({ cccc: number }) & { A?: never; D?: never; bbb?: never } | ({ D: {
+	* 	a: string,
+	* 	bbbbbb: number,
+	* } }) & { A?: never; bbb?: never; cccc?: never }} EnumMacroAttributes
+	* @property {{ A: string }} A
+	* @property {{ bbb: number }} bbb
+	* @property {{ cccc: number }} cccc
+	* @property {{ D: {
+	* 	a: string,
+	* 	bbbbbb: number,
+	* } }} D
+	*/
+
+InlineEnumField: /**
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} InlineEnumField
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
+	*/
+
+InlineOptionalType: /**
+	* @typedef {{
+	*		optional_field: {
+	* 	a: string,
+	* } | null,
+	*	}} InlineOptionalType
+	* @property {{
+	* 	a: string,
+	* } | null} optional_field
+	*/
+
+Rename: /**
+	* @typedef {"OneWord" | "Two words"} Rename
+	* @property {"OneWord"} OneWord
+	* @property {"Two words"} "Two words"
+	*/
+
+TransparentType: /**
+	* @typedef {TransparentTypeInner} TransparentType
+	* @property {TransparentTypeInner} "0"
+	*/
+
+TransparentType2: /**
+	* @typedef {null} TransparentType2
+	* @property {null} "0"
+	*/
+
+TransparentTypeWithOverride: /**
+	* @typedef {string} TransparentTypeWithOverride
+	* @property {string} "0"
+	*/
+
+HashMap<BasicEnum, ()>: 
+HashMap<BasicEnum, i32>: 
+Vec<PlaceholderInnerField>: 
+EnumReferenceRecordKey: /**
+	* @typedef {{
+	*		a: Partial<{ [key in BasicEnum]: number }>,
+	*	}} EnumReferenceRecordKey
+	* @property {Partial<{ [key in BasicEnum]: number }>} a
+	*/
+
+FlattenOnNestedEnum: /**
+	* @typedef {{
+	*		id: string,
+	*	} & NestedEnum} FlattenOnNestedEnum
+	* @property {string} id
+	*/
+
+MyEmptyInput: /**
+	* @typedef {Record<string, never>} MyEmptyInput
+	*/
+
+(String): 
+ExtraBracketsInTupleVariant: /**
+	* @typedef {{ A: string }} ExtraBracketsInTupleVariant
+	* @property {{ A: string }} A
+	*/
+
+ExtraBracketsInUnnamedStruct: /**
+	* @typedef {string} ExtraBracketsInUnnamedStruct
+	* @property {string} "0"
+	*/
+
+Vec<MyEnum>: 
+InlineTuple: /**
+	* @typedef {{
+	*		demo: [string, boolean],
+	*	}} InlineTuple
+	* @property {[string, boolean]} demo
+	*/
+
+InlineTuple2: /**
+	* @typedef {{
+	*		demo: [{
+	* 	demo: [string, boolean],
+	* }, boolean],
+	*	}} InlineTuple2
+	* @property {[{
+	* 	demo: [string, boolean],
+	* }, boolean]} demo
+	*/
+
+Box<str>: 
+Box<String>: 
+SkippedFieldWithinVariant: /**
+	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A" }} A
+	* @property {{ type: "B"; data: string }} B
+	*/
+
+KebabCase: /**
+	* @typedef {{
+	*		"test-ing": string,
+	*	}} KebabCase
+	* @property {string} "test-ing"
+	*/
+
+Issue281<'_>: /**
+	* @typedef {{
+	*		default_unity_arguments: string[],
+	*	}} Issue281
+	* @property {string[]} default_unity_arguments
+	*/
+
+LifetimeGenericStruct<'_, i32>: /**
+	* @typedef {{
+	*		borrowed: T[],
+	*		owned: T[],
+	*	}} LifetimeGenericStruct<T>
+	* @property {T[]} borrowed
+	* @property {T[]} owned
+	*/
+
+LifetimeGenericEnum<'_, i32>: /**
+	* @typedef {({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never }} LifetimeGenericEnum<T>
+	* @property {{ Borrowed: T }} Borrowed
+	* @property {{ Owned: T }} Owned
+	*/
+
+RenameWithWeirdCharsField: /**
+	* @typedef {{
+	*		"@odata.context": string,
+	*	}} RenameWithWeirdCharsField
+	* @property {string} "@odata.context"
+	*/
+
+RenameWithWeirdCharsVariant: /**
+	* @typedef {{ "@odata.context": string }} RenameWithWeirdCharsVariant
+	* @property {{ "@odata.context": string }} "@odata.context"
+	*/
+
+RenamedFieldKeys: /**
+	* @typedef {{
+	*		"": string,
+	*		"a\"b": string,
+	*		"a\\b": string,
+	*		"line\nbreak": string,
+	*		"line\u2028break": string,
+	*		"line\u2029break": string,
+	*	}} RenamedFieldKeys
+	* @property {string} ""
+	* @property {string} "a\"b"
+	* @property {string} "a\\b"
+	* @property {string} "line\nbreak"
+	* @property {string} "line\u2028break"
+	* @property {string} "line\u2029break"
+	*/
+
+RenamedVariantWithSkippedPayload: /**
+	* @typedef {"a-b"} RenamedVariantWithSkippedPayload
+	* @property {"a-b"} "a-b"
+	*/
+
+type_type::Type: /**
+	* @typedef {never} Type
+	*/
+
+ActualType: /**
+	* @typedef {{
+	*		a: GenericType<string>,
+	*	}} ActualType
+	* @property {GenericType<string>} a
+	*/
+
+SpectaTypeOverride: /**
+	* @typedef {{
+	*		string_ident: string,
+	*		u32_ident: number,
+	*		path: string,
+	*		tuple: [string, number],
+	*	}} SpectaTypeOverride
+	* @property {string} string_ident
+	* @property {number} u32_ident
+	* @property {string} path
+	* @property {[string, number]} tuple
+	*/
+
+ContainerTypeOverrideStruct: /**
+	* @typedef {string} ContainerTypeOverrideStruct
+	*/
+
+ContainerTypeOverrideEnum: /**
+	* @typedef {string} ContainerTypeOverrideEnum
+	*/
+
+ContainerTypeOverrideGeneric<Box<dyn Any>>: /**
+	* @typedef {string} ContainerTypeOverrideGeneric
+	*/
+
+ContainerTypeOverrideToGeneric<i32>: /**
+	* @typedef {T} ContainerTypeOverrideToGeneric<T>
+	*/
+
+ContainerTypeOverrideTuple: /**
+	* @typedef {[string, number]} ContainerTypeOverrideTuple
+	*/
+
+ContainerTypeOverrideTupleGeneric<i32>: /**
+	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
+	*/
+
+InvalidToValidType: /**
+	* @typedef {{
+	*		cause: null,
+	*	}} InvalidToValidType
+	* @property {null} cause
+	*/
+
+TupleStruct: /**
+	* @typedef {string} TupleStruct
+	* @property {string} "0"
+	*/
+
+TupleStructWithRep: /**
+	* @typedef {string} TupleStructWithRep
+	* @property {string} "0"
+	*/
+
+GenericTupleStruct<String>: /**
+	* @typedef {T} GenericTupleStruct<T>
+	* @property {T} "0"
+	*/
+
+BracedStruct: /**
+	* @typedef {string} BracedStruct
+	* @property {string} "0"
+	*/
+
+Struct: /**
+	* @typedef {{
+	*		t: "StructNew",
+	*		a: string,
+	*	}} StructNew
+	* @property {"StructNew"} t
+	* @property {string} a
+	*/
+
+Struct2: /**
+	* @typedef {{
+	*		b: string,
+	*	}} Struct2
+	* @property {string} b
+	*/
+
+Enum: /**
+	* @typedef {{ t: "A" } | { t: "B" }} Enum
+	* @property {{ t: "A" }} A
+	* @property {{ t: "B" }} B
+	*/
+
+Enum2: /**
+	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2
+	* @property {{ t: "C" }} C
+	* @property {{ t: "B" }} B
+	* @property {{ t: "D"; enumField: null }} D
+	*/
+
+Enum3: /**
+	* @typedef {{ t: "A"; b: string }} Enum3
+	* @property {{ t: "A"; b: string }} A
+	*/
+
+StructRenameAllUppercase: /**
+	* @typedef {{
+	*		A: number,
+	*		B: number,
+	*	}} StructRenameAllUppercase
+	* @property {number} A
+	* @property {number} B
+	*/
+
+RenameSerdeSpecialChar: /**
+	* @typedef {{
+	*		"a/b": number,
+	*	}} RenameSerdeSpecialChar
+	* @property {number} "a/b"
+	*/
+
+EnumRenameAllUppercase: /**
+	* @typedef {"HELLOWORLD" | "VARIANTB" | "TESTINGWORDS"} EnumRenameAllUppercase
+	* @property {"HELLOWORLD"} HELLOWORLD
+	* @property {"VARIANTB"} VARIANTB
+	* @property {"TESTINGWORDS"} TESTINGWORDS
+	*/
+
+Recursive: /**
+	* @typedef {{
+	*		demo: Recursive,
+	*	}} Recursive
+	* @property {Recursive} demo
+	*/
+
+RecursiveMapValue: /**
+	* @typedef {{
+	*		demo: { [key in string]: RecursiveMapValue },
+	*	}} RecursiveMapValue
+	* @property {{ [key in string]: RecursiveMapValue }} demo
+	*/
+
+RecursiveTransparent: /**
+	* @typedef {RecursiveInline} RecursiveTransparent
+	* @property {RecursiveInline} "0"
+	*/
+
+RecursiveInEnum: /**
+	* @typedef {{ A: {
+	* 	demo: RecursiveInEnum,
+	* } }} RecursiveInEnum
+	* @property {{ A: {
+	* 	demo: RecursiveInEnum,
+	* } }} A
+	*/
+
+NonOptional: /**
+	* @typedef {string | null} NonOptional
+	* @property {string | null} "0"
+	*/
+
+OptionalOnNamedField: /**
+	* @typedef {string | null} OptionalOnNamedField
+	* @property {string | null} ["0"]
+	*/
+
+OptionalOnTransparentNamedField: /**
+	* @typedef {{
+	*		b: string | null,
+	*	}} OptionalOnTransparentNamedField
+	* @property {string | null} b
+	*/
+
+OptionalInEnum: /**
+	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
+	* 	a: string | null,
+	* } }) & { A?: never; C?: never } | ({ C: {
+	* 	a?: string | null,
+	* } }) & { A?: never; B?: never }} OptionalInEnum
+	* @property {{ A?: string | null }} A
+	* @property {{ B: {
+	* 	a: string | null,
+	* } }} B
+	* @property {{ C: {
+	* 	a?: string | null,
+	* } }} C
+	*/
+
+UntaggedVariants: /**
+	* @typedef {string | number | { id: string } | [string, boolean]} UntaggedVariants
+	* @property {string} A
+	* @property {number} B
+	* @property {number} C
+	* @property {{ id: string }} D
+	* @property {[string, boolean]} E
+	*/
+
+UntaggedVariantsWithoutValue: /**
+	* @typedef {string | [number, string] | number} UntaggedVariantsWithoutValue
+	* @property {string} A
+	* @property {[number, string]} B
+	* @property {number} C
+	*/
+
+UntaggedVariantsWithDuplicateBranches: /**
+	* @typedef {null | number} UntaggedVariantsWithDuplicateBranches
+	* @property {null} A
+	* @property {number} B
+	* @property {null} C
+	*/
+
+HashMap<String, ()>: 
+Regular: /**
+	* @typedef {{ [key in string]: null }} Regular
+	* @property {{ [key in string]: null }} "0"
+	*/
+
+HashMap<Infallible, ()>: 
+HashMap<TransparentStruct, ()>: 
+HashMap<UnitVariants, ()>: 
+HashMap<UntaggedVariantsKey, ()>: 
+ValidMaybeValidKey: /**
+	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
+	*/
+
+ValidMaybeValidKeyNested: /**
+	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
+	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
+	*/
+
+MacroStruct: /**
+	* @typedef {string} MacroStruct
+	* @property {string} "0"
+	*/
+
+MacroStruct2: /**
+	* @typedef {{
+	*		demo: string,
+	*	}} MacroStruct2
+	* @property {string} demo
+	*/
+
+MacroEnum: /**
+	* @typedef {({ Demo: string }) & { Demo2?: never } | ({ Demo2: {
+	* 	demo2: string,
+	* } }) & { Demo?: never }} MacroEnum
+	* @property {{ Demo: string }} Demo
+	* @property {{ Demo2: {
+	* 	demo2: string,
+	* } }} Demo2
+	*/
+
+DeprecatedType: /**
+	* @deprecated
+	* @typedef {{
+	*		a: number,
+	*	}} DeprecatedType
+	* @property {number} a
+	*/
+
+DeprecatedTypeWithMsg: /**
+	* @deprecated Look at you big man using a deprecation message
+	* @typedef {{
+	*		a: number,
+	*	}} DeprecatedTypeWithMsg
+	* @property {number} a
+	*/
+
+DeprecatedTypeWithMsg2: /**
+	* @deprecated Look at you big man using a deprecation message
+	* @typedef {{
+	*		a: number,
+	*	}} DeprecatedTypeWithMsg2
+	* @property {number} a
+	*/
+
+DeprecatedFields: /**
+	* @typedef {{
+	*		a: number,
+	*		/**
+	*		 * @deprecated
+	*		 */
+	*		b: string,
+	*		/**
+	*		 * @deprecated This field is cringe!
+	*		 */
+	*		c: string,
+	*		/**
+	*		 * @deprecated This field is cringe!
+	*		 */
+	*		d: string,
+	*	}} DeprecatedFields
+	* @property {number} a
+	* @property {string} b - @deprecated
+	* @property {string} c - @deprecated This field is cringe!
+	* @property {string} d - @deprecated This field is cringe!
+	*/
+
+DeprecatedTupleVariant: /**
+	* @typedef {[
+	*	/**
+	*	 * @deprecated
+	*	 */
+	* string, 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* string, 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* number]} DeprecatedTupleVariant
+	* @property {string} "0" - @deprecated
+	* @property {string} "1" - @deprecated Nope
+	* @property {number} "2" - @deprecated Nope
+	*/
+
+DeprecatedEnumVariants: /**
+	* @typedef {
+	*	/**
+	*	 * @deprecated
+	*	 */
+	* "A" | 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* "B" | 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* "C"} DeprecatedEnumVariants
+	* @property {
+	* /**
+	*  * @deprecated
+	*  */
+	* "A"} A - @deprecated
+	* @property {
+	* /**
+	*  * @deprecated Nope
+	*  */
+	* "B"} B - @deprecated Nope
+	* @property {
+	* /**
+	*  * @deprecated Nope
+	*  */
+	* "C"} C - @deprecated Nope
+	*/
+
+CommentedStruct: /**
+	*  Some triple-slash comment
+	*  Some more triple-slash comment
+	*
+	* @typedef {{
+	*		/**
+	*		 *  Some triple-slash comment
+	*		 *  Some more triple-slash comment
+	*		 */
+	*		a: number,
+	*	}} CommentedStruct
+	* @property {number} a - Some triple-slash comment Some more triple-slash comment
+	*/
+
+CommentedEnum: /**
+	*  Some triple-slash comment
+	*  Some more triple-slash comment
+	*
+	* @typedef {
+	*	/**
+	*	 *  Some triple-slash comment
+	*	 *  Some more triple-slash comment
+	*	 */
+	* ({ A: number }) & { B?: never } | 
+	*	/**
+	*	 *  Some triple-slash comment
+	*	 *  Some more triple-slash comment
+	*	 */
+	* ({ B: {
+	* 	/**
+	* 	 *  Some triple-slash comment
+	* 	 *  Some more triple-slash comment
+	* 	 */
+	* 	a: number,
+	* } }) & { A?: never }} CommentedEnum
+	* @property {
+	* /**
+	*  *  Some triple-slash comment
+	*  *  Some more triple-slash comment
+	*  */
+	* { A: number }} A - Some triple-slash comment Some more triple-slash comment
+	* @property {
+	* /**
+	*  *  Some triple-slash comment
+	*  *  Some more triple-slash comment
+	*  */
+	* { B: {
+	* 	/**
+	* 	 *  Some triple-slash comment
+	* 	 *  Some more triple-slash comment
+	* 	 */
+	* 	a: number,
+	* } }} B - Some triple-slash comment Some more triple-slash comment
+	*/
+
+SingleLineComment: /**
+	*  Some single-line comment
+	*
+	* @typedef {
+	*	/**  Some single-line comment */
+	* ({ A: number }) & { B?: never } | 
+	*	/**  Some single-line comment */
+	* ({ B: {
+	* 	/**  Some single-line comment */
+	* 	a: number,
+	* } }) & { A?: never }} SingleLineComment
+	* @property {
+	* /**  Some single-line comment */
+	* { A: number }} A - Some single-line comment
+	* @property {
+	* /**  Some single-line comment */
+	* { B: {
+	* 	/**  Some single-line comment */
+	* 	a: number,
+	* } }} B - Some single-line comment
+	*/
+
+NonGeneric: /**
+	* @typedef {{
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	* @property {A} a
+	* @property {B} b
+	*/
+
+HalfGenericA<u8>: /**
+	* @typedef {{
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	* @property {A} a
+	* @property {B} b
+	*/
+
+HalfGenericB<bool>: /**
+	* @typedef {{
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	* @property {A} a
+	* @property {B} b
+	*/
+
+FullGeneric<u8, bool>: /**
+	* @typedef {{
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	* @property {A} a
+	* @property {B} b
+	*/
+
+Another<bool>: /**
+	* @typedef {{
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	* @property {A} a
+	* @property {B} b
+	*/
+
+MapA<u32>: 
+MapB<u32>: 
+MapC<u32>: 
+AGenericStruct<u32>: /**
+	* @typedef {{
+	*		field: Demo<T, boolean>,
+	*	}} AGenericStruct<T>
+	* @property {Demo<T, boolean>} field
+	*/
+
+A: /**
+	* @typedef {{
+	*		a: B,
+	*		b: {
+	*			b: number,
+	*		},
+	*		c: B,
+	*		d: {
+	*			flattened: number,
+	*		},
+	*		e: {
+	*			generic_flattened: number,
+	*		},
+	*	}} A
+	* @property {B} a
+	* @property {{
+	*		b: number,
+	*	}} b
+	* @property {B} c
+	* @property {{
+	*		flattened: number,
+	*	}} d
+	* @property {{
+	*		generic_flattened: number,
+	*	}} e
+	*/
+
+DoubleFlattened: /**
+	* @typedef {{
+	*		a: ToBeFlattened,
+	*		b: ToBeFlattened,
+	*	}} DoubleFlattened
+	* @property {ToBeFlattened} a
+	* @property {ToBeFlattened} b
+	*/
+
+FlattenedInner: /**
+	* @typedef {Inner} FlattenedInner
+	*/
+
+BoxFlattened: /**
+	* @typedef {BoxedInner} BoxFlattened
+	*/
+
+BoxInline: /**
+	* @typedef {{
+	*		c: {
+	*			a: number,
+	*		},
+	*	}} BoxInline
+	* @property {{
+	*		a: number,
+	*	}} c
+	*/
+
+First: /**
+	* @typedef {{
+	*		a: string,
+	*	}} First
+	* @property {string} a
+	*/
+
+Second: /**
+	* @typedef {{
+	*		a: number,
+	*	}} Second
+	* @property {number} a
+	*/
+
+Third: /**
+	* @typedef {{
+	*		b: { [key in string]: string },
+	*		c: First,
+	*	} & First} Third
+	* @property {{ [key in string]: string }} b
+	* @property {First} c
+	*/
+
+Fourth: /**
+	* @typedef {{
+	*		a: First,
+	*		b: {
+	*			a: string,
+	*		},
+	*	}} Fourth
+	* @property {First} a
+	* @property {{
+	*		a: string,
+	*	}} b
+	*/
+
+TagOnStructWithInline: /**
+	* @typedef {{
+	*		type: "TagOnStructWithInline",
+	*		a: First,
+	*		b: {
+	*			a: string,
+	*		},
+	*	}} TagOnStructWithInline
+	* @property {"TagOnStructWithInline"} type
+	* @property {First} a
+	* @property {{
+	*		a: string,
+	*	}} b
+	*/
+
+Sixth: /**
+	* @typedef {{
+	*		a: First,
+	*		b: First,
+	*	}} Sixth
+	* @property {First} a
+	* @property {First} b
+	*/
+
+Seventh: /**
+	* @typedef {{
+	*		a: First,
+	*		b: Second,
+	*	}} Seventh
+	* @property {First} a
+	* @property {Second} b
+	*/
+
+Eight: /**
+	* @typedef {{ A: string } | "B"} Eight
+	* @property {{ A: string }} A
+	* @property {"B"} B
+	*/
+
+Ninth: /**
+	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
+	* 	a: string,
+	* } } | { t: "D"; c: First }} Ninth
+	* @property {{ t: "A"; c: string }} A
+	* @property {{ t: "B" }} B
+	* @property {{ t: "C"; c: {
+	* 	a: string,
+	* } }} C
+	* @property {{ t: "D"; c: First }} D
+	*/
+
+Tenth: /**
+	* @typedef {string | "B" | {
+	* 	a: string,
+	* } | First} Tenth
+	* @property {string} A
+	* @property {"B"} B
+	* @property {{
+	* 	a: string,
+	* }} C
+	* @property {First} D
+	*/
+
+MyEnumTagged: /**
+	* @typedef {{ type: "Variant"; inner: First }} MyEnumTagged
+	* @property {{ type: "Variant"; inner: First }} Variant
+	*/
+
+MyEnumExternal: /**
+	* @typedef {{ Variant: {
+	* 	inner: First,
+	* } }} MyEnumExternal
+	* @property {{ Variant: {
+	* 	inner: First,
+	* } }} Variant
+	*/
+
+MyEnumAdjacent: /**
+	* @typedef {{ t: "Variant"; c: {
+	* 	inner: First,
+	* } }} MyEnumAdjacent
+	* @property {{ t: "Variant"; c: {
+	* 	inner: First,
+	* } }} Variant
+	*/
+
+MyEnumUntagged: /**
+	* @typedef {{ inner: First }} MyEnumUntagged
+	* @property {{ inner: First }} Variant
+	*/
+
+EmptyStruct: /**
+	* @typedef {Record<string, never>} EmptyStruct
+	*/
+
+EmptyStructWithTag: /**
+	* @typedef {{
+	*		a: "EmptyStructWithTag",
+	*	}} EmptyStructWithTag
+	* @property {"EmptyStructWithTag"} a
+	*/
+
+AdjacentlyTagged: /**
+	* @typedef {{ t: "A" } | { t: "B"; c: {
+	* 	id: string,
+	* 	method: string,
+	* } } | { t: "C"; c: string }} AdjacentlyTagged
+	* @property {{ t: "A" }} A
+	* @property {{ t: "B"; c: {
+	* 	id: string,
+	* 	method: string,
+	* } }} B
+	* @property {{ t: "C"; c: string }} C
+	*/
+
+LoadProjectEvent: /**
+	* @typedef {{ event: "started"; data: {
+	* 	projectName: string,
+	* } } | { event: "progressTest"; data: {
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } } | { event: "finished"; data: {
+	* 	projectName: string,
+	* } }} LoadProjectEvent
+	* @property {{ event: "started"; data: {
+	* 	projectName: string,
+	* } }} started
+	* @property {{ event: "progressTest"; data: {
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } }} progressTest
+	* @property {{ event: "finished"; data: {
+	* 	projectName: string,
+	* } }} finished
+	*/
+
+ExternallyTagged: /**
+	* @typedef {"A" | ({ B: {
+	* 	id: string,
+	* 	method: string,
+	* } }) & { C?: never } | ({ C: string }) & { B?: never }} ExternallyTagged
+	* @property {"A"} A
+	* @property {{ B: {
+	* 	id: string,
+	* 	method: string,
+	* } }} B
+	* @property {{ C: string }} C
+	*/
+
+Issue221External: /**
+	* @typedef {({ A: {
+	* 	a: string,
+	* } }) & { B?: never } | ({ B: {
+	* 	b: string,
+	* } }) & { A?: never }} Issue221External
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
+	* @property {{ B: {
+	* 	b: string,
+	* } }} B
+	*/
+
+InternallyTaggedD: /**
+	* @typedef {{
+	* 	type: "A",
+	* } & { [key in string]: string }} InternallyTaggedD
+	* @property {{
+	* 	type: "A",
+	* } & { [key in string]: string }} A
+	*/
+
+InternallyTaggedE: /**
+	* @typedef {{ type: "A" }} InternallyTaggedE
+	* @property {{ type: "A" }} A
+	*/
+
+InternallyTaggedF: /**
+	* @typedef {{ type: "A" }} InternallyTaggedF
+	* @property {{ type: "A" }} A
+	*/
+
+InternallyTaggedH: /**
+	* @typedef {{ type: "A" }} InternallyTaggedH
+	* @property {{ type: "A" }} A
+	*/
+
+InternallyTaggedL: /**
+	* @typedef {{
+	* 	type: "A",
+	* } & { type: "A" } | { type: "B" }} InternallyTaggedL
+	* @property {{
+	* 	type: "A",
+	* } & { type: "A" } | { type: "B" }} A
+	*/
+
+InternallyTaggedM: /**
+	* @typedef {{ type: "A" }} InternallyTaggedM
+	* @property {{ type: "A" }} A
+	*/
+
+StructWithAlias: /**
+	* @typedef {{
+	*		field: string,
+	*	}} StructWithAlias
+	* @property {string} field
+	*/
+
+StructWithMultipleAliases: /**
+	* @typedef {{
+	*		field: string,
+	*	}} StructWithMultipleAliases
+	* @property {string} field
+	*/
+
+StructWithAliasAndRename: /**
+	* @typedef {{
+	*		renamed_field: string,
+	*	}} StructWithAliasAndRename
+	* @property {string} renamed_field
+	*/
+
+EnumWithVariantAlias: /**
+	* @typedef {"Variant" | "Other"} EnumWithVariantAlias
+	* @property {"Variant"} Variant
+	* @property {"Other"} Other
+	*/
+
+EnumWithMultipleVariantAliases: /**
+	* @typedef {"Variant" | "Other"} EnumWithMultipleVariantAliases
+	* @property {"Variant"} Variant
+	* @property {"Other"} Other
+	*/
+
+EnumWithVariantAliasAndRename: /**
+	* @typedef {"renamed_variant" | "Other"} EnumWithVariantAliasAndRename
+	* @property {"renamed_variant"} renamed_variant
+	* @property {"Other"} Other
+	*/
+
+InternallyTaggedWithAlias: /**
+	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
+	* @property {{ type: "A"; field: string }} A
+	* @property {{ type: "B"; other: number }} B
+	*/
+
+AdjacentlyTaggedWithAlias: /**
+	* @typedef {{ type: "A"; data: {
+	* 	field: string,
+	* } } | { type: "B"; data: {
+	* 	other: number,
+	* } }} AdjacentlyTaggedWithAlias
+	* @property {{ type: "A"; data: {
+	* 	field: string,
+	* } }} A
+	* @property {{ type: "B"; data: {
+	* 	other: number,
+	* } }} B
+	*/
+
+UntaggedWithAlias: /**
+	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
+	* @property {{ field: string }} A
+	* @property {{ other: number }} B
+	*/
+
+Issue221UntaggedSafe: /**
+	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }} Issue221UntaggedSafe
+	* @property {{ a: string }} A
+	* @property {{ b: string }} B
+	*/
+
+Issue221UntaggedMixed: /**
+	* @typedef {({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }} Issue221UntaggedMixed
+	* @property {{ a: string }} A
+	* @property {{ b: string }} B
+	* @property {{ values: { [key in string]: string } }} Unsafe
+	*/
+
+EmptyEnum: /**
+	* @typedef {never} EmptyEnum
+	*/
+
+EmptyEnumTagged: /**
+	* @typedef {never} EmptyEnumTagged
+	*/
+
+EmptyEnumTaggedWContent: /**
+	* @typedef {never} EmptyEnumTaggedWContent
+	*/
+
+EmptyEnumUntagged: /**
+	* @typedef {never} EmptyEnumUntagged
+	*/
+
+SkipOnlyField: /**
+	* @typedef {Record<string, never>} SkipOnlyField
+	*/
+
+SkipField: /**
+	* @typedef {{
+	*		b: number,
+	*	}} SkipField
+	* @property {number} b
+	*/
+
+SkipVariant: /**
+	* @typedef {{ A: string }} SkipVariant
+	* @property {{ A: string }} A
+	*/
+
+SkipUnnamedFieldInVariant: /**
+	* @typedef {"A" | { B: [number] }} SkipUnnamedFieldInVariant
+	* @property {"A"} A
+	* @property {{ B: [number] }} B
+	*/
+
+SkipNamedFieldInVariant: /**
+	* @typedef {({ A: Record<string, never> }) & { B?: never } | ({ B: {
+	* 	b: number,
+	* } }) & { A?: never }} SkipNamedFieldInVariant
+	* @property {{ A: Record<string, never> }} A
+	* @property {{ B: {
+	* 	b: number,
+	* } }} B
+	*/
+
+TransparentWithSkip: /**
+	* @typedef {null} TransparentWithSkip
+	* @property {null} "0"
+	*/
+
+TransparentWithSkip2: /**
+	* @typedef {string} TransparentWithSkip2
+	* @property {string} "0"
+	*/
+
+TransparentWithSkip3: /**
+	* @typedef {string} TransparentWithSkip3
+	* @property {string} "0"
+	*/
+
+SkipVariant2: /**
+	* @typedef {{ tag: "A"; data: string }} SkipVariant2
+	* @property {{ tag: "A"; data: string }} A
+	*/
+
+SkipVariant3: /**
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} SkipVariant3
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
+	*/
+
+SkipStructFields: /**
+	* @typedef {{
+	*		a: number,
+	*	}} SkipStructFields
+	* @property {number} a
+	*/
+
+SpectaSkipNonTypeField: /**
+	* @typedef {{
+	*		a: number,
+	*	}} SpectaSkipNonTypeField
+	* @property {number} a
+	*/
+
+FlattenA: /**
+	* @typedef {{
+	*		a: number,
+	*		b: number,
+	*	}} FlattenA
+	* @property {number} a
+	* @property {number} b
+	*/
+
+FlattenB: /**
+	* @typedef {{
+	*		c: number,
+	*	} & FlattenA} FlattenB
+	* @property {number} c
+	*/
+
+FlattenC: /**
+	* @typedef {{
+	*		c: number,
+	*	} & FlattenA} FlattenC
+	* @property {number} c
+	*/
+
+FlattenD: /**
+	* @typedef {{
+	*		a: FlattenA,
+	*		c: number,
+	*	}} FlattenD
+	* @property {FlattenA} a
+	* @property {number} c
+	*/
+
+FlattenE: /**
+	* @typedef {{
+	*		b: ({
+	*			c: number,
+	*		}) & (FlattenA),
+	*		d: number,
+	*	}} FlattenE
+	* @property {({
+	*		c: number,
+	*	}) & (FlattenA)} b
+	* @property {number} d
+	*/
+
+FlattenF: /**
+	* @typedef {{
+	*		b: ({
+	*			c: number,
+	*		}) & (FlattenA),
+	*		d: number,
+	*	}} FlattenF
+	* @property {({
+	*		c: number,
+	*	}) & (FlattenA)} b
+	* @property {number} d
+	*/
+
+FlattenG: /**
+	* @typedef {{
+	*		b: FlattenB,
+	*		d: number,
+	*	}} FlattenG
+	* @property {FlattenB} b
+	* @property {number} d
+	*/
+
+TupleNested: /**
+	* @typedef {[number[], [number[], number[]], [number[], number[], number[]]]} TupleNested
+	* @property {number[]} "0"
+	* @property {[number[], number[]]} "1"
+	* @property {[number[], number[], number[]]} "2"
+	*/
+
+Generic1<()>: /**
+	* @typedef {{
+	*		value: T,
+	*		values: T[],
+	*	}} Generic1<T>
+	* @property {T} value
+	* @property {T[]} values
+	*/
+
+GenericAutoBound<()>: /**
+	* @typedef {{
+	*		value: T,
+	*		values: T[],
+	*	}} GenericAutoBound<T>
+	* @property {T} value
+	* @property {T[]} values
+	*/
+
+GenericAutoBound2<()>: /**
+	* @typedef {{
+	*		value: T,
+	*		values: T[],
+	*	}} GenericAutoBound2<T>
+	* @property {T} value
+	* @property {T[]} values
+	*/
+
+Container1: /**
+	* @typedef {{
+	*		foo: Generic1<number>,
+	*		bar: Generic1<number>[],
+	*		baz: { [key in string]: Generic1<string> },
+	*	}} Container1
+	* @property {Generic1<number>} foo
+	* @property {Generic1<number>[]} bar
+	* @property {{ [key in string]: Generic1<string> }} baz
+	*/
+
+Generic2<(), String, i32>: /**
+	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: {
+	* 	a: A,
+	* 	b: B,
+	* 	c: C,
+	* } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
+	* @property {{ A: A }} A
+	* @property {{ B: [B, B, B] }} B
+	* @property {{ C: C[] }} C
+	* @property {{ D: A[][][] }} D
+	* @property {{ E: {
+	* 	a: A,
+	* 	b: B,
+	* 	c: C,
+	* } }} E
+	* @property {{ X: number[] }} X
+	* @property {{ Y: number }} Y
+	* @property {{ Z: number[][] }} Z
+	*/
+
+GenericNewType1<()>: /**
+	* @typedef {T[][]} GenericNewType1<T>
+	* @property {T[][]} "0"
+	*/
+
+GenericTuple<()>: /**
+	* @typedef {[T, T[], T[][]]} GenericTuple<T>
+	* @property {T} "0"
+	* @property {T[]} "1"
+	* @property {T[][]} "2"
+	*/
+
+GenericStruct2<()>: /**
+	* @typedef {{
+	*		a: T,
+	*		b: [T, T],
+	*		c: [T, [T, T]],
+	*		d: [T, T, T],
+	*		e: [([T, T]), ([T, T]), ([T, T])],
+	*		f: T[],
+	*		g: T[][],
+	*		h: ([([T, T]), ([T, T]), ([T, T])])[],
+	*	}} GenericStruct2<T>
+	* @property {T} a
+	* @property {[T, T]} b
+	* @property {[T, [T, T]]} c
+	* @property {[T, T, T]} d
+	* @property {[([T, T]), ([T, T]), ([T, T])]} e
+	* @property {T[]} f
+	* @property {T[][]} g
+	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
+	*/
+
+InlineGenericNewtype<String>: 
+InlineGenericNested<String>: 
+InlineFlattenGenericsG<()>: /**
+	* @typedef {{
+	*		t: T,
+	*	}} InlineFlattenGenericsG<T>
+	* @property {T} t
+	*/
+
+InlineFlattenGenerics: /**
+	* @typedef {{
+	*		g: InlineFlattenGenericsG<string>,
+	*		gi: {
+	*			t: string,
+	*		},
+	*	} & InlineFlattenGenericsG<string>} InlineFlattenGenerics
+	* @property {InlineFlattenGenericsG<string>} g
+	* @property {{
+	*		t: string,
+	*	}} gi
+	*/
+
+GenericDefault: /**
+	* @typedef {{
+	*		value: T,
+	*	}} GenericDefault<T = string>
+	* @property {T} value
+	*/
+
+ChainedGenericDefault: /**
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*/
+
+ChainedGenericDefault<String, String>: /**
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*/
+
+ChainedGenericDefault<i32>: /**
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*/
+
+ChainedGenericDefault<String, i32>: /**
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*/
+
+GenericDefaultSkipped: /**
+	* @typedef {{
+	*		value: T,
+	*	}} GenericDefaultSkipped<T>
+	* @property {T} value
+	*/
+
+GenericDefaultSkippedNonType: /**
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkippedNonType<T>
+	* @property {number} value
+	*/
+
+GenericParameterOrderPreserved: /**
+	* @typedef {{
+	*		pair: Pair<number, string>,
+	*	}} GenericParameterOrderPreserved
+	* @property {Pair<number, string>} pair
+	*/
+
+ConstGenericInNonConstContainer: /**
+	* @typedef {{
+	*		data: [number],
+	*		a: [number, number],
+	*		d: [number, number],
+	*	}} ConstGenericInNonConstContainer
+	* @property {[number]} data
+	* @property {[number, number]} a
+	* @property {[number, number]} d
+	*/
+
+ConstGenericInConstContainer: /**
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} ConstGenericInConstContainer
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*/
+
+NamedConstGenericContainer: /**
+	* @typedef {{
+	*		a: NamedConstGeneric,
+	*		b: NamedConstGeneric,
+	*		d: [number, number],
+	*	}} NamedConstGenericContainer
+	* @property {NamedConstGeneric} a
+	* @property {NamedConstGeneric} b
+	* @property {[number, number]} d
+	*/
+
+InlineConstGenericContainer: /**
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		d: [number, number],
+	*	}} InlineConstGenericContainer
+	* @property {{
+	*		data: [number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*	}} b
+	* @property {{
+	*		data: [number, number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*	}} c
+	* @property {[number, number]} d
+	*/
+
+InlineRecursiveConstGenericContainer: /**
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		d: [number, number],
+	*	}} InlineRecursiveConstGenericContainer
+	* @property {{
+	*		data: [number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} b
+	* @property {{
+	*		data: [number, number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} c
+	* @property {[number, number]} d
+	*/
+
+TestCollectionRegister: /**
+	* @typedef {never} TestCollectionRegister
+	*/
+
+TestCollectionRegister: /**
+	* @typedef {never} TestCollectionRegister
+	*/

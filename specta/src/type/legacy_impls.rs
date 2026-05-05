@@ -1,392 +1,717 @@
-#![allow(unused)]
+use crate::{Type, Types};
+#[allow(unused_imports)]
+use crate::{datatype::*, r#type::impls::*, r#type::macros::impl_ndt};
 
-//! The plan is to try and move these into the ecosystem for the v2 release.
-use super::macros::*;
-use crate::{Type, TypeCollection, datatype::*};
-
-use std::borrow::Cow;
+// `String` requires `std` feature, while `str` does not.
+// We can't use `str` in a lot of places because it's not `Sized`, so this bridges that.
+#[allow(unused)]
+pub struct String;
+impl Type for String {
+    fn definition(types: &mut Types) -> DataType {
+        str::definition(types)
+    }
+}
 
 #[cfg(feature = "indexmap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
 const _: () = {
-    impl_for_list!(true; indexmap::IndexSet<T>);
-    impl_for_map!(indexmap::IndexMap<K, V>);
-};
-
-#[cfg(feature = "bytes")]
-const _: () = {
-    use bytes::{Bytes, BytesMut};
-
-    impl_as!(
-        Bytes as Vec<u8>
-        BytesMut as Vec<u8>
+    impl_ndt!(
+        indexmap::IndexSet<T> as PrimitiveSet<T> = passthrough;
+        indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = passthrough;
     );
 };
 
+#[cfg(feature = "ordered-float")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
+impl_ndt!(
+    ordered_float::OrderedFloat<T> where { T: Type + ordered_float::FloatCore } as T = inline;
+    ordered_float::NotNan<T> where { T: Type + ordered_float::FloatCore } as T = inline;
+);
+
+#[cfg(feature = "heapless")]
+#[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
+const _: () = {
+    impl_ndt!(
+        // Sequential containers
+        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = passthrough;
+        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
+        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
+        heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = passthrough;
+
+        // Sets
+        heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = passthrough;
+
+        // Maps
+        heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = passthrough;
+        heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = passthrough;
+
+        // String container
+        heapless::String <const N: usize, LenT> where { LenT: heapless::LenType } as str = inline;
+    );
+};
+
+#[cfg(feature = "semver")]
+#[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
+impl_ndt!(
+     semver::Version as str = inline;
+     semver::VersionReq  as str = inline;
+     semver::Comparator  as str = inline;
+);
+
+#[cfg(feature = "smol_str")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smol_str")))]
+impl_ndt!(smol_str::SmolStr as str = inline);
+
+#[cfg(feature = "arrayvec")]
+#[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
+impl_ndt!(
+    arrayvec::ArrayString <const N: usize> as str = inline;
+    arrayvec::ArrayVec<T> <T, const N: usize> as [T; N] = passthrough;
+);
+
+#[cfg(feature = "smallvec")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as [T] = passthrough);
+
+#[cfg(feature = "bytes")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
+impl_ndt!(
+    bytes::Bytes as [u8] = inline;
+    bytes::BytesMut as [u8] = inline;
+);
+
 #[cfg(feature = "serde_json")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_json")))]
 const _: () = {
     use serde_json::{Map, Number, Value};
 
-    impl_for_map!(Map<K, V>);
+    impl_ndt!(
+        serde_json::Map<K, V> as PrimitiveMap<K, V> = passthrough;
+        serde_json::Value as SerdeValue = inline;
+        serde_json::Number as SerdeNumber = inline;
+    );
 
-    impl Type for Value {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct SerdeValue;
+    impl Type for SerdeValue {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
-                    ("Null".into(), EnumVariant::unit()),
+                    ("Null".into(), Variant::unit()),
                     (
                         "Bool".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(bool::definition(types)))
                             .build(),
                     ),
                     (
                         "Number".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Number::definition(types)))
                             .build(),
                     ),
                     (
                         "String".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(String::definition(types)))
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
                             .build(),
                     ),
                     (
                         "Array".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<Value>::definition(types)))
                             .build(),
                     ),
                     (
                         "Object".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Map::<String, Value>::definition(types)))
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: Default::default(),
             })
         }
     }
 
-    impl Type for Number {
-        fn definition(_: &mut TypeCollection) -> DataType {
+    struct SerdeNumber;
+    impl Type for SerdeNumber {
+        fn definition(_: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::f64)))
                             .build(),
                     ),
                     (
                         "i64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::i64)))
                             .build(),
                     ),
                     (
                         "u64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::u64)))
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
-                    path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
-                        String::from("untagged"),
-                    ))]),
-                }],
+                attributes: Attributes::default(),
             })
         }
     }
 };
 
 #[cfg(feature = "serde_yaml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
 
-    impl Type for serde_yaml::Mapping {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Map(crate::datatype::Map::new(
-                serde_yaml::Value::definition(types),
-                serde_yaml::Value::definition(types),
-            ))
-        }
-    }
+    impl_ndt!(
+        serde_yaml::Mapping as PrimitiveMap<Value, Value> = passthrough;
+        serde_yaml::Value as SerdeYamlValue = inline;
+        serde_yaml::Number as SerdeYamlNumber = inline;
+        serde_yaml::value::TaggedValue as SerdeYamlTaggedValue = inline;
+    );
 
-    impl Type for serde_yaml::value::TaggedValue {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            std::collections::HashMap::<String, serde_yaml::Value>::definition(types)
-        }
-    }
-
-    impl Type for Value {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct SerdeYamlValue;
+    impl Type for SerdeYamlValue {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
-                    ("Null".into(), EnumVariant::unit()),
+                    ("Null".into(), Variant::unit()),
                     (
                         "Bool".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(bool::definition(types)))
                             .build(),
                     ),
                     (
                         "Number".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Number::definition(types)))
                             .build(),
                     ),
                     (
                         "String".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(String::definition(types)))
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
                             .build(),
                     ),
                     (
                         "Sequence".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<Value>::definition(types)))
                             .build(),
                     ),
                     (
                         "Mapping".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(std::collections::BTreeMap::<
-                                serde_yaml::Value,
-                                serde_yaml::Value,
-                            >::definition(types)))
+                        Variant::unnamed()
+                            .field(Field::new(Mapping::definition(types)))
                             .build(),
                     ),
                     (
                         "Tagged".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Box::<TaggedValue>::definition(types)))
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
         }
     }
 
-    impl Type for serde_yaml::Number {
-        fn definition(_: &mut TypeCollection) -> DataType {
+    struct SerdeYamlNumber;
+    impl Type for SerdeYamlNumber {
+        fn definition(_: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::f64)))
                             .build(),
                     ),
                     (
                         "i64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::i64)))
                             .build(),
                     ),
                     (
                         "u64".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(DataType::Primitive(Primitive::u64)))
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
+        }
+    }
+
+    struct SerdeYamlTaggedValue;
+    impl Type for SerdeYamlTaggedValue {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("tag", Field::new(str::definition(types)))
+                .field("value", Field::new(Value::definition(types)))
+                .build()
         }
     }
 };
-
 #[cfg(feature = "toml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
     use toml::{Value, value};
 
-    impl_for_map!(toml::map::Map<K, V>);
+    impl_ndt!(
+        toml::map::Map<K, V> as PrimitiveMap<K, V> = passthrough;
+        toml::value::Datetime as TomlDatetime = inline;
+        toml::Value as TomlValue = inline;
+    );
 
-    impl Type for value::Datetime {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Named(NamedFields {
-                    fields: vec![(
-                        "v".into(),
-                        Field {
-                            optional: false,
-
-                            inline: false,
-                            deprecated: None,
-                            docs: Cow::Borrowed(""),
-                            ty: Some(String::definition(types)),
-                            attributes: Vec::new(),
-                        },
-                    )],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
-            })
+    struct TomlDatetime;
+    impl Type for TomlDatetime {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("v", Field::new(str::definition(types)))
+                .build()
         }
     }
 
-    impl Type for Value {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct TomlValue;
+    impl Type for TomlValue {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
                     (
                         "String".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(String::definition(types)))
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
                             .build(),
                     ),
                     (
                         "Integer".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(i64::definition(types)))
                             .build(),
                     ),
                     (
                         "Float".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(f64::definition(types)))
                             .build(),
                     ),
                     (
                         "Boolean".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(bool::definition(types)))
                             .build(),
                     ),
                     (
                         "Datetime".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(value::Datetime::definition(types)))
                             .build(),
                     ),
                     (
                         "Array".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<Value>::definition(types)))
                             .build(),
                     ),
                     (
                         "Table".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(
-                                std::collections::BTreeMap::<String, Value>::definition(types),
-                            ))
+                        Variant::unnamed()
+                            .field(Field::new(toml::map::Map::<String, Value>::definition(
+                                types,
+                            )))
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
         }
     }
 };
 
 #[cfg(feature = "ulid")]
-impl_as!(ulid::Ulid as String);
+#[cfg_attr(docsrs, doc(cfg(feature = "ulid")))]
+impl_ndt!(ulid::Ulid as str = inline);
 
 #[cfg(feature = "uuid")]
-impl_as!(
-    uuid::Uuid as String
-    uuid::fmt::Hyphenated as String
+#[cfg_attr(docsrs, doc(cfg(feature = "uuid")))]
+impl_ndt!(
+    uuid::Uuid as str = inline;
+    uuid::fmt::Braced as str = inline;
+    uuid::fmt::Hyphenated as str = inline;
+    uuid::fmt::Simple as str = inline;
+    uuid::fmt::Urn as str = inline;
 );
 
 #[cfg(feature = "chrono")]
+#[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+#[allow(deprecated)]
 const _: () = {
-    use chrono::*;
-
-    impl_as!(
-        NaiveDateTime as String
-        NaiveDate as String
-        NaiveTime as String
-        chrono::Duration as String
+    impl_ndt!(
+        chrono::NaiveDateTime as str = inline;
+        chrono::NaiveDate as str = inline;
+        chrono::NaiveTime as str = inline;
+        chrono::Duration as str = inline;
+        chrono::FixedOffset as str = inline;
+        chrono::Utc as str = inline;
+        chrono::Local as str = inline;
+        chrono::Weekday as str = inline;
+        chrono::Month as str = inline;
+        chrono::Date<T> where { T: Type + chrono::TimeZone } as str = inline;
+        chrono::DateTime<T> where { T: Type + chrono::TimeZone } as str = inline;
     );
-
-    impl<T: TimeZone> Type for DateTime<T> {
-        impl_passthrough!(String);
-    }
-
-    #[allow(deprecated)]
-    impl<T: TimeZone> Type for Date<T> {
-        impl_passthrough!(String);
-    }
 };
 
 #[cfg(feature = "time")]
-impl_as!(
-    time::PrimitiveDateTime as String
-    time::OffsetDateTime as String
-    time::Date as String
-    time::Time as String
-    time::Duration as String
-    time::Weekday as String
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+impl_ndt!(
+    time::PrimitiveDateTime as str = inline;
+    time::OffsetDateTime as str = inline;
+    time::Date as str = inline;
+    time::UtcDateTime as str = inline;
+    time::Time as str = inline;
+    time::Duration as str = inline;
+    time::UtcOffset as str = inline;
+    time::Weekday as str = inline;
+    time::Month as str = inline;
 );
 
 #[cfg(feature = "jiff")]
-impl_as!(
-    jiff::Timestamp as String
-    jiff::Zoned as String
-    jiff::Span as String
-    jiff::civil::Date as String
-    jiff::civil::Time as String
-    jiff::civil::DateTime as String
-    jiff::tz::TimeZone as String
+#[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
+impl_ndt!(
+    jiff::Timestamp as str = inline;
+    jiff::Zoned as str = inline;
+    jiff::SignedDuration as str = inline;
+    jiff::civil::Date as str = inline;
+    jiff::civil::Time as str = inline;
+    jiff::civil::DateTime as str = inline;
+    jiff::civil::ISOWeekDate as str = inline;
+    jiff::tz::TimeZone as str = inline;
 );
 
 #[cfg(feature = "bigdecimal")]
-impl_as!(bigdecimal::BigDecimal as String);
+#[cfg_attr(docsrs, doc(cfg(feature = "bigdecimal")))]
+impl_ndt!(bigdecimal::BigDecimal as str = inline);
 
 // This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
 #[cfg(feature = "rust_decimal")]
-impl_as!(rust_decimal::Decimal as String);
+#[cfg_attr(docsrs, doc(cfg(feature = "rust_decimal")))]
+impl_ndt!(rust_decimal::Decimal as str = inline);
 
 #[cfg(feature = "ipnetwork")]
-impl_as!(
-    ipnetwork::IpNetwork as String
-    ipnetwork::Ipv4Network as String
-    ipnetwork::Ipv6Network as String
+#[cfg_attr(docsrs, doc(cfg(feature = "ipnetwork")))]
+impl_ndt!(
+    ipnetwork::IpNetwork as str = inline;
+    ipnetwork::Ipv4Network as str = inline;
+    ipnetwork::Ipv6Network as str = inline;
 );
 
 #[cfg(feature = "mac_address")]
-impl_as!(mac_address::MacAddress as String);
-
-#[cfg(feature = "chrono")]
-impl_as!(
-    chrono::FixedOffset as String
-    chrono::Utc as String
-    chrono::Local as String
-);
+#[cfg_attr(docsrs, doc(cfg(feature = "mac_address")))]
+impl_ndt!(mac_address::MacAddress as str = inline);
 
 #[cfg(feature = "bson")]
-impl_as!(
-    bson::oid::ObjectId as String
-    bson::Decimal128 as i128
-    bson::DateTime as String
-    bson::Uuid as String
-);
-
-// TODO: bson::bson
-// TODO: bson::Document
-
-#[cfg(feature = "bytesize")]
-impl_as!(bytesize::ByteSize as u64);
-
-#[cfg(feature = "uhlc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
 const _: () = {
-    use std::num::NonZeroU128;
-
-    use uhlc::*;
-
-    impl_as!(
-        NTP64 as u64
-        ID as NonZeroU128
+    impl_ndt!(
+        bson::oid::ObjectId as BsonObjectId = inline;
+        bson::Decimal128 as BsonDecimal128 = inline;
+        bson::DateTime as BsonDateTime = inline;
+        bson::Uuid as str = inline;
+        bson::Timestamp as BsonTimestamp = inline;
+        bson::Binary as BsonBinary = inline;
+        bson::Regex as BsonRegex = inline;
+        bson::JavaScriptCodeWithScope as BsonJavaScriptCodeWithScope = inline;
+        bson::DbPointer as BsonDbPointer = inline;
+        bson::Document as PrimitiveMap<String, bson::Bson> = inline;
+        bson::Bson as Bson = inline;
+        bson::Utf8Lossy<T> as T = passthrough;
+        bson::RawBsonRef<'a,> as Bson = inline;
     );
 
-    impl Type for Timestamp {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct BsonObjectId;
+    impl Type for BsonObjectId {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$oid", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDecimal128;
+    impl Type for BsonDecimal128 {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$numberDecimal", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDateTime;
+    impl Type for BsonDateTime {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$date", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonTimestamp;
+    impl Type for BsonTimestamp {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "$timestamp",
+                    Field::new(
+                        Struct::named()
+                            .field("t", Field::new(u32::definition(types)))
+                            .field("i", Field::new(u32::definition(types)))
+                            .build(),
+                    ),
+                )
+                .build()
+        }
+    }
+
+    struct BsonBinary;
+    impl Type for BsonBinary {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "$binary",
+                    Field::new(
+                        Struct::named()
+                            .field("base64", Field::new(str::definition(types)))
+                            .field("subType", Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                )
+                .build()
+        }
+    }
+
+    struct BsonRegex;
+    impl Type for BsonRegex {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$regex", Field::new(str::definition(types)))
+                .field("$options", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonJavaScriptCode;
+    impl Type for BsonJavaScriptCode {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$code", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonJavaScriptCodeWithScope;
+    impl Type for BsonJavaScriptCodeWithScope {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$code", Field::new(str::definition(types)))
+                .field("$scope", Field::new(bson::Document::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDbPointer;
+    impl Type for BsonDbPointer {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "$dbPointer",
+                    Field::new(
+                        Struct::named()
+                            .field("$ref", Field::new(str::definition(types)))
+                            .field("$id", Field::new(bson::oid::ObjectId::definition(types)))
+                            .build(),
+                    ),
+                )
+                .build()
+        }
+    }
+
+    struct Bson;
+    impl Type for Bson {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Double".into(),
+                        Variant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Vec::<bson::Bson>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Document".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Document::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Boolean".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    ("Null".into(), Variant::unit()),
+                    (
+                        "RegularExpression".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Regex::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "JavaScriptCode".into(),
+                        Variant::unnamed()
+                            .field(Field::new(BsonJavaScriptCode::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "JavaScriptCodeWithScope".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::JavaScriptCodeWithScope::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Int32".into(),
+                        Variant::unnamed()
+                            .field(Field::new(i32::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Int64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(i64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Timestamp".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Timestamp::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Binary".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Binary::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "ObjectId".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::oid::ObjectId::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "DateTime".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::DateTime::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Symbol".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$symbol", Field::new(str::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Decimal128".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Decimal128::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Undefined".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$undefined", Field::new(bool::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "MaxKey".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$maxKey", Field::new(u8::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "MinKey".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$minKey", Field::new(u8::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "DbPointer".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::DbPointer::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+};
+
+// Technically this can be u64 for formats not marked as human readable in Serde.
+// but we have no way of inspecting that as it's runtime. This is the most common output.
+#[cfg(feature = "bytesize")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
+impl_ndt!(bytesize::ByteSize as String = inline);
+
+#[cfg(feature = "uhlc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
+const _: () = {
+    impl_ndt!(
+        uhlc::NTP64 as u64 = inline;
+        uhlc::ID as std::num::NonZeroU128 = inline;
+        uhlc::Timestamp as UhlcTimestamp = inline;
+    );
+
+    struct UhlcTimestamp;
+    impl Type for UhlcTimestamp {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Struct(Struct {
                 fields: Fields::Named(NamedFields {
                     fields: vec![
@@ -394,613 +719,1015 @@ const _: () = {
                             "time".into(),
                             Field {
                                 optional: false,
-
-                                inline: false,
                                 deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(NTP64::definition(types)),
-                                attributes: Vec::new(),
+                                docs: Default::default(),
+                                ty: Some(uhlc::NTP64::definition(types)),
+                                attributes: Attributes::default(),
                             },
                         ),
                         (
                             "id".into(),
                             Field {
                                 optional: false,
-
-                                inline: false,
                                 deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(ID::definition(types)),
-                                attributes: Vec::new(),
+                                docs: Default::default(),
+                                ty: Some(uhlc::ID::definition(types)),
+                                attributes: Attributes::default(),
                             },
                         ),
                     ],
-                    attributes: Vec::new(),
                 }),
-                attributes: Vec::new(),
+                attributes: Attributes::default(),
             })
         }
     }
 };
 
 #[cfg(feature = "glam")]
-const _: () = {
-    macro_rules! implement_specta_type_for_glam_type {
-        (
-            $name: ident as $representation: ty
-        ) => {
-            impl Type for glam::$name {
-                fn definition(types: &mut TypeCollection) -> DataType {
-                    <$representation>::definition(types)
-                }
-            }
-        };
-    }
-
-    // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
+#[cfg_attr(docsrs, doc(cfg(feature = "glam")))]
+impl_ndt!(
     // Affines
-    implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
-    implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);
+    glam::Affine2 as [f32; 6] = inline;
+    glam::Affine3A as [f32; 12] = inline;
+
+    glam::DAffine2 as [f64; 6] = inline;
+    glam::DAffine3 as [f64; 12] = inline;
 
     // Matrices
-    implement_specta_type_for_glam_type!(Mat2 as [f32; 4]);
-    implement_specta_type_for_glam_type!(Mat3 as [f32; 9]);
-    implement_specta_type_for_glam_type!(Mat3A as [f32; 9]);
-    implement_specta_type_for_glam_type!(Mat4 as [f32; 16]);
+    glam::Mat2 as [f32; 4] = inline;
+    glam::Mat3 as [f32; 9] = inline;
+    glam::Mat3A as [f32; 9] = inline;
+    glam::Mat4 as [f32; 16] = inline;
+
+    glam::DMat2 as [f64; 4] = inline;
+    glam::DMat3 as [f64; 9] = inline;
+    glam::DMat4 as [f64; 16] = inline;
 
     // Quaternions
-    implement_specta_type_for_glam_type!(Quat as [f32; 4]);
+    glam::Quat as [f32; 4] = inline;
+
+    glam::DQuat as [f64; 4] = inline;
 
     // Vectors
-    implement_specta_type_for_glam_type!(Vec2 as [f32; 2]);
-    implement_specta_type_for_glam_type!(Vec3 as [f32; 3]);
-    implement_specta_type_for_glam_type!(Vec3A as [f32; 3]);
-    implement_specta_type_for_glam_type!(Vec4 as [f32; 4]);
+    glam::Vec2 as [f32; 2] = inline;
+    glam::Vec3 as [f32; 3] = inline;
+    glam::Vec3A as [f32; 3] = inline;
+    glam::Vec4 as [f32; 4] = inline;
 
-    // Implementations for https://docs.rs/glam/latest/glam/f64/index.html
-    // Affines
-    implement_specta_type_for_glam_type!(DAffine2 as [f64; 6]);
-    implement_specta_type_for_glam_type!(DAffine3 as [f64; 12]);
-
-    // Matrices
-    implement_specta_type_for_glam_type!(DMat2 as [f64; 4]);
-    implement_specta_type_for_glam_type!(DMat3 as [f64; 9]);
-    implement_specta_type_for_glam_type!(DMat4 as [f64; 16]);
-
-    // Quaternions
-    implement_specta_type_for_glam_type!(DQuat as [f64; 4]);
-
-    // Vectors
-    implement_specta_type_for_glam_type!(DVec2 as [f64; 2]);
-    implement_specta_type_for_glam_type!(DVec3 as [f64; 3]);
-    implement_specta_type_for_glam_type!(DVec4 as [f64; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
-    implement_specta_type_for_glam_type!(I8Vec2 as [i8; 2]);
-    implement_specta_type_for_glam_type!(I8Vec3 as [i8; 3]);
-    implement_specta_type_for_glam_type!(I8Vec4 as [i8; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
-    implement_specta_type_for_glam_type!(U8Vec2 as [u8; 2]);
-    implement_specta_type_for_glam_type!(U8Vec3 as [u8; 3]);
-    implement_specta_type_for_glam_type!(U8Vec4 as [u8; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
-    implement_specta_type_for_glam_type!(I16Vec2 as [i16; 2]);
-    implement_specta_type_for_glam_type!(I16Vec3 as [i16; 3]);
-    implement_specta_type_for_glam_type!(I16Vec4 as [i16; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
-    implement_specta_type_for_glam_type!(U16Vec2 as [u16; 2]);
-    implement_specta_type_for_glam_type!(U16Vec3 as [u16; 3]);
-    implement_specta_type_for_glam_type!(U16Vec4 as [u16; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
-    implement_specta_type_for_glam_type!(IVec2 as [i32; 2]);
-    implement_specta_type_for_glam_type!(IVec3 as [i32; 3]);
-    implement_specta_type_for_glam_type!(IVec4 as [i32; 4]);
-
-    // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
-    implement_specta_type_for_glam_type!(UVec2 as [u32; 2]);
-    implement_specta_type_for_glam_type!(UVec3 as [u32; 3]);
-    implement_specta_type_for_glam_type!(UVec4 as [u32; 4]);
-
-    // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
-    implement_specta_type_for_glam_type!(I64Vec2 as [i64; 2]);
-    implement_specta_type_for_glam_type!(I64Vec3 as [i64; 3]);
-    implement_specta_type_for_glam_type!(I64Vec4 as [i64; 4]);
-
-    // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
-    implement_specta_type_for_glam_type!(U64Vec2 as [u64; 2]);
-    implement_specta_type_for_glam_type!(U64Vec3 as [u64; 3]);
-    implement_specta_type_for_glam_type!(U64Vec4 as [u64; 4]);
-
-    // implementation for https://docs.rs/glam/latest/glam/usize/index.html
-    implement_specta_type_for_glam_type!(USizeVec2 as [usize; 2]);
-    implement_specta_type_for_glam_type!(USizeVec3 as [usize; 3]);
-    implement_specta_type_for_glam_type!(USizeVec4 as [usize; 4]);
+    glam::DVec2 as [f64; 2] = inline;
+    glam::DVec3 as [f64; 3] = inline;
+    glam::DVec4 as [f64; 4] = inline;
 
     // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
-    implement_specta_type_for_glam_type!(BVec2 as [bool; 2]);
-    implement_specta_type_for_glam_type!(BVec3 as [bool; 3]);
-    implement_specta_type_for_glam_type!(BVec4 as [bool; 4]);
-};
+    glam::BVec2 as [bool; 2] = inline;
+    glam::BVec3 as [bool; 3] = inline;
+    glam::BVec3A as [bool; 3] = inline;
+    glam::BVec4 as [bool; 4] = inline;
+    glam::BVec4A as [bool; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
+    glam::I8Vec2 as [i8; 2] = inline;
+    glam::I8Vec3 as [i8; 3] = inline;
+    glam::I8Vec4 as [i8; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
+    glam::U8Vec2 as [u8; 2] = inline;
+    glam::U8Vec3 as [u8; 3] = inline;
+    glam::U8Vec4 as [u8; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
+    glam::I16Vec2 as [i16; 2] = inline;
+    glam::I16Vec3 as [i16; 3] = inline;
+    glam::I16Vec4 as [i16; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
+    glam::U16Vec2 as [u16; 2] = inline;
+    glam::U16Vec3 as [u16; 3] = inline;
+    glam::U16Vec4 as [u16; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
+    glam::UVec2 as [u32; 2] = inline;
+    glam::UVec3 as [u32; 3] = inline;
+    glam::UVec4 as [u32; 4] = inline;
+
+    // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
+    glam::IVec2 as [i32; 2] = inline;
+    glam::IVec3 as [i32; 3] = inline;
+    glam::IVec4 as [i32; 4] = inline;
+
+    // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
+    glam::I64Vec2 as [i64; 2] = inline;
+    glam::I64Vec3 as [i64; 3] = inline;
+    glam::I64Vec4 as [i64; 4] = inline;
+
+    // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
+    glam::U64Vec2 as [u64; 2] = inline;
+    glam::U64Vec3 as [u64; 3] = inline;
+    glam::U64Vec4 as [u64; 4] = inline;
+
+    // implementation for https://docs.rs/glam/latest/glam/usize/index.html
+    glam::USizeVec2 as [usize; 2] = inline;
+    glam::USizeVec3 as [usize; 3] = inline;
+    glam::USizeVec4 as [usize; 4] = inline;
+
+    // implementation for https://docs.rs/glam/latest/glam/isize/index.html
+    glam::ISizeVec2 as [isize; 2] = inline;
+    glam::ISizeVec3 as [isize; 3] = inline;
+    glam::ISizeVec4 as [isize; 4] = inline;
+);
 
 #[cfg(feature = "url")]
-impl_as!(url::Url as String);
-
-#[cfg(feature = "either")]
-impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Enum(Enum {
-            variants: vec![
-                (
-                    "Left".into(),
-                    EnumVariant::unnamed()
-                        .field(Field::new(L::definition(types)))
-                        .build(),
-                ),
-                (
-                    "Right".into(),
-                    EnumVariant::unnamed()
-                        .field(Field::new(R::definition(types)))
-                        .build(),
-                ),
-            ],
-            attributes: vec![],
-        })
-    }
-}
-
-#[cfg(feature = "bevy_ecs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "url")))]
 const _: () = {
-    impl Type for bevy_ecs::entity::Entity {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Unnamed(UnnamedFields {
-                    fields: vec![Field {
-                        optional: false,
-                        inline: false,
-                        deprecated: None,
-                        docs: Cow::Borrowed(""),
-                        ty: Some(u64::definition(types)),
-                        attributes: Vec::new(),
-                    }],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
+    impl_ndt!(
+        url::Url as str = inline;
+        url::Host as UrlHost = inline;
+    );
+
+    struct UrlHost;
+    impl Type for UrlHost {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Domain".into(),
+                        Variant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Ipv4".into(),
+                        Variant::unnamed()
+                            .field(Field::new(std::net::Ipv4Addr::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Ipv6".into(),
+                        Variant::unnamed()
+                            .field(Field::new(std::net::Ipv6Addr::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
             })
         }
     }
 };
 
-#[cfg(feature = "bevy_input")]
+#[cfg(feature = "either")]
+#[cfg_attr(docsrs, doc(cfg(feature = "either")))]
 const _: () = {
-    impl Type for bevy_input::ButtonState {
-        fn definition(_: &mut TypeCollection) -> DataType {
+    impl_ndt!(either::Either<L, R> as Either<L, R> = inline);
+
+    struct Either<L, R>(std::marker::PhantomData<(L, R)>);
+    impl<L: Type, R: Type> Type for Either<L, R> {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
-                    ("Pressed".into(), EnumVariant::unit()),
-                    ("Released".into(), EnumVariant::unit()),
+                    (
+                        "Left".into(),
+                        Variant::unnamed()
+                            .field(Field::new(L::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Right".into(),
+                        Variant::unnamed()
+                            .field(Field::new(R::definition(types)))
+                            .build(),
+                    ),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
         }
     }
+};
 
-    impl Type for bevy_input::keyboard::KeyboardInput {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Named(NamedFields {
-                    fields: vec![
-                        (
-                            "key_code".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::keyboard::KeyCode::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "logical_key".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::keyboard::Key::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "state".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::ButtonState::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "window".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                    ],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
-            })
-        }
-    }
-
-    // Reduced KeyCode and Key to String to avoid redefining a quite large enum (for now)
-    impl_as!(
-        bevy_input::keyboard::KeyCode as String
-        bevy_input::keyboard::Key as String
+#[cfg(feature = "error-stack")]
+#[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
+const _: () = {
+    impl_ndt!(
+        "error_stack" ErrorStackContext as ErrorStackContextInner = named;
+        error_stack::Report<> <C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
     );
 
-    impl Type for bevy_input::mouse::MouseButtonInput {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Named(NamedFields {
-                    fields: vec![
-                        (
-                            "button".into(),
-                            Field {
-                                optional: false,
+    impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
+        fn definition(types: &mut Types) -> DataType {
+            error_stack::Report::<C>::definition(types)
+        }
+    }
 
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::mouse::MouseButton::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "state".into(),
-                            Field {
-                                optional: false,
+    struct ErrorStackContext;
 
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::ButtonState::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "window".into(),
-                            Field {
-                                optional: false,
+    struct ErrorStackContextInner;
+    impl Type for ErrorStackContextInner {
+        fn definition(types: &mut Types) -> DataType {
+            let attachments = DataType::List(List::new(String::definition(types)));
+            let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
 
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                    ],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
+            Struct::named()
+                .field("context", Field::new(String::definition(types)))
+                .field("attachments", Field::new(attachments))
+                .field("sources", Field::new(sources))
+                .build()
+        }
+    }
+
+    struct ReportInner;
+    impl Type for ReportInner {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::List(List::new(ErrorStackContext::definition(types)))
+        }
+    }
+};
+
+#[cfg(feature = "bevy_ecs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
+impl_ndt!(
+    bevy_ecs::entity::Entity as u64 = named;
+    bevy_ecs::name::Name as str = named;
+    bevy_ecs::hierarchy::ChildOf as bevy_ecs::entity::Entity = named;
+    bevy_ecs::entity::EntityHashMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+    bevy_ecs::entity::EntityHashSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+    bevy_ecs::entity::EntityIndexMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+    bevy_ecs::entity::EntityIndexSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+);
+
+#[cfg(feature = "bevy_input")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
+const _: () = {
+    impl_ndt!(
+        bevy_input::ButtonState as BevyButtonState = named;
+        bevy_input::keyboard::KeyboardInput as BevyKeyboardInput = named;
+        bevy_input::keyboard::KeyboardFocusLost as BevyKeyboardFocusLost = named;
+        bevy_input::keyboard::NativeKeyCode as str = named;
+        bevy_input::keyboard::KeyCode as str = named;
+        bevy_input::keyboard::NativeKey as str = named;
+        bevy_input::keyboard::Key as str = named;
+        bevy_input::mouse::MouseButtonInput as BevyMouseButtonInput = named;
+        bevy_input::mouse::MouseButton as BevyMouseButton = named;
+        bevy_input::mouse::MouseMotion as BevyMouseMotion = named;
+        bevy_input::mouse::MouseScrollUnit as BevyMouseScrollUnit = named;
+        bevy_input::mouse::MouseWheel as BevyMouseWheel = named;
+        bevy_input::mouse::AccumulatedMouseMotion as BevyAccumulatedMouseMotion = named;
+        bevy_input::mouse::AccumulatedMouseScroll as BevyAccumulatedMouseScroll = named;
+        bevy_input::touch::TouchInput as BevyTouchInput = named;
+        bevy_input::touch::ForceTouch as BevyForceTouch = named;
+        bevy_input::touch::TouchPhase as BevyTouchPhase = named;
+        bevy_input::gestures::PinchGesture as f32 = named;
+        bevy_input::gestures::RotationGesture as f32 = named;
+        bevy_input::gestures::DoubleTapGesture as BevyDoubleTapGesture = named;
+        bevy_input::gestures::PanGesture as [f32; 2] = named;
+        bevy_input::gamepad::GamepadEvent as BevyGamepadEvent = named;
+        bevy_input::gamepad::RawGamepadEvent as BevyRawGamepadEvent = named;
+        bevy_input::gamepad::RawGamepadButtonChangedEvent as BevyRawGamepadButtonChangedEvent = named;
+        bevy_input::gamepad::RawGamepadAxisChangedEvent as BevyRawGamepadAxisChangedEvent = named;
+        bevy_input::gamepad::GamepadConnectionEvent as BevyGamepadConnectionEvent = named;
+        bevy_input::gamepad::GamepadButtonStateChangedEvent as BevyGamepadButtonStateChangedEvent = named;
+        bevy_input::gamepad::GamepadButtonChangedEvent as BevyGamepadButtonChangedEvent = named;
+        bevy_input::gamepad::GamepadAxisChangedEvent as BevyGamepadAxisChangedEvent = named;
+        bevy_input::gamepad::GamepadButton as BevyGamepadButton = named;
+        bevy_input::gamepad::GamepadAxis as BevyGamepadAxis = named;
+        bevy_input::gamepad::GamepadConnection as BevyGamepadConnection = named;
+    );
+
+    struct BevyButtonState;
+    impl Type for BevyButtonState {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Pressed".into(), Variant::unit()),
+                    ("Released".into(), Variant::unit()),
+                ],
+                attributes: Attributes::default(),
             })
         }
     }
 
-    impl Type for bevy_input::mouse::MouseButton {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct BevyKeyboardFocusLost;
+    impl Type for BevyKeyboardFocusLost {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Unit,
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyKeyboardInput;
+    impl Type for BevyKeyboardInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "key_code",
+                    Field::new(bevy_input::keyboard::KeyCode::definition(types)),
+                )
+                .field(
+                    "logical_key",
+                    Field::new(bevy_input::keyboard::Key::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field(
+                    "text",
+                    Field::new(Option::<smol_str::SmolStr>::definition(types)),
+                )
+                .field("repeat", Field::new(bool::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyMouseButtonInput;
+    impl Type for BevyMouseButtonInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "button",
+                    Field::new(bevy_input::mouse::MouseButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyMouseButton;
+    impl Type for BevyMouseButton {
+        fn definition(types: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
-                    ("Left".into(), EnumVariant::unit()),
-                    ("Right".into(), EnumVariant::unit()),
-                    ("Middle".into(), EnumVariant::unit()),
-                    ("Back".into(), EnumVariant::unit()),
-                    ("Forward".into(), EnumVariant::unit()),
+                    ("Left".into(), Variant::unit()),
+                    ("Right".into(), Variant::unit()),
+                    ("Middle".into(), Variant::unit()),
+                    ("Back".into(), Variant::unit()),
+                    ("Forward".into(), Variant::unit()),
                     (
                         "Other".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(u16::definition(types)))
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
         }
     }
 
-    impl Type for bevy_input::mouse::MouseWheel {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Named(NamedFields {
-                    fields: vec![
-                        (
-                            "unit".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_input::mouse::MouseScrollUnit::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "x".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(f32::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "y".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(f32::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                        (
-                            "window".into(),
-                            Field {
-                                optional: false,
-
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
-                                attributes: Vec::new(),
-                            },
-                        ),
-                    ],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
-            })
+    struct BevyMouseMotion;
+    impl Type for BevyMouseMotion {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
         }
     }
 
-    impl Type for bevy_input::mouse::MouseScrollUnit {
-        fn definition(_: &mut TypeCollection) -> DataType {
+    struct BevyMouseScrollUnit;
+    impl Type for BevyMouseScrollUnit {
+        fn definition(_: &mut Types) -> DataType {
             DataType::Enum(Enum {
                 variants: vec![
-                    ("Line".into(), EnumVariant::unit()),
-                    ("Pixel".into(), EnumVariant::unit()),
+                    ("Line".into(), Variant::unit()),
+                    ("Pixel".into(), Variant::unit()),
                 ],
-                attributes: vec![],
+                attributes: Attributes::default(),
             })
         }
     }
 
-    impl Type for bevy_input::mouse::MouseMotion {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(Struct {
-                fields: Fields::Named(NamedFields {
-                    fields: vec![(
-                        "delta".into(),
-                        Field {
-                            optional: false,
+    struct BevyMouseWheel;
+    impl Type for BevyMouseWheel {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "unit",
+                    Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                )
+                .field("x", Field::new(f32::definition(types)))
+                .field("y", Field::new(f32::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "phase",
+                    Field::new(bevy_input::touch::TouchPhase::definition(types)),
+                )
+                .build()
+        }
+    }
 
-                            inline: false,
-                            deprecated: None,
-                            docs: Cow::Borrowed(""),
-                            ty: Some(glam::Vec2::definition(types)),
-                            attributes: Vec::new(),
-                        },
-                    )],
-                    attributes: Vec::new(),
-                }),
-                attributes: Vec::new(),
+    struct BevyAccumulatedMouseMotion;
+    impl Type for BevyAccumulatedMouseMotion {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyAccumulatedMouseScroll;
+    impl Type for BevyAccumulatedMouseScroll {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "unit",
+                    Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                )
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyTouchInput;
+    impl Type for BevyTouchInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "phase",
+                    Field::new(bevy_input::touch::TouchPhase::definition(types)),
+                )
+                .field("position", Field::new(<[f32; 2]>::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "force",
+                    Field::new(Option::<bevy_input::touch::ForceTouch>::definition(types)),
+                )
+                .field("id", Field::new(u64::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyForceTouch;
+    impl Type for BevyForceTouch {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Calibrated".into(),
+                        Variant::named()
+                            .field("force", Field::new(f64::definition(types)))
+                            .field("max_possible_force", Field::new(f64::definition(types)))
+                            .field(
+                                "altitude_angle",
+                                Field::new(Option::<f64>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "Normalized".into(),
+                        Variant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyTouchPhase;
+    impl Type for BevyTouchPhase {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Started".into(), Variant::unit()),
+                    ("Moved".into(), Variant::unit()),
+                    ("Ended".into(), Variant::unit()),
+                    ("Canceled".into(), Variant::unit()),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyDoubleTapGesture;
+    impl Type for BevyDoubleTapGesture {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Unit,
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadEvent;
+    impl Type for BevyGamepadEvent {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadConnectionEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Button".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadButtonChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Axis".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadAxisChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyRawGamepadEvent;
+    impl Type for BevyRawGamepadEvent {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadConnectionEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Button".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::RawGamepadButtonChangedEvent::definition(
+                                    types,
+                                ),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Axis".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::RawGamepadAxisChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyRawGamepadButtonChangedEvent;
+    impl Type for BevyRawGamepadButtonChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyRawGamepadAxisChangedEvent;
+    impl Type for BevyRawGamepadAxisChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "axis",
+                    Field::new(bevy_input::gamepad::GamepadAxis::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadConnectionEvent;
+    impl Type for BevyGamepadConnectionEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "connection",
+                    Field::new(bevy_input::gamepad::GamepadConnection::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyGamepadButtonStateChangedEvent;
+    impl Type for BevyGamepadButtonStateChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyGamepadButtonChangedEvent;
+    impl Type for BevyGamepadButtonChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadAxisChangedEvent;
+    impl Type for BevyGamepadAxisChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "axis",
+                    Field::new(bevy_input::gamepad::GamepadAxis::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadButton;
+    impl Type for BevyGamepadButton {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("South".into(), Variant::unit()),
+                    ("East".into(), Variant::unit()),
+                    ("North".into(), Variant::unit()),
+                    ("West".into(), Variant::unit()),
+                    ("C".into(), Variant::unit()),
+                    ("Z".into(), Variant::unit()),
+                    ("LeftTrigger".into(), Variant::unit()),
+                    ("LeftTrigger2".into(), Variant::unit()),
+                    ("RightTrigger".into(), Variant::unit()),
+                    ("RightTrigger2".into(), Variant::unit()),
+                    ("Select".into(), Variant::unit()),
+                    ("Start".into(), Variant::unit()),
+                    ("Mode".into(), Variant::unit()),
+                    ("LeftThumb".into(), Variant::unit()),
+                    ("RightThumb".into(), Variant::unit()),
+                    ("DPadUp".into(), Variant::unit()),
+                    ("DPadDown".into(), Variant::unit()),
+                    ("DPadLeft".into(), Variant::unit()),
+                    ("DPadRight".into(), Variant::unit()),
+                    (
+                        "Other".into(),
+                        Variant::unnamed()
+                            .field(Field::new(u8::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadAxis;
+    impl Type for BevyGamepadAxis {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("LeftStickX".into(), Variant::unit()),
+                    ("LeftStickY".into(), Variant::unit()),
+                    ("LeftZ".into(), Variant::unit()),
+                    ("RightStickX".into(), Variant::unit()),
+                    ("RightStickY".into(), Variant::unit()),
+                    ("RightZ".into(), Variant::unit()),
+                    (
+                        "Other".into(),
+                        Variant::unnamed()
+                            .field(Field::new(u8::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadConnection;
+    impl Type for BevyGamepadConnection {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connected".into(),
+                        Variant::named()
+                            .field("name", Field::new(String::definition(types)))
+                            .field("vendor_id", Field::new(Option::<u16>::definition(types)))
+                            .field("product_id", Field::new(Option::<u16>::definition(types)))
+                            .build(),
+                    ),
+                    ("Disconnected".into(), Variant::unit()),
+                ],
+                attributes: Attributes::default(),
             })
         }
     }
 };
 
 #[cfg(feature = "camino")]
-impl_as!(
-    camino::Utf8Path as String
-    camino::Utf8PathBuf as String
+#[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
+impl_ndt!(
+    camino::Utf8Path as str = inline;
+    camino::Utf8PathBuf as str = inline;
 );
 
 #[cfg(feature = "geojson")]
+#[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
 const _: () = {
-    use geojson::{Feature, FeatureCollection, Geometry, Value};
+    impl_ndt!(
+        geojson::Position as [f64] = inline;
+        geojson::GeoJson as GeoJson = inline;
+        geojson::GeometryValue as GeoJsonGeometryValue = inline;
+        geojson::Geometry as GeoJsonGeometry = inline;
+        geojson::Feature as GeoJsonFeature = inline;
+        geojson::FeatureCollection as GeoJsonFeatureCollection = inline;
+        geojson::feature::Id as GeoJsonFeatureId = inline;
+    );
 
-    impl Type for Value {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct GeoJson;
+    impl Type for GeoJson {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Geometry".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::Geometry::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Feature".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::Feature::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "FeatureCollection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::FeatureCollection::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes,
+            })
+        }
+    }
+
+    struct GeoJsonGeometryValue;
+    impl Type for GeoJsonGeometryValue {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
                         "Point".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(geojson::PointType::definition(types)))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::PointType::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "MultiPoint".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(Vec::<geojson::PointType>::definition(types)))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::PointType>::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "LineString".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(geojson::LineStringType::definition(types)))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::LineStringType::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "MultiLineString".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(Vec::<geojson::LineStringType>::definition(
-                                types,
-                            )))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::LineStringType>::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "Polygon".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(geojson::PolygonType::definition(types)))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::PolygonType::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "MultiPolygon".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::PolygonType>::definition(types)),
+                            )
                             .build(),
                     ),
                     (
                         "GeometryCollection".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(Vec::<Geometry>::definition(types)))
+                        Variant::named()
+                            .field(
+                                "geometries",
+                                Field::new(Vec::<geojson::Geometry>::definition(types)),
+                            )
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
-                    path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
-                        String::from("untagged"),
-                    ))]),
-                }],
+                attributes,
             })
         }
     }
 
-    #[derive(Type)]
-    #[specta(remote = Geometry, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoJsonGeometry {
-        pub bbox: Option<geojson::Bbox>,
-        pub value: Value,
-        pub foreign_members: Option<geojson::JsonObject>,
+    struct GeoJsonGeometry;
+    impl Type for GeoJsonGeometry {
+        fn definition(types: &mut Types) -> DataType {
+            let mut value = Field::new(geojson::GeometryValue::definition(types));
+            value.attributes.insert("serde:field:flatten", true);
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
+
+            Struct::named()
+                .field(
+                    "bbox",
+                    Field::new(Option::<geojson::Bbox>::definition(types)),
+                )
+                .field("value", value)
+                .field("foreign_members", foreign_members)
+                .build()
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = Feature, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoJsonFeature {
-        pub bbox: Option<geojson::Bbox>,
-        pub geometry: Option<Geometry>,
-        pub id: Option<geojson::feature::Id>,
-        pub properties: Option<geojson::JsonObject>,
-        pub foreign_members: Option<geojson::JsonObject>,
+    struct GeoJsonFeature;
+    impl Type for GeoJsonFeature {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
+
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        (
+                            "geometry".into(),
+                            Field::new(Option::<geojson::Geometry>::definition(types)),
+                        ),
+                        (
+                            "id".into(),
+                            Field::new(Option::<geojson::feature::Id>::definition(types)),
+                        ),
+                        (
+                            "properties".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                        ("foreign_members".into(), foreign_members),
+                    ],
+                }),
+                attributes,
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = FeatureCollection, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoJsonFeatureCollection {
-        pub bbox: Option<geojson::Bbox>,
-        pub features: Vec<Feature>,
-        pub foreign_members: Option<geojson::JsonObject>,
+    struct GeoJsonFeatureCollection;
+    impl Type for GeoJsonFeatureCollection {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
+
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        (
+                            "features".into(),
+                            Field::new(Vec::<geojson::Feature>::definition(types)),
+                        ),
+                        ("foreign_members".into(), foreign_members),
+                    ],
+                }),
+                attributes,
+            })
+        }
     }
 
-    impl Type for geojson::feature::Id {
-        fn definition(types: &mut TypeCollection) -> DataType {
+    struct GeoJsonFeatureId;
+    impl Type for GeoJsonFeatureId {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
                         "String".into(),
-                        EnumVariant::unnamed()
-                            .field(Field::new(String::definition(types)))
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
                             .build(),
                     ),
                     (
                         "Number".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(serde_json::Number::definition(types)))
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
-                    path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
-                        String::from("untagged"),
-                    ))]),
-                }],
+                attributes,
             })
         }
-    }
-};
-
-#[cfg(feature = "geozero")]
-const _: () = {
-    use geozero::mvt::tile;
-
-    #[derive(Type)]
-    #[specta(remote = geozero::mvt::Tile, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoZeroTile {
-        pub layers: Vec<tile::Layer>,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = tile::Value, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoZeroValue {
-        pub string_value: Option<String>,
-        pub float_value: Option<f32>,
-        pub double_value: Option<f64>,
-        pub int_value: Option<i64>,
-        pub uint_value: Option<u64>,
-        pub sint_value: Option<i64>,
-        pub bool_value: Option<bool>,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = tile::Feature, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoZeroFeature {
-        pub id: Option<u64>,
-        pub tags: Vec<u32>,
-        pub r#type: Option<i32>,
-        pub geometry: Vec<u32>,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = tile::Layer, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct GeoZeroLayer {
-        pub version: u32,
-        pub name: String,
-        pub features: Vec<tile::Feature>,
-        pub keys: Vec<String>,
-        pub values: Vec<tile::Value>,
-        pub extent: Option<u32>,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = tile::GeomType, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub enum GeoZeroGeomType {
-        Unknown = 0,
-        Point = 1,
-        Linestring = 2,
-        Polygon = 3,
     }
 };
