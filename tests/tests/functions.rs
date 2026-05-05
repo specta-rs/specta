@@ -104,6 +104,15 @@ mod nested {
 #[specta]
 fn raw(r#type: i32) {}
 
+// https://github.com/specta-rs/specta/issues/213
+#[allow(non_snake_case)]
+#[specta(rename_all = "snake_case")]
+fn rename_all_fn(myArg: i32, anotherValue: String) {}
+
+#[allow(non_snake_case)]
+#[specta(rename = "totally_custom")]
+fn renamed_fn(myArg: i32) {}
+
 // TODO: Finish fixing these
 
 #[test]
@@ -332,5 +341,20 @@ fn test_function_exporting() {
         let mut types = Types::default();
         let def: Function = fn_datatype![raw](&mut types);
         insta::assert_snapshot!(def.args()[0].0, @"type");
+    }
+
+    {
+        let mut types = TypeCollection::default();
+        let def: Function = fn_datatype![rename_all_fn](&mut types);
+        insta::assert_snapshot!(def.name(), @"rename_all_fn");
+        insta::assert_snapshot!(def.args()[0].0, @"my_arg");
+        insta::assert_snapshot!(def.args()[1].0, @"another_value");
+    }
+
+    {
+        let mut types = TypeCollection::default();
+        let def: Function = fn_datatype![renamed_fn](&mut types);
+        insta::assert_snapshot!(def.name(), @"totally_custom");
+        insta::assert_snapshot!(def.args()[0].0, @"myArg");
     }
 }

@@ -84,6 +84,12 @@ error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] mac
     |
     = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error: specta: unsupported rename rule. Expected one of lowercase, UPPERCASE, PascalCase, camelCase, snake_case, SCREAMING_SNAKE_CASE, kebab-case, SCREAMING-KEBAB-CASE
+   --> tests/macro/compile_error.rs:162:23
+    |
+162 | #[specta(rename_all = "camelCase123")]
+    |                       ^^^^^^^^^^^^^^
+
 error[E0255]: the name `__specta__fn__testing` is defined multiple times
    --> tests/macro/compile_error.rs:160:8
     |
@@ -192,10 +198,10 @@ error: cannot find attribute `serde` in this scope
    = note: `serde` is in scope, but it is a crate, not an attribute
 
 error[E0601]: `main` function not found in crate `$CRATE`
-   --> tests/macro/compile_error.rs:160:20
+   --> tests/macro/compile_error.rs:163:40
     |
-160 | pub fn testing() {}
-    |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+163 | pub fn invalid_function_rename_all() {}
+    |                                        ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`
   --> tests/macro/compile_error.rs:15:23
