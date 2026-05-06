@@ -20,7 +20,7 @@ use super::legacy::ExportPath;
 /// If you encounter this error, there are a few common migration paths (in order of preference):
 ///
 /// 1. Use a Specta-based framework which can handle these types
-///     - None currently exist but it would theoretically be possible refer to [#203](https://github.com/specta-rs/specta/issues/203) for more information.
+///     - None currently exist but it would theoretically be possible refer to [#203](https://github.com/specta-rs/specta/issues/203#issuecomment-4387573925) for more information.
 ///
 /// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
 ///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
@@ -39,6 +39,7 @@ use super::legacy::ExportPath;
 /// 5. **UNSAFE:** Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
 ///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
 ///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
+///     - Refer to discussion around this on [#481](https://github.com/specta-rs/specta/issues/481).
 ///
 #[non_exhaustive]
 pub struct Error {
