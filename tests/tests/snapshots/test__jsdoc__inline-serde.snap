@@ -673,3 +673,7 @@ specta_typescript::Unknown: unknown
 specta_typescript::Unknown<String>: unknown
 specta_typescript::Never: never
 specta_typescript::Never<String>: never
+specta_typescript::Number: number
+specta_typescript::Number<i128>: number
+specta_typescript::BigInt: bigint
+specta_typescript::BigInt<i128>: bigint
