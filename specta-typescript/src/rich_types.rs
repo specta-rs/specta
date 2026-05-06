@@ -31,17 +31,32 @@ impl fmt::Debug for Transform {
 }
 
 impl Transform {
+    /// Construct a runtime transform from a JavaScript identifier mapper.
     pub fn new(runtime: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
         Self(Some(Arc::new(runtime)))
     }
 
+    /// Construct an identity runtime transform.
     pub fn identity() -> Self {
         Self(None)
     }
+
+    fn apply(&self, ident: &str) -> String {
+        match &self.0 {
+            Some(runtime) => runtime(ident),
+            None => ident.to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Phase {
+    Serialize,
+    Deserialize,
 }
 
 #[derive(Clone)]
-struct DataTypeFn(Arc<dyn Fn(DataType) -> DataType + Send + Sync>);
+pub(crate) struct DataTypeFn(Arc<dyn Fn(DataType) -> DataType + Send + Sync>);
 
 impl DataTypeFn {
     pub(crate) fn new(f: impl Fn(DataType) -> DataType + Send + Sync + 'static) -> Self {
@@ -81,9 +96,136 @@ pub(crate) struct Rule {
 #[derive(Debug, Clone)]
 pub struct RichTypesConfiguration {
     rules: Vec<Rule>,
-    remapper: Option<specta_util::Remapper>,
+    remapper: Remapper,
     lossless_bigint: bool,
     lossless_floats: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct Remapper {
+    rules: Vec<RemapRule>,
+}
+
+#[derive(Debug, Clone)]
+struct RemapRule {
+    from: DataType,
+    serialize_to: DataType,
+    deserialize_to: DataType,
+}
+
+impl Remapper {
+    fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    fn rule(&mut self, from: DataType, serialize_to: DataType, deserialize_to: DataType) {
+        self.rules.push(RemapRule {
+            from,
+            serialize_to,
+            deserialize_to,
+        });
+    }
+
+    fn remap_dt(&self, phase: Phase, mut dt: DataType) -> DataType {
+        self.remap_internal(phase, &mut dt);
+        dt
+    }
+
+    fn remap_types(&self, types: Types) -> Types {
+        types.map(|mut ndt| {
+            let phase = if ndt.name.ends_with("_Serialize") {
+                Phase::Serialize
+            } else {
+                Phase::Deserialize
+            };
+
+            ndt.generics.to_mut().iter_mut().for_each(|generic| {
+                if let Some(dt) = &mut generic.default {
+                    self.remap_internal(phase, dt);
+                }
+            });
+            if let Some(dt) = &mut ndt.ty {
+                self.remap_internal(phase, dt);
+            }
+            ndt
+        })
+    }
+
+    fn remap_internal(&self, phase: Phase, dt: &mut DataType) {
+        self.remap_rules(phase, dt);
+
+        match dt {
+            DataType::Primitive(_) | DataType::Generic(_) => {}
+            DataType::List(list) => self.remap_internal(phase, &mut list.ty),
+            DataType::Map(map) => {
+                self.remap_internal(phase, map.key_ty_mut());
+                self.remap_internal(phase, map.value_ty_mut());
+            }
+            DataType::Struct(s) => self.remap_fields(phase, &mut s.fields),
+            DataType::Enum(e) => {
+                for (_, variant) in &mut e.variants {
+                    self.remap_fields(phase, &mut variant.fields);
+                }
+            }
+            DataType::Tuple(tuple) => {
+                for dt in &mut tuple.elements {
+                    self.remap_internal(phase, dt);
+                }
+            }
+            DataType::Nullable(dt) => self.remap_internal(phase, dt),
+            DataType::Intersection(dts) => {
+                for dt in dts {
+                    self.remap_internal(phase, dt);
+                }
+            }
+            DataType::Reference(reference) => {
+                let Reference::Named(reference) = reference else {
+                    return;
+                };
+
+                match &mut reference.inner {
+                    NamedReferenceType::Recursive => {}
+                    NamedReferenceType::Inline { dt, .. } => self.remap_internal(phase, dt),
+                    NamedReferenceType::Reference { generics, .. } => {
+                        for (_, dt) in generics {
+                            self.remap_internal(phase, dt);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn remap_rules(&self, phase: Phase, dt: &mut DataType) {
+        for rule in &self.rules {
+            if *dt == rule.from {
+                *dt = match phase {
+                    Phase::Serialize => rule.serialize_to.clone(),
+                    Phase::Deserialize => rule.deserialize_to.clone(),
+                };
+            }
+        }
+    }
+
+    fn remap_fields(&self, phase: Phase, fields: &mut Fields) {
+        match fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => {
+                for field in &mut fields.fields {
+                    if let Some(dt) = &mut field.ty {
+                        self.remap_internal(phase, dt);
+                    }
+                }
+            }
+            Fields::Named(fields) => {
+                for (_, field) in &mut fields.fields {
+                    if let Some(dt) = &mut field.ty {
+                        self.remap_internal(phase, dt);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl RichTypesConfiguration {
@@ -93,7 +235,7 @@ impl RichTypesConfiguration {
     pub fn empty() -> Self {
         Self {
             rules: Default::default(),
-            remapper: None,
+            remapper: Remapper::default(),
             lossless_bigint: false,
             lossless_floats: false,
         }
@@ -143,12 +285,11 @@ impl RichTypesConfiguration {
                 Primitive::u128,
                 Primitive::i128,
             ] {
-                // TODO: For input it should be `bigint | number` when phased is enabled??? How do we know that???
-
-                self.remapper = Some(self.remapper.take().unwrap_or_default().rule(
+                self.remapper.rule(
                     DataType::Primitive(primitive),
+                    crate::define("bigint | number").into(),
                     Reference::opaque(crate::opaque::BigInt).into(),
-                ));
+                );
             }
         }
 
@@ -167,10 +308,9 @@ impl RichTypesConfiguration {
             // We don't map `f128` as it just can't exist in JS.
             for primitive in [Primitive::f16, Primitive::f32, Primitive::f64] {
                 // This remaps `number | null` to `number`, which is correct if the runtime can handle it.
-                self.remapper = Some(self.remapper.take().unwrap_or_default().rule(
-                    DataType::Primitive(primitive),
-                    Reference::opaque(crate::opaque::Number).into(),
-                ));
+                let number: DataType = Reference::opaque(crate::opaque::Number).into();
+                self.remapper
+                    .rule(DataType::Primitive(primitive), number.clone(), number);
             }
         }
 
@@ -183,8 +323,8 @@ impl RichTypesConfiguration {
     pub fn apply_types<'a>(&self, types: &'a Types) -> Cow<'a, Types> {
         let mut types = Cow::Borrowed(types);
 
-        if let Some(remapper) = self.remapper.as_ref() {
-            types = Cow::Owned(remapper.remap_types(types.into_owned()));
+        if !self.remapper.is_empty() {
+            types = Cow::Owned(self.remapper.remap_types(types.into_owned()));
         }
 
         if !self.rules.is_empty() {
@@ -195,7 +335,7 @@ impl RichTypesConfiguration {
                     .find(|r| r.name == ndt.name && r.module_path == ndt.module_path)
                     && let Some(dt) = ndt.ty.take()
                 {
-                    ndt.ty = Some((rule.typ)(dt));
+                    ndt.ty = Some((rule.data_type.0)(dt));
                 }
 
                 ndt
@@ -214,17 +354,38 @@ impl RichTypesConfiguration {
     ///
     /// If no rules are matched, `None` is returned, if the type doesn't require transformations, `Some((None, runtime_str))` is returned.
     ///
+    pub fn apply_serialize(
+        &self,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Option<(Option<DataType>, String)> {
+        self.apply_inner(Phase::Serialize, types, dt, js_ident, &mut Vec::new())
+    }
+
+    /// Scan a [`DataType`] tree applying deserialize-facing rules.
+    pub fn apply_deserialize(
+        &self,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Option<(Option<DataType>, String)> {
+        self.apply_inner(Phase::Deserialize, types, dt, js_ident, &mut Vec::new())
+    }
+
+    /// Scan a [`DataType`] tree applying serialize-facing rules.
     pub fn apply(
         &self,
         types: &Types,
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(types, dt, js_ident, &mut Vec::new())
+        self.apply_serialize(types, dt, js_ident)
     }
 
     fn apply_inner(
         &self,
+        phase: Phase,
         types: &Types,
         dt: &DataType,
         js_ident: &str,
@@ -233,7 +394,7 @@ impl RichTypesConfiguration {
         let result = match dt {
             DataType::Reference(Reference::Named(r)) => match &r.inner {
                 NamedReferenceType::Inline { dt, .. } => {
-                    self.apply_inner(types, dt, js_ident, stack)
+                    self.apply_inner(phase, types, dt, js_ident, stack)
                 }
                 NamedReferenceType::Recursive => None,
                 NamedReferenceType::Reference { .. } => {
@@ -245,8 +406,16 @@ impl RichTypesConfiguration {
 
                     if let Some(rule) = rule {
                         return Some((
-                            ndt.ty.clone().map(|dt| (rule.typ)(dt)),
-                            (rule.serialize_runtime)(js_ident),
+                            ndt.ty.clone().map(|dt| (rule.data_type.0)(dt)),
+                            match phase {
+                                Phase::Serialize => &rule.serialize,
+                                Phase::Deserialize => &rule.deserialize,
+                            }
+                            .as_ref()
+                            .map_or_else(
+                                || js_ident.to_owned(),
+                                |transform| transform.apply(js_ident),
+                            ),
                         ));
                     }
 
@@ -257,7 +426,7 @@ impl RichTypesConfiguration {
                     }
                     stack.push(key);
                     let result = self
-                        .apply_inner(types, ty, js_ident, stack)
+                        .apply_inner(phase, types, ty, js_ident, stack)
                         .map(|(_, runtime)| (None, runtime));
                     stack.pop();
                     result
@@ -273,7 +442,7 @@ impl RichTypesConfiguration {
                         let Some(field_ty) = &field.ty else { continue };
                         let field_ident = format!("{js_ident}.{name}");
                         let Some((next_ty, runtime)) =
-                            self.apply_inner(types, field_ty, &field_ident, stack)
+                            self.apply_inner(phase, types, field_ty, &field_ident, stack)
                         else {
                             continue;
                         };
@@ -309,7 +478,7 @@ impl RichTypesConfiguration {
                             let field_ty = field.ty.as_ref()?;
                             let field_ident = format!("{js_ident}[{idx}]");
                             let (next_ty, runtime) =
-                                self.apply_inner(types, field_ty, &field_ident, stack)?;
+                                self.apply_inner(phase, types, field_ty, &field_ident, stack)?;
 
                             if let Some(next_ty) = next_ty
                                 && let Fields::Unnamed(fields) = &mut ty.fields
@@ -342,7 +511,8 @@ impl RichTypesConfiguration {
                     .enumerate()
                     .filter_map(|(idx, element)| {
                         let ident = format!("{js_ident}[{idx}]");
-                        let (next_ty, runtime) = self.apply_inner(types, element, &ident, stack)?;
+                        let (next_ty, runtime) =
+                            self.apply_inner(phase, types, element, &ident, stack)?;
                         if let Some(next_ty) = next_ty {
                             ty.elements[idx] = next_ty;
                             changed = true;
@@ -362,7 +532,7 @@ impl RichTypesConfiguration {
             }
             DataType::List(list) => {
                 let item = "i";
-                let (next_ty, runtime) = self.apply_inner(types, &list.ty, item, stack)?;
+                let (next_ty, runtime) = self.apply_inner(phase, types, &list.ty, item, stack)?;
                 let mut ty = list.clone();
                 let mut changed = false;
                 if let Some(next_ty) = next_ty {
@@ -375,7 +545,7 @@ impl RichTypesConfiguration {
                 ))
             }
             DataType::Nullable(inner) => {
-                let (next_ty, runtime) = self.apply_inner(types, inner, js_ident, stack)?;
+                let (next_ty, runtime) = self.apply_inner(phase, types, inner, js_ident, stack)?;
                 Some((
                     next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
                     format!("{js_ident}==null?{js_ident}:{runtime}"),
@@ -388,7 +558,8 @@ impl RichTypesConfiguration {
                     .iter()
                     .enumerate()
                     .filter_map(|(idx, item)| {
-                        let (next_ty, runtime) = self.apply_inner(types, item, js_ident, stack)?;
+                        let (next_ty, runtime) =
+                            self.apply_inner(phase, types, item, js_ident, stack)?;
                         if let Some(next_ty) = next_ty {
                             ty[idx] = next_ty;
                             changed = true;
@@ -419,20 +590,22 @@ impl RichTypesConfiguration {
             | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
-        self.apply_remapper(dt, js_ident, result)
+        self.apply_remapper(phase, dt, js_ident, result)
     }
 
     fn apply_remapper(
         &self,
+        phase: Phase,
         dt: &DataType,
         js_ident: &str,
         result: Option<(Option<DataType>, String)>,
     ) -> Option<(Option<DataType>, String)> {
-        let Some(remapper) = self.remapper.as_ref() else {
+        if self.remapper.is_empty() {
             return result;
-        };
+        }
 
-        let remapped = remapper.remap_dt(
+        let remapped = self.remapper.remap_dt(
+            phase,
             result
                 .as_ref()
                 .and_then(|(dt, _)| dt.clone())

@@ -33,7 +33,7 @@ impl Default for RichTypesConfiguration {
                 // TODO: `NaiveDate`, `NaiveDateTime`, `DateTime<FixedOffset>`
                 // https://chatgpt.com/c/69fae901-2590-839c-8174-cfca70cc23bc
             ],
-            remapper: None,
+            remapper: Default::default(),
             lossless_bigint: false,
             lossless_floats: false,
         }
