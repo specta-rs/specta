@@ -7,8 +7,6 @@ use specta::{
 
 use crate::define;
 
-use crate::define;
-
 /// A rich type runtime JS transformer function.
 ///
 /// This defines a JS function which can convert between the incoming/outgoing type and it's JSON representation.
