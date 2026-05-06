@@ -193,7 +193,13 @@ impl RichTypesConfiguration {
         }
 
         if !self.rules.is_empty() {
-            types = Cow::Owned(types.into_owned().map(|mut ndt| {
+            let source = types.into_owned();
+            let lookup = source.clone();
+            types = Cow::Owned(source.map(|mut ndt| {
+                if let Some(dt) = &mut ndt.ty {
+                    self.apply_rules_to_dt(&lookup, dt);
+                }
+
                 if let Some(rule) = self
                     .rules
                     .iter()
@@ -208,6 +214,66 @@ impl RichTypesConfiguration {
         }
 
         types
+    }
+
+    fn apply_rules_to_dt(&self, types: &Types, dt: &mut DataType) {
+        if let DataType::Reference(Reference::Named(reference)) = dt
+            && let Some(rule) = self.rule_for_reference(types, reference)
+        {
+            *dt = (rule.data_type.0)(Self::reference_source_dt(types, reference));
+            return;
+        }
+
+        match dt {
+            DataType::Primitive(_) | DataType::Generic(_) => {}
+            DataType::List(list) => self.apply_rules_to_dt(types, &mut list.ty),
+            DataType::Map(map) => {
+                self.apply_rules_to_dt(types, map.key_ty_mut());
+                self.apply_rules_to_dt(types, map.value_ty_mut());
+            }
+            DataType::Struct(s) => self.apply_rules_to_fields(types, &mut s.fields),
+            DataType::Enum(e) => {
+                for (_, variant) in &mut e.variants {
+                    self.apply_rules_to_fields(types, &mut variant.fields);
+                }
+            }
+            DataType::Tuple(tuple) => {
+                for dt in &mut tuple.elements {
+                    self.apply_rules_to_dt(types, dt);
+                }
+            }
+            DataType::Nullable(dt) => self.apply_rules_to_dt(types, dt),
+            DataType::Intersection(dts) => {
+                for dt in dts {
+                    self.apply_rules_to_dt(types, dt);
+                }
+            }
+            DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+                NamedReferenceType::Recursive | NamedReferenceType::Reference { .. } => {}
+                NamedReferenceType::Inline { dt, .. } => self.apply_rules_to_dt(types, dt),
+            },
+            DataType::Reference(Reference::Opaque(_)) => {}
+        }
+    }
+
+    fn apply_rules_to_fields(&self, types: &Types, fields: &mut Fields) {
+        match fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => {
+                for field in &mut fields.fields {
+                    if let Some(dt) = &mut field.ty {
+                        self.apply_rules_to_dt(types, dt);
+                    }
+                }
+            }
+            Fields::Named(fields) => {
+                for (_, field) in &mut fields.fields {
+                    if let Some(dt) = &mut field.ty {
+                        self.apply_rules_to_dt(types, dt);
+                    }
+                }
+            }
+        }
     }
 
     /// Scan a [`DataType`] tree applying all rules and building a JS runtime transform, and an updated type.
@@ -257,46 +323,44 @@ impl RichTypesConfiguration {
         stack: &mut Vec<(Cow<'static, str>, Cow<'static, str>)>,
     ) -> Option<(Option<DataType>, String)> {
         let result = match dt {
-            DataType::Reference(Reference::Named(r)) => match &r.inner {
-                NamedReferenceType::Inline { dt, .. } => {
-                    self.apply_inner(phase, types, dt, js_ident, stack)
+            DataType::Reference(Reference::Named(r)) => {
+                if let Some(rule) = self.rule_for_reference(types, r) {
+                    return Some((
+                        Some((rule.data_type.0)(Self::reference_source_dt(types, r))),
+                        match phase {
+                            Phase::Serialize => &rule.serialize,
+                            Phase::Deserialize => &rule.deserialize,
+                        }
+                        .as_ref()
+                        .map_or_else(
+                            || js_ident.to_owned(),
+                            |transform| transform.apply(js_ident),
+                        ),
+                    ));
                 }
-                NamedReferenceType::Recursive => None,
-                NamedReferenceType::Reference { .. } => {
-                    let ndt = types.get(r)?;
-                    let rule = self
-                        .rules
-                        .iter()
-                        .find(|r| r.name == ndt.name && r.module_path == ndt.module_path);
 
-                    if let Some(rule) = rule {
-                        return Some((
-                            ndt.ty.clone().map(|dt| (rule.data_type.0)(dt)),
-                            match phase {
-                                Phase::Serialize => &rule.serialize,
-                                Phase::Deserialize => &rule.deserialize,
-                            }
-                            .as_ref()
-                            .map_or_else(
-                                || js_ident.to_owned(),
-                                |transform| transform.apply(js_ident),
-                            ),
-                        ));
+                match &r.inner {
+                    NamedReferenceType::Inline { dt, .. } => {
+                        self.apply_inner(phase, types, dt, js_ident, stack)
                     }
+                    NamedReferenceType::Recursive => None,
+                    NamedReferenceType::Reference { .. } => {
+                        let ndt = types.get(r)?;
 
-                    let ty = ndt.ty.as_ref()?;
-                    let key = (ndt.name.clone(), ndt.module_path.clone());
-                    if stack.contains(&key) {
-                        return None;
+                        let ty = ndt.ty.as_ref()?;
+                        let key = (ndt.name.clone(), ndt.module_path.clone());
+                        if stack.contains(&key) {
+                            return None;
+                        }
+                        stack.push(key);
+                        let result = self
+                            .apply_inner(phase, types, ty, js_ident, stack)
+                            .map(|(_, runtime)| (None, runtime));
+                        stack.pop();
+                        result
                     }
-                    stack.push(key);
-                    let result = self
-                        .apply_inner(phase, types, ty, js_ident, stack)
-                        .map(|(_, runtime)| (None, runtime));
-                    stack.pop();
-                    result
                 }
-            },
+            }
             DataType::Struct(s) => match &s.fields {
                 Fields::Named(fields) => {
                     let mut ty = s.clone();
@@ -456,6 +520,30 @@ impl RichTypesConfiguration {
         };
 
         self.apply_builtin_remaps(phase, dt, js_ident, result)
+    }
+
+    fn rule_for_reference<'a>(
+        &'a self,
+        types: &'a Types,
+        reference: &specta::datatype::NamedReference,
+    ) -> Option<&'a Rule> {
+        let ndt = types.get(reference)?;
+        self.rules
+            .iter()
+            .find(|rule| rule.name == ndt.name && rule.module_path == ndt.module_path)
+    }
+
+    fn reference_source_dt(
+        types: &Types,
+        reference: &specta::datatype::NamedReference,
+    ) -> DataType {
+        match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => (**dt).clone(),
+            NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive => types
+                .get(reference)
+                .and_then(|ndt| ndt.ty.clone())
+                .unwrap_or_else(|| DataType::Reference(Reference::Named(reference.clone()))),
+        }
     }
 
     fn has_builtin_remaps(&self) -> bool {
