@@ -1,16 +1,42 @@
 //! Runtime-aware TypeScript type remapping.
 //!
 //! Semantic types are Rust types whose TypeScript runtime value should be more
-//! specific than their JSON-compatible wire representation. For example,
-//! `bytes::Bytes` is commonly transported as an array of numbers but is nicer to
-//! work with as a `Uint8Array` in TypeScript, and `chrono::DateTime` is commonly
-//! transported as a string but used as a `Date` in TypeScript.
+//! specific than their JSON-compatible wire representation.
 //!
-//! [`semantic::Configuration`] records those type remaps and the JavaScript
-//! snippets needed to convert values at framework/runtime boundaries. The type
-//! graph can then be rewritten with [`Configuration::apply_types`], and
-//! individual function arguments or return values can be wrapped with
-//! [`Configuration::apply_serialize`] or [`Configuration::apply_deserialize`].
+//! This enables the following default rules:
+//!  - [`bytes::Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html) to become [`Uint8Array`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array)
+//!  - [`bytes::BytesMut`](https://docs.rs/bytes/latest/bytes/struct.BytesMut.html) to become [`Uint8Array`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array)
+//!  - [`url::Url`](https://docs.rs/url/latest/url/struct.Url.html) to become [`Url`](https://developer.mozilla.org/en-US/docs/Web/API/URL/URL)
+//!  - [`chrono::DateTime`](https://docs.rs/chrono/latest/chrono/struct.DateTime.html) to become [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date)
+//!  - [`chrono::NaiveDate`](https://docs.rs/chrono/latest/chrono/struct.NaiveDate.html) to become [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date)
+//!  - [`jiff::Timestamp`](https://docs.rs/jiff/latest/jiff/struct.Timestamp.html) to become [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date)
+//!  - [`jiff::civil::Date`](https://docs.rs/jiff/latest/jiff/civil/struct.Date.html) to become [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date)
+//!
+//! This could also allow you to map your own Rust types into custom JavaScript types like custom classes. Refer to [`semantic::Configuration::define`](Configuration::define) for building your own rules.
+//!
+//! This is intended the be implemented by frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta), [TauRPC](https://github.com/MatsDK/TauRPC) and [rspc](https://github.com/specta-rs/rspc) as they have control of the runtime and type layer.
+//!
+//! <div class="warning">
+//!
+//! **WARNING:** The current implementation relies on the frontend and backend being versioned in-step. This works for a Tauri desktop application but may become an issue for a HTTP API unless you have something like [Skew Protection](https://vercel.com/docs/skew-protection).
+//!
+//! We will likely lift this as a hard restriction in the future!
+//!
+//! </div>
+//!
+//! <details>
+//! <summary>Implementing into your own framework</summary>
+//!
+//! # Implementing into your own framework
+//!
+//! A framework needs to be integrated properly for this feature to work, as it requires both type-level and runtime JS to make it work properly.
+//!
+//! I would highly recommend reading [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) and understanding it as it's the core work which inspired this feature.
+//!
+//! Documentation coming soon... For now refer to [specta-rs/tauri-specta#219](https://github.com/specta-rs/tauri-specta/pull/219) which was the original implementation into [Tauri Specta](https://github.com/specta-rs/tauri-specta).
+//!
+//! </details>
+//!
 
 use std::{borrow::Cow, fmt, sync::Arc};
 
@@ -21,9 +47,7 @@ use specta::{
 
 use crate::define;
 
-/// A semantic type runtime JS transformer function.
-///
-/// This defines a JavaScript expression builder that converts between a semantic
+/// A JavaScript expression that converts between a semantic
 /// TypeScript runtime value and its JSON-compatible representation.
 ///
 /// The closure receives the JavaScript identifier/expression being transformed
@@ -50,7 +74,8 @@ use crate::define;
 /// ```
 ///
 /// Use [`Transform::identity`] when the TypeScript runtime value already has
-/// the same representation as the value crossing the wire.
+/// the same representation as the value crossing the wire or when JSON.stringify/JSON.parse
+/// is already able to handle the transformation for you.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Transform(
@@ -130,9 +155,9 @@ impl fmt::Debug for DataTypeFn {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Rule {
-    /// NDT's name
+    /// Matched against [`NamedDataType::name`](specta::datatype::NamedDataType::name) to determine if rule should apply
     pub name: Cow<'static, str>,
-    /// NDT's module path
+    /// Matched against [`NamedDataType::module_path`](specta::datatype::NamedDataType::module_path) to determine if rule should apply
     pub module_path: Cow<'static, str>,
     /// The type transformation function
     ///
@@ -148,73 +173,10 @@ pub struct Rule {
 
 /// Configuration for runtime-aware TypeScript type remapping.
 ///
-/// By default this contains rules for common Rust types that have better
-/// TypeScript runtime equivalents than their wire representation:
+/// By default this contains a set of default rules as defined on [the module](crate::semantic). If you don't want them use [`Configuration::empty()`](Configuration::empty) instead.
 ///
-/// - `bytes::Bytes` and `bytes::BytesMut` are exported as `Uint8Array`, with
-///   `Uint8Array -> number[]` and `number[] -> Uint8Array` transforms.
-/// - `url::Url` is exported as `URL`, with a `string -> URL` transform.
-/// - Supported `chrono` and `jiff` date/time types are exported as `Date`, with
-///   runtime transforms where the wire value differs from the JavaScript value.
+/// You can add your own rules via [`Configuration::define(...)`](Configuration::define).
 ///
-/// You can add custom named-type rules with [`Configuration::define`]
-/// or start from [`Configuration::empty`] if you do not want the
-/// defaults.
-///
-/// # Examples
-///
-/// Apply the default semantic type rewrites before exporting TypeScript:
-///
-/// ```rust
-/// use specta::{Type, Types};
-/// use specta_typescript::{Typescript, semantic::Configuration};
-///
-/// #[derive(Type)]
-/// struct User {
-///     id: u32,
-/// }
-///
-/// let types = Types::default().register::<User>();
-/// let semantic_types = Configuration::default();
-/// let types = semantic_types.apply_types(&types);
-///
-/// let bindings = Typescript::default().export(&types, specta_serde::Format)?;
-/// # let _ = bindings;
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// Define a custom semantic type rule. This example treats a Rust newtype as a
-/// TypeScript `URL`, while serializing it back to a string before sending it to
-/// Rust and deserializing strings from Rust into `URL` instances:
-///
-/// ```rust
-/// use specta::{Type, Types};
-/// use specta_typescript::{define, semantic::{Configuration, Transform}};
-///
-/// #[derive(Type)]
-/// struct Website(String);
-///
-/// let mut semantic_types = Configuration::empty();
-/// semantic_types.define::<Website>(
-///     |_| define("URL").into(),
-///     Some(Transform::new(|value| format!("{value}.toString()"))),
-///     Some(Transform::new(|value| format!("new URL({value})"))),
-/// );
-///
-/// let types = Types::default().register::<Website>();
-/// let types = semantic_types.apply_types(&types);
-/// # let _ = types;
-/// ```
-///
-/// Enable lossless bigint support when your runtime preserves integer values
-/// outside JavaScript's safe `number` range:
-///
-/// ```rust
-/// use specta_typescript::semantic::Configuration;
-///
-/// let mut semantic_types = Configuration::default();
-/// semantic_types.enable_lossless_bigints();
-/// ```
 #[derive(Debug, Clone)]
 pub struct Configuration {
     rules: Vec<Rule>,
@@ -326,21 +288,21 @@ impl Configuration {
     /// use specta_typescript::{define, semantic::{Configuration, Transform}};
     ///
     /// #[derive(Type)]
-    /// struct Website(String);
+    /// struct MyCustomUrl(String);
     ///
     /// let mut semantic_types = Configuration::empty();
-    /// semantic_types.define::<Website>(
-    ///     |_| define("URL").into(),
-    ///     Some(Transform::new(|value| format!("{value}.toString()"))),
-    ///     Some(Transform::new(|value| format!("new URL({value})"))),
+    /// semantic_types.define::<MyCustomUrl>(
+    ///     |_| define("URL").into(), // Runtime Specta Type
+    ///     Some(Transform::new(|value| format!("{value}.toString()"))), // JS -> JSON
+    ///     Some(Transform::new(|value| format!("new URL({value})"))), // JSON -> JS
     /// );
     /// ```
     pub fn define<T: Type>(
-        &mut self,
+        mut self,
         dt: impl Fn(DataType) -> DataType + Send + Sync + 'static,
         serialize: Option<Transform>,
         deserialize: Option<Transform>,
-    ) -> &mut Self {
+    ) -> Self {
         let mut types = Types::default();
         let ndt = match T::definition(&mut types) {
             DataType::Reference(Reference::Named(r)) => types.get(&r),
@@ -369,7 +331,7 @@ impl Configuration {
     /// `BigInt`s. Refer to
     /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
     /// for implementation details.
-    pub fn enable_lossless_bigints(&mut self) -> &mut Self {
+    pub fn enable_lossless_bigints(mut self) -> Self {
         if !self.lossless_bigint {
             self.lossless_bigint = true;
         }
@@ -386,7 +348,7 @@ impl Configuration {
     /// Refer to
     /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
     /// for implementation details.
-    pub fn enable_lossless_floats(&mut self) -> &mut Self {
+    pub fn enable_lossless_floats(mut self) -> Self {
         if !self.lossless_floats {
             self.lossless_floats = true;
         }
