@@ -1,6 +1,6 @@
 //! Runtime-aware TypeScript type remapping.
 //!
-//! Rich types are Rust types whose TypeScript runtime value should be more
+//! Semantic types are Rust types whose TypeScript runtime value should be more
 //! specific than their JSON-compatible wire representation. For example,
 //! `bytes::Bytes` is commonly transported as an array of numbers but is nicer to
 //! work with as a `Uint8Array` in TypeScript, and `chrono::DateTime` is commonly
@@ -8,10 +8,9 @@
 //!
 //! [`semantic::Configuration`] records those type remaps and the JavaScript
 //! snippets needed to convert values at framework/runtime boundaries. The type
-//! graph can then be rewritten with [`RichTypesConfiguration::apply_types`], and
+//! graph can then be rewritten with [`Configuration::apply_types`], and
 //! individual function arguments or return values can be wrapped with
-//! [`RichTypesConfiguration::apply_serialize`] or
-//! [`RichTypesConfiguration::apply_deserialize`].
+//! [`Configuration::apply_serialize`] or [`Configuration::apply_deserialize`].
 
 use std::{borrow::Cow, fmt, sync::Arc};
 
@@ -22,9 +21,9 @@ use specta::{
 
 use crate::define;
 
-/// A rich type runtime JS transformer function.
+/// A semantic type runtime JS transformer function.
 ///
-/// This defines a JavaScript expression builder that converts between a rich
+/// This defines a JavaScript expression builder that converts between a semantic
 /// TypeScript runtime value and its JSON-compatible representation.
 ///
 /// The closure receives the JavaScript identifier/expression being transformed
@@ -35,7 +34,7 @@ use crate::define;
 /// Convert a JSON string into a TypeScript `Date`:
 ///
 /// ```rust
-/// use specta_typescript::Transform;
+/// use specta_typescript::semantic::Transform;
 ///
 /// let transform = Transform::new(|value| format!("new Date({value})"));
 /// # let _ = transform;
@@ -44,7 +43,7 @@ use crate::define;
 /// Convert a `Uint8Array` into a JSON array of numbers:
 ///
 /// ```rust
-/// use specta_typescript::Transform;
+/// use specta_typescript::semantic::Transform;
 ///
 /// let transform = Transform::new(|value| format!("[...{value}]"));
 /// # let _ = transform;
@@ -78,7 +77,7 @@ impl Transform {
     /// The mapper should return a JavaScript expression, not a statement.
     ///
     /// ```rust
-    /// use specta_typescript::Transform;
+    /// use specta_typescript::semantic::Transform;
     ///
     /// let transform = Transform::new(|ident| format!("new URL({ident})"));
     /// # let _ = transform;
@@ -93,7 +92,7 @@ impl Transform {
     /// when one direction does not need runtime conversion.
     ///
     /// ```rust
-    /// use specta_typescript::Transform;
+    /// use specta_typescript::semantic::Transform;
     ///
     /// let transform = Transform::identity();
     /// # let _ = transform;
@@ -158,17 +157,17 @@ pub struct Rule {
 /// - Supported `chrono` and `jiff` date/time types are exported as `Date`, with
 ///   runtime transforms where the wire value differs from the JavaScript value.
 ///
-/// You can add custom named-type rules with [`RichTypesConfiguration::define`]
-/// or start from [`RichTypesConfiguration::empty`] if you do not want the
+/// You can add custom named-type rules with [`Configuration::define`]
+/// or start from [`Configuration::empty`] if you do not want the
 /// defaults.
 ///
 /// # Examples
 ///
-/// Apply the default rich type rewrites before exporting TypeScript:
+/// Apply the default semantic type rewrites before exporting TypeScript:
 ///
 /// ```rust
 /// use specta::{Type, Types};
-/// use specta_typescript::{RichTypesConfiguration, Typescript};
+/// use specta_typescript::{Typescript, semantic::Configuration};
 ///
 /// #[derive(Type)]
 /// struct User {
@@ -176,34 +175,34 @@ pub struct Rule {
 /// }
 ///
 /// let types = Types::default().register::<User>();
-/// let rich_types = RichTypesConfiguration::default();
-/// let types = rich_types.apply_types(&types);
+/// let semantic_types = Configuration::default();
+/// let types = semantic_types.apply_types(&types);
 ///
 /// let bindings = Typescript::default().export(&types, specta_serde::Format)?;
 /// # let _ = bindings;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
-/// Define a custom rich type rule. This example treats a Rust newtype as a
+/// Define a custom semantic type rule. This example treats a Rust newtype as a
 /// TypeScript `URL`, while serializing it back to a string before sending it to
 /// Rust and deserializing strings from Rust into `URL` instances:
 ///
 /// ```rust
 /// use specta::{Type, Types};
-/// use specta_typescript::{RichTypesConfiguration, Transform, define};
+/// use specta_typescript::{define, semantic::{Configuration, Transform}};
 ///
 /// #[derive(Type)]
 /// struct Website(String);
 ///
-/// let mut rich_types = RichTypesConfiguration::empty();
-/// rich_types.define::<Website>(
+/// let mut semantic_types = Configuration::empty();
+/// semantic_types.define::<Website>(
 ///     |_| define("URL").into(),
 ///     Some(Transform::new(|value| format!("{value}.toString()"))),
 ///     Some(Transform::new(|value| format!("new URL({value})"))),
 /// );
 ///
 /// let types = Types::default().register::<Website>();
-/// let types = rich_types.apply_types(&types);
+/// let types = semantic_types.apply_types(&types);
 /// # let _ = types;
 /// ```
 ///
@@ -211,10 +210,10 @@ pub struct Rule {
 /// outside JavaScript's safe `number` range:
 ///
 /// ```rust
-/// use specta_typescript::RichTypesConfiguration;
+/// use specta_typescript::semantic::Configuration;
 ///
-/// let mut rich_types = RichTypesConfiguration::default();
-/// rich_types.enable_lossless_bigints();
+/// let mut semantic_types = Configuration::default();
+/// semantic_types.enable_lossless_bigints();
 /// ```
 #[derive(Debug, Clone)]
 pub struct Configuration {
@@ -292,9 +291,9 @@ impl Default for Configuration {
 }
 
 impl Configuration {
-    /// Construct a [`RichTypesConfiguration`] without the default rules.
+    /// Construct a [`Configuration`] without the default rules.
     ///
-    /// Prefer [`RichTypesConfiguration::default`] when possible; the default
+    /// Prefer [`Configuration::default`] when possible; the default
     /// rules cover common ecosystem types and may grow over time.
     pub fn empty() -> Self {
         Self {
@@ -324,13 +323,13 @@ impl Configuration {
     ///
     /// ```rust
     /// use specta::Type;
-    /// use specta_typescript::{RichTypesConfiguration, Transform, define};
+    /// use specta_typescript::{define, semantic::{Configuration, Transform}};
     ///
     /// #[derive(Type)]
     /// struct Website(String);
     ///
-    /// let mut rich_types = RichTypesConfiguration::empty();
-    /// rich_types.define::<Website>(
+    /// let mut semantic_types = Configuration::empty();
+    /// semantic_types.define::<Website>(
     ///     |_| define("URL").into(),
     ///     Some(Transform::new(|value| format!("{value}.toString()"))),
     ///     Some(Transform::new(|value| format!("new URL({value})"))),
@@ -522,7 +521,7 @@ impl Configuration {
 
     /// Scan a [`DataType`] tree applying serialize-facing rules.
     ///
-    /// This assumes [`RichTypesConfiguration::apply_types`] has already been applied to the [`Types`].
+    /// This assumes [`Configuration::apply_types`] has already been applied to the [`Types`].
     /// Therefore the type updates will be shallow (up until references to the `Types`).
     ///
     /// The returned JavaScript expression is built around `js_ident` and may be
@@ -571,7 +570,7 @@ impl Configuration {
 
     /// Scan a [`DataType`] tree applying serialize-facing rules.
     ///
-    /// This is an alias for [`RichTypesConfiguration::apply_serialize`].
+    /// This is an alias for [`Configuration::apply_serialize`].
     pub fn apply(
         &self,
         types: &Types,
