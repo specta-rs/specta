@@ -6,6 +6,7 @@ impl Default for RichTypesConfiguration {
             rules: vec![
                 // TODO
             ],
+            remapper: None,
             lossless_bigint: false,
             lossless_floats: false,
         }

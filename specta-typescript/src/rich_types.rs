@@ -4,7 +4,7 @@ use std::{borrow::Cow, fmt, sync::Arc};
 
 use specta::{
     Type, Types,
-    datatype::{DataType, Fields, NamedDataType, NamedReferenceType, Primitive, Reference},
+    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
 };
 
 mod rules;
@@ -44,6 +44,7 @@ impl fmt::Debug for Rule {
 #[derive(Debug, Clone)]
 pub struct RichTypesConfiguration {
     rules: Vec<Rule>,
+    remapper: Option<specta_util::Remapper>,
     lossless_bigint: bool,
     lossless_floats: bool,
 }
@@ -55,6 +56,7 @@ impl RichTypesConfiguration {
     pub fn empty() -> Self {
         Self {
             rules: Default::default(),
+            remapper: None,
             lossless_bigint: false,
             lossless_floats: false,
         }
@@ -88,7 +90,25 @@ impl RichTypesConfiguration {
     /// This assumes your runtime is configured to handle losslessly transmitting the `BigInt`'s.
     /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for the implementation details around this.
     pub fn enable_lossless_bigint(&mut self) -> &mut Self {
-        self.lossless_bigint = true;
+        if !self.lossless_bigint {
+            self.lossless_bigint = true;
+
+            for primitive in [
+                Primitive::usize,
+                Primitive::isize,
+                Primitive::u64,
+                Primitive::i64,
+                Primitive::u128,
+                Primitive::i128,
+            ] {
+                // TODO: For input it should be `bigint | number` when phased is enabled??? How do we know that???
+                self.remapper = Some(self.remapper.take().unwrap_or_default().rule(
+                    DataType::Primitive(primitive),
+                    Reference::opaque(crate::opaque::BigInt).into(),
+                ));
+            }
+        }
+
         self
     }
 
@@ -98,7 +118,19 @@ impl RichTypesConfiguration {
     ///
     /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for the implementation details around this.
     pub fn enable_lossless_floats(&mut self) -> &mut Self {
-        self.lossless_floats = true;
+        if !self.lossless_floats {
+            self.lossless_floats = true;
+
+            // We don't map `f128` as it just can't exist in JS.
+            for primitive in [Primitive::f16, Primitive::f32, Primitive::f64] {
+                // This remaps `number | null` to `number`, which is correct if the runtime can handle it.
+                self.remapper = Some(self.remapper.take().unwrap_or_default().rule(
+                    DataType::Primitive(primitive),
+                    Reference::opaque(crate::opaque::Number).into(),
+                ));
+            }
+        }
+
         self
     }
 
@@ -108,38 +140,7 @@ impl RichTypesConfiguration {
     pub fn apply_types<'a>(&self, types: &'a Types) -> Cow<'a, Types> {
         let mut types = Cow::Borrowed(types);
 
-        if self.lossless_bigint || self.lossless_floats {
-            let mut remapper = specta_util::Remapper::new();
-
-            if self.lossless_bigint {
-                for primitive in [
-                    Primitive::usize,
-                    Primitive::isize,
-                    Primitive::u64,
-                    Primitive::i64,
-                    Primitive::u128,
-                    Primitive::i128,
-                ] {
-                    // TODO: For input it should be `bigint | number` when phased is enabled??? How do we know that???
-
-                    remapper = remapper.rule(
-                        DataType::Primitive(primitive),
-                        Reference::opaque(crate::opaque::BigInt).into(),
-                    );
-                }
-            }
-
-            if self.lossless_floats {
-                // We don't map `f128` as it just can't exist in JS.
-                for primitive in [Primitive::f16, Primitive::f32, Primitive::f64] {
-                    // This remaps `number | null` to `number`, which is correct if the runtime can handle it.
-                    remapper = remapper.rule(
-                        DataType::Primitive(primitive),
-                        Reference::opaque(crate::opaque::Number).into(),
-                    );
-                }
-            }
-
+        if let Some(remapper) = self.remapper.as_ref() {
             types = Cow::Owned(remapper.remap_types(types.into_owned()));
         }
 
@@ -186,9 +187,9 @@ impl RichTypesConfiguration {
         types: &Types,
         dt: &DataType,
         js_ident: &str,
-        stack: &mut Vec<(*const NamedDataType, *const DataType)>,
+        stack: &mut Vec<(Cow<'static, str>, Cow<'static, str>)>,
     ) -> Option<(Option<DataType>, String)> {
-        match dt {
+        let result = match dt {
             DataType::Reference(Reference::Named(r)) => match &r.inner {
                 NamedReferenceType::Inline { dt, .. } => {
                     self.apply_inner(types, dt, js_ident, stack)
@@ -209,7 +210,7 @@ impl RichTypesConfiguration {
                     }
 
                     let ty = ndt.ty.as_ref()?;
-                    let key = (ndt as *const _, ty as *const _);
+                    let key = (ndt.name.clone(), ndt.module_path.clone());
                     if stack.contains(&key) {
                         return None;
                     }
@@ -375,6 +376,34 @@ impl RichTypesConfiguration {
             | DataType::Primitive(_)
             | DataType::Generic(_)
             | DataType::Reference(Reference::Opaque(_)) => None,
+        };
+
+        self.apply_remapper(dt, js_ident, result)
+    }
+
+    fn apply_remapper(
+        &self,
+        dt: &DataType,
+        js_ident: &str,
+        result: Option<(Option<DataType>, String)>,
+    ) -> Option<(Option<DataType>, String)> {
+        let Some(remapper) = self.remapper.as_ref() else {
+            return result;
+        };
+
+        let remapped = remapper.remap_dt(
+            result
+                .as_ref()
+                .and_then(|(dt, _)| dt.clone())
+                .unwrap_or_else(|| dt.clone()),
+        );
+
+        if remapped == *dt {
+            result
+        } else if let Some((_, runtime)) = result {
+            Some((Some(remapped), runtime))
+        } else {
+            Some((Some(remapped), js_ident.to_owned()))
         }
     }
 }
