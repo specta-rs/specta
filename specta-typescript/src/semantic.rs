@@ -843,14 +843,39 @@ impl Configuration {
             self.lossless_floats,
         );
 
+        let runtime = result
+            .as_ref()
+            .map(|(_, runtime)| runtime.as_str())
+            .unwrap_or(js_ident);
+        let runtime = if is_lossless_bigint_primitive(&source)
+            && self.lossless_bigint
+            && remap_bigint() == deserialize_bigint()
+        {
+            format!("new BigInt({runtime})")
+        } else {
+            runtime.to_owned()
+        };
+
         if remapped == source {
             result
-        } else if let Some((_, runtime)) = result {
-            Some((Some(remapped), runtime))
         } else {
-            Some((Some(remapped), js_ident.to_owned()))
+            Some((Some(remapped), runtime))
         }
     }
+}
+
+fn is_lossless_bigint_primitive(dt: &DataType) -> bool {
+    matches!(
+        dt,
+        DataType::Primitive(
+            Primitive::usize
+                | Primitive::isize
+                | Primitive::u64
+                | Primitive::i64
+                | Primitive::u128
+                | Primitive::i128
+        )
+    )
 }
 
 fn apply_builtin_remaps(
