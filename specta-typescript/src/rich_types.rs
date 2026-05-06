@@ -4,7 +4,7 @@ use std::{borrow::Cow, fmt, sync::Arc};
 
 use specta::{
     Type, Types,
-    datatype::{DataType, Primitive, Reference},
+    datatype::{DataType, Fields, NamedDataType, NamedReferenceType, Primitive, Reference},
 };
 
 mod rules;
@@ -176,10 +176,212 @@ impl RichTypesConfiguration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        // TODO: Scan the `DataType` tree, following references and generate a string applying the runtime transform.
-        // TODO: The runtime map function will need to be deeply nested but the changes to the `DataType` can stop at references as it's assumed `Self::apply_types` was already done.
         // TODO: Maybe abstract the `Remapper` onto `Self` as `Option<Remapper>` so it can be reused here and in `apply_types`.
 
-        todo!();
+        self.apply_inner(types, dt, js_ident, &mut Vec::new())
     }
+
+    fn apply_inner(
+        &self,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+        stack: &mut Vec<(*const NamedDataType, *const DataType)>,
+    ) -> Option<(Option<DataType>, String)> {
+        match dt {
+            DataType::Reference(Reference::Named(r)) => match &r.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    self.apply_inner(types, dt, js_ident, stack)
+                }
+                NamedReferenceType::Recursive => None,
+                NamedReferenceType::Reference { .. } => {
+                    let ndt = types.get(r)?;
+                    let rule = self
+                        .rules
+                        .iter()
+                        .find(|r| r.name == ndt.name && r.module_path == ndt.module_path);
+
+                    if let Some(rule) = rule {
+                        return Some((
+                            ndt.ty.clone().map(|dt| (rule.typ)(dt)),
+                            (rule.runtime)(js_ident),
+                        ));
+                    }
+
+                    let ty = ndt.ty.as_ref()?;
+                    let key = (ndt as *const _, ty as *const _);
+                    if stack.contains(&key) {
+                        return None;
+                    }
+                    stack.push(key);
+                    let result = self
+                        .apply_inner(types, ty, js_ident, stack)
+                        .map(|(_, runtime)| (None, runtime));
+                    stack.pop();
+                    result
+                }
+            },
+            DataType::Struct(s) => match &s.fields {
+                Fields::Named(fields) => {
+                    let mut ty = s.clone();
+                    let mut changed = false;
+                    let mut parts = Vec::new();
+
+                    for (name, field) in &fields.fields {
+                        let Some(field_ty) = &field.ty else { continue };
+                        let field_ident = format!("{js_ident}.{name}");
+                        let Some((next_ty, runtime)) =
+                            self.apply_inner(types, field_ty, &field_ident, stack)
+                        else {
+                            continue;
+                        };
+
+                        if let Some(next_ty) = next_ty
+                            && let Fields::Named(fields) = &mut ty.fields
+                            && let Some((_, field)) =
+                                fields.fields.iter_mut().find(|(n, _)| n == name)
+                        {
+                            field.ty = Some(next_ty);
+                            changed = true;
+                        }
+                        parts.push(format!("{name}:{runtime}"));
+                    }
+
+                    if parts.is_empty() {
+                        None
+                    } else {
+                        Some((
+                            changed.then_some(DataType::Struct(ty)),
+                            spread_transform(js_ident, parts),
+                        ))
+                    }
+                }
+                Fields::Unnamed(fields) => {
+                    let mut ty = s.clone();
+                    let mut changed = false;
+                    let parts = fields
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, field)| {
+                            let field_ty = field.ty.as_ref()?;
+                            let field_ident = format!("{js_ident}[{idx}]");
+                            let (next_ty, runtime) =
+                                self.apply_inner(types, field_ty, &field_ident, stack)?;
+
+                            if let Some(next_ty) = next_ty
+                                && let Fields::Unnamed(fields) = &mut ty.fields
+                            {
+                                fields.fields[idx].ty = Some(next_ty);
+                                changed = true;
+                            }
+
+                            Some(format!("{idx}:{runtime}"))
+                        })
+                        .collect::<Vec<_>>();
+
+                    if parts.is_empty() {
+                        None
+                    } else {
+                        Some((
+                            changed.then_some(DataType::Struct(ty)),
+                            spread_transform(js_ident, parts),
+                        ))
+                    }
+                }
+                Fields::Unit => None,
+            },
+            DataType::Tuple(tuple) => {
+                let mut ty = tuple.clone();
+                let mut changed = false;
+                let parts = tuple
+                    .elements
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, element)| {
+                        let ident = format!("{js_ident}[{idx}]");
+                        let (next_ty, runtime) = self.apply_inner(types, element, &ident, stack)?;
+                        if let Some(next_ty) = next_ty {
+                            ty.elements[idx] = next_ty;
+                            changed = true;
+                        }
+                        Some(format!("{idx}:{runtime}"))
+                    })
+                    .collect::<Vec<_>>();
+
+                if parts.is_empty() {
+                    None
+                } else {
+                    Some((
+                        changed.then_some(DataType::Tuple(ty)),
+                        spread_transform(js_ident, parts),
+                    ))
+                }
+            }
+            DataType::List(list) => {
+                let item = "i";
+                let (next_ty, runtime) = self.apply_inner(types, &list.ty, item, stack)?;
+                let mut ty = list.clone();
+                let mut changed = false;
+                if let Some(next_ty) = next_ty {
+                    ty.ty = Box::new(next_ty);
+                    changed = true;
+                }
+                Some((
+                    changed.then_some(DataType::List(ty)),
+                    format!("{js_ident}.map({item}=>{runtime})"),
+                ))
+            }
+            DataType::Nullable(inner) => {
+                let (next_ty, runtime) = self.apply_inner(types, inner, js_ident, stack)?;
+                Some((
+                    next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
+                    format!("{js_ident}==null?{js_ident}:{runtime}"),
+                ))
+            }
+            DataType::Intersection(items) => {
+                let mut ty = items.clone();
+                let mut changed = false;
+                let parts = items
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, item)| {
+                        let (next_ty, runtime) = self.apply_inner(types, item, js_ident, stack)?;
+                        if let Some(next_ty) = next_ty {
+                            ty[idx] = next_ty;
+                            changed = true;
+                        }
+                        Some(runtime)
+                    })
+                    .collect::<Vec<_>>();
+
+                match parts.as_slice() {
+                    [] => None,
+                    [runtime] => Some((
+                        changed.then_some(DataType::Intersection(ty)),
+                        runtime.clone(),
+                    )),
+                    _ => Some((
+                        changed.then_some(DataType::Intersection(ty)),
+                        spread_transform(
+                            "",
+                            parts.into_iter().map(|p| format!("...{p}")).collect(),
+                        ),
+                    )),
+                }
+            }
+            DataType::Map(_)
+            | DataType::Enum(_)
+            | DataType::Primitive(_)
+            | DataType::Generic(_)
+            | DataType::Reference(Reference::Opaque(_)) => None,
+        }
+    }
+}
+
+fn spread_transform(js_ident: &str, mut parts: Vec<String>) -> String {
+    if !js_ident.is_empty() {
+        parts.insert(0, format!("...{js_ident}"));
+    }
+    format!("{{{}}}", parts.join(","))
 }
