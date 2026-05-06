@@ -96,136 +96,8 @@ pub(crate) struct Rule {
 #[derive(Debug, Clone)]
 pub struct RichTypesConfiguration {
     rules: Vec<Rule>,
-    remapper: Remapper,
     lossless_bigint: bool,
     lossless_floats: bool,
-}
-
-#[derive(Debug, Clone, Default)]
-struct Remapper {
-    rules: Vec<RemapRule>,
-}
-
-#[derive(Debug, Clone)]
-struct RemapRule {
-    from: DataType,
-    serialize_to: DataType,
-    deserialize_to: DataType,
-}
-
-impl Remapper {
-    fn is_empty(&self) -> bool {
-        self.rules.is_empty()
-    }
-
-    fn rule(&mut self, from: DataType, serialize_to: DataType, deserialize_to: DataType) {
-        self.rules.push(RemapRule {
-            from,
-            serialize_to,
-            deserialize_to,
-        });
-    }
-
-    fn remap_dt(&self, phase: Phase, mut dt: DataType) -> DataType {
-        self.remap_internal(phase, &mut dt);
-        dt
-    }
-
-    fn remap_types(&self, types: Types) -> Types {
-        types.map(|mut ndt| {
-            let phase = if ndt.name.ends_with("_Serialize") {
-                Phase::Serialize
-            } else {
-                Phase::Deserialize
-            };
-
-            ndt.generics.to_mut().iter_mut().for_each(|generic| {
-                if let Some(dt) = &mut generic.default {
-                    self.remap_internal(phase, dt);
-                }
-            });
-            if let Some(dt) = &mut ndt.ty {
-                self.remap_internal(phase, dt);
-            }
-            ndt
-        })
-    }
-
-    fn remap_internal(&self, phase: Phase, dt: &mut DataType) {
-        self.remap_rules(phase, dt);
-
-        match dt {
-            DataType::Primitive(_) | DataType::Generic(_) => {}
-            DataType::List(list) => self.remap_internal(phase, &mut list.ty),
-            DataType::Map(map) => {
-                self.remap_internal(phase, map.key_ty_mut());
-                self.remap_internal(phase, map.value_ty_mut());
-            }
-            DataType::Struct(s) => self.remap_fields(phase, &mut s.fields),
-            DataType::Enum(e) => {
-                for (_, variant) in &mut e.variants {
-                    self.remap_fields(phase, &mut variant.fields);
-                }
-            }
-            DataType::Tuple(tuple) => {
-                for dt in &mut tuple.elements {
-                    self.remap_internal(phase, dt);
-                }
-            }
-            DataType::Nullable(dt) => self.remap_internal(phase, dt),
-            DataType::Intersection(dts) => {
-                for dt in dts {
-                    self.remap_internal(phase, dt);
-                }
-            }
-            DataType::Reference(reference) => {
-                let Reference::Named(reference) = reference else {
-                    return;
-                };
-
-                match &mut reference.inner {
-                    NamedReferenceType::Recursive => {}
-                    NamedReferenceType::Inline { dt, .. } => self.remap_internal(phase, dt),
-                    NamedReferenceType::Reference { generics, .. } => {
-                        for (_, dt) in generics {
-                            self.remap_internal(phase, dt);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn remap_rules(&self, phase: Phase, dt: &mut DataType) {
-        for rule in &self.rules {
-            if *dt == rule.from {
-                *dt = match phase {
-                    Phase::Serialize => rule.serialize_to.clone(),
-                    Phase::Deserialize => rule.deserialize_to.clone(),
-                };
-            }
-        }
-    }
-
-    fn remap_fields(&self, phase: Phase, fields: &mut Fields) {
-        match fields {
-            Fields::Unit => {}
-            Fields::Unnamed(fields) => {
-                for field in &mut fields.fields {
-                    if let Some(dt) = &mut field.ty {
-                        self.remap_internal(phase, dt);
-                    }
-                }
-            }
-            Fields::Named(fields) => {
-                for (_, field) in &mut fields.fields {
-                    if let Some(dt) = &mut field.ty {
-                        self.remap_internal(phase, dt);
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl RichTypesConfiguration {
@@ -235,7 +107,6 @@ impl RichTypesConfiguration {
     pub fn empty() -> Self {
         Self {
             rules: Default::default(),
-            remapper: Remapper::default(),
             lossless_bigint: false,
             lossless_floats: false,
         }
@@ -276,21 +147,6 @@ impl RichTypesConfiguration {
     pub fn enable_lossless_bigints(&mut self) -> &mut Self {
         if !self.lossless_bigint {
             self.lossless_bigint = true;
-
-            for primitive in [
-                Primitive::usize,
-                Primitive::isize,
-                Primitive::u64,
-                Primitive::i64,
-                Primitive::u128,
-                Primitive::i128,
-            ] {
-                self.remapper.rule(
-                    DataType::Primitive(primitive),
-                    crate::define("bigint | number").into(),
-                    Reference::opaque(crate::opaque::BigInt).into(),
-                );
-            }
         }
 
         self
@@ -304,14 +160,6 @@ impl RichTypesConfiguration {
     pub fn enable_lossless_floats(&mut self) -> &mut Self {
         if !self.lossless_floats {
             self.lossless_floats = true;
-
-            // We don't map `f128` as it just can't exist in JS.
-            for primitive in [Primitive::f16, Primitive::f32, Primitive::f64] {
-                // This remaps `number | null` to `number`, which is correct if the runtime can handle it.
-                let number: DataType = Reference::opaque(crate::opaque::Number).into();
-                self.remapper
-                    .rule(DataType::Primitive(primitive), number.clone(), number);
-            }
         }
 
         self
@@ -323,8 +171,25 @@ impl RichTypesConfiguration {
     pub fn apply_types<'a>(&self, types: &'a Types) -> Cow<'a, Types> {
         let mut types = Cow::Borrowed(types);
 
-        if !self.remapper.is_empty() {
-            types = Cow::Owned(self.remapper.remap_types(types.into_owned()));
+        if self.has_builtin_remaps() {
+            types = Cow::Owned(types.into_owned().map(|mut ndt| {
+                let phase = if ndt.name.ends_with("_Serialize") {
+                    Phase::Serialize
+                } else {
+                    Phase::Deserialize
+                };
+
+                ndt.generics.to_mut().iter_mut().for_each(|generic| {
+                    if let Some(dt) = &mut generic.default {
+                        apply_builtin_remaps(dt, phase, self.lossless_bigint, self.lossless_floats);
+                    }
+                });
+                if let Some(dt) = &mut ndt.ty {
+                    apply_builtin_remaps(dt, phase, self.lossless_bigint, self.lossless_floats);
+                }
+
+                ndt
+            }));
         }
 
         if !self.rules.is_empty() {
@@ -590,29 +455,37 @@ impl RichTypesConfiguration {
             | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
-        self.apply_remapper(phase, dt, js_ident, result)
+        self.apply_builtin_remaps(phase, dt, js_ident, result)
     }
 
-    fn apply_remapper(
+    fn has_builtin_remaps(&self) -> bool {
+        self.lossless_bigint || self.lossless_floats
+    }
+
+    fn apply_builtin_remaps(
         &self,
         phase: Phase,
         dt: &DataType,
         js_ident: &str,
         result: Option<(Option<DataType>, String)>,
     ) -> Option<(Option<DataType>, String)> {
-        if self.remapper.is_empty() {
+        if !self.has_builtin_remaps() {
             return result;
         }
 
-        let remapped = self.remapper.remap_dt(
+        let source = result
+            .as_ref()
+            .and_then(|(dt, _)| dt.clone())
+            .unwrap_or_else(|| dt.clone());
+        let mut remapped = source.clone();
+        apply_builtin_remaps(
+            &mut remapped,
             phase,
-            result
-                .as_ref()
-                .and_then(|(dt, _)| dt.clone())
-                .unwrap_or_else(|| dt.clone()),
+            self.lossless_bigint,
+            self.lossless_floats,
         );
 
-        if remapped == *dt {
+        if remapped == source {
             result
         } else if let Some((_, runtime)) = result {
             Some((Some(remapped), runtime))
@@ -620,6 +493,130 @@ impl RichTypesConfiguration {
             Some((Some(remapped), js_ident.to_owned()))
         }
     }
+}
+
+fn apply_builtin_remaps(
+    dt: &mut DataType,
+    phase: Phase,
+    lossless_bigint: bool,
+    lossless_floats: bool,
+) {
+    if let DataType::Primitive(primitive) = dt
+        && let Some(remapped) =
+            remap_primitive(primitive.clone(), phase, lossless_bigint, lossless_floats)
+    {
+        *dt = remapped;
+        return;
+    }
+
+    match dt {
+        DataType::Primitive(_) | DataType::Generic(_) => {}
+        DataType::List(list) => {
+            apply_builtin_remaps(&mut list.ty, phase, lossless_bigint, lossless_floats)
+        }
+        DataType::Map(map) => {
+            apply_builtin_remaps(map.key_ty_mut(), phase, lossless_bigint, lossless_floats);
+            apply_builtin_remaps(map.value_ty_mut(), phase, lossless_bigint, lossless_floats);
+        }
+        DataType::Struct(s) => {
+            apply_builtin_remaps_to_fields(&mut s.fields, phase, lossless_bigint, lossless_floats)
+        }
+        DataType::Enum(e) => {
+            for (_, variant) in &mut e.variants {
+                apply_builtin_remaps_to_fields(
+                    &mut variant.fields,
+                    phase,
+                    lossless_bigint,
+                    lossless_floats,
+                );
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for dt in &mut tuple.elements {
+                apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+            }
+        }
+        DataType::Nullable(dt) => {
+            apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+        }
+        DataType::Intersection(dts) => {
+            for dt in dts {
+                apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+            }
+        }
+        DataType::Reference(reference) => {
+            let Reference::Named(reference) = reference else {
+                return;
+            };
+
+            match &mut reference.inner {
+                NamedReferenceType::Recursive => {}
+                NamedReferenceType::Inline { dt, .. } => {
+                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                }
+                NamedReferenceType::Reference { generics, .. } => {
+                    for (_, dt) in generics {
+                        apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn apply_builtin_remaps_to_fields(
+    fields: &mut Fields,
+    phase: Phase,
+    lossless_bigint: bool,
+    lossless_floats: bool,
+) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => {
+            for field in &mut fields.fields {
+                if let Some(dt) = &mut field.ty {
+                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                }
+            }
+        }
+        Fields::Named(fields) => {
+            for (_, field) in &mut fields.fields {
+                if let Some(dt) = &mut field.ty {
+                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                }
+            }
+        }
+    }
+}
+
+fn remap_primitive(
+    primitive: Primitive,
+    phase: Phase,
+    lossless_bigint: bool,
+    lossless_floats: bool,
+) -> Option<DataType> {
+    if lossless_bigint
+        && matches!(
+            primitive,
+            Primitive::usize
+                | Primitive::isize
+                | Primitive::u64
+                | Primitive::i64
+                | Primitive::u128
+                | Primitive::i128
+        )
+    {
+        return Some(match phase {
+            Phase::Serialize => crate::define("bigint | number").into(),
+            Phase::Deserialize => Reference::opaque(crate::opaque::BigInt).into(),
+        });
+    }
+
+    if lossless_floats && matches!(primitive, Primitive::f16 | Primitive::f32 | Primitive::f64) {
+        return Some(Reference::opaque(crate::opaque::Number).into());
+    }
+
+    None
 }
 
 fn spread_transform(js_ident: &str, mut parts: Vec<String>) -> String {
