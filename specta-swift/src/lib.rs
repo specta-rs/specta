@@ -39,7 +39,7 @@
 //!
 //! Now you're set up with Specta Swift!
 //!
-//! If you get tired of listing all your types, checkout the `specta::collect` function.
+//! If you get tired of listing all your types, checkout [`specta::collect`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",

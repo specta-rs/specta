@@ -41,7 +41,7 @@
 //!
 //! Now your setup with Specta!
 //!
-//! If you get tired of listing all your types manually? Checkout `specta::collect`!
+//! If you get tired of listing all your types manually? Checkout [`specta::collect`]!
 //!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
