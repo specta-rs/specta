@@ -102,6 +102,7 @@ impl RichTypesConfiguration {
                 Primitive::i128,
             ] {
                 // TODO: For input it should be `bigint | number` when phased is enabled??? How do we know that???
+
                 self.remapper = Some(self.remapper.take().unwrap_or_default().rule(
                     DataType::Primitive(primitive),
                     Reference::opaque(crate::opaque::BigInt).into(),
@@ -177,8 +178,6 @@ impl RichTypesConfiguration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        // TODO: Maybe abstract the `Remapper` onto `Self` as `Option<Remapper>` so it can be reused here and in `apply_types`.
-
         self.apply_inner(types, dt, js_ident, &mut Vec::new())
     }
 
