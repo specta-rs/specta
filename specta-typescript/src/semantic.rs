@@ -1,3 +1,18 @@
+//! Runtime-aware TypeScript type remapping.
+//!
+//! Rich types are Rust types whose TypeScript runtime value should be more
+//! specific than their JSON-compatible wire representation. For example,
+//! `bytes::Bytes` is commonly transported as an array of numbers but is nicer to
+//! work with as a `Uint8Array` in TypeScript, and `chrono::DateTime` is commonly
+//! transported as a string but used as a `Date` in TypeScript.
+//!
+//! [`RichTypesConfiguration`] records those type remaps and the JavaScript
+//! snippets needed to convert values at framework/runtime boundaries. The type
+//! graph can then be rewritten with [`RichTypesConfiguration::apply_types`], and
+//! individual function arguments or return values can be wrapped with
+//! [`RichTypesConfiguration::apply_serialize`] or
+//! [`RichTypesConfiguration::apply_deserialize`].
+
 use std::{borrow::Cow, fmt, sync::Arc};
 
 use specta::{
@@ -9,7 +24,34 @@ use crate::define;
 
 /// A rich type runtime JS transformer function.
 ///
-/// This defines a JS function which can convert between the incoming/outgoing type and it's JSON representation.
+/// This defines a JavaScript expression builder that converts between a rich
+/// TypeScript runtime value and its JSON-compatible representation.
+///
+/// The closure receives the JavaScript identifier/expression being transformed
+/// and must return a JavaScript expression using that value.
+///
+/// # Examples
+///
+/// Convert a JSON string into a TypeScript `Date`:
+///
+/// ```rust
+/// use specta_typescript::Transform;
+///
+/// let transform = Transform::new(|value| format!("new Date({value})"));
+/// # let _ = transform;
+/// ```
+///
+/// Convert a `Uint8Array` into a JSON array of numbers:
+///
+/// ```rust
+/// use specta_typescript::Transform;
+///
+/// let transform = Transform::new(|value| format!("[...{value}]"));
+/// # let _ = transform;
+/// ```
+///
+/// Use [`Transform::identity`] when the TypeScript runtime value already has
+/// the same representation as the value crossing the wire.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Transform(
@@ -32,11 +74,30 @@ impl fmt::Debug for Transform {
 
 impl Transform {
     /// Construct a runtime transform from a JavaScript identifier mapper.
+    ///
+    /// The mapper should return a JavaScript expression, not a statement.
+    ///
+    /// ```rust
+    /// use specta_typescript::Transform;
+    ///
+    /// let transform = Transform::new(|ident| format!("new URL({ident})"));
+    /// # let _ = transform;
+    /// ```
     pub fn new(runtime: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
         Self(Some(Arc::new(runtime)))
     }
 
     /// Construct an identity runtime transform.
+    ///
+    /// This is useful when a rule only changes the exported TypeScript type, or
+    /// when one direction does not need runtime conversion.
+    ///
+    /// ```rust
+    /// use specta_typescript::Transform;
+    ///
+    /// let transform = Transform::identity();
+    /// # let _ = transform;
+    /// ```
     pub fn identity() -> Self {
         Self(None)
     }
@@ -92,7 +153,75 @@ pub(crate) struct Rule {
     pub(crate) deserialize: Option<Transform>,
 }
 
-/// TODO
+/// Configuration for runtime-aware TypeScript type remapping.
+///
+/// By default this contains rules for common Rust types that have better
+/// TypeScript runtime equivalents than their wire representation:
+///
+/// - `bytes::Bytes` and `bytes::BytesMut` are exported as `Uint8Array`, with
+///   `Uint8Array -> number[]` and `number[] -> Uint8Array` transforms.
+/// - `url::Url` is exported as `URL`, with a `string -> URL` transform.
+/// - Supported `chrono` and `jiff` date/time types are exported as `Date`, with
+///   runtime transforms where the wire value differs from the JavaScript value.
+///
+/// You can add custom named-type rules with [`RichTypesConfiguration::define`]
+/// or start from [`RichTypesConfiguration::empty`] if you do not want the
+/// defaults.
+///
+/// # Examples
+///
+/// Apply the default rich type rewrites before exporting TypeScript:
+///
+/// ```rust
+/// use specta::{Type, Types};
+/// use specta_typescript::{RichTypesConfiguration, Typescript};
+///
+/// #[derive(Type)]
+/// struct User {
+///     id: u32,
+/// }
+///
+/// let types = Types::default().register::<User>();
+/// let rich_types = RichTypesConfiguration::default();
+/// let types = rich_types.apply_types(&types);
+///
+/// let bindings = Typescript::default().export(&types, specta_serde::Format)?;
+/// # let _ = bindings;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// Define a custom rich type rule. This example treats a Rust newtype as a
+/// TypeScript `URL`, while serializing it back to a string before sending it to
+/// Rust and deserializing strings from Rust into `URL` instances:
+///
+/// ```rust
+/// use specta::{Type, Types};
+/// use specta_typescript::{RichTypesConfiguration, Transform, define};
+///
+/// #[derive(Type)]
+/// struct Website(String);
+///
+/// let mut rich_types = RichTypesConfiguration::empty();
+/// rich_types.define::<Website>(
+///     |_| define("URL").into(),
+///     Some(Transform::new(|value| format!("{value}.toString()"))),
+///     Some(Transform::new(|value| format!("new URL({value})"))),
+/// );
+///
+/// let types = Types::default().register::<Website>();
+/// let types = rich_types.apply_types(&types);
+/// # let _ = types;
+/// ```
+///
+/// Enable lossless bigint support when your runtime preserves integer values
+/// outside JavaScript's safe `number` range:
+///
+/// ```rust
+/// use specta_typescript::RichTypesConfiguration;
+///
+/// let mut rich_types = RichTypesConfiguration::default();
+/// rich_types.enable_lossless_bigints();
+/// ```
 #[derive(Debug, Clone)]
 pub struct RichTypesConfiguration {
     rules: Vec<Rule>,
@@ -171,7 +300,8 @@ impl Default for RichTypesConfiguration {
 impl RichTypesConfiguration {
     /// Construct a [`RichTypesConfiguration`] without the default rules.
     ///
-    /// You should prefer [`RichTypesConfiguration::default`] when possible as the default rules are likely to be more suitable for your use case.
+    /// Prefer [`RichTypesConfiguration::default`] when possible; the default
+    /// rules cover common ecosystem types and may grow over time.
     pub fn empty() -> Self {
         Self {
             rules: Default::default(),
@@ -182,8 +312,29 @@ impl RichTypesConfiguration {
 
     /// Define a new rule for a given type `T`.
     ///
-    /// Note: this will only worked if applied to a named type like generated by the `Type` macro. It will not work with primitives.
+    /// `dt` receives the original [`DataType`] for `T` and must return the
+    /// TypeScript-facing [`DataType`] that should replace it. `serialize`
+    /// transforms TypeScript runtime values before sending them to Rust.
+    /// `deserialize` transforms values received from Rust into TypeScript
+    /// runtime values.
     ///
+    /// This only works for named types, such as types generated by the
+    /// [`Type`] derive macro. It does not work for primitives.
+    ///
+    /// ```rust
+    /// use specta::Type;
+    /// use specta_typescript::{RichTypesConfiguration, Transform, define};
+    ///
+    /// #[derive(Type)]
+    /// struct Website(String);
+    ///
+    /// let mut rich_types = RichTypesConfiguration::empty();
+    /// rich_types.define::<Website>(
+    ///     |_| define("URL").into(),
+    ///     Some(Transform::new(|value| format!("{value}.toString()"))),
+    ///     Some(Transform::new(|value| format!("new URL({value})"))),
+    /// );
+    /// ```
     pub fn define<T: Type>(
         &mut self,
         dt: impl Fn(DataType) -> DataType + Send + Sync + 'static,
@@ -208,10 +359,16 @@ impl RichTypesConfiguration {
         self
     }
 
-    /// Enable lossless support for large number types (BigInt's).
+    /// Enable lossless support for large integer types (`BigInt`s).
     ///
-    /// This assumes your runtime is configured to handle losslessly transmitting the `BigInt`'s.
-    /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for the implementation details around this.
+    /// This remaps `usize`, `isize`, `u64`, `i64`, `u128`, and `i128` so they
+    /// can be represented as `bigint` values where JavaScript `number` would be
+    /// lossy.
+    ///
+    /// This assumes your runtime is configured to losslessly transmit
+    /// `BigInt`s. Refer to
+    /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
+    /// for implementation details.
     pub fn enable_lossless_bigints(&mut self) -> &mut Self {
         if !self.lossless_bigint {
             self.lossless_bigint = true;
@@ -222,9 +379,13 @@ impl RichTypesConfiguration {
 
     /// Enable lossless float support.
     ///
-    /// By enabling this your asserting your runtime *MUST* preserve `NaN`, `Infinity` and `-Infinity` values from JS to Rust. This constrain is REQUIRED for this to not have runtime issues.
+    /// By enabling this, you assert that your runtime *must* preserve `NaN`,
+    /// `Infinity`, and `-Infinity` values from JavaScript to Rust. This
+    /// constraint is required to avoid runtime issues.
     ///
-    /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for the implementation details around this.
+    /// Refer to
+    /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
+    /// for implementation details.
     pub fn enable_lossless_floats(&mut self) -> &mut Self {
         if !self.lossless_floats {
             self.lossless_floats = true;
@@ -235,7 +396,11 @@ impl RichTypesConfiguration {
 
     /// Transform a [`Types`] collection using the configured rules.
     ///
-    /// This will ensure all of your types match the values match what the JS transform will output.
+    /// This rewrites registered named types so their exported TypeScript shapes
+    /// match the values produced or consumed by the runtime transforms.
+    ///
+    /// Call this after any format-specific mapping that changes the type graph,
+    /// and before exporting the final TypeScript definitions.
     pub fn apply_types<'a>(&self, types: &'a Types) -> Cow<'a, Types> {
         let mut types = Cow::Borrowed(types);
 
@@ -344,14 +509,18 @@ impl RichTypesConfiguration {
         }
     }
 
-    /// Scan a [`DataType`] tree applying all rules and building a JS runtime transform, and an updated type.
+    /// Scan a [`DataType`] tree applying serialize-facing rules.
     ///
     /// This assumes [`RichTypesConfiguration::apply_types`] has already been applied to the [`Types`].
     /// Therefore the type updates will be shallow (up until references to the `Types`).
     ///
-    /// The JavaScript transform will be deeply nested and will be applied around the JS identifier which is provided.
+    /// The returned JavaScript expression is built around `js_ident` and may be
+    /// deeply nested for structs, tuples, lists, nullable values, and
+    /// intersections.
     ///
-    /// If no rules are matched, `None` is returned, if the type doesn't require transformations, `Some((None, runtime_str))` is returned.
+    /// If no rule or built-in remap matches, `None` is returned. If a rule
+    /// matches but the type shape does not need to change, `Some((None,
+    /// runtime_str))` is returned.
     ///
     pub fn apply_serialize(
         &self,
@@ -363,6 +532,9 @@ impl RichTypesConfiguration {
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
+    ///
+    /// Use this for values received from Rust before exposing them to
+    /// TypeScript callers.
     pub fn apply_deserialize(
         &self,
         types: &Types,
@@ -373,6 +545,8 @@ impl RichTypesConfiguration {
     }
 
     /// Scan a [`DataType`] tree applying serialize-facing rules.
+    ///
+    /// This is an alias for [`RichTypesConfiguration::apply_serialize`].
     pub fn apply(
         &self,
         types: &Types,
