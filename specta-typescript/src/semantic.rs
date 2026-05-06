@@ -110,12 +110,6 @@ impl Transform {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Phase {
-    Serialize,
-    Deserialize,
-}
-
 #[derive(Clone)]
 pub(crate) struct DataTypeFn(Arc<dyn Fn(DataType) -> DataType + Send + Sync>);
 
@@ -406,19 +400,29 @@ impl RichTypesConfiguration {
 
         if self.has_builtin_remaps() {
             types = Cow::Owned(types.into_owned().map(|mut ndt| {
-                let phase = if ndt.name.ends_with("_Serialize") {
-                    Phase::Serialize
+                let remap_bigint = if ndt.name.ends_with("_Serialize") {
+                    serialize_bigint
                 } else {
-                    Phase::Deserialize
+                    deserialize_bigint
                 };
 
                 ndt.generics.to_mut().iter_mut().for_each(|generic| {
                     if let Some(dt) = &mut generic.default {
-                        apply_builtin_remaps(dt, phase, self.lossless_bigint, self.lossless_floats);
+                        apply_builtin_remaps(
+                            dt,
+                            remap_bigint,
+                            self.lossless_bigint,
+                            self.lossless_floats,
+                        );
                     }
                 });
                 if let Some(dt) = &mut ndt.ty {
-                    apply_builtin_remaps(dt, phase, self.lossless_bigint, self.lossless_floats);
+                    apply_builtin_remaps(
+                        dt,
+                        remap_bigint,
+                        self.lossless_bigint,
+                        self.lossless_floats,
+                    );
                 }
 
                 ndt
@@ -528,7 +532,14 @@ impl RichTypesConfiguration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(Phase::Serialize, types, dt, js_ident, &mut Vec::new())
+        self.apply_inner(
+            |rule| &rule.serialize,
+            serialize_bigint,
+            types,
+            dt,
+            js_ident,
+            &mut Vec::new(),
+        )
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
@@ -541,7 +552,14 @@ impl RichTypesConfiguration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(Phase::Deserialize, types, dt, js_ident, &mut Vec::new())
+        self.apply_inner(
+            |rule| &rule.deserialize,
+            deserialize_bigint,
+            types,
+            dt,
+            js_ident,
+            &mut Vec::new(),
+        )
     }
 
     /// Scan a [`DataType`] tree applying serialize-facing rules.
@@ -558,7 +576,8 @@ impl RichTypesConfiguration {
 
     fn apply_inner(
         &self,
-        phase: Phase,
+        transform_for_rule: fn(&Rule) -> &Option<Transform>,
+        remap_bigint: fn() -> DataType,
         types: &Types,
         dt: &DataType,
         js_ident: &str,
@@ -569,12 +588,7 @@ impl RichTypesConfiguration {
                 if let Some(rule) = self.rule_for_reference(types, r) {
                     return Some((
                         Some((rule.data_type.0)(Self::reference_source_dt(types, r))),
-                        match phase {
-                            Phase::Serialize => &rule.serialize,
-                            Phase::Deserialize => &rule.deserialize,
-                        }
-                        .as_ref()
-                        .map_or_else(
+                        transform_for_rule(rule).as_ref().map_or_else(
                             || js_ident.to_owned(),
                             |transform| transform.apply(js_ident),
                         ),
@@ -582,9 +596,14 @@ impl RichTypesConfiguration {
                 }
 
                 match &r.inner {
-                    NamedReferenceType::Inline { dt, .. } => {
-                        self.apply_inner(phase, types, dt, js_ident, stack)
-                    }
+                    NamedReferenceType::Inline { dt, .. } => self.apply_inner(
+                        transform_for_rule,
+                        remap_bigint,
+                        types,
+                        dt,
+                        js_ident,
+                        stack,
+                    ),
                     NamedReferenceType::Recursive => None,
                     NamedReferenceType::Reference { .. } => {
                         let ndt = types.get(r)?;
@@ -596,7 +615,14 @@ impl RichTypesConfiguration {
                         }
                         stack.push(key);
                         let result = self
-                            .apply_inner(phase, types, ty, js_ident, stack)
+                            .apply_inner(
+                                transform_for_rule,
+                                remap_bigint,
+                                types,
+                                ty,
+                                js_ident,
+                                stack,
+                            )
                             .map(|(_, runtime)| (None, runtime));
                         stack.pop();
                         result
@@ -612,9 +638,14 @@ impl RichTypesConfiguration {
                     for (name, field) in &fields.fields {
                         let Some(field_ty) = &field.ty else { continue };
                         let field_ident = format!("{js_ident}.{name}");
-                        let Some((next_ty, runtime)) =
-                            self.apply_inner(phase, types, field_ty, &field_ident, stack)
-                        else {
+                        let Some((next_ty, runtime)) = self.apply_inner(
+                            transform_for_rule,
+                            remap_bigint,
+                            types,
+                            field_ty,
+                            &field_ident,
+                            stack,
+                        ) else {
                             continue;
                         };
 
@@ -650,8 +681,14 @@ impl RichTypesConfiguration {
                         .filter_map(|(idx, field)| {
                             let field_ty = field.ty.as_ref()?;
                             let field_ident = format!("{js_ident}[{idx}]");
-                            let (next_ty, runtime) =
-                                self.apply_inner(phase, types, field_ty, &field_ident, stack)?;
+                            let (next_ty, runtime) = self.apply_inner(
+                                transform_for_rule,
+                                remap_bigint,
+                                types,
+                                field_ty,
+                                &field_ident,
+                                stack,
+                            )?;
 
                             if let Some(next_ty) = next_ty
                                 && let Fields::Unnamed(fields) = &mut ty.fields
@@ -684,8 +721,14 @@ impl RichTypesConfiguration {
                     .enumerate()
                     .filter_map(|(idx, element)| {
                         let ident = format!("{js_ident}[{idx}]");
-                        let (next_ty, runtime) =
-                            self.apply_inner(phase, types, element, &ident, stack)?;
+                        let (next_ty, runtime) = self.apply_inner(
+                            transform_for_rule,
+                            remap_bigint,
+                            types,
+                            element,
+                            &ident,
+                            stack,
+                        )?;
                         if let Some(next_ty) = next_ty {
                             ty.elements[idx] = next_ty;
                             changed = true;
@@ -705,7 +748,14 @@ impl RichTypesConfiguration {
             }
             DataType::List(list) => {
                 let item = "i";
-                let (next_ty, runtime) = self.apply_inner(phase, types, &list.ty, item, stack)?;
+                let (next_ty, runtime) = self.apply_inner(
+                    transform_for_rule,
+                    remap_bigint,
+                    types,
+                    &list.ty,
+                    item,
+                    stack,
+                )?;
                 let mut ty = list.clone();
                 let mut changed = false;
                 if let Some(next_ty) = next_ty {
@@ -718,7 +768,14 @@ impl RichTypesConfiguration {
                 ))
             }
             DataType::Nullable(inner) => {
-                let (next_ty, runtime) = self.apply_inner(phase, types, inner, js_ident, stack)?;
+                let (next_ty, runtime) = self.apply_inner(
+                    transform_for_rule,
+                    remap_bigint,
+                    types,
+                    inner,
+                    js_ident,
+                    stack,
+                )?;
                 Some((
                     next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
                     format!("{js_ident}==null?{js_ident}:{runtime}"),
@@ -731,8 +788,14 @@ impl RichTypesConfiguration {
                     .iter()
                     .enumerate()
                     .filter_map(|(idx, item)| {
-                        let (next_ty, runtime) =
-                            self.apply_inner(phase, types, item, js_ident, stack)?;
+                        let (next_ty, runtime) = self.apply_inner(
+                            transform_for_rule,
+                            remap_bigint,
+                            types,
+                            item,
+                            js_ident,
+                            stack,
+                        )?;
                         if let Some(next_ty) = next_ty {
                             ty[idx] = next_ty;
                             changed = true;
@@ -763,7 +826,7 @@ impl RichTypesConfiguration {
             | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
-        self.apply_builtin_remaps(phase, dt, js_ident, result)
+        self.apply_builtin_remaps(remap_bigint, dt, js_ident, result)
     }
 
     fn rule_for_reference<'a>(
@@ -796,7 +859,7 @@ impl RichTypesConfiguration {
 
     fn apply_builtin_remaps(
         &self,
-        phase: Phase,
+        remap_bigint: fn() -> DataType,
         dt: &DataType,
         js_ident: &str,
         result: Option<(Option<DataType>, String)>,
@@ -812,7 +875,7 @@ impl RichTypesConfiguration {
         let mut remapped = source.clone();
         apply_builtin_remaps(
             &mut remapped,
-            phase,
+            remap_bigint,
             self.lossless_bigint,
             self.lossless_floats,
         );
@@ -829,13 +892,17 @@ impl RichTypesConfiguration {
 
 fn apply_builtin_remaps(
     dt: &mut DataType,
-    phase: Phase,
+    remap_bigint: fn() -> DataType,
     lossless_bigint: bool,
     lossless_floats: bool,
 ) {
     if let DataType::Primitive(primitive) = dt
-        && let Some(remapped) =
-            remap_primitive(primitive.clone(), phase, lossless_bigint, lossless_floats)
+        && let Some(remapped) = remap_primitive(
+            primitive.clone(),
+            remap_bigint,
+            lossless_bigint,
+            lossless_floats,
+        )
     {
         *dt = remapped;
         return;
@@ -844,20 +911,33 @@ fn apply_builtin_remaps(
     match dt {
         DataType::Primitive(_) | DataType::Generic(_) => {}
         DataType::List(list) => {
-            apply_builtin_remaps(&mut list.ty, phase, lossless_bigint, lossless_floats)
+            apply_builtin_remaps(&mut list.ty, remap_bigint, lossless_bigint, lossless_floats)
         }
         DataType::Map(map) => {
-            apply_builtin_remaps(map.key_ty_mut(), phase, lossless_bigint, lossless_floats);
-            apply_builtin_remaps(map.value_ty_mut(), phase, lossless_bigint, lossless_floats);
+            apply_builtin_remaps(
+                map.key_ty_mut(),
+                remap_bigint,
+                lossless_bigint,
+                lossless_floats,
+            );
+            apply_builtin_remaps(
+                map.value_ty_mut(),
+                remap_bigint,
+                lossless_bigint,
+                lossless_floats,
+            );
         }
-        DataType::Struct(s) => {
-            apply_builtin_remaps_to_fields(&mut s.fields, phase, lossless_bigint, lossless_floats)
-        }
+        DataType::Struct(s) => apply_builtin_remaps_to_fields(
+            &mut s.fields,
+            remap_bigint,
+            lossless_bigint,
+            lossless_floats,
+        ),
         DataType::Enum(e) => {
             for (_, variant) in &mut e.variants {
                 apply_builtin_remaps_to_fields(
                     &mut variant.fields,
-                    phase,
+                    remap_bigint,
                     lossless_bigint,
                     lossless_floats,
                 );
@@ -865,15 +945,15 @@ fn apply_builtin_remaps(
         }
         DataType::Tuple(tuple) => {
             for dt in &mut tuple.elements {
-                apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
             }
         }
         DataType::Nullable(dt) => {
-            apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+            apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
         }
         DataType::Intersection(dts) => {
             for dt in dts {
-                apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
             }
         }
         DataType::Reference(reference) => {
@@ -884,11 +964,11 @@ fn apply_builtin_remaps(
             match &mut reference.inner {
                 NamedReferenceType::Recursive => {}
                 NamedReferenceType::Inline { dt, .. } => {
-                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                    apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
                 }
                 NamedReferenceType::Reference { generics, .. } => {
                     for (_, dt) in generics {
-                        apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                        apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
                     }
                 }
             }
@@ -898,7 +978,7 @@ fn apply_builtin_remaps(
 
 fn apply_builtin_remaps_to_fields(
     fields: &mut Fields,
-    phase: Phase,
+    remap_bigint: fn() -> DataType,
     lossless_bigint: bool,
     lossless_floats: bool,
 ) {
@@ -907,14 +987,14 @@ fn apply_builtin_remaps_to_fields(
         Fields::Unnamed(fields) => {
             for field in &mut fields.fields {
                 if let Some(dt) = &mut field.ty {
-                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                    apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
                 }
             }
         }
         Fields::Named(fields) => {
             for (_, field) in &mut fields.fields {
                 if let Some(dt) = &mut field.ty {
-                    apply_builtin_remaps(dt, phase, lossless_bigint, lossless_floats);
+                    apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
                 }
             }
         }
@@ -923,7 +1003,7 @@ fn apply_builtin_remaps_to_fields(
 
 fn remap_primitive(
     primitive: Primitive,
-    phase: Phase,
+    remap_bigint: fn() -> DataType,
     lossless_bigint: bool,
     lossless_floats: bool,
 ) -> Option<DataType> {
@@ -938,10 +1018,7 @@ fn remap_primitive(
                 | Primitive::i128
         )
     {
-        return Some(match phase {
-            Phase::Serialize => crate::define("bigint | number").into(),
-            Phase::Deserialize => Reference::opaque(crate::opaque::BigInt).into(),
-        });
+        return Some(remap_bigint());
     }
 
     if lossless_floats && matches!(primitive, Primitive::f16 | Primitive::f32 | Primitive::f64) {
@@ -949,6 +1026,14 @@ fn remap_primitive(
     }
 
     None
+}
+
+fn serialize_bigint() -> DataType {
+    crate::define("bigint | number").into()
+}
+
+fn deserialize_bigint() -> DataType {
+    Reference::opaque(crate::opaque::BigInt).into()
 }
 
 fn spread_transform(js_ident: &str, mut parts: Vec<String>) -> String {
