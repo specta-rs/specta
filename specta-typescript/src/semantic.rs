@@ -324,13 +324,11 @@ impl Configuration {
     /// Enable lossless support for large integer types (`BigInt`s).
     ///
     /// This remaps `usize`, `isize`, `u64`, `i64`, `u128`, and `i128` so they
-    /// can be represented as `bigint` values where JavaScript `number` would be
-    /// lossy.
+    /// are a [`BigInt`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt) in JavaScript.
     ///
-    /// This assumes your runtime is configured to losslessly transmit
-    /// `BigInt`s. Refer to
-    /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
-    /// for implementation details.
+    /// This is only safe if your serialization and deserialization layer can losslessly transmit `BigInt`s to the frontend.
+    ///
+    /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for implementation details.
     pub fn enable_lossless_bigints(mut self) -> Self {
         if !self.lossless_bigint {
             self.lossless_bigint = true;
@@ -342,12 +340,9 @@ impl Configuration {
     /// Enable lossless float support.
     ///
     /// By enabling this, you assert that your runtime *must* preserve `NaN`,
-    /// `Infinity`, and `-Infinity` values from JavaScript to Rust. This
-    /// constraint is required to avoid runtime issues.
+    /// `Infinity`, and `-Infinity` values from JavaScript to Rust and we will flatten `number | null` into `number`.
     ///
-    /// Refer to
-    /// [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203)
-    /// for implementation details.
+    /// Refer to [specta-rs/specta#203](https://github.com/specta-rs/specta/issues/203) for implementation details.
     pub fn enable_lossless_floats(mut self) -> Self {
         if !self.lossless_floats {
             self.lossless_floats = true;
