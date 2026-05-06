@@ -1,0 +1,6 @@
+---
+source: tests/tests/semantic.rs
+expression: "transformed_snapshot(&types,\nsemantic.apply_serialize(&types, &dt, \"payload\"),)"
+---
+type: <unchanged>
+runtime: ({...payload,scores:payload.scores.map(i=>i),maybe_score:payload.maybe_score==null?payload.maybe_score:payload.maybe_score})

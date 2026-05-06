@@ -327,3 +327,84 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Number<T> {
         T::deserialize(deserializer).map(Self)
     }
 }
+
+/// Cast a Rust type to a Typescript `bigint` type.
+///
+/// This can be used to opt into exporting BigInt-style Rust integer types as
+/// Typescript `bigint` when your runtime supports lossless bigint transport.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_typescript::BigInt;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = BigInt)]
+///     pub field: i128,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_typescript::BigInt;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: BigInt<i128>,
+/// }
+/// # }
+/// ```
+pub struct BigInt<T = ()>(T);
+
+impl<T> Type for BigInt<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::BigInt))
+    }
+}
+
+impl<T: Debug> Debug for BigInt<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BigInt").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for BigInt<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for BigInt<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for BigInt<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for BigInt<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}

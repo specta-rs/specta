@@ -1,0 +1,6 @@
+---
+source: tests/tests/semantic.rs
+expression: "transformed_snapshot(&types,\nsemantic.apply_serialize(&types, &dt, \"payload\"),)"
+---
+type: <unchanged>
+runtime: ({...payload,site:payload.site.toString(),sites:payload.sites.map(i=>i.toString()),optional_site:payload.optional_site==null?payload.optional_site:payload.optional_site.toString()})
