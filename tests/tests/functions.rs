@@ -266,7 +266,7 @@ fn test_function_exporting() {
                 .map(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"Result<number, number>"
+            @"Result<number, number | null>"
         );
     }
 
@@ -282,7 +282,7 @@ fn test_function_exporting() {
                 .map(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"Result<string, number>"
+            @"Result<string, number | null>"
         );
     }
 

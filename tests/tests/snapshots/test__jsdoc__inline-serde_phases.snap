@@ -22,8 +22,8 @@ i32: number
 u8: number
 u16: number
 u32: number
-f32: number
-f64: number
+f32: number | null
+f64: number | null
 bool: boolean
 char: string
 Range<i32>: {
