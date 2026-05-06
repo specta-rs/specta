@@ -6,7 +6,7 @@
 //! work with as a `Uint8Array` in TypeScript, and `chrono::DateTime` is commonly
 //! transported as a string but used as a `Date` in TypeScript.
 //!
-//! [`RichTypesConfiguration`] records those type remaps and the JavaScript
+//! [`semantic::Configuration`] records those type remaps and the JavaScript
 //! snippets needed to convert values at framework/runtime boundaries. The type
 //! graph can then be rewritten with [`RichTypesConfiguration::apply_types`], and
 //! individual function arguments or return values can be wrapped with
@@ -130,11 +130,11 @@ impl fmt::Debug for DataTypeFn {
 /// A rule for a specific named data type.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub(crate) struct Rule {
+pub struct Rule {
     /// NDT's name
-    pub(crate) name: Cow<'static, str>,
+    pub name: Cow<'static, str>,
     /// NDT's module path
-    pub(crate) module_path: Cow<'static, str>,
+    pub module_path: Cow<'static, str>,
     /// The type transformation function
     ///
     /// This must match up with the type produced or consumed by the runtime.
@@ -217,13 +217,13 @@ pub(crate) struct Rule {
 /// rich_types.enable_lossless_bigints();
 /// ```
 #[derive(Debug, Clone)]
-pub struct RichTypesConfiguration {
+pub struct Configuration {
     rules: Vec<Rule>,
     lossless_bigint: bool,
     lossless_floats: bool,
 }
 
-impl Default for RichTypesConfiguration {
+impl Default for Configuration {
     fn default() -> Self {
         Self {
             rules: vec![
@@ -291,7 +291,7 @@ impl Default for RichTypesConfiguration {
     }
 }
 
-impl RichTypesConfiguration {
+impl Configuration {
     /// Construct a [`RichTypesConfiguration`] without the default rules.
     ///
     /// Prefer [`RichTypesConfiguration::default`] when possible; the default
@@ -302,6 +302,13 @@ impl RichTypesConfiguration {
             lossless_bigint: false,
             lossless_floats: false,
         }
+    }
+
+    /// Exposes the rules applies to this instance for manual manipulation.
+    ///
+    /// This could be used to filter the default rules if you want to exclude certain ones.
+    pub fn rules_mut(&mut self) -> &mut Vec<Rule> {
+        &mut self.rules
     }
 
     /// Define a new rule for a given type `T`.
