@@ -1,6 +1,6 @@
 use crate::{
     define,
-    rich_types::{RichTypesConfiguration, Rule, Transform},
+    rich_types::{DataTypeFn, RichTypesConfiguration, Rule, Transform},
 };
 
 impl Default for RichTypesConfiguration {
@@ -11,36 +11,24 @@ impl Default for RichTypesConfiguration {
                 Rule {
                     name: "Bytes".into(),
                     module_path: "bytes".into(),
-                    serialize: Transform::new(
-                        |_| define("Uint8Array").into(),
-                        |i| format!("[...{i}]"),
-                    ),
-                    deserialize: Transform::new(
-                        |_| define("Uint8Array").into(),
-                        |i| format!("new Uint8Array({i})"),
-                    ),
+                    data_type: DataTypeFn::new(|_| define("Uint8Array").into()),
+                    serialize: Some(Transform::new(|i| format!("[...{i}]"))),
+                    deserialize: Some(Transform::new(|i| format!("new Uint8Array({i})"))),
                 },
                 Rule {
                     name: "BytesMut".into(),
                     module_path: "bytes".into(),
-                    serialize: Transform::new(
-                        |_| define("Uint8Array").into(),
-                        |i| format!("[...{i}]"),
-                    ),
-                    deserialize: Transform::new(
-                        |_| define("Uint8Array").into(),
-                        |i| format!("new Uint8Array({i})"),
-                    ),
+                    data_type: DataTypeFn::new(|_| define("Uint8Array").into()),
+                    serialize: Some(Transform::new(|i| format!("[...{i}]"))),
+                    deserialize: Some(Transform::new(|i| format!("new Uint8Array({i})"))),
                 },
                 // Date
                 Rule {
                     name: "DateTime".into(),
                     module_path: "chrono".into(),
-                    serialize: Transform::new_identity_runtime(|_| define("Date").into()),
-                    deserialize: Transform::new(
-                        |_| define("Date").into(),
-                        |i| format!("new Date({i})"),
-                    ),
+                    data_type: DataTypeFn::new(|_| define("Date").into()),
+                    serialize: None,
+                    deserialize: Some(Transform::new(|i| format!("new Date({i})"))),
                 },
                 // TODO: `NaiveDate`, `NaiveDateTime`, `DateTime<FixedOffset>`
                 // https://chatgpt.com/c/69fae901-2590-839c-8174-cfca70cc23bc
