@@ -119,6 +119,14 @@ impl Default for RichTypesConfiguration {
                     serialize: Some(Transform::new(|i| format!("[...{i}]"))),
                     deserialize: Some(Transform::new(|i| format!("new Uint8Array({i})"))),
                 },
+                // URL
+                Rule {
+                    name: "Url".into(),
+                    module_path: "url".into(),
+                    data_type: DataTypeFn::new(|_| define("URL").into()),
+                    serialize: None,
+                    deserialize: Some(Transform::new(|i| format!("new URL({i})"))),
+                },
                 // Date
                 Rule {
                     name: "DateTime".into(),
@@ -136,7 +144,23 @@ impl Default for RichTypesConfiguration {
                     })),
                     deserialize: Some(Transform::new(|i| format!("new Date({i})"))),
                 },
-                // We don't implement support for `NaiveDateTime` as timezone is an issue
+                Rule {
+                    name: "Timestamp".into(),
+                    module_path: "jiff".into(),
+                    data_type: DataTypeFn::new(|_| define("Date").into()),
+                    serialize: Some(Transform::new(|i| format!("{i}.toISOString()"))),
+                    deserialize: Some(Transform::new(|i| format!("new Date({i})"))),
+                },
+                Rule {
+                    name: "Date".into(),
+                    module_path: "jiff::civil".into(),
+                    data_type: DataTypeFn::new(|_| define("Date").into()),
+                    serialize: Some(Transform::new(|i| {
+                        format!("{i}.toISOString().slice(0, 10)")
+                    })),
+                    deserialize: Some(Transform::new(|i| format!("new Date({i})"))),
+                },
+                // We don't implement support for `chrono::NaiveDateTime`, and many `jiff` types as lack of timezone is an issue with JS's `Date`
             ],
             lossless_bigint: false,
             lossless_floats: false,
@@ -428,11 +452,13 @@ impl RichTypesConfiguration {
                             field.ty = Some(next_ty);
                             changed = true;
                         }
-                        parts.push(format!("{name}:{runtime}"));
+                        if runtime != field_ident {
+                            parts.push(format!("{name}:{runtime}"));
+                        }
                     }
 
                     if parts.is_empty() {
-                        None
+                        changed.then_some((Some(DataType::Struct(ty)), js_ident.to_owned()))
                     } else {
                         Some((
                             changed.then_some(DataType::Struct(ty)),
@@ -460,12 +486,12 @@ impl RichTypesConfiguration {
                                 changed = true;
                             }
 
-                            Some(format!("{idx}:{runtime}"))
+                            (runtime != field_ident).then_some(format!("{idx}:{runtime}"))
                         })
                         .collect::<Vec<_>>();
 
                     if parts.is_empty() {
-                        None
+                        changed.then_some((Some(DataType::Struct(ty)), js_ident.to_owned()))
                     } else {
                         Some((
                             changed.then_some(DataType::Struct(ty)),
@@ -490,12 +516,12 @@ impl RichTypesConfiguration {
                             ty.elements[idx] = next_ty;
                             changed = true;
                         }
-                        Some(format!("{idx}:{runtime}"))
+                        (runtime != ident).then_some(format!("{idx}:{runtime}"))
                     })
                     .collect::<Vec<_>>();
 
                 if parts.is_empty() {
-                    None
+                    changed.then_some((Some(DataType::Tuple(ty)), js_ident.to_owned()))
                 } else {
                     Some((
                         changed.then_some(DataType::Tuple(ty)),
@@ -755,5 +781,5 @@ fn spread_transform(js_ident: &str, mut parts: Vec<String>) -> String {
     if !js_ident.is_empty() {
         parts.insert(0, format!("...{js_ident}"));
     }
-    format!("{{{}}}", parts.join(","))
+    format!("({{{}}})", parts.join(","))
 }
