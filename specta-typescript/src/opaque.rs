@@ -17,6 +17,9 @@ pub(crate) struct Never;
 #[derive(PartialEq, Eq, Hash)]
 pub(crate) struct Number;
 
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct BigInt;
+
 /// Define a custom Typescript string which can be used as a `DataType::Reference`.
 ///
 /// This is an advanced feature which should be used with caution.

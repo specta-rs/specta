@@ -59,6 +59,7 @@ mod opaque;
 pub mod primitives;
 mod references;
 pub(crate) mod reserved_names;
+pub mod rich_types;
 mod types;
 mod typescript;
 
@@ -68,5 +69,5 @@ pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;
-pub use types::{Any, Never, Number, Unknown};
+pub use types::{Any, BigInt, Never, Number, Unknown};
 pub use typescript::Typescript;

@@ -1937,18 +1937,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "specta-tags"
-version = "0.0.0"
-dependencies = [
- "bytes",
- "chrono",
- "serde",
- "serde_json",
- "specta",
- "specta-serde",
-]
-
-[[package]]
 name = "specta-tests"
 version = "0.0.0"
 dependencies = [

@@ -28,6 +28,7 @@ serde = ["dep:serde"]
 [dependencies]
 specta = { version = "=2.0.0-rc.24", path = "../specta" }
 serde = { version = "1", default-features = false, optional = true }
+specta-util = { version = "0.0.11", path = "../specta-util" }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

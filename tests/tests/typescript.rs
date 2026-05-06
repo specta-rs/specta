@@ -26,6 +26,10 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
         specta_typescript::Unknown<String>,
         specta_typescript::Never,
         specta_typescript::Never<String>,
+        specta_typescript::Number,
+        specta_typescript::Number<i128>,
+        specta_typescript::BigInt,
+        specta_typescript::BigInt<i128>,
     );
     let _ = <HashMap<specta_typescript::Any, ()> as Type>::definition(&mut types);
 
