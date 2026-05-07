@@ -39,7 +39,7 @@ const VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 
 const FIELD_RENAME_SERIALIZE: &str = "serde:field:rename_serialize";
 const FIELD_RENAME_DESERIALIZE: &str = "serde:field:rename_deserialize";
-const FIELD_ALIASES: &str = "serde:field:aliases";
+pub(crate) const FIELD_ALIASES: &str = "serde:field:aliases";
 const FIELD_DEFAULT: &str = "serde:field:default";
 const FIELD_FLATTEN: &str = "serde:field:flatten";
 const FIELD_SKIP_SERIALIZING: &str = "serde:field:skip_serializing";

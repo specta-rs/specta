@@ -867,6 +867,10 @@ fn rewrite_datatype_for_phase(
                 false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
+            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
+                *ty = intersection;
+                return Ok(());
+            }
             if let Some(intersection) = lower_flattened_struct(s)? {
                 *ty = intersection;
             }
@@ -889,6 +893,10 @@ fn rewrite_datatype_for_phase(
                     false,
                     true,
                 )?;
+
+                if let Some(aliases) = lower_field_aliases_for_phase(&mut variant.fields, mode)? {
+                    variant.fields = Variant::unnamed().field(Field::new(aliases)).build().fields;
+                }
             }
 
             if rewrite_identifier_enum_for_phase(e, mode, original_types, generated, split_types)? {
@@ -1017,6 +1025,85 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
     }
 
     Ok(Some(DataType::Intersection(parts)))
+}
+
+fn lower_field_aliases_for_phase(
+    fields: &mut Fields,
+    mode: PhaseRewrite,
+) -> Result<Option<DataType>, Error> {
+    if mode != PhaseRewrite::Deserialize {
+        return Ok(None);
+    }
+
+    let Fields::Named(named) = fields else {
+        return Ok(None);
+    };
+
+    if !named
+        .fields
+        .iter()
+        .any(|(_, field)| field_has_aliases(field))
+    {
+        return Ok(None);
+    }
+
+    let mut base = Struct::named();
+    let mut parts = Vec::new();
+
+    for (name, field) in std::mem::take(&mut named.fields) {
+        let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+            base.field_mut(name, field);
+            continue;
+        };
+
+        if attrs.aliases.is_empty() {
+            base.field_mut(name, field);
+            continue;
+        }
+
+        let mut accepted_names = Vec::with_capacity(attrs.aliases.len() + 1);
+        accepted_names.push(name);
+        accepted_names.extend(attrs.aliases.into_iter().map(Cow::Owned));
+        parts.push(alias_field_union(accepted_names, field));
+    }
+
+    let base = match base.build() {
+        DataType::Struct(base) => base,
+        _ => unreachable!("Struct::named always builds a struct"),
+    };
+
+    if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
+        parts.insert(0, DataType::Struct(base));
+    }
+
+    Ok(Some(DataType::Intersection(parts)))
+}
+
+fn field_has_aliases(field: &Field) -> bool {
+    SerdeFieldAttrs::from_attributes(&field.attributes)
+        .ok()
+        .flatten()
+        .is_some_and(|attrs| !attrs.aliases.is_empty())
+}
+
+fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
+    let mut aliases = Enum::default();
+    let empty_variant = Variant::unnamed().build();
+
+    for name in names {
+        let mut field = field.clone();
+        field.attributes.remove(parser::FIELD_ALIASES);
+
+        aliases.variants.push((
+            Cow::Borrowed(""),
+            clone_variant_with_unnamed_fields(
+                &empty_variant,
+                vec![Field::new(named_fields_datatype(vec![(name, field)]))],
+            ),
+        ));
+    }
+
+    DataType::Enum(aliases)
 }
 
 fn field_is_flattened(field: &Field) -> bool {
@@ -1277,37 +1364,48 @@ fn rewrite_enum_repr_for_phase(
 
         let serialized_name =
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
-        let widen_tag =
-            mode == PhaseRewrite::Deserialize && variant_attrs.is_some_and(|attrs| attrs.other);
-        let mut transformed_variant = match &repr {
-            EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant)?,
-            EnumRepr::Internal { tag } => transform_internal_variant(
-                serialized_name.clone(),
-                tag.as_ref(),
-                &variant,
-                original_types,
-                widen_tag,
-            )?,
-            EnumRepr::Adjacent { tag, content } => {
-                if tag == content {
-                    return Err(Error::invalid_enum_representation(
-                        "serde adjacent tagging requires distinct `tag` and `content` field names",
-                    ));
-                }
+        let aliases = variant_attrs
+            .as_ref()
+            .filter(|_| mode == PhaseRewrite::Deserialize)
+            .map(|attrs| attrs.aliases.as_slice())
+            .unwrap_or(&[]);
+        let names = std::iter::once(serialized_name).chain(aliases.iter().cloned());
 
-                transform_adjacent_variant(
+        for serialized_name in names {
+            let widen_tag = mode == PhaseRewrite::Deserialize
+                && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
+            let mut transformed_variant = match &repr {
+                EnumRepr::External => {
+                    transform_external_variant(serialized_name.clone(), &variant)?
+                }
+                EnumRepr::Internal { tag } => transform_internal_variant(
                     serialized_name.clone(),
                     tag.as_ref(),
-                    content.as_ref(),
                     &variant,
+                    original_types,
                     widen_tag,
-                )?
-            }
-            EnumRepr::Untagged => unreachable!(),
-        };
+                )?,
+                EnumRepr::Adjacent { tag, content } => {
+                    if tag == content {
+                        return Err(Error::invalid_enum_representation(
+                            "serde adjacent tagging requires distinct `tag` and `content` field names",
+                        ));
+                    }
 
-        transformed_variant.attributes = Default::default();
-        transformed.push((Cow::Owned(serialized_name), transformed_variant));
+                    transform_adjacent_variant(
+                        serialized_name.clone(),
+                        tag.as_ref(),
+                        content.as_ref(),
+                        &variant,
+                        widen_tag,
+                    )?
+                }
+                EnumRepr::Untagged => unreachable!(),
+            };
+
+            transformed_variant.attributes = Default::default();
+            transformed.push((Cow::Owned(serialized_name), transformed_variant));
+        }
     }
 
     e.variants = transformed;
@@ -2174,6 +2272,7 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
     Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
+                || !attrs.aliases.is_empty()
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with
@@ -2188,6 +2287,7 @@ fn variant_has_local_difference(variant: &Variant) -> Result<bool, Error> {
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || attrs.rename_all_serialize != attrs.rename_all_deserialize
+                || !attrs.aliases.is_empty()
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.has_serialize_with
                 || attrs.has_deserialize_with

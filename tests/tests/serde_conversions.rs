@@ -99,9 +99,39 @@ struct FieldAlias {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FieldMultipleAliases {
+    #[serde(alias = "old_value", alias = "legacy_value")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum VariantAlias {
     #[serde(alias = "OldValue")]
     Value,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantMultipleAliases {
+    #[serde(alias = "OldValue", alias = "LegacyValue")]
+    Value,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InternalVariantAlias {
+    #[serde(alias = "OldValue")]
+    Value { value: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", content = "data")]
+enum AdjacentVariantAlias {
+    #[serde(alias = "OldValue")]
+    Value(String),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -404,22 +434,101 @@ fn tuple_variant_skip_serializing_if_requires_phases_and_splits_owner() {
 }
 
 #[test]
-fn aliases_are_rejected_when_not_representable() {
+fn aliases_require_phases_format() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<FieldAlias>(),
             specta_serde::Format,
         )
-        .expect_err("field aliases should not be silently ignored");
+        .expect_err("field aliases should require PhasesFormat");
     assert!(err.to_string().contains("alias"));
 
     let err = Typescript::default()
         .export(
             &Types::default().register::<VariantAlias>(),
+            specta_serde::Format,
+        )
+        .expect_err("variant aliases should require PhasesFormat");
+    assert!(err.to_string().contains("alias"));
+}
+
+#[test]
+fn phases_format_exports_field_aliases() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FieldAlias>(),
             specta_serde::PhasesFormat,
         )
-        .expect_err("variant aliases should not be silently ignored outside identifier enums");
-    assert!(err.to_string().contains("alias"));
+        .expect("PhasesFormat should support field aliases");
+
+    insta::assert_snapshot!("serde-conversions-format-phases-field-alias", rendered);
+}
+
+#[test]
+fn phases_format_exports_multiple_field_aliases() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FieldMultipleAliases>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should support multiple field aliases");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-phases-multiple-field-aliases",
+        rendered
+    );
+}
+
+#[test]
+fn phases_format_exports_variant_aliases() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<VariantAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should support externally tagged variant aliases");
+
+    insta::assert_snapshot!("serde-conversions-format-phases-variant-alias", rendered);
+}
+
+#[test]
+fn phases_format_exports_multiple_variant_aliases() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<VariantMultipleAliases>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should support multiple variant aliases");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-phases-multiple-variant-aliases",
+        rendered
+    );
+}
+
+#[test]
+fn phases_format_exports_tagged_variant_aliases() {
+    let internal = Typescript::default()
+        .export(
+            &Types::default().register::<InternalVariantAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should support internally tagged variant aliases");
+    let adjacent = Typescript::default()
+        .export(
+            &Types::default().register::<AdjacentVariantAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should support adjacently tagged variant aliases");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-phases-internal-variant-alias",
+        internal
+    );
+    insta::assert_snapshot!(
+        "serde-conversions-format-phases-adjacent-variant-alias",
+        adjacent
+    );
 }
 
 #[test]
