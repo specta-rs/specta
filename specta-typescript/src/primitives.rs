@@ -3,7 +3,7 @@
 //! These are for advanced usecases, you should generally use [crate::Typescript] or
 //! [crate::JSDoc] in end-user applications.
 
-use std::{borrow::Cow, collections::BTreeSet, fmt::Write as _};
+use std::{borrow::Cow, collections::BTreeSet};
 
 use specta::{
     Format, Types,
@@ -82,14 +82,23 @@ pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
             '\t' => escaped.push_str(r#"\t"#),
             '\u{2028}' => escaped.push_str(r#"\u2028"#),
             '\u{2029}' => escaped.push_str(r#"\u2029"#),
-            ch if ch.is_control() => {
-                write!(escaped, r#"\u{:04X}"#, ch as u32).expect("infallible");
-            }
+            ch if ch.is_control() => push_unicode_escape(&mut escaped, ch),
             _ => escaped.push(ch),
         }
     }
 
     Cow::Owned(escaped)
+}
+
+fn push_unicode_escape(s: &mut String, ch: char) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let value = ch as u32;
+
+    s.push_str(r#"\u"#);
+    s.push(HEX[((value >> 12) & 0xF) as usize] as char);
+    s.push(HEX[((value >> 8) & 0xF) as usize] as char);
+    s.push(HEX[((value >> 4) & 0xF) as usize] as char);
+    s.push(HEX[(value & 0xF) as usize] as char);
 }
 
 fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
@@ -850,7 +859,8 @@ fn shallow_inline_datatype(
                 }
                 s.push(']');
             } else {
-                write!(s, "{inner}[]")?;
+                s.push_str(&inner);
+                s.push_str("[]");
             }
         }
         DataType::Map(map) => {
@@ -1132,7 +1142,8 @@ fn inline_datatype(
                 }
                 s.push(']');
             } else {
-                write!(s, "{dt_str}[]")?;
+                s.push_str(&dt_str);
+                s.push_str("[]");
             }
         }
         DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
@@ -1406,7 +1417,8 @@ fn list_dt(
 
             s.push(']');
         } else {
-            write!(s, "{dt}[]")?;
+            s.push_str(&dt);
+            s.push_str("[]");
         }
     }
 
@@ -1686,7 +1698,7 @@ fn struct_dt(
                 .collect::<Vec<_>>();
 
             if fields.is_empty() {
-                write!(s, "Record<{STRING}, {NEVER}>")?;
+                s.push_str("Record<string, never>");
                 return Ok(());
             }
 
@@ -1784,7 +1796,12 @@ fn object_field_to_ts(
         }
     };
 
-    Ok(write!(s, "{prefix}{key}: {value}")?)
+    s.push_str(prefix);
+    s.push_str(&key);
+    s.push_str(": ");
+    s.push_str(&value);
+
+    Ok(())
 }
 
 fn inline_reference_docs<'a>(
@@ -1872,7 +1889,7 @@ fn analyze_discriminator(
     }
 
     Some(DiscriminatorAnalysis {
-        key: key.expect("at least one variant when called"),
+        key: key?,
         known_literals: known_literals.into_iter().collect(),
         fallback_variant_idx,
     })

@@ -122,7 +122,6 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
-    Fmt(std::fmt::Error),
     UnableToExport(Layout),
 }
 
@@ -257,14 +256,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<std::fmt::Error> for Error {
-    fn from(error: std::fmt::Error) -> Self {
-        Self {
-            kind: ErrorKind::Fmt(error),
-        }
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
@@ -347,7 +338,6 @@ impl fmt::Display for Error {
                     write!(f, "Format error: {message}: {source}")
                 }
             }
-            ErrorKind::Fmt(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
                 f,
                 "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
@@ -373,7 +363,6 @@ impl error::Error for Error {
             ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
                 Some(source.as_ref())
             }
-            ErrorKind::Fmt(error) => Some(error),
             _ => None,
         }
     }
