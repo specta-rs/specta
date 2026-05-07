@@ -813,6 +813,118 @@ fn resolved_reference_generics(
     Some((rendered_generics, all_default, scoped_generics))
 }
 
+type DatatypeRenderer = fn(
+    &mut String,
+    &Exporter,
+    Option<&dyn Format>,
+    &Types,
+    &DataType,
+    Vec<Cow<'static, str>>,
+    Option<&str>,
+    &str,
+    &[(GenericReference, DataType)],
+) -> Result<(), Error>;
+
+fn needs_array_parens(ty: &str) -> bool {
+    ty.contains(' ') && (!ty.ends_with('}') || ty.contains('&') || ty.contains('|'))
+}
+
+fn push_list(s: &mut String, ty: &str, length: Option<usize>) {
+    let ty = if needs_array_parens(ty) {
+        Cow::Owned(format!("({ty})"))
+    } else {
+        Cow::Borrowed(ty)
+    };
+
+    if let Some(length) = length {
+        s.push('[');
+        for i in 0..length {
+            if i != 0 {
+                s.push_str(", ");
+            }
+            s.push_str(&ty);
+        }
+        s.push(']');
+    } else {
+        s.push_str(&ty);
+        s.push_str("[]");
+    }
+}
+
+fn push_nullable(s: &mut String, inner: &str) {
+    s.push_str(inner);
+    if inner != NULL && !inner.ends_with(" | null") {
+        s.push_str(" | null");
+    }
+}
+
+fn is_exhaustive_map_key(dt: &DataType, types: &Types) -> bool {
+    match dt {
+        DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
+        DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r)
+            .map(|ty| is_exhaustive_map_key(ty, types))
+            .unwrap_or(false),
+        DataType::Reference(Reference::Opaque(_)) => false,
+        _ => true,
+    }
+}
+
+fn render_map(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    map: &Map,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+    render_value: DatatypeRenderer,
+) -> Result<(), Error> {
+    let path = map_key_path(&location);
+    map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
+
+    let rendered_key = map_key_render_type(map.key_ty().clone());
+    let exhaustive = is_exhaustive_map_key(&rendered_key, types);
+
+    // Use `{ [key in K]: V }` instead of `Record<K, V>` to avoid circular reference issues.
+    if !exhaustive {
+        s.push_str("Partial<");
+    }
+
+    s.push_str("{ [key in ");
+    map_key_datatype(
+        s,
+        exporter,
+        format,
+        types,
+        &rendered_key,
+        location.clone(),
+        parent_name,
+        prefix,
+        generics,
+    )?;
+    s.push_str("]: ");
+    render_value(
+        s,
+        exporter,
+        format,
+        types,
+        map.value_ty(),
+        location,
+        parent_name,
+        prefix,
+        generics,
+    )?;
+    s.push_str(" }");
+
+    if !exhaustive {
+        s.push('>');
+    }
+
+    Ok(())
+}
+
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -840,83 +952,20 @@ fn shallow_inline_datatype(
                 prefix,
                 generics,
             )?;
-
-            let inner = if (inner.contains(' ') && !inner.ends_with('}'))
-                || (inner.contains(' ') && (inner.contains('&') || inner.contains('|')))
-            {
-                format!("({inner})")
-            } else {
-                inner
-            };
-
-            if let Some(length) = list.length {
-                s.push('[');
-                for i in 0..length {
-                    if i != 0 {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&inner);
-                }
-                s.push(']');
-            } else {
-                s.push_str(&inner);
-                s.push_str("[]");
-            }
+            push_list(s, &inner, list.length);
         }
-        DataType::Map(map) => {
-            let path = map_key_path(&location);
-            map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
-            let rendered_key = map_key_render_type(map.key_ty().clone());
-
-            fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
-                match dt {
-                    DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
-                    DataType::Reference(Reference::Named(r)) => {
-                        match named_reference_ty(types, r) {
-                            Ok(ty) => is_exhaustive(ty, types),
-                            Err(_) => false,
-                        }
-                    }
-                    DataType::Reference(Reference::Opaque(_)) => false,
-                    _ => true,
-                }
-            }
-
-            let exhaustive = is_exhaustive(&rendered_key, types);
-            if !exhaustive {
-                s.push_str("Partial<");
-            }
-
-            s.push_str("{ [key in ");
-            map_key_datatype(
-                s,
-                exporter,
-                format,
-                types,
-                &rendered_key,
-                location.clone(),
-                parent_name,
-                prefix,
-                generics,
-            )?;
-            s.push_str("]: ");
-            shallow_inline_datatype(
-                s,
-                exporter,
-                format,
-                types,
-                map.value_ty(),
-                location,
-                parent_name,
-                prefix,
-                generics,
-            )?;
-            s.push_str(" }");
-
-            if !exhaustive {
-                s.push('>');
-            }
-        }
+        DataType::Map(map) => render_map(
+            s,
+            exporter,
+            format,
+            types,
+            map,
+            location,
+            parent_name,
+            prefix,
+            generics,
+            shallow_inline_datatype,
+        )?,
         DataType::Nullable(dt) => {
             let mut inner = String::new();
             shallow_inline_datatype(
@@ -930,11 +979,7 @@ fn shallow_inline_datatype(
                 prefix,
                 generics,
             )?;
-
-            s.push_str(&inner);
-            if inner != "null" && !inner.ends_with(" | null") {
-                s.push_str(" | null");
-            }
+            push_nullable(s, &inner);
         }
         DataType::Intersection(types_) => intersection_dt(
             s,
@@ -1011,18 +1056,6 @@ fn shallow_inline_datatype(
 
     Ok(())
 }
-
-type DatatypeRenderer = fn(
-    &mut String,
-    &Exporter,
-    Option<&dyn Format>,
-    &Types,
-    &DataType,
-    Vec<Cow<'static, str>>,
-    Option<&str>,
-    &str,
-    &[(GenericReference, DataType)],
-) -> Result<(), Error>;
 
 fn shallow_intersection_part_datatype(
     s: &mut String,
@@ -1123,28 +1156,7 @@ fn inline_datatype(
                 prefix,
                 generics,
             )?;
-
-            let dt_str = if (dt_str.contains(' ') && !dt_str.ends_with('}'))
-                || (dt_str.contains(' ') && (dt_str.contains('&') || dt_str.contains('|')))
-            {
-                format!("({dt_str})")
-            } else {
-                dt_str
-            };
-
-            if let Some(length) = l.length {
-                s.push('[');
-                for n in 0..length {
-                    if n != 0 {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&dt_str);
-                }
-                s.push(']');
-            } else {
-                s.push_str(&dt_str);
-                s.push_str("[]");
-            }
+            push_list(s, &dt_str, l.length);
         }
         DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
@@ -1162,10 +1174,7 @@ fn inline_datatype(
                 generics,
             )?;
 
-            s.push_str(&inner);
-            if inner != "null" && !inner.ends_with(" | null") {
-                s.push_str(" | null");
-            }
+            push_nullable(s, &inner);
         }
         DataType::Struct(st) => {
             if !generics.is_empty() {
@@ -1307,10 +1316,7 @@ pub(crate) fn datatype(
                 generics,
             )?;
 
-            s.push_str(&inner);
-            if inner != "null" && !inner.ends_with(" | null") {
-                s.push_str(" | null");
-            }
+            push_nullable(s, &inner);
 
             // datatype(s, ts, types, &*t, location, state)?;
             // let or_null = " | null";
@@ -1380,81 +1386,19 @@ fn list_dt(
     l: &List,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    {
-        let mut dt = String::new();
-        datatype(
-            &mut dt,
-            exporter,
-            None,
-            types,
-            &l.ty,
-            vec![],
-            None,
-            "",
-            generics,
-        )?;
-
-        let dt = if (dt.contains(' ') && !dt.ends_with('}'))
-          // This is to do with maintaining order of operations.
-          // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-          || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
-        {
-            format!("({dt})")
-        } else {
-            dt
-        };
-
-        if let Some(length) = l.length {
-            s.push('[');
-
-            for n in 0..length {
-                if n != 0 {
-                    s.push_str(", ");
-                }
-
-                s.push_str(&dt);
-            }
-
-            s.push(']');
-        } else {
-            s.push_str(&dt);
-            s.push_str("[]");
-        }
-    }
-
-    //     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
-
-    //     let mut result = String::new();
-    //     datatype(&mut result, ts, types, &&l.ty, location, state)?;
-    //     let result = if (result.contains(' ') && !result.ends_with('}'))
-    //         // This is to do with maintaining order of operations.
-    //         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-    //         || (result.contains(' ') && (result.contains('&') || result.contains('|')))
-    //     {
-    //         format!("({result})")
-    //     } else {
-    //         result
-    //     };
-
-    //     match l.length {
-    //         Some(len) => {
-    //             s.push_str("[");
-    //             iter_with_sep(
-    //                 s,
-    //                 0..len,
-    //                 |s, _| {
-    //                     s.push_str(&result);
-    //                     Ok(())
-    //                 },
-    //                 ", ",
-    //             )?;
-    //             s.push_str("]");
-    //         }
-    //         None => {
-    //             s.push_str(&result);
-    //             s.push_str("[]");
-    //         }
-    //     }
+    let mut dt = String::new();
+    datatype(
+        &mut dt,
+        exporter,
+        None,
+        types,
+        &l.ty,
+        vec![],
+        None,
+        "",
+        generics,
+    )?;
+    push_list(s, &dt, l.length);
 
     Ok(())
 }
@@ -1497,69 +1441,9 @@ fn map_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    let path = map_key_path(&location);
-    map_keys::validate_map_key(m.key_ty(), types, format!("{path}.<map_key>"))?;
-
-    {
-        fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
-            match dt {
-                DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
-                DataType::Reference(Reference::Named(r)) => match named_reference_ty(types, r) {
-                    Ok(ty) => is_exhaustive(ty, types),
-                    Err(_) => false,
-                },
-                DataType::Reference(Reference::Opaque(_)) => false,
-                _ => true,
-            }
-        }
-
-        let resolved_key = map_key_render_type(m.key_ty().clone());
-        let is_exhaustive = is_exhaustive(&resolved_key, types);
-
-        // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
-        // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-        if !is_exhaustive {
-            s.push_str("Partial<");
-        }
-        s.push_str("{ [key in ");
-        map_key_datatype(
-            s,
-            exporter,
-            format,
-            types,
-            &resolved_key,
-            location.clone(),
-            None,
-            "",
-            generics,
-        )?;
-        s.push_str("]: ");
-        datatype(
-            s,
-            exporter,
-            format,
-            types,
-            m.value_ty(),
-            location,
-            None,
-            "",
-            generics,
-        )?;
-        s.push_str(" }");
-        if !is_exhaustive {
-            s.push('>');
-        }
-    }
-    // assert!(flattening, "todo: map flattening");
-
-    // // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
-    // // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-    // s.push_str("Partial<{ [key in ");
-    // datatype(s, ts, types, m.key_ty(), location.clone(), state)?;
-    // s.push_str("]: ");
-    // datatype(s, ts, types, m.value_ty(), location, state)?;
-    // s.push_str(" }>");
-    Ok(())
+    render_map(
+        s, exporter, format, types, m, location, None, "", generics, datatype,
+    )
 }
 
 fn map_key_path(location: &[Cow<'static, str>]) -> String {
@@ -1723,17 +1607,9 @@ fn struct_dt(
                     None,
                 )?;
 
-                let docs = field
-                    .docs
-                    .trim()
-                    .is_empty()
-                    .then(|| inline_reference_docs(types, (field, ty), false))
-                    .flatten()
-                    .unwrap_or(&field.docs);
-
                 unflattened_fields.push(inner_comments(
                     field.deprecated.as_ref(),
-                    docs,
+                    &field.docs,
                     other,
                     false,
                     &field_prefix,
@@ -1802,28 +1678,6 @@ fn object_field_to_ts(
     s.push_str(&value);
 
     Ok(())
-}
-
-fn inline_reference_docs<'a>(
-    types: &'a Types,
-    (_field, ty): (&Field, &'a DataType),
-    force_inline: bool,
-) -> Option<&'a str> {
-    let DataType::Reference(Reference::Named(r)) = ty else {
-        return None;
-    };
-
-    if !force_inline {
-        return None;
-    }
-
-    match &r.inner {
-        NamedReferenceType::Reference { .. } => types
-            .get(r)
-            .filter(|ndt| !ndt.docs.trim().is_empty())
-            .map(|ndt| ndt.docs.as_ref()),
-        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => None,
-    }
 }
 
 struct EnumVariantOutput {
@@ -2037,17 +1891,9 @@ fn enum_variant_datatype(
                         .map(|override_ty| override_ty.ty),
                 )?;
 
-                let docs = field
-                    .docs
-                    .trim()
-                    .is_empty()
-                    .then(|| inline_reference_docs(types, (field, ty), false))
-                    .flatten()
-                    .unwrap_or(&field.docs);
-
                 regular_fields.push(inner_comments(
                     field.deprecated.as_ref(),
-                    docs,
+                    &field.docs,
                     other,
                     true,
                     prefix,
@@ -2180,405 +2026,8 @@ fn enum_dt(
         s.push_str(&variants.join(" | "));
     }
 
-    //     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
-
-    //     location.push(e.name().clone());
-
-    //     let variants = &e.variants.iter().filter(|(_, variant)| !variant.skip);
-
-    //     if variants.clone().next().is_none()
-    //     /* is_empty */
-    //     {
-    //         s.push_str("never");
-    //         return Ok(());
-    //     }
-
-    //     let mut variants = variants
-    //         .into_iter()
-    //         .map(|(variant_name, variant)| {
-    //             let mut s = String::new();
-    //             let mut location = location.clone();
-    //             location.push(variant_name.clone());
-
-    //             // TODO
-    //             // variant.deprecated.as_ref()
-    //             // &variant.docs
-
-    //             match &e.repr() {
-    //                 EnumRepr::Untagged => {
-    //                     fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
-    //                 },
-    //                 EnumRepr::External => match variant.fields() {
-    //                     Fields::Unit => {
-    //                         s.push_str("\"");
-    //                         s.push_str(variant_name);
-    //                         s.push_str("\"");
-    //                     },
-    //                     Fields::Unnamed(n) if n.fields().into_iter().filter(|f| f.ty().is_some()).next().is_none() /* is_empty */ => {
-    //                         // We detect `#[specta(skip)]` by checking if the unfiltered fields are also empty.
-    //                         if n.fields().is_empty() {
-    //                             s.push_str("{ ");
-    //                             s.push_str(&escape_key(variant_name));
-    //                             s.push_str(": [] }");
-    //                         } else {
-    //                             s.push_str("\"");
-    //                             s.push_str(variant_name);
-    //                             s.push_str("\"");
-    //                         }
-    //                     }
-    //                     _ => {
-    //                         s.push_str("{ ");
-    //                         s.push_str(&escape_key(variant_name));
-    //                         s.push_str(": ");
-    //                         fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
-    //                         s.push_str(" }");
-    //                     }
-    //                 }
-    //                 EnumRepr::Internal { tag } => {
-    //                     // TODO: Unconditionally wrapping in `(` kinda sucks.
-    //                     write!(s, "({{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
-
-    //                     match variant.fields() {
-    //                         Fields::Unit => {
-    //                              s.push_str(" })");
-    //                         },
-    //                         // Fields::Unnamed(f) if f.fields.iter().filter(|f| f.ty().is_some()).count() == 1 => {
-    //                         //     // let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
-
-    //                         //      s.push_str("______"); // TODO
-
-    //                         // //     // if fields.len
-
-    //                         // //     // TODO: Having no fields are skipping is valid
-    //                         // //     // TODO: Having more than 1 field is invalid
-
-    //                         // //     // TODO: Check if the field's type is object-like and can be merged.
-
-    //                         //     // todo!();
-    //                         // }
-    //                         f => {
-    //                             // TODO: Cleanup and explain this
-    //                             let mut skip_join = false;
-    //                             if let Fields::Unnamed(f) = &f {
-    //                                 let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
-    //                                 if let (Some(v), None) = (fields.next(), fields.next()) {
-    //                                     if let Some(DataType::Tuple(tuple)) = &v.ty() {
-    //                                         skip_join = &tuple.elements.len() == 0;
-    //                                     }
-    //                                 }
-    //                             }
-
-    //                             if skip_join {
-    //                                 s.push_str(" })");
-    //                             } else {
-    //                                 s.push_str(" } & ");
-
-    //                                 // TODO: Can we be smart enough to omit the `{` and `}` if this is an object
-    //                                 fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
-    //                                 s.push_str(")");
-    //                             }
-
-    //                             // match f {
-    //                             //     // Checked above
-    //                             //     Fields::Unit => unreachable!(),
-    //                             //     Fields::Unnamed(unnamed_fields) => unnamed_fields,
-    //                             //     Fields::Named(named_fields) => todo!(),
-    //                             // }
-
-    //                             // println!("{:?}", f); // TODO: If object we can join in fields like this, else `} & ...`
-    //                             // flattened_fields_dt(&mut s, ts, types, variant_name, f, location, false)?; // TODO: Fix `flattening`
-
-    //                         }
-    //                     }
-
-    //                 }
-    //                 EnumRepr::Adjacent { tag, content } => {
-    //                     write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
-
-    //                     match variant.fields() {
-    //                         Fields::Unit => {},
-    //                         f => {
-    //                             write!(s, "; {}: ", escape_key(content)).expect("infallible");
-    //                             fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
-    //                         }
-    //                     }
-
-    //                     s.push_str(" }");
-    //                 }
-    //             }
-
-    //             Ok(s)
-    //         })
-    //         .collect::<Result<Vec<String>, Error>>()?;
-
-    //     // TODO: Instead of deduplicating on the string, we should do it in the AST.
-    //     // This would avoid the intermediate `String` allocations and be more reliable.
-    //     variants.dedup();
-
-    //     iter_with_sep(
-    //         s,
-    //         variants,
-    //         |s, v| {
-    //             s.push_str(&v);
-    //             Ok(())
-    //         },
-    //         " | ",
-    //     )?;
-
     Ok(())
 }
-
-// fn fields_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &Types,
-//     name: &Cow<'static, str>,
-//     f: &Fields,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     match f {
-//         Fields::Unit => {
-//             assert!(!state.flattening, "todo: support for flattening enums"); // TODO
-//             s.push_str("null")
-//         }
-//         Fields::Unnamed(f) => {
-//             assert!(!state.flattening, "todo: support for flattening enums"); // TODO
-//             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
-
-//             // A single field usually becomes `T`.
-//             // but when `#[serde(skip)]` is used it should be `[T]`.
-//             if fields.clone().count() == 1 && f.fields.len() == 1 {
-//                 return field_dt(
-//                     s,
-//                     ts,
-//                     types,
-//                     None,
-//                     fields.next().expect("checked above"),
-//                     location,
-//                     state,
-//                 );
-//             }
-
-//             s.push_str("[");
-//             iter_with_sep(
-//                 s,
-//                 fields.enumerate(),
-//                 |s, (i, f)| {
-//                     let mut location = location.clone();
-//                     location.push(i.to_string().into());
-
-//                     field_dt(s, ts, types, None, f, location, state)
-//                 },
-//                 ", ",
-//             )?;
-//             s.push_str("]");
-//         }
-//         Fields::Named(f) => {
-//             let fields = f.fields().into_iter().filter(|(_, f)| f.ty().is_some());
-//             if fields.clone().next().is_none()
-//             /* is_empty */
-//             {
-//                 assert!(!state.flattening, "todo: support for flattening enums"); // TODO
-
-//                 if let Some(tag) = f.tag() {
-//                     if !state.flattening {}
-
-//                     write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
-//                 } else {
-//                     s.push_str("Record<string, never>");
-//                 }
-
-//                 return Ok(());
-//             }
-
-//             if !state.flattening {
-//                 s.push_str("{ ");
-//             }
-//             if let Some(tag) = &f.tag() {
-//                 write!(s, "{}: \"{name}\"; ", escape_key(tag)).expect("infallible");
-//             }
-
-//             iter_with_sep(
-//                 s,
-//                 fields,
-//                 |s, (key, f)| {
-//                     let mut location = location.clone();
-//                     location.push(key.clone());
-
-//                     field_dt(s, ts, types, Some(key), f, location, state)
-//                 },
-//                 "; ",
-//             )?;
-//             if !state.flattening {
-//                 s.push_str(" }");
-//             }
-//         }
-//     }
-//     Ok(())
-// }
-
-// // TODO: Remove this to avoid so much duplicate logic
-// fn flattened_fields_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &Types,
-//     name: &Cow<'static, str>,
-//     f: &Fields,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     match f {
-//         Fields::Unit => todo!(), // s.push_str("null"),
-//         Fields::Unnamed(f) => {
-//             // TODO: Validate flattening?
-
-//             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
-
-//             // A single field usually becomes `T`.
-//             // but when `#[serde(skip)]` is used it should be `[T]`.
-//             if fields.clone().count() == 1 && f.fields.len() == 1 {
-//                 return field_dt(
-//                     s,
-//                     ts,
-//                     types,
-//                     None,
-//                     fields.next().expect("checked above"),
-//                     location,
-//                     state,
-//                 );
-//             }
-
-//             s.push_str("[");
-//             iter_with_sep(
-//                 s,
-//                 fields.enumerate(),
-//                 |s, (i, f)| {
-//                     let mut location = location.clone();
-//                     location.push(i.to_string().into());
-
-//                     field_dt(s, ts, types, None, f, location, state)
-//                 },
-//                 ", ",
-//             )?;
-//             s.push_str("]");
-//         }
-//         Fields::Named(f) => {
-//             let fields = f.fields().into_iter().filter(|(_, f)| f.ty().is_some());
-//             if fields.clone().next().is_none()
-//             /* is_empty */
-//             {
-//                 if let Some(tag) = f.tag() {
-//                     write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
-//                 } else {
-//                     s.push_str("Record<string, never>");
-//                 }
-
-//                 return Ok(());
-//             }
-
-//             // s.push_str("{ "); // TODO
-//             if let Some(tag) = &f.tag() {
-//                 write!(s, "{}: \"{name}\"; ", escape_key(tag)).expect("infallible");
-//             }
-
-//             iter_with_sep(
-//                 s,
-//                 fields,
-//                 |s, (key, f)| {
-//                     let mut location = location.clone();
-//                     location.push(key.clone());
-
-//                     field_dt(s, ts, types, Some(key), f, location, state)
-//                 },
-//                 "; ",
-//             )?;
-//             // s.push_str(" }"); // TODO
-//         }
-//     }
-//     Ok(())
-// }
-
-// fn field_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &Types,
-//     key: Option<&Cow<'static, str>>,
-//     f: &Field,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     let Some(ty) = f.ty() else {
-//         // These should be filtered out before getting here.
-//         unreachable!()
-//     };
-
-//     // TODO
-//     // field.deprecated.as_ref(),
-//     // &field.docs,
-
-//     let ty = if f.inline() {
-//         specta::datatype::inline_dt(types, ty.clone())
-//     } else {
-//         ty.clone()
-//     };
-
-//     if !f.flatten() {
-//         if let Some(key) = key {
-//             s.push_str(&*escape_key(key));
-//             // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
-//             if f.optional() {
-//                 s.push_str("?");
-//             }
-//             s.push_str(": ");
-//         }
-//     } else {
-//         // TODO: We need to validate the inner type can be flattened safely???
-
-//         //     data
-
-//         //     match ty {
-//         //         DataType::Any => todo!(),
-//         //         DataType::Unknown => todo!(),
-//         //         DataType::Primitive(primitive_type) => todo!(),
-//         //         DataType::Literal(literal_type) => todo!(),
-//         //         DataType::List(list) => todo!(),
-//         //         DataType::Map(map) => todo!(),
-//         //         DataType::Nullable(data_type) => todo!(),
-//         //         DataType::Struct(st) => {
-//         //             // location.push(st.name().clone()); // TODO
-//         //             flattened_fields_dt(s, ts, types, st.name(), &&st.fields, location)?
-//         //         }
-
-//         //         // flattened_fields_dt(s, ts, types, &ty, location)?,
-//         //         DataType::Enum(enum_type) => todo!(),
-//         //         DataType::Tuple(tuple_type) => todo!(),
-//         //         DataType::Reference(reference) => todo!(),
-//         //         DataType::Generic(generic_type) => todo!(),
-//         //     };
-//     }
-
-//     // TODO: Only flatten when object is inline?
-
-//     datatype(
-//         s,
-//         ts,
-//         types,
-//         &ty,
-//         location,
-//         State {
-//             flattening: state.flattening || f.flatten(),
-//         },
-//     )?;
-
-//     // TODO: This is not always correct but is it ever correct?
-//     // If we can't use `?` (Eg. in a tuple) we manually join it.
-//     // if key.is_none() && f.optional() {
-//     //     s.push_str(" | undefined");
-//     // }
-
-//     Ok(())
-// }
 
 fn tuple_dt(
     s: &mut String,
@@ -2611,24 +2060,6 @@ fn tuple_dt(
         }
     }
 
-    // match &t.elements()[..] {
-    //     [] => s.push_str("null"),
-    //     elems => {
-    //         s.push_str("[");
-    //         iter_with_sep(
-    //             s,
-    //             elems.into_iter().enumerate(),
-    //             |s, (i, dt)| {
-    //                 let mut location = location.clone();
-    //                 location.push(i.to_string().into());
-
-    //                 datatype(s, ts, types, &dt, location, state)
-    //             },
-    //             ", ",
-    //         )?;
-    //         s.push_str("]");
-    //     }
-    // }
     Ok(())
 }
 
@@ -2722,190 +2153,78 @@ fn reference_named_dt(
     r: &NamedReference,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    {
-        let ndt = types
-            .get(r)
-            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-        // We check it's valid before tracking
-        crate::references::track_nr(r);
+    let ndt = types
+        .get(r)
+        .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+    // We check it's valid before tracking
+    crate::references::track_nr(r);
 
-        let name = match exporter.layout {
-            Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-                s.push('_');
-                s.push_str(&ndt.name);
-                Cow::Owned(s)
-            }
-            Layout::Namespaces => {
-                if ndt.module_path.is_empty() {
-                    ndt.name.clone()
-                } else {
-                    let mut path =
-                        ndt.module_path
-                            .split("::")
-                            .fold("$s$.".to_string(), |mut s, segment| {
-                                s.push_str(segment);
-                                s.push('.');
-                                s
-                            });
-                    path.push_str(&ndt.name);
-                    Cow::Owned(path)
-                }
-            }
-            Layout::Files => {
-                let current_module_path =
-                    crate::references::current_module_path().unwrap_or_default();
-
-                if ndt.module_path == current_module_path {
-                    ndt.name.clone()
-                } else {
-                    let mut path = crate::exporter::module_alias(&ndt.module_path);
-                    path.push('.');
-                    path.push_str(&ndt.name);
-                    Cow::Owned(path)
-                }
-            }
-            _ => ndt.name.clone(),
-        };
-
-        let (rendered_generics, omit_generics, scoped_generics) =
-            resolved_reference_generics(ndt, r, generics)
-                .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-
-        s.push_str(&name);
-        if !omit_generics && !rendered_generics.is_empty() {
-            s.push('<');
-
-            for (i, dt) in rendered_generics.iter().enumerate() {
-                if i != 0 {
-                    s.push_str(", ");
-                }
-
-                datatype(
-                    s,
-                    exporter,
-                    None,
-                    types,
-                    dt,
-                    vec![],
-                    None,
-                    "",
-                    &scoped_generics,
-                )?;
-            }
-
-            s.push('>');
+    let name = match exporter.layout {
+        Layout::ModulePrefixedName => {
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
+            s.push('_');
+            s.push_str(&ndt.name);
+            Cow::Owned(s)
         }
+        Layout::Namespaces => {
+            if ndt.module_path.is_empty() {
+                ndt.name.clone()
+            } else {
+                let mut path =
+                    ndt.module_path
+                        .split("::")
+                        .fold("$s$.".to_string(), |mut s, segment| {
+                            s.push_str(segment);
+                            s.push('.');
+                            s
+                        });
+                path.push_str(&ndt.name);
+                Cow::Owned(path)
+            }
+        }
+        Layout::Files => {
+            let current_module_path = crate::references::current_module_path().unwrap_or_default();
+
+            if ndt.module_path == current_module_path {
+                ndt.name.clone()
+            } else {
+                let mut path = crate::exporter::module_alias(&ndt.module_path);
+                path.push('.');
+                path.push_str(&ndt.name);
+                Cow::Owned(path)
+            }
+        }
+        _ => ndt.name.clone(),
+    };
+
+    let (rendered_generics, omit_generics, scoped_generics) =
+        resolved_reference_generics(ndt, r, generics)
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+
+    s.push_str(&name);
+    if !omit_generics && !rendered_generics.is_empty() {
+        s.push('<');
+
+        for (i, dt) in rendered_generics.iter().enumerate() {
+            if i != 0 {
+                s.push_str(", ");
+            }
+
+            datatype(
+                s,
+                exporter,
+                None,
+                types,
+                dt,
+                vec![],
+                None,
+                "",
+                &scoped_generics,
+            )?;
+        }
+
+        s.push('>');
     }
-
-    //     let ndt = types
-    //         .get(r.sid())
-    //         // Should be impossible without a bug in Specta.
-    //         .unwrap_or_else(|| panic!("Missing {:?} in `Types`", r.sid()));
-
-    //     if r.inline() {
-    //         todo!("inline reference!");
-    //     }
-
-    //     s.push_str(&ndt.name);
-    //     // TODO: We could possible break this out, the root `export` function also has to emit generics.
-    //     match r.generics()() {
-    //         [] => {}
-    //         generics => {
-    //             s.push('<');
-    //             // TODO: Should we push a location for which generic?
-    //             iter_with_sep(
-    //                 s,
-    //                 generics,
-    //                 |s, dt| datatype(s, ts, types, &dt, location.clone(), state),
-    //                 ", ",
-    //             )?;
-    //             s.push('>');
-    //         }
-    //     }
 
     Ok(())
 }
-
-// fn validate_name(
-//     ident: &Cow<'static, str>,
-//     location: &Vec<Cow<'static, str>>,
-// ) -> Result<(), Error> {
-//     // TODO: Use a perfect hash-map for faster lookups?
-//     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-//         return Err(Error::ForbiddenName {
-//             path: location.join("."),
-//             name,
-//         });
-//     }
-
-//     if ident.is_empty() {
-//         return Err(Error::InvalidName {
-//             path: location.join("."),
-//             name: ident.clone(),
-//         });
-//     }
-
-//     if let Some(first_char) = ident.chars().next() {
-//         if !first_char.is_alphabetic() && first_char != '_' {
-//             return Err(Error::InvalidName {
-//                 path: location.join("."),
-//                 name: ident.clone(),
-//             });
-//         }
-//     }
-
-//     if ident
-//         .find(|c: char| !c.is_alphanumeric() && c != '_')
-//         .is_some()
-//     {
-//         return Err(Error::InvalidName {
-//             path: location.join("."),
-//             name: ident.clone(),
-//         });
-//     }
-
-//     Ok(())
-// }
-
-// fn escape_key(name: &Cow<'static, str>) -> Cow<'static, str> {
-//     let needs_escaping = name
-//         .chars()
-//         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
-//         && name
-//             .chars()
-//             .next()
-//             .map(|first| !first.is_numeric())
-//             .unwrap_or(true);
-
-//     if !needs_escaping {
-//         format!(r#""{name}""#).into()
-//     } else {
-//         name.clone()
-//     }
-// }
-
-// fn comment() {
-//     // TODO: Different JSDoc modes
-
-//     // TODO: Regular comments
-//     // TODO: Deprecated
-
-//     // TODO: When enabled: arguments, result types
-// }
-
-// /// Iterate with separate and error handling
-// fn iter_with_sep<T>(
-//     s: &mut String,
-//     i: impl IntoIterator<Item = T>,
-//     mut item: impl FnMut(&mut String, T) -> Result<(), Error>,
-//     sep: &'static str,
-// ) -> Result<(), Error> {
-//     for (i, e) in i.into_iter().enumerate() {
-//         if i != 0 {
-//             s.push_str(sep);
-//         }
-//         (item)(s, e)?;
-//     }
-//     Ok(())
-// }
