@@ -110,6 +110,8 @@ enum ErrorKind {
     DanglingNamedReference { reference: String },
     /// Found a recursive named reference while expanding an inline type.
     InfiniteRecursiveInlineType { reference: String },
+    /// Reached the recursion limit while expanding an inline type.
+    InlineRecursionLimitExceeded { path: String },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
@@ -251,6 +253,10 @@ impl Error {
         Self::new(ErrorKind::InfiniteRecursiveInlineType { reference })
     }
 
+    pub(crate) fn inline_recursion_limit_exceeded(path: String) -> Self {
+        Self::new(ErrorKind::InlineRecursionLimitExceeded { path })
+    }
+
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
         Self::new(ErrorKind::UnableToExport(layout))
     }
@@ -323,6 +329,11 @@ impl fmt::Display for Error {
             ErrorKind::InfiniteRecursiveInlineType { reference } => write!(
                 f,
                 "Found infinitely recursive inline named reference {reference}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+            ),
+            ErrorKind::InlineRecursionLimitExceeded { path } => write!(
+                f,
+                "Type recursion limit exceeded while expanding an inline Typescript type at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
+                display_path(path)
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

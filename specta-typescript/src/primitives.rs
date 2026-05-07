@@ -1271,10 +1271,9 @@ fn inline_datatype(
 ) -> Result<(), Error> {
     // Prevent infinite recursion
     if depth == 25 {
-        return Err(Error::invalid_name(
-            location.join("."),
-            "Type recursion limit exceeded during inline expansion",
-        ));
+        return Err(Error::inline_recursion_limit_exceeded(path_string(
+            &location,
+        )));
     }
 
     match dt {

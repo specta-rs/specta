@@ -722,7 +722,7 @@ fn typescript_errors_include_recursive_inline_error() {
 
     assert_eq!(
         err.to_string(),
-        "Attempted to export  but was unable to due to name \"Type recursion limit exceeded during inline expansion\" containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
+        "Type recursion limit exceeded while expanding an inline Typescript type at . Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
     );
 }
 
