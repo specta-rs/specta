@@ -8,9 +8,9 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, generics_with_ident_only_and_const_ty, type_where_clause,
-    type_with_inferred_lifetimes, used_direct_type_params, used_type_params,
+    add_type_to_where_clause, build_type_where_clause, generics_with_ident_and_bounds_only,
+    generics_with_ident_only, generics_with_ident_only_and_const_ty, type_with_inferred_lifetimes,
+    used_type_params,
 };
 
 pub(crate) mod attr;
@@ -33,17 +33,8 @@ pub(super) fn build_runtime_attributes(
     scope: AttributeScope,
     attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
-    skip_attrs: &[String],
+    _skip_attrs: &[String],
 ) -> syn::Result<Option<TokenStream>> {
-    let metas = raw_attrs
-        .iter()
-        .filter(|attr| {
-            let path = attr.path().to_token_stream().to_string();
-            !skip_attrs.contains(&path) && path != "specta"
-        })
-        .map(|attr| attr.meta.to_token_stream())
-        .collect::<Vec<_>>();
-
     #[cfg(feature = "serde")]
     let serde_insert = serde::lower_runtime_attributes(crate_ref, scope, raw_attrs)?;
     #[cfg(not(feature = "serde"))]
@@ -53,7 +44,7 @@ pub(super) fn build_runtime_attributes(
         None
     };
 
-    if metas.is_empty() && serde_insert.is_none() {
+    if serde_insert.is_none() {
         return Ok(None);
     }
 
@@ -61,6 +52,25 @@ pub(super) fn build_runtime_attributes(
         let attrs = &mut #attrs;
         #serde_insert
     })))
+}
+
+fn generic_type_and_const_args(
+    generics: &syn::Generics,
+    type_arg: impl Fn(&syn::TypeParam) -> TokenStream,
+) -> Option<TokenStream> {
+    generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
+        .then(|| {
+            let args = generics.params.iter().filter_map(|param| match param {
+                GenericParam::Lifetime(_) => None,
+                GenericParam::Const(param) => Some(param.ident.to_token_stream()),
+                GenericParam::Type(param) => Some(type_arg(param)),
+            });
+
+            quote!(::<#(#args),*>)
+        })
 }
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
@@ -94,52 +104,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let name = unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream();
 
-    // Check for unknown specta attributes after all parsing is done
-    // Since extract() removes consumed attributes, any remaining ones are unknown
-    if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
-        // Check if it's an invalid formatted attribute (like #[specta] or #[specta = "..."])
-        match &attr.value {
-            None
-            | Some(crate::utils::AttributeValue::Lit(_))
-            | Some(crate::utils::AttributeValue::Path(_)) => {
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-            Some(crate::utils::AttributeValue::Expr(_)) => {
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-            Some(crate::utils::AttributeValue::Attribute {
-                attr: inner_attrs, ..
-            }) => {
-                // If there are nested attributes remaining, report the first one
-                if let Some(inner_attr) = inner_attrs.first() {
-                    if let Some(message) =
-                        migration_hint(Scope::Container, &inner_attr.key.to_string())
-                    {
-                        return Err(syn::Error::new(inner_attr.key.span(), message));
-                    }
-
-                    return Err(syn::Error::new(
-                        inner_attr.key.span(),
-                        format!(
-                            "specta: Found unsupported container attribute '{}'",
-                            inner_attr.key
-                        ),
-                    ));
-                }
-                // If the nested list is empty, it's an invalid format
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-        }
-    }
+    reject_unknown_specta_attrs(&attrs, Scope::Container)?;
 
     let container_runtime_attrs = build_runtime_attributes(
         &crate_ref,
@@ -195,51 +160,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .iter()
         .any(|param| matches!(param, GenericParam::Const(_)));
     let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref())?;
-    let all_generic_type_idents = all_type_param_idents(generics);
-    let used_direct_generics =
-        used_direct_type_params(&used_generic_types, &all_generic_type_idents);
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
-        used_direct_generics,
+        &used_generic_types,
     );
-    let build_ty_where_bound = type_where_clause(
-        &quote!(#crate_ref::Type),
-        used_direct_generics,
-        generics,
-        None,
-    );
+    let build_ty_where_bound =
+        build_type_where_clause(&quote!(#crate_ref::Type), &used_generic_types);
     let build_ty_bounds = generics_with_ident_only_and_const_ty(generics);
 
-    let build_ty_placeholder_args = generics
-        .params
-        .iter()
-        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
-        .then(|| {
-            let args = generics.params.iter().filter_map(|param| match param {
-                GenericParam::Lifetime(_) => None,
-                GenericParam::Const(t) => Some(t.ident.to_token_stream()),
-                GenericParam::Type(t) => {
-                    Some(format_ident!("PLACEHOLDER_{}", t.ident).to_token_stream())
-                }
-            });
-
-            quote!(::<#(#args),*>)
-        });
-    let build_ty_passthrough_args = generics
-        .params
-        .iter()
-        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
-        .then(|| {
-            let args = generics.params.iter().filter_map(|param| match param {
-                GenericParam::Lifetime(_) => None,
-                GenericParam::Const(t) => Some(t.ident.to_token_stream()),
-                GenericParam::Type(t) => Some(t.ident.to_token_stream()),
-            });
-
-            quote!(::<#(#args),*>)
-        });
+    let build_ty_placeholder_args = generic_type_and_const_args(generics, |ty| {
+        format_ident!("PLACEHOLDER_{}", ty.ident).to_token_stream()
+    });
+    let build_ty_passthrough_args =
+        generic_type_and_const_args(generics, |ty| ty.ident.to_token_stream());
 
     let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics
         .params
@@ -278,7 +213,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     .map(|attr| attr.parse_bool().unwrap_or(true))
                     .unwrap_or(false);
 
-                if !used_direct_generics.iter().any(|used| used == i) && !skip_default {
+                if !used_generic_types.iter().any(|used| used == i) && !skip_default {
                     return Ok(None);
                 }
 
@@ -289,7 +224,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         quote!(Some(<#default as #crate_ref::Type>::definition(types)))
                     }
                 };
-                let reference = used_direct_generics.iter().any(|used| used == i).then(|| {
+                let reference = used_generic_types.iter().any(|used| used == i).then(|| {
                     quote!((
                         #crate_ref::datatype::Generic::new(Cow::Borrowed(#i_str)),
                         <#i as #crate_ref::Type>::definition(types),

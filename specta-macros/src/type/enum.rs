@@ -5,7 +5,7 @@ use super::{
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DataEnum, Fields, Type, spanned::Spanned};
+use syn::{DataEnum, Fields, spanned::Spanned};
 
 pub fn parse_enum(
     crate_ref: &TokenStream,
@@ -26,51 +26,9 @@ pub fn parse_enum(
             // We pass all the attributes at the start and when decoding them pop them off the list.
             // This means at the end we can check for any that weren't consumed and throw an error.
             let mut attrs = parse_attrs_with_filter(&v.attrs, &container_attrs.skip_attrs)?;
-            let mut variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
-            if variant_attrs.r#type.is_none() {
-                variant_attrs.r#type = parse_variant_type_override(&v.attrs)?;
-                let _ = attrs.extract("specta", "type");
-                let _ = attrs.extract("specta", "r#type");
-            }
+            let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
 
-            // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
-            // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-            if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
-                match &attr.value {
-                    None
-                    | Some(AttributeValue::Lit(_))
-                    | Some(AttributeValue::Path(_))
-                    | Some(AttributeValue::Expr(_)) => {
-                        return Err(syn::Error::new(
-                            attr.key.span(),
-                            "specta: invalid formatted attribute",
-                        ));
-                    }
-                    Some(AttributeValue::Attribute {
-                        attr: inner_attrs, ..
-                    }) => {
-                        if let Some(inner_attr) = inner_attrs.first() {
-                            if let Some(message) =
-                                migration_hint(Scope::Variant, &inner_attr.key.to_string())
-                            {
-                                return Err(syn::Error::new(inner_attr.key.span(), message));
-                            }
-
-                            return Err(syn::Error::new(
-                                inner_attr.key.span(),
-                                format!(
-                                    "specta: Found unsupported variant attribute '{}'",
-                                    inner_attr.key
-                                ),
-                            ));
-                        }
-                        return Err(syn::Error::new(
-                            attr.key.span(),
-                            "specta: invalid formatted attribute",
-                        ));
-                    }
-                }
-            }
+            reject_unknown_specta_attrs(&attrs, Scope::Variant)?;
 
             let runtime_attrs = build_runtime_attributes(
                 crate_ref,
@@ -192,28 +150,4 @@ pub fn parse_enum(
         e.variants = vec![#(#variant_types),*];
         e.into()
     }))
-}
-
-fn parse_variant_type_override(attrs: &[syn::Attribute]) -> syn::Result<Option<Type>> {
-    let mut result = None;
-    for attr in attrs {
-        if !attr.path().is_ident("specta") {
-            continue;
-        }
-
-        let syn::Meta::List(list) = &attr.meta else {
-            continue;
-        };
-
-        list.parse_nested_meta(|meta| {
-            if meta.path.is_ident("type") || meta.path.is_ident("r#type") {
-                let value = meta.value()?;
-                result = Some(value.parse()?);
-            }
-
-            Ok(())
-        })?;
-    }
-
-    Ok(result)
 }

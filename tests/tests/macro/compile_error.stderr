@@ -40,11 +40,11 @@ error: specta: `#[specta(rename ...)]` is no longer supported on fields. Use `#[
 117 |     #[specta(rename = "renamed")]
     |              ^^^^^^
 
-error: expected `,`
-   --> tests/macro/compile_error.rs:124:21
+error: specta: `#[specta(rename ...)]` is no longer supported on variants. Use `#[serde(rename = "...")]` instead.
+   --> tests/macro/compile_error.rs:124:14
     |
 124 |     #[specta(rename = "renamed")]
-    |                     ^
+    |              ^^^^^^
 
 error: specta: Found unsupported field attribute 'rename_from_path'
    --> tests/macro/compile_error.rs:133:14
