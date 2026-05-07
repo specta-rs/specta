@@ -30,12 +30,6 @@ export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: {
 	method: string,
 } } | { t: "C"; c: string };
 
-export type AdjacentlyTaggedWithAlias = { type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} };
-
 export type B = {
 	b: number,
 };
@@ -236,12 +230,6 @@ export type EnumReferenceRecordKey = {
 };
 
 export type EnumRenameAllUppercase = "HELLOWORLD" | "VARIANTB" | "TESTINGWORDS";
-
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-export type EnumWithVariantAlias = "Variant" | "Other";
-
-export type EnumWithVariantAliasAndRename = "renamed_variant" | "Other";
 
 export type ExternallyTagged = "A" | ({ B: {
 	id: string,
@@ -486,8 +474,6 @@ export type InternallyTaggedLInner = { type: "A" } | { type: "B" };
 export type InternallyTaggedM = { type: "A" };
 
 export type InternallyTaggedMInner = "A" | "B";
-
-export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
 
 export type InvalidToValidType = {
 	cause: null,
@@ -800,15 +786,6 @@ export type Primitives = {
 	InternallyTaggedH: InternallyTaggedH,
 	InternallyTaggedL: InternallyTaggedL,
 	InternallyTaggedM: InternallyTaggedM,
-	StructWithAlias: StructWithAlias,
-	StructWithMultipleAliases: StructWithMultipleAliases,
-	StructWithAliasAndRename: StructWithAliasAndRename,
-	EnumWithVariantAlias: EnumWithVariantAlias,
-	EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases,
-	EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename,
-	InternallyTaggedWithAlias: InternallyTaggedWithAlias,
-	AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias,
-	UntaggedWithAlias: UntaggedWithAlias,
 	Issue221UntaggedSafe: Issue221UntaggedSafe,
 	Issue221UntaggedMixed: Issue221UntaggedMixed,
 	EmptyEnum: EmptyEnum,
@@ -1007,18 +984,6 @@ export type StructRenameAllUppercase = {
 	B: number,
 };
 
-export type StructWithAlias = {
-	field: string,
-};
-
-export type StructWithAliasAndRename = {
-	renamed_field: string,
-};
-
-export type StructWithMultipleAliases = {
-	field: string,
-};
-
 export type TagOnStructWithInline = {
 	type: "TagOnStructWithInline",
 	a: First,
@@ -1099,8 +1064,6 @@ export type UntaggedVariantsKey = string | number;
 export type UntaggedVariantsWithDuplicateBranches = null | number;
 
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
-
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
 export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
 

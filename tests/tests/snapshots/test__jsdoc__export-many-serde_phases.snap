@@ -17,6 +17,42 @@ expression: output
 	* @property {StructPhaseSpecificRenameSerialize} Serialize
 	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
 	*
+	* @typedef {StructWithAlias_Serialize | StructWithAlias_Deserialize} StructWithAlias
+	* @property {StructWithAlias_Serialize} Serialize
+	* @property {StructWithAlias_Deserialize} Deserialize
+	*
+	* @typedef {StructWithMultipleAliases_Serialize | StructWithMultipleAliases_Deserialize} StructWithMultipleAliases
+	* @property {StructWithMultipleAliases_Serialize} Serialize
+	* @property {StructWithMultipleAliases_Deserialize} Deserialize
+	*
+	* @typedef {StructWithAliasAndRename_Serialize | StructWithAliasAndRename_Deserialize} StructWithAliasAndRename
+	* @property {StructWithAliasAndRename_Serialize} Serialize
+	* @property {StructWithAliasAndRename_Deserialize} Deserialize
+	*
+	* @typedef {EnumWithVariantAlias_Serialize | EnumWithVariantAlias_Deserialize} EnumWithVariantAlias
+	* @property {EnumWithVariantAlias_Serialize} Serialize
+	* @property {EnumWithVariantAlias_Deserialize} Deserialize
+	*
+	* @typedef {EnumWithMultipleVariantAliases_Serialize | EnumWithMultipleVariantAliases_Deserialize} EnumWithMultipleVariantAliases
+	* @property {EnumWithMultipleVariantAliases_Serialize} Serialize
+	* @property {EnumWithMultipleVariantAliases_Deserialize} Deserialize
+	*
+	* @typedef {EnumWithVariantAliasAndRename_Serialize | EnumWithVariantAliasAndRename_Deserialize} EnumWithVariantAliasAndRename
+	* @property {EnumWithVariantAliasAndRename_Serialize} Serialize
+	* @property {EnumWithVariantAliasAndRename_Deserialize} Deserialize
+	*
+	* @typedef {InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize} InternallyTaggedWithAlias
+	* @property {InternallyTaggedWithAlias_Serialize} Serialize
+	* @property {InternallyTaggedWithAlias_Deserialize} Deserialize
+	*
+	* @typedef {AdjacentlyTaggedWithAlias_Serialize | AdjacentlyTaggedWithAlias_Deserialize} AdjacentlyTaggedWithAlias
+	* @property {AdjacentlyTaggedWithAlias_Serialize} Serialize
+	* @property {AdjacentlyTaggedWithAlias_Deserialize} Deserialize
+	*
+	* @typedef {UntaggedWithAlias_Serialize | UntaggedWithAlias_Deserialize} UntaggedWithAlias
+	* @property {UntaggedWithAlias_Serialize} Serialize
+	* @property {UntaggedWithAlias_Deserialize} Deserialize
+	*
 	* @typedef {{
 	*		start: T,
 	*		end: T,
@@ -850,53 +886,6 @@ expression: output
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
-	*
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithAlias
-	* @property {string} field
-	*
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithMultipleAliases
-	* @property {string} field
-	*
-	* @typedef {{
-	*		renamed_field: string,
-	*	}} StructWithAliasAndRename
-	* @property {string} renamed_field
-	*
-	* @typedef {"Variant" | "Other"} EnumWithVariantAlias
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*
-	* @typedef {"Variant" | "Other"} EnumWithMultipleVariantAliases
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*
-	* @typedef {"renamed_variant" | "Other"} EnumWithVariantAliasAndRename
-	* @property {"renamed_variant"} renamed_variant
-	* @property {"Other"} Other
-	*
-	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
-	* @property {{ type: "A"; field: string }} A
-	* @property {{ type: "B"; other: number }} B
-	*
-	* @typedef {{ type: "A"; data: {
-	* 	field: string,
-	* } } | { type: "B"; data: {
-	* 	other: number,
-	* } }} AdjacentlyTaggedWithAlias
-	* @property {{ type: "A"; data: {
-	* 	field: string,
-	* } }} A
-	* @property {{ type: "B"; data: {
-	* 	other: number,
-	* } }} B
-	*
-	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
 	*
 	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }} Issue221UntaggedSafe
 	* @property {{ a: string }} A

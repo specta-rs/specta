@@ -537,30 +537,6 @@ InternallyTaggedL: export type InternallyTaggedL = "A" | "B";
 
 InternallyTaggedM: export type InternallyTaggedM = "A" | "B";
 
-StructWithAlias: export type StructWithAlias = {
-	field: string,
-};
-
-StructWithMultipleAliases: export type StructWithMultipleAliases = {
-	field: string,
-};
-
-StructWithAliasAndRename: export type StructWithAliasAndRename = {
-	field: string,
-};
-
-EnumWithVariantAlias: export type EnumWithVariantAlias = "Variant" | "Other";
-
-EnumWithMultipleVariantAliases: export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-EnumWithVariantAliasAndRename: export type EnumWithVariantAliasAndRename = "Variant" | "Other";
-
-InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-UntaggedWithAlias: export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
 Issue221UntaggedSafe: export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
 Issue221UntaggedMixed: export type Issue221UntaggedMixed = ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never };

@@ -544,34 +544,6 @@ export type InternallyTaggedL = {
 
 export type InternallyTaggedM = { type: "A" };
 
-export type StructWithAlias = {
-	field: string,
-};
-
-export type StructWithMultipleAliases = {
-	field: string,
-};
-
-export type StructWithAliasAndRename = {
-	renamed_field: string,
-};
-
-export type EnumWithVariantAlias = "Variant" | "Other";
-
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-export type EnumWithVariantAliasAndRename = "renamed_variant" | "Other";
-
-export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
-
-export type AdjacentlyTaggedWithAlias = { type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} };
-
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
 export type Issue221UntaggedMixed = ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never };

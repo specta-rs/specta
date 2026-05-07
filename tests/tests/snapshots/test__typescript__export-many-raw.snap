@@ -506,30 +506,6 @@ export type InternallyTaggedL = "A" | "B";
 
 export type InternallyTaggedM = "A" | "B";
 
-export type StructWithAlias = {
-	field: string,
-};
-
-export type StructWithMultipleAliases = {
-	field: string,
-};
-
-export type StructWithAliasAndRename = {
-	field: string,
-};
-
-export type EnumWithVariantAlias = "Variant" | "Other";
-
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-export type EnumWithVariantAliasAndRename = "Variant" | "Other";
-
-export type InternallyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-export type AdjacentlyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
 export type Issue221UntaggedMixed = ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never };

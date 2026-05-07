@@ -9,6 +9,24 @@ export type Optional = Optional_Serialize | Optional_Deserialize;
 
 export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize;
 
+export type StructWithAlias = StructWithAlias_Serialize | StructWithAlias_Deserialize;
+
+export type StructWithMultipleAliases = StructWithMultipleAliases_Serialize | StructWithMultipleAliases_Deserialize;
+
+export type StructWithAliasAndRename = StructWithAliasAndRename_Serialize | StructWithAliasAndRename_Deserialize;
+
+export type EnumWithVariantAlias = EnumWithVariantAlias_Serialize | EnumWithVariantAlias_Deserialize;
+
+export type EnumWithMultipleVariantAliases = EnumWithMultipleVariantAliases_Serialize | EnumWithMultipleVariantAliases_Deserialize;
+
+export type EnumWithVariantAliasAndRename = EnumWithVariantAliasAndRename_Serialize | EnumWithVariantAliasAndRename_Deserialize;
+
+export type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize;
+
+export type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Serialize | AdjacentlyTaggedWithAlias_Deserialize;
+
+export type UntaggedWithAlias = UntaggedWithAlias_Serialize | UntaggedWithAlias_Deserialize;
+
 export type Range<T> = {
 	start: T,
 	end: T,
@@ -550,34 +568,6 @@ export type InternallyTaggedL = {
 } & { type: "A" } | { type: "B" };
 
 export type InternallyTaggedM = { type: "A" };
-
-export type StructWithAlias = {
-	field: string,
-};
-
-export type StructWithMultipleAliases = {
-	field: string,
-};
-
-export type StructWithAliasAndRename = {
-	renamed_field: string,
-};
-
-export type EnumWithVariantAlias = "Variant" | "Other";
-
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-export type EnumWithVariantAliasAndRename = "renamed_variant" | "Other";
-
-export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
-
-export type AdjacentlyTaggedWithAlias = { type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} };
-
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 

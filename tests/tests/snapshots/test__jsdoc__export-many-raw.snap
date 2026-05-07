@@ -760,45 +760,6 @@ expression: output
 	* @typedef {"A" | "B"} InternallyTaggedM
 	* @property {"A" | "B"} A
 	*
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithAlias
-	* @property {string} field
-	*
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithMultipleAliases
-	* @property {string} field
-	*
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithAliasAndRename
-	* @property {string} field
-	*
-	* @typedef {"Variant" | "Other"} EnumWithVariantAlias
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*
-	* @typedef {"Variant" | "Other"} EnumWithMultipleVariantAliases
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*
-	* @typedef {"Variant" | "Other"} EnumWithVariantAliasAndRename
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*
-	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} InternallyTaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
-	*
-	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} AdjacentlyTaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
-	*
-	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
-	*
 	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }} Issue221UntaggedSafe
 	* @property {{ a: string }} A
 	* @property {{ b: string }} B

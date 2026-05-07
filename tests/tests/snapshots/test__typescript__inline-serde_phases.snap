@@ -16,6 +16,25 @@ StructPhaseSpecificRename: {
 	kind: "StructPhaseSpecificRenameSerialize",
 	ser: string,
 }
+StructWithAlias: {
+	field: string,
+}
+StructWithMultipleAliases: {
+	field: string,
+}
+StructWithAliasAndRename: {
+	renamed_field: string,
+}
+EnumWithVariantAlias: "Variant" | "Other"
+EnumWithMultipleVariantAliases: "Variant" | "Other"
+EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
+InternallyTaggedWithAlias: ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }
+AdjacentlyTaggedWithAlias: { type: "A"; data: {
+	field: string,
+} } | { type: "B"; data: {
+	other: number,
+} }
+UntaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
 i8: number
 i16: number
 i32: number
@@ -483,25 +502,6 @@ InternallyTaggedL: {
 	type: "A",
 } & { type: "A" } | { type: "B" }
 InternallyTaggedM: { type: "A" }
-StructWithAlias: {
-	field: string,
-}
-StructWithMultipleAliases: {
-	field: string,
-}
-StructWithAliasAndRename: {
-	renamed_field: string,
-}
-EnumWithVariantAlias: "Variant" | "Other"
-EnumWithMultipleVariantAliases: "Variant" | "Other"
-EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
-InternallyTaggedWithAlias: { type: "A"; field: string } | { type: "B"; other: number }
-AdjacentlyTaggedWithAlias: { type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} }
-UntaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
 Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
 Issue221UntaggedMixed: ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }
 EmptyEnum: never

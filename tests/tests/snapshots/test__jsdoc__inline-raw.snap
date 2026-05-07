@@ -431,21 +431,6 @@ InternallyTaggedF: InternallyTaggedFInner
 InternallyTaggedH: InternallyTaggedHInner
 InternallyTaggedL: "A" | "B"
 InternallyTaggedM: "A" | "B"
-StructWithAlias: {
-	field: string,
-}
-StructWithMultipleAliases: {
-	field: string,
-}
-StructWithAliasAndRename: {
-	field: string,
-}
-EnumWithVariantAlias: "Variant" | "Other"
-EnumWithMultipleVariantAliases: "Variant" | "Other"
-EnumWithVariantAliasAndRename: "Variant" | "Other"
-InternallyTaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
-AdjacentlyTaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
-UntaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
 Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
 Issue221UntaggedMixed: ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }
 EmptyEnum: never

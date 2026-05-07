@@ -9,6 +9,24 @@ Optional: export type Optional = Optional_Serialize | Optional_Deserialize;
 
 StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize;
 
+StructWithAlias: export type StructWithAlias = StructWithAlias_Serialize | StructWithAlias_Deserialize;
+
+StructWithMultipleAliases: export type StructWithMultipleAliases = StructWithMultipleAliases_Serialize | StructWithMultipleAliases_Deserialize;
+
+StructWithAliasAndRename: export type StructWithAliasAndRename = StructWithAliasAndRename_Serialize | StructWithAliasAndRename_Deserialize;
+
+EnumWithVariantAlias: export type EnumWithVariantAlias = EnumWithVariantAlias_Serialize | EnumWithVariantAlias_Deserialize;
+
+EnumWithMultipleVariantAliases: export type EnumWithMultipleVariantAliases = EnumWithMultipleVariantAliases_Serialize | EnumWithMultipleVariantAliases_Deserialize;
+
+EnumWithVariantAliasAndRename: export type EnumWithVariantAliasAndRename = EnumWithVariantAliasAndRename_Serialize | EnumWithVariantAliasAndRename_Deserialize;
+
+InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize;
+
+AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Serialize | AdjacentlyTaggedWithAlias_Deserialize;
+
+UntaggedWithAlias: export type UntaggedWithAlias = UntaggedWithAlias_Serialize | UntaggedWithAlias_Deserialize;
+
 Range<i32>: export type Range<T> = {
 	start: T,
 	end: T,
@@ -581,34 +599,6 @@ InternallyTaggedL: export type InternallyTaggedL = {
 } & { type: "A" } | { type: "B" };
 
 InternallyTaggedM: export type InternallyTaggedM = { type: "A" };
-
-StructWithAlias: export type StructWithAlias = {
-	field: string,
-};
-
-StructWithMultipleAliases: export type StructWithMultipleAliases = {
-	field: string,
-};
-
-StructWithAliasAndRename: export type StructWithAliasAndRename = {
-	renamed_field: string,
-};
-
-EnumWithVariantAlias: export type EnumWithVariantAlias = "Variant" | "Other";
-
-EnumWithMultipleVariantAliases: export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-EnumWithVariantAliasAndRename: export type EnumWithVariantAliasAndRename = "renamed_variant" | "Other";
-
-InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
-
-AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = { type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} };
-
-UntaggedWithAlias: export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
 Issue221UntaggedSafe: export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 

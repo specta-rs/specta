@@ -22,6 +22,60 @@ StructPhaseSpecificRename: /**
 	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
 	*/
 
+StructWithAlias: /**
+	* @typedef {StructWithAlias_Serialize | StructWithAlias_Deserialize} StructWithAlias
+	* @property {StructWithAlias_Serialize} Serialize
+	* @property {StructWithAlias_Deserialize} Deserialize
+	*/
+
+StructWithMultipleAliases: /**
+	* @typedef {StructWithMultipleAliases_Serialize | StructWithMultipleAliases_Deserialize} StructWithMultipleAliases
+	* @property {StructWithMultipleAliases_Serialize} Serialize
+	* @property {StructWithMultipleAliases_Deserialize} Deserialize
+	*/
+
+StructWithAliasAndRename: /**
+	* @typedef {StructWithAliasAndRename_Serialize | StructWithAliasAndRename_Deserialize} StructWithAliasAndRename
+	* @property {StructWithAliasAndRename_Serialize} Serialize
+	* @property {StructWithAliasAndRename_Deserialize} Deserialize
+	*/
+
+EnumWithVariantAlias: /**
+	* @typedef {EnumWithVariantAlias_Serialize | EnumWithVariantAlias_Deserialize} EnumWithVariantAlias
+	* @property {EnumWithVariantAlias_Serialize} Serialize
+	* @property {EnumWithVariantAlias_Deserialize} Deserialize
+	*/
+
+EnumWithMultipleVariantAliases: /**
+	* @typedef {EnumWithMultipleVariantAliases_Serialize | EnumWithMultipleVariantAliases_Deserialize} EnumWithMultipleVariantAliases
+	* @property {EnumWithMultipleVariantAliases_Serialize} Serialize
+	* @property {EnumWithMultipleVariantAliases_Deserialize} Deserialize
+	*/
+
+EnumWithVariantAliasAndRename: /**
+	* @typedef {EnumWithVariantAliasAndRename_Serialize | EnumWithVariantAliasAndRename_Deserialize} EnumWithVariantAliasAndRename
+	* @property {EnumWithVariantAliasAndRename_Serialize} Serialize
+	* @property {EnumWithVariantAliasAndRename_Deserialize} Deserialize
+	*/
+
+InternallyTaggedWithAlias: /**
+	* @typedef {InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize} InternallyTaggedWithAlias
+	* @property {InternallyTaggedWithAlias_Serialize} Serialize
+	* @property {InternallyTaggedWithAlias_Deserialize} Deserialize
+	*/
+
+AdjacentlyTaggedWithAlias: /**
+	* @typedef {AdjacentlyTaggedWithAlias_Serialize | AdjacentlyTaggedWithAlias_Deserialize} AdjacentlyTaggedWithAlias
+	* @property {AdjacentlyTaggedWithAlias_Serialize} Serialize
+	* @property {AdjacentlyTaggedWithAlias_Deserialize} Deserialize
+	*/
+
+UntaggedWithAlias: /**
+	* @typedef {UntaggedWithAlias_Serialize | UntaggedWithAlias_Deserialize} UntaggedWithAlias
+	* @property {UntaggedWithAlias_Serialize} Serialize
+	* @property {UntaggedWithAlias_Deserialize} Deserialize
+	*/
+
 Range<i32>: /**
 	* @typedef {{
 	*		start: T,
@@ -1143,71 +1197,6 @@ InternallyTaggedL: /**
 InternallyTaggedM: /**
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
-	*/
-
-StructWithAlias: /**
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithAlias
-	* @property {string} field
-	*/
-
-StructWithMultipleAliases: /**
-	* @typedef {{
-	*		field: string,
-	*	}} StructWithMultipleAliases
-	* @property {string} field
-	*/
-
-StructWithAliasAndRename: /**
-	* @typedef {{
-	*		renamed_field: string,
-	*	}} StructWithAliasAndRename
-	* @property {string} renamed_field
-	*/
-
-EnumWithVariantAlias: /**
-	* @typedef {"Variant" | "Other"} EnumWithVariantAlias
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*/
-
-EnumWithMultipleVariantAliases: /**
-	* @typedef {"Variant" | "Other"} EnumWithMultipleVariantAliases
-	* @property {"Variant"} Variant
-	* @property {"Other"} Other
-	*/
-
-EnumWithVariantAliasAndRename: /**
-	* @typedef {"renamed_variant" | "Other"} EnumWithVariantAliasAndRename
-	* @property {"renamed_variant"} renamed_variant
-	* @property {"Other"} Other
-	*/
-
-InternallyTaggedWithAlias: /**
-	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
-	* @property {{ type: "A"; field: string }} A
-	* @property {{ type: "B"; other: number }} B
-	*/
-
-AdjacentlyTaggedWithAlias: /**
-	* @typedef {{ type: "A"; data: {
-	* 	field: string,
-	* } } | { type: "B"; data: {
-	* 	other: number,
-	* } }} AdjacentlyTaggedWithAlias
-	* @property {{ type: "A"; data: {
-	* 	field: string,
-	* } }} A
-	* @property {{ type: "B"; data: {
-	* 	other: number,
-	* } }} B
-	*/
-
-UntaggedWithAlias: /**
-	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
 	*/
 
 Issue221UntaggedSafe: /**

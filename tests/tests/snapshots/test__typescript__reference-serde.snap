@@ -162,15 +162,6 @@ InternallyTaggedF: InternallyTaggedF
 InternallyTaggedH: InternallyTaggedH
 InternallyTaggedL: InternallyTaggedL
 InternallyTaggedM: InternallyTaggedM
-StructWithAlias: StructWithAlias
-StructWithMultipleAliases: StructWithMultipleAliases
-StructWithAliasAndRename: StructWithAliasAndRename
-EnumWithVariantAlias: EnumWithVariantAlias
-EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases
-EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename
-InternallyTaggedWithAlias: InternallyTaggedWithAlias
-AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias
-UntaggedWithAlias: UntaggedWithAlias
 Issue221UntaggedSafe: Issue221UntaggedSafe
 Issue221UntaggedMixed: Issue221UntaggedMixed
 EmptyEnum: EmptyEnum

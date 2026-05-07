@@ -342,18 +342,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InternallyTaggedL,
         InternallyTaggedM,
 
-        // Alias
-        StructWithAlias,
-        StructWithMultipleAliases,
-        StructWithAliasAndRename,
-
-        EnumWithVariantAlias,
-        EnumWithMultipleVariantAliases,
-        EnumWithVariantAliasAndRename,
-
-        InternallyTaggedWithAlias,
-        AdjacentlyTaggedWithAlias,
-        UntaggedWithAlias,
         Issue221UntaggedSafe,
         Issue221UntaggedMixed,
 
@@ -437,6 +425,17 @@ pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
         Issue374,
         Optional,
         StructPhaseSpecificRename,
+
+        // Alias. These are deserialize-only and require PhasesFormat.
+        StructWithAlias,
+        StructWithMultipleAliases,
+        StructWithAliasAndRename,
+        EnumWithVariantAlias,
+        EnumWithMultipleVariantAliases,
+        EnumWithVariantAliasAndRename,
+        InternallyTaggedWithAlias,
+        AdjacentlyTaggedWithAlias,
+        UntaggedWithAlias,
     );
 
     (types, dts)

@@ -30,7 +30,17 @@ export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: {
 	method: string,
 } } | { t: "C"; c: string };
 
-export type AdjacentlyTaggedWithAlias = { type: "A"; data: {
+export type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Serialize | AdjacentlyTaggedWithAlias_Deserialize;
+
+export type AdjacentlyTaggedWithAlias_Deserialize = { type: "A"; data: {
+	field: string,
+} | {
+	bruh: string,
+} } | { type: "B"; data: {
+	other: number,
+} };
+
+export type AdjacentlyTaggedWithAlias_Serialize = { type: "A"; data: {
 	field: string,
 } } | { type: "B"; data: {
 	other: number,
@@ -237,11 +247,23 @@ export type EnumReferenceRecordKey = {
 
 export type EnumRenameAllUppercase = "HELLOWORLD" | "VARIANTB" | "TESTINGWORDS";
 
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
+export type EnumWithMultipleVariantAliases = EnumWithMultipleVariantAliases_Serialize | EnumWithMultipleVariantAliases_Deserialize;
 
-export type EnumWithVariantAlias = "Variant" | "Other";
+export type EnumWithMultipleVariantAliases_Deserialize = "Variant" | "bruh" | "alternative" | "Other";
 
-export type EnumWithVariantAliasAndRename = "renamed_variant" | "Other";
+export type EnumWithMultipleVariantAliases_Serialize = "Variant" | "Other";
+
+export type EnumWithVariantAlias = EnumWithVariantAlias_Serialize | EnumWithVariantAlias_Deserialize;
+
+export type EnumWithVariantAliasAndRename = EnumWithVariantAliasAndRename_Serialize | EnumWithVariantAliasAndRename_Deserialize;
+
+export type EnumWithVariantAliasAndRename_Deserialize = "renamed_variant" | "bruh" | "Other";
+
+export type EnumWithVariantAliasAndRename_Serialize = "renamed_variant" | "Other";
+
+export type EnumWithVariantAlias_Deserialize = "Variant" | "bruh" | "Other";
+
+export type EnumWithVariantAlias_Serialize = "Variant" | "Other";
 
 export type ExternallyTagged = "A" | ({ B: {
 	id: string,
@@ -487,7 +509,20 @@ export type InternallyTaggedM = { type: "A" };
 
 export type InternallyTaggedMInner = "A" | "B";
 
-export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
+export type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize;
+
+export type InternallyTaggedWithAlias_Deserialize = ({ A: {
+	type: "A",
+} & {
+	field: string,
+} | {
+	bruh: string,
+} }) & { B?: never } | ({ B: {
+	type: "B",
+	other: number,
+} }) & { A?: never };
+
+export type InternallyTaggedWithAlias_Serialize = ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never };
 
 export type InvalidToValidType = {
 	cause: null,
@@ -831,15 +866,6 @@ export type Primitives = {
 	InternallyTaggedH: InternallyTaggedH,
 	InternallyTaggedL: InternallyTaggedL,
 	InternallyTaggedM: InternallyTaggedM,
-	StructWithAlias: StructWithAlias,
-	StructWithMultipleAliases: StructWithMultipleAliases,
-	StructWithAliasAndRename: StructWithAliasAndRename,
-	EnumWithVariantAlias: EnumWithVariantAlias,
-	EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases,
-	EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename,
-	InternallyTaggedWithAlias: InternallyTaggedWithAlias,
-	AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias,
-	UntaggedWithAlias: UntaggedWithAlias,
 	Issue221UntaggedSafe: Issue221UntaggedSafe,
 	Issue221UntaggedMixed: Issue221UntaggedMixed,
 	EmptyEnum: EmptyEnum,
@@ -1050,15 +1076,41 @@ export type StructRenameAllUppercase = {
 	B: number,
 };
 
-export type StructWithAlias = {
-	field: string,
-};
+export type StructWithAlias = StructWithAlias_Serialize | StructWithAlias_Deserialize;
 
-export type StructWithAliasAndRename = {
+export type StructWithAliasAndRename = StructWithAliasAndRename_Serialize | StructWithAliasAndRename_Deserialize;
+
+export type StructWithAliasAndRename_Deserialize = {
 	renamed_field: string,
 };
 
-export type StructWithMultipleAliases = {
+export type StructWithAliasAndRename_Serialize = {
+	renamed_field: string,
+};
+
+export type StructWithAlias_Deserialize = {
+	field: string,
+} | {
+	bruh: string,
+};
+
+export type StructWithAlias_Serialize = {
+	field: string,
+};
+
+export type StructWithMultipleAliases = StructWithMultipleAliases_Serialize | StructWithMultipleAliases_Deserialize;
+
+export type StructWithMultipleAliases_Deserialize = {
+	field: string,
+} | {
+	bruh: string,
+} | {
+	alternative: string,
+} | {
+	another: string,
+};
+
+export type StructWithMultipleAliases_Serialize = {
 	field: string,
 };
 
@@ -1143,7 +1195,15 @@ export type UntaggedVariantsWithDuplicateBranches = null | number;
 
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
+export type UntaggedWithAlias = UntaggedWithAlias_Serialize | UntaggedWithAlias_Deserialize;
+
+export type UntaggedWithAlias_Deserialize = {
+	field: string,
+} | {
+	bruh: string,
+} | { other: number };
+
+export type UntaggedWithAlias_Serialize = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
 export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
 
