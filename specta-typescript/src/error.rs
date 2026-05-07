@@ -74,16 +74,23 @@ enum ErrorKind {
         reason: Cow<'static, str>,
     },
     /// Attempted to export a bigint type but the configuration forbids it.
-    BigIntForbidden { path: String },
+    BigIntForbidden {
+        path: String,
+    },
     /// A type's name conflicts with a reserved keyword in Typescript.
-    ForbiddenName { path: String, name: &'static str },
+    ForbiddenName {
+        path: String,
+        name: &'static str,
+    },
     /// A type's name contains invalid characters or is not valid.
     InvalidName {
         path: String,
         name: Cow<'static, str>,
     },
     /// A type's name is empty and cannot be emitted as a Typescript type name.
-    EmptyName { path: String },
+    EmptyName {
+        path: String,
+    },
     /// Anonymous enum variants cannot be represented by the Typescript exporter.
     UnsupportedAnonymousEnumVariant {
         path: String,
@@ -102,13 +109,40 @@ enum ErrorKind {
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
     Io(io::Error),
     /// Failed to read a directory while exporting files.
-    ReadDir { path: PathBuf, source: io::Error },
+    ReadDir {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Failed to inspect filesystem metadata while exporting files.
-    Metadata { path: PathBuf, source: io::Error },
+    Metadata {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Failed to remove a stale file while exporting files.
-    RemoveFile { path: PathBuf, source: io::Error },
+    RemoveFile {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Failed to remove an empty directory while exporting files.
-    RemoveDir { path: PathBuf, source: io::Error },
+    RemoveDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to create an output directory while exporting files.
+    CreateDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to write an output file while exporting files.
+    WriteFile {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to read a generated file while exporting files.
+    ReadFile {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference {
@@ -117,7 +151,10 @@ enum ErrorKind {
     },
     /// Found a named reference that cannot be resolved from the provided
     /// [`Types`](specta::Types).
-    DanglingNamedReference { path: String, reference: String },
+    DanglingNamedReference {
+        path: String,
+        reference: String,
+    },
     /// Found a recursive named reference marked by core inline resolution.
     InfiniteRecursiveInlineType {
         path: String,
@@ -125,7 +162,9 @@ enum ErrorKind {
         cycle: RecursiveInlineType,
     },
     /// Reached the recursion limit while rendering an anonymous Typescript type.
-    InlineRecursionLimitExceeded { path: String },
+    InlineRecursionLimitExceeded {
+        path: String,
+    },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
@@ -134,13 +173,15 @@ enum ErrorKind {
     /// An error occurred in a format callback.
     Format {
         message: Cow<'static, str>,
+        path: Option<String>,
         source: FrameworkSource,
     },
     /// The requested export layout is not supported by the current exporter configuration.
     ///
     /// Some layouts require the higher-level [`Exporter`](crate::Exporter) APIs so imports,
     /// file paths, and module boundaries can be coordinated correctly.
-    UnableToExport(Layout),
+    ExportRequiresExportTo(Layout),
+    JsdocNamespacesUnsupported,
 }
 
 impl Error {
@@ -208,6 +249,19 @@ impl Error {
     ) -> Self {
         Self::new(ErrorKind::Format {
             message: message.into(),
+            path: None,
+            source: source.into(),
+        })
+    }
+
+    pub(crate) fn format_at(
+        message: impl Into<Cow<'static, str>>,
+        path: impl Into<String>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self::new(ErrorKind::Format {
+            message: message.into(),
+            path: Some(path.into()),
             source: source.into(),
         })
     }
@@ -266,6 +320,18 @@ impl Error {
         Self::new(ErrorKind::RemoveDir { path, source })
     }
 
+    pub(crate) fn create_dir(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::CreateDir { path, source })
+    }
+
+    pub(crate) fn write_file(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::WriteFile { path, source })
+    }
+
+    pub(crate) fn read_file(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::ReadFile { path, source })
+    }
+
     pub(crate) fn unsupported_opaque_reference(path: String, reference: OpaqueReference) -> Self {
         Self::new(ErrorKind::UnsupportedOpaqueReference { path, reference })
     }
@@ -290,8 +356,12 @@ impl Error {
         Self::new(ErrorKind::InlineRecursionLimitExceeded { path })
     }
 
-    pub(crate) fn unable_to_export(layout: Layout) -> Self {
-        Self::new(ErrorKind::UnableToExport(layout))
+    pub(crate) fn export_requires_export_to(layout: Layout) -> Self {
+        Self::new(ErrorKind::ExportRequiresExportTo(layout))
+    }
+
+    pub(crate) fn jsdoc_namespaces_unsupported() -> Self {
+        Self::new(ErrorKind::JsdocNamespacesUnsupported)
     }
 }
 
@@ -360,6 +430,19 @@ impl fmt::Display for Error {
                     path.display()
                 )
             }
+            ErrorKind::CreateDir { path, source } => {
+                write!(
+                    f,
+                    "Failed to create directory '{}': {source}",
+                    path.display()
+                )
+            }
+            ErrorKind::WriteFile { path, source } => {
+                write!(f, "Failed to write file '{}': {source}", path.display())
+            }
+            ErrorKind::ReadFile { path, source } => {
+                write!(f, "Failed to read file '{}': {source}", path.display())
+            }
             ErrorKind::UnsupportedOpaqueReference { path, reference } => write!(
                 f,
                 "Found unsupported opaque reference '{}' at {}. It is not supported by the Typescript exporter.",
@@ -403,19 +486,32 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
-            ErrorKind::Format { message, source } => {
+            ErrorKind::Format {
+                message,
+                path,
+                source,
+            } => {
                 let source = source.to_string();
+                let location = path
+                    .as_deref()
+                    .filter(|path| !path.is_empty())
+                    .map(|path| format!(" at {}", display_path(path)))
+                    .unwrap_or_default();
                 if message.is_empty() && source.is_empty() {
-                    write!(f, "Format error")
+                    write!(f, "Format error{location}")
                 } else if source.is_empty() {
-                    write!(f, "Format error: {message}")
+                    write!(f, "Format error{location}: {message}")
                 } else {
-                    write!(f, "Format error: {message}: {source}")
+                    write!(f, "Format error{location}: {message}: {source}")
                 }
             }
-            ErrorKind::UnableToExport(layout) => write!(
+            ErrorKind::ExportRequiresExportTo(layout) => write!(
                 f,
-                "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
+                "Unable to export layout {layout} as a single string. Use `Exporter::export_to` with a directory path for file-based exports."
+            ),
+            ErrorKind::JsdocNamespacesUnsupported => write!(
+                f,
+                "Unable to export JSDoc with the Namespaces layout. Disable JSDoc or use FlatFile, ModulePrefixedName, or Files layout."
             ),
         }?;
 
@@ -465,7 +561,10 @@ impl error::Error for Error {
             ErrorKind::ReadDir { source, .. }
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
-            | ErrorKind::RemoveDir { source, .. } => Some(source),
+            | ErrorKind::RemoveDir { source, .. }
+            | ErrorKind::CreateDir { source, .. }
+            | ErrorKind::WriteFile { source, .. }
+            | ErrorKind::ReadFile { source, .. } => Some(source),
             ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
                 Some(source.as_ref())
             }

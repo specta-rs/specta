@@ -351,7 +351,7 @@ fn export_single_internal(
     s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
-    write_generic_parameters(s, exporter, types, &ndt.generics)?;
+    write_generic_parameters(s, exporter, types, &[rust_type_path(ndt)], &ndt.generics)?;
     s.push_str(" = ");
 
     datatype(
@@ -599,7 +599,13 @@ fn append_typedef_body(
 ) -> Result<(), Error> {
     let name = &dt.name;
     let mut type_name = String::from(name.as_ref());
-    write_generic_parameters(&mut type_name, exporter, types, &dt.generics)?;
+    write_generic_parameters(
+        &mut type_name,
+        exporter,
+        types,
+        &[rust_type_path(dt)],
+        &dt.generics,
+    )?;
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
@@ -656,6 +662,7 @@ fn write_generic_parameters(
     s: &mut String,
     exporter: &Exporter,
     types: &Types,
+    parent_location: &[Cow<'static, str>],
     generics: &[GenericDefinition],
 ) -> Result<(), Error> {
     if generics.is_empty() {
@@ -672,13 +679,15 @@ fn write_generic_parameters(
 
         if let Some(default) = &generic.default {
             let mut rendered_default = String::new();
+            let mut default_location = parent_location.to_vec();
+            default_location.push(format!("<generic {} default>", generic.name).into());
             shallow_inline_datatype(
                 &mut rendered_default,
                 exporter,
                 None,
                 types,
                 default,
-                Vec::new(),
+                default_location,
                 None,
                 "",
                 Default::default(),

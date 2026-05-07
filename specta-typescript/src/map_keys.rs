@@ -144,15 +144,15 @@ fn validate_map_key_inner(
                             substitute_generics(&mut ty, generics);
                             validate_map_key_inner(&ty, types, path, visiting_named_refs)
                         } else {
-                            Err(Error::invalid_map_key(
+                            Err(Error::dangling_named_reference(
                                 path,
-                                format!("unresolved named map key reference {reference:?}"),
+                                format!("{reference:?}"),
                             ))
                         }
                     } else {
-                        Err(Error::invalid_map_key(
+                        Err(Error::dangling_named_reference(
                             path,
-                            format!("unresolved named map key reference {reference:?}"),
+                            format!("{reference:?}"),
                         ))
                     }
                 }
