@@ -178,15 +178,11 @@ pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
 }
 
 pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
-    let note = typ.note.as_deref().map(str::trim).filter(|v| !v.is_empty());
-    let since: Option<&str> = None;
-
-    match (note, since) {
-        (Some(note), Some(since)) => Some(format!("{note} since {since}")),
-        (Some(note), None) => Some(note.to_string()),
-        (None, Some(since)) => Some(format!("since {since}")),
-        (None, None) => None,
-    }
+    typ.note
+        .as_deref()
+        .map(str::trim)
+        .filter(|note| !note.is_empty())
+        .map(str::to_string)
 }
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -813,17 +809,78 @@ fn resolved_reference_generics(
     Some((rendered_generics, all_default, scoped_generics))
 }
 
-type DatatypeRenderer = fn(
-    &mut String,
-    &Exporter,
-    Option<&dyn Format>,
-    &Types,
-    &DataType,
-    Vec<Cow<'static, str>>,
-    Option<&str>,
-    &str,
-    &[(GenericReference, DataType)],
-) -> Result<(), Error>;
+#[derive(Clone, Copy)]
+struct RenderCtx<'a> {
+    exporter: &'a Exporter,
+    format: Option<&'a dyn Format>,
+    types: &'a Types,
+    parent_name: Option<&'a str>,
+    prefix: &'a str,
+    generics: &'a [(GenericReference, DataType)],
+}
+
+#[derive(Clone, Copy)]
+enum RenderMode {
+    Normal,
+    ShallowInline,
+}
+
+impl RenderMode {
+    fn render(
+        self,
+        s: &mut String,
+        ctx: RenderCtx<'_>,
+        dt: &DataType,
+        location: Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        match self {
+            Self::Normal => datatype(
+                s,
+                ctx.exporter,
+                ctx.format,
+                ctx.types,
+                dt,
+                location,
+                ctx.parent_name,
+                ctx.prefix,
+                ctx.generics,
+            ),
+            Self::ShallowInline => shallow_inline_datatype(
+                s,
+                ctx.exporter,
+                ctx.format,
+                ctx.types,
+                dt,
+                location,
+                ctx.parent_name,
+                ctx.prefix,
+                ctx.generics,
+            ),
+        }
+    }
+
+    fn render_intersection_part(
+        self,
+        s: &mut String,
+        ctx: RenderCtx<'_>,
+        dt: &DataType,
+        location: Vec<Cow<'static, str>>,
+    ) -> Result<(), Error> {
+        match (self, dt) {
+            (Self::ShallowInline, DataType::Reference(r)) => reference_dt(
+                s,
+                ctx.exporter,
+                ctx.format,
+                ctx.types,
+                r,
+                location,
+                ctx.prefix,
+                ctx.generics,
+            ),
+            _ => self.render(s, ctx, dt, location),
+        }
+    }
+}
 
 fn needs_array_parens(ty: &str) -> bool {
     ty.contains(' ') && (!ty.ends_with('}') || ty.contains('&') || ty.contains('|'))
@@ -879,7 +936,7 @@ fn render_map(
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
-    render_value: DatatypeRenderer,
+    value_mode: RenderMode,
 ) -> Result<(), Error> {
     let path = map_key_path(&location);
     map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
@@ -905,16 +962,18 @@ fn render_map(
         generics,
     )?;
     s.push_str("]: ");
-    render_value(
+    value_mode.render(
         s,
-        exporter,
-        format,
-        types,
+        RenderCtx {
+            exporter,
+            format,
+            types,
+            parent_name,
+            prefix,
+            generics,
+        },
         map.value_ty(),
         location,
-        parent_name,
-        prefix,
-        generics,
     )?;
     s.push_str(" }");
 
@@ -964,7 +1023,7 @@ fn shallow_inline_datatype(
             parent_name,
             prefix,
             generics,
-            shallow_inline_datatype,
+            RenderMode::ShallowInline,
         )?,
         DataType::Nullable(dt) => {
             let mut inner = String::new();
@@ -991,7 +1050,7 @@ fn shallow_inline_datatype(
             parent_name,
             prefix,
             generics,
-            shallow_intersection_part_datatype,
+            RenderMode::ShallowInline,
         )?,
         DataType::Struct(st) => {
             struct_dt(
@@ -1057,35 +1116,6 @@ fn shallow_inline_datatype(
     Ok(())
 }
 
-fn shallow_intersection_part_datatype(
-    s: &mut String,
-    exporter: &Exporter,
-    format: Option<&dyn Format>,
-    types: &Types,
-    dt: &DataType,
-    location: Vec<Cow<'static, str>>,
-    parent_name: Option<&str>,
-    prefix: &str,
-    generics: &[(GenericReference, DataType)],
-) -> Result<(), Error> {
-    match dt {
-        DataType::Reference(r) => {
-            reference_dt(s, exporter, format, types, r, location, prefix, generics)
-        }
-        _ => shallow_inline_datatype(
-            s,
-            exporter,
-            format,
-            types,
-            dt,
-            location,
-            parent_name,
-            prefix,
-            generics,
-        ),
-    }
-}
-
 fn intersection_dt(
     s: &mut String,
     exporter: &Exporter,
@@ -1096,21 +1126,23 @@ fn intersection_dt(
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
-    render: DatatypeRenderer,
+    mode: RenderMode,
 ) -> Result<(), Error> {
     let mut rendered = Vec::with_capacity(parts.len());
     for part in parts {
         let mut out = String::new();
-        render(
+        mode.render_intersection_part(
             &mut out,
-            exporter,
-            format,
-            types,
+            RenderCtx {
+                exporter,
+                format,
+                types,
+                parent_name,
+                prefix,
+                generics,
+            },
             part,
             location.clone(),
-            parent_name,
-            prefix,
-            generics,
         )?;
         rendered.push(format!("({out})"));
     }
@@ -1257,7 +1289,7 @@ fn inline_datatype(
             parent_name,
             prefix,
             generics,
-            datatype,
+            RenderMode::Normal,
         )?,
         DataType::Reference(r) => {
             if let Reference::Named(r) = r
@@ -1317,12 +1349,6 @@ pub(crate) fn datatype(
             )?;
 
             push_nullable(s, &inner);
-
-            // datatype(s, ts, types, &*t, location, state)?;
-            // let or_null = " | null";
-            // if !s.ends_with(or_null) {
-            //     s.push_str(or_null);
-            // }
         }
         DataType::Struct(st) => struct_dt(
             s,
@@ -1442,7 +1468,16 @@ fn map_dt(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     render_map(
-        s, exporter, format, types, m, location, None, "", generics, datatype,
+        s,
+        exporter,
+        format,
+        types,
+        m,
+        location,
+        None,
+        "",
+        generics,
+        RenderMode::Normal,
     )
 }
 
@@ -1814,6 +1849,13 @@ fn has_anonymous_variant(variants: &[&(Cow<'static, str>, Variant)]) -> bool {
     variants.iter().any(|(name, _)| name.is_empty())
 }
 
+fn active_variants(e: &Enum) -> Vec<&(Cow<'static, str>, Variant)> {
+    e.variants
+        .iter()
+        .filter(|(_, variant)| !variant.skip)
+        .collect()
+}
+
 fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
     let strict_key_universe = variants
         .iter()
@@ -1839,6 +1881,20 @@ fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
         if !missing_keys.is_empty() {
             variant.value = format!("({}) & {{ {} }}", variant.value, missing_keys.join("; "));
         }
+    }
+}
+
+fn push_union(s: &mut String, variants: Vec<String>) {
+    let mut seen = BTreeSet::new();
+    let variants = variants
+        .into_iter()
+        .filter(|variant| seen.insert(variant.clone()))
+        .collect::<Vec<_>>();
+
+    if variants.is_empty() {
+        s.push_str(NEVER);
+    } else {
+        s.push_str(&variants.join(" | "));
     }
 }
 
@@ -1955,11 +2011,7 @@ fn enum_dt(
         return Ok(());
     }
 
-    let filtered_variants = e
-        .variants
-        .iter()
-        .filter(|(_, variant)| !variant.skip)
-        .collect::<Vec<_>>();
+    let filtered_variants = active_variants(e);
 
     let discriminator = analyze_discriminator(&filtered_variants);
     let fallback_override = discriminator.as_ref().and_then(|discriminator| {
@@ -2003,7 +2055,7 @@ fn enum_dt(
         strictify_enum_variants(&mut rendered_variants);
     }
 
-    let mut variants = filtered_variants
+    let variants = filtered_variants
         .into_iter()
         .zip(rendered_variants)
         .map(|((_, variant), rendered)| {
@@ -2017,14 +2069,7 @@ fn enum_dt(
         })
         .collect::<Vec<_>>();
 
-    let mut seen = BTreeSet::new();
-    variants.retain(|variant| seen.insert(variant.clone()));
-
-    if variants.is_empty() {
-        s.push_str(NEVER);
-    } else {
-        s.push_str(&variants.join(" | "));
-    }
+    push_union(s, variants);
 
     Ok(())
 }
@@ -2097,22 +2142,34 @@ fn reference_opaque_dt(
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
         return Ok(());
-    } else if r.downcast_ref::<opaque::Any>().is_some() {
+    }
+
+    if r.downcast_ref::<opaque::Any>().is_some() {
         s.push_str("any");
         return Ok(());
-    } else if r.downcast_ref::<opaque::Unknown>().is_some() {
+    }
+
+    if r.downcast_ref::<opaque::Unknown>().is_some() {
         s.push_str("unknown");
         return Ok(());
-    } else if r.downcast_ref::<opaque::Never>().is_some() {
+    }
+
+    if r.downcast_ref::<opaque::Never>().is_some() {
         s.push_str("never");
         return Ok(());
-    } else if r.downcast_ref::<opaque::Number>().is_some() {
+    }
+
+    if r.downcast_ref::<opaque::Number>().is_some() {
         s.push_str("number");
         return Ok(());
-    } else if r.downcast_ref::<opaque::BigInt>().is_some() {
+    }
+
+    if r.downcast_ref::<opaque::BigInt>().is_some() {
         s.push_str("bigint");
         return Ok(());
-    } else if let Some(def) = r.downcast_ref::<Branded>() {
+    }
+
+    if let Some(def) = r.downcast_ref::<Branded>() {
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
