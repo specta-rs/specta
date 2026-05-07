@@ -1,7 +1,0 @@
----
-source: tests/tests/semantic.rs
-assertion_line: 121
-expression: "transformed_snapshot(&types,\nsemantic.apply_deserialize(&types, &dt, \"payload\"),)"
----
-type: <unchanged>
-runtime: ({...payload,site:new URL(payload.site),id:BigInt(payload.id),nested:payload.nested.map(i=>i==null?i:new URL(i))})

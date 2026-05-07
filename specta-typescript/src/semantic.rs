@@ -47,7 +47,7 @@ use specta::{
 
 use crate::{
     define,
-    legacy::{escape_typescript_string_literal, is_identifier},
+    primitives::{escape_typescript_string_literal, is_identifier},
 };
 
 /// A JavaScript expression that converts between a semantic

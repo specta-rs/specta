@@ -1,7 +1,0 @@
----
-source: tests/tests/semantic.rs
-assertion_line: 100
-expression: "transformed_snapshot(&types,\nsemantic.apply_deserialize(&types, &dt, \"payload\"),)"
----
-type: <unchanged>
-runtime: ({...payload,id:BigInt(payload.id),signed:BigInt(payload.signed),scores:payload.scores.map(i=>i),maybe_score:payload.maybe_score==null?payload.maybe_score:payload.maybe_score})

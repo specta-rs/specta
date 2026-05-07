@@ -53,7 +53,6 @@ mod branded;
 mod error;
 mod exporter;
 mod jsdoc;
-mod legacy; // TODO: Remove this
 mod map_keys;
 mod opaque;
 pub mod primitives;

@@ -3,25 +3,182 @@
 //! These are for advanced usecases, you should generally use [crate::Typescript] or
 //! [crate::JSDoc] in end-user applications.
 
-use std::{borrow::Cow, fmt::Write as _};
+use std::{borrow::Cow, collections::BTreeSet, fmt::Write as _};
 
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Deprecated, Enum, Fields, GenericDefinition, GenericReference, List, Map,
+        DataType, Deprecated, Enum, Field, Fields, GenericDefinition, GenericReference, List, Map,
         NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
-        Tuple, Variant,
+        Struct, Tuple, Variant,
     },
 };
 
 use crate::{
-    Branded, BrandedTypeExporter, Error, Exporter, Layout,
-    legacy::{
-        ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
-        is_identifier, js_doc,
-    },
-    map_keys, opaque,
+    Branded, BrandedTypeExporter, Error, Exporter, Layout, map_keys, opaque,
+    reserved_names::RESERVED_TYPE_NAMES,
 };
+
+const STRING: &str = "string";
+const NULL: &str = "null";
+const NEVER: &str = "never";
+
+fn path_string(location: &[Cow<'static, str>]) -> String {
+    location.join(".")
+}
+
+fn inner_comments(
+    deprecated: Option<&Deprecated>,
+    docs: &str,
+    other: String,
+    start_with_newline: bool,
+    prefix: &str,
+) -> String {
+    let mut comments = String::new();
+    js_doc(&mut comments, docs, deprecated);
+    if comments.is_empty() {
+        return other;
+    }
+
+    let mut out = String::new();
+    if start_with_newline {
+        out.push('\n');
+    }
+
+    for line in comments.lines() {
+        out.push_str(prefix);
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    out.push_str(&other);
+    out
+}
+
+pub(crate) fn is_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    (first.is_ascii_alphabetic() || first == '_' || first == '$')
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')
+}
+
+pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
+    if !value.chars().any(|ch| {
+        ch == '"' || ch == '\\' || ch == '\u{2028}' || ch == '\u{2029}' || ch.is_control()
+    }) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str(r#"\""#),
+            '\\' => escaped.push_str(r#"\\"#),
+            '\n' => escaped.push_str(r#"\n"#),
+            '\r' => escaped.push_str(r#"\r"#),
+            '\t' => escaped.push_str(r#"\t"#),
+            '\u{2028}' => escaped.push_str(r#"\u2028"#),
+            '\u{2029}' => escaped.push_str(r#"\u2029"#),
+            ch if ch.is_control() => {
+                write!(escaped, r#"\u{:04X}"#, ch as u32).expect("infallible");
+            }
+            _ => escaped.push(ch),
+        }
+    }
+
+    Cow::Owned(escaped)
+}
+
+fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
+    if force_string || !is_identifier(&field_name) {
+        format!(r#""{}""#, escape_typescript_string_literal(&field_name)).into()
+    } else {
+        field_name
+    }
+}
+
+fn sanitise_type_name(location: &[Cow<'static, str>], ident: &str) -> Result<String, Error> {
+    let path = path_string(location);
+
+    if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
+        return Err(Error::forbidden_name(path, name));
+    }
+
+    if let Some(first_char) = ident.chars().next()
+        && !first_char.is_alphabetic()
+        && first_char != '_'
+    {
+        return Err(Error::invalid_name(path, ident.to_string()));
+    }
+
+    if ident
+        .find(|c: char| !c.is_alphanumeric() && c != '_')
+        .is_some()
+    {
+        return Err(Error::invalid_name(path, ident.to_string()));
+    }
+
+    Ok(ident.to_string())
+}
+
+pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&Deprecated>) {
+    if docs.is_empty() && deprecated.is_none() {
+        return;
+    }
+
+    if deprecated.is_none() {
+        let mut lines = docs.lines();
+        if let (Some(line), None) = (lines.next(), lines.next()) {
+            s.push_str("/** ");
+            s.push_str(&escape_jsdoc_text(line));
+            s.push_str(" */\n");
+            return;
+        }
+    }
+
+    s.push_str("/**\n");
+    if !docs.is_empty() {
+        for line in docs.lines() {
+            s.push_str(" * ");
+            s.push_str(&escape_jsdoc_text(line));
+            s.push('\n');
+        }
+    }
+
+    if let Some(typ) = deprecated {
+        s.push_str(" * @deprecated");
+        if let Some(details) = deprecated_details(typ) {
+            s.push(' ');
+            s.push_str(&details);
+        }
+        s.push('\n');
+    }
+
+    s.push_str(" */\n");
+}
+
+pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
+    if text.contains("*/") {
+        Cow::Owned(text.replace("*/", "*\\/"))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
+    let note = typ.note.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let since: Option<&str> = None;
+
+    match (note, since) {
+        (Some(note), Some(since)) => Some(format!("{note} since {since}")),
+        (Some(note), None) => Some(note.to_string()),
+        (None, Some(since)) => Some(format!("since {since}")),
+        (None, None) => None,
+    }
+}
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -111,22 +268,16 @@ fn export_single_internal(
         return Ok(());
     }
 
-    // TODO: Modernise this
-    let name = crate::legacy::sanitise_type_name(
-        crate::legacy::ExportContext {
-            cfg: exporter,
-            path: vec![],
-        },
-        &match exporter.layout {
-            Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-                s.push('_');
-                s.push_str(&ndt.name);
-                Cow::Owned(s)
-            }
-            _ => ndt.name.clone(),
-        },
-    )?;
+    let raw_name = match exporter.layout {
+        Layout::ModulePrefixedName => {
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
+            s.push('_');
+            s.push_str(&ndt.name);
+            Cow::Owned(s)
+        }
+        _ => ndt.name.clone(),
+    };
+    let name = sanitise_type_name(&[], &raw_name)?;
 
     let mut comments = String::new();
     js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref());
@@ -291,17 +442,7 @@ fn append_jsdoc_properties(
                     .retain(|(name, _)| name == variant_name);
 
                 let mut variant_ty = String::new();
-                crate::legacy::enum_datatype(
-                    ExportContext {
-                        cfg: exporter,
-                        path: vec![],
-                    },
-                    &one_variant_enum,
-                    types,
-                    &mut variant_ty,
-                    "",
-                    &[],
-                )?;
+                enum_dt(&mut variant_ty, exporter, types, &one_variant_enum, "", &[])?;
 
                 push_jsdoc_property(
                     s,
@@ -798,30 +939,20 @@ fn shallow_inline_datatype(
             shallow_intersection_part_datatype,
         )?,
         DataType::Struct(st) => {
-            crate::legacy::struct_datatype(
-                crate::legacy::ExportContext {
-                    cfg: exporter,
-                    path: vec![],
-                },
-                st,
-                types,
+            struct_dt(
                 s,
+                exporter,
+                format,
+                types,
+                st,
+                location,
+                parent_name,
                 prefix,
                 generics,
             )?;
         }
         DataType::Enum(enm) => {
-            crate::legacy::enum_datatype(
-                crate::legacy::ExportContext {
-                    cfg: exporter,
-                    path: vec![],
-                },
-                enm,
-                types,
-                s,
-                prefix,
-                generics,
-            )?;
+            enum_dt(s, exporter, types, enm, prefix, generics)?;
         }
         DataType::Tuple(tuple) => match tuple.elements.as_slice() {
             [] => s.push_str("null"),
@@ -970,16 +1101,16 @@ fn inline_datatype(
         DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::Generic(g) => write_generic_reference(s, g),
         DataType::List(l) => {
-            // Inline the list element type
             let mut dt_str = String::new();
-            crate::legacy::datatype_inner(
-                crate::legacy::ExportContext {
-                    cfg: exporter,
-                    path: vec![],
-                },
-                &l.ty,
-                types,
+            datatype(
                 &mut dt_str,
+                exporter,
+                format,
+                types,
+                &l.ty,
+                location.clone(),
+                parent_name,
+                prefix,
                 generics,
             )?;
 
@@ -1015,7 +1146,7 @@ fn inline_datatype(
                 def,
                 location,
                 parent_name,
-                prefix,
+                "",
                 depth + 1,
                 generics,
             )?;
@@ -1026,16 +1157,13 @@ fn inline_datatype(
             }
         }
         DataType::Struct(st) => {
-            // If we have generics to resolve, handle the struct inline to preserve context
             if !generics.is_empty() {
-                use specta::datatype::Fields;
                 match &st.fields {
-                    Fields::Unit => s.push_str("null"),
+                    Fields::Unit => s.push_str(NULL),
                     Fields::Named(named) => {
                         s.push('{');
                         let mut has_field = false;
                         for (key, field) in &named.fields {
-                            // Skip fields without a type (e.g., flattened or skipped fields)
                             let Some(field_ty) = field.ty.as_ref() else {
                                 continue;
                             };
@@ -1044,7 +1172,10 @@ fn inline_datatype(
                             s.push('\n');
                             s.push_str(prefix);
                             s.push('\t');
-                            s.push_str(key);
+                            s.push_str(&sanitise_key(key.clone(), false));
+                            if field.optional {
+                                s.push('?');
+                            }
                             s.push_str(": ");
                             inline_datatype(
                                 s,
@@ -1068,34 +1199,30 @@ fn inline_datatype(
 
                         s.push('}');
                     }
-                    Fields::Unnamed(_) => {
-                        // For unnamed fields, fall back to legacy handling
-                        crate::legacy::struct_datatype(
-                            crate::legacy::ExportContext {
-                                cfg: exporter,
-                                path: vec![],
-                            },
-                            st,
-                            types,
-                            s,
-                            prefix,
-                            generics,
-                        )?
-                    }
+                    Fields::Unnamed(_) => struct_dt(
+                        s,
+                        exporter,
+                        format,
+                        types,
+                        st,
+                        location,
+                        parent_name,
+                        prefix,
+                        generics,
+                    )?,
                 }
             } else {
-                // No generics, use legacy path
-                crate::legacy::struct_datatype(
-                    crate::legacy::ExportContext {
-                        cfg: exporter,
-                        path: vec![],
-                    },
-                    st,
-                    types,
+                struct_dt(
                     s,
+                    exporter,
+                    format,
+                    types,
+                    st,
+                    location,
+                    parent_name,
                     prefix,
-                    Default::default(),
-                )?
+                    generics,
+                )?;
             }
         }
         DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
@@ -1145,7 +1272,7 @@ pub(crate) fn datatype(
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    _parent_name: Option<&str>,
+    parent_name: Option<&str>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
@@ -1156,16 +1283,16 @@ pub(crate) fn datatype(
         DataType::List(l) => list_dt(s, exporter, types, l, generics)?,
         DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
-            // TODO: Replace legacy stuff
             let mut inner = String::new();
-            crate::legacy::datatype_inner(
-                crate::legacy::ExportContext {
-                    cfg: exporter,
-                    path: vec![],
-                },
-                def,
-                types,
+            datatype(
                 &mut inner,
+                exporter,
+                format,
+                types,
+                def,
+                location,
+                parent_name,
+                "",
                 generics,
             )?;
 
@@ -1180,22 +1307,17 @@ pub(crate) fn datatype(
             //     s.push_str(or_null);
             // }
         }
-        DataType::Struct(st) => {
-            // location.push(st.name().clone());
-            // fields_dt(s, ts, types, st.name(), &&st.fields, location, state)?
-
-            crate::legacy::struct_datatype(
-                crate::legacy::ExportContext {
-                    cfg: exporter,
-                    path: vec![],
-                },
-                st,
-                types,
-                s,
-                prefix,
-                generics,
-            )?
-        }
+        DataType::Struct(st) => struct_dt(
+            s,
+            exporter,
+            format,
+            types,
+            st,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        )?,
         DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
         DataType::Intersection(types_) => {
@@ -1210,7 +1332,7 @@ pub(crate) fn datatype(
                     types,
                     ty,
                     location.clone(),
-                    _parent_name,
+                    parent_name,
                     prefix,
                     generics,
                 )?;
@@ -1247,17 +1369,17 @@ fn list_dt(
     l: &List,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    // TODO: This is the legacy stuff
     {
         let mut dt = String::new();
-        crate::legacy::datatype_inner(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            &l.ty,
-            types,
+        datatype(
             &mut dt,
+            exporter,
+            None,
+            types,
+            &l.ty,
+            vec![],
+            None,
+            "",
             generics,
         )?;
 
@@ -1394,20 +1516,21 @@ fn map_dt(
             format,
             types,
             &resolved_key,
-            location,
+            location.clone(),
             None,
             "",
             generics,
         )?;
         s.push_str("]: ");
-        crate::legacy::datatype_inner(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            m.value_ty(),
-            types,
+        datatype(
             s,
+            exporter,
+            format,
+            types,
+            m.value_ty(),
+            location,
+            None,
+            "",
             generics,
         )?;
         s.push_str(" }");
@@ -1454,6 +1577,508 @@ fn bool_key_literal_datatype() -> DataType {
     DataType::Enum(bool_enum)
 }
 
+fn unnamed_fields_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    fields: &[(&Field, &DataType)],
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+    force_inline: bool,
+) -> Result<(), Error> {
+    match fields {
+        [(field, ty)] => {
+            let mut v = String::new();
+            datatype_with_inline_attr(
+                &mut v,
+                exporter,
+                format,
+                types,
+                ty,
+                location,
+                parent_name,
+                "",
+                generics,
+                force_inline,
+            )?;
+            s.push_str(&inner_comments(
+                field.deprecated.as_ref(),
+                &field.docs,
+                v,
+                true,
+                prefix,
+            ));
+        }
+        fields => {
+            s.push('[');
+            for (i, (field, ty)) in fields.iter().enumerate() {
+                if i != 0 {
+                    s.push_str(", ");
+                }
+
+                let mut v = String::new();
+                let mut field_location = location.clone();
+                field_location.push(i.to_string().into());
+                datatype_with_inline_attr(
+                    &mut v,
+                    exporter,
+                    format,
+                    types,
+                    ty,
+                    field_location,
+                    parent_name,
+                    "",
+                    generics,
+                    force_inline,
+                )?;
+                s.push_str(&inner_comments(
+                    field.deprecated.as_ref(),
+                    &field.docs,
+                    v,
+                    true,
+                    prefix,
+                ));
+            }
+            s.push(']');
+        }
+    }
+
+    Ok(())
+}
+
+fn struct_dt(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    st: &Struct,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match &st.fields {
+        Fields::Unit => s.push_str(NULL),
+        Fields::Unnamed(unnamed) => unnamed_fields_datatype(
+            s,
+            exporter,
+            format,
+            types,
+            &unnamed
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
+                .collect::<Vec<_>>(),
+            location,
+            parent_name,
+            prefix,
+            generics,
+            false,
+        )?,
+        Fields::Named(named) => {
+            let fields = named
+                .fields
+                .iter()
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
+                .collect::<Vec<_>>();
+
+            if fields.is_empty() {
+                write!(s, "Record<{STRING}, {NEVER}>")?;
+                return Ok(());
+            }
+
+            let mut unflattened_fields = Vec::with_capacity(fields.len());
+            for (key, (field, ty)) in fields {
+                let field_prefix = format!("{prefix}\t");
+                let mut other = String::new();
+                let mut field_location = location.clone();
+                field_location.push(key.clone());
+                object_field_to_ts(
+                    &mut other,
+                    exporter,
+                    format,
+                    types,
+                    key.clone(),
+                    (field, ty),
+                    field_location,
+                    parent_name,
+                    generics,
+                    &field_prefix,
+                    false,
+                    None,
+                )?;
+
+                let docs = field
+                    .docs
+                    .trim()
+                    .is_empty()
+                    .then(|| inline_reference_docs(types, (field, ty), false))
+                    .flatten()
+                    .unwrap_or(&field.docs);
+
+                unflattened_fields.push(inner_comments(
+                    field.deprecated.as_ref(),
+                    docs,
+                    other,
+                    false,
+                    &field_prefix,
+                ));
+            }
+
+            s.push('{');
+            for field in unflattened_fields {
+                s.push('\n');
+                s.push_str(&field);
+                s.push(',');
+            }
+            s.push('\n');
+            s.push_str(prefix);
+            s.push('}');
+        }
+    }
+
+    Ok(())
+}
+
+fn object_field_to_ts(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    key: Cow<'static, str>,
+    (field, ty): (&Field, &DataType),
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    generics: &[(GenericReference, DataType)],
+    prefix: &str,
+    force_inline: bool,
+    ty_override: Option<&str>,
+) -> Result<(), Error> {
+    let field_name_safe = sanitise_key(key, false);
+    let key = if field.optional {
+        format!("{field_name_safe}?").into()
+    } else {
+        field_name_safe
+    };
+
+    let value = match ty_override {
+        Some(ty_override) => ty_override.to_string(),
+        None => {
+            let mut value = String::new();
+            datatype_with_inline_attr(
+                &mut value,
+                exporter,
+                format,
+                types,
+                ty,
+                location,
+                parent_name,
+                prefix,
+                generics,
+                force_inline,
+            )?;
+            value
+        }
+    };
+
+    Ok(write!(s, "{prefix}{key}: {value}")?)
+}
+
+fn inline_reference_docs<'a>(
+    types: &'a Types,
+    (_field, ty): (&Field, &'a DataType),
+    force_inline: bool,
+) -> Option<&'a str> {
+    let DataType::Reference(Reference::Named(r)) = ty else {
+        return None;
+    };
+
+    if !force_inline {
+        return None;
+    }
+
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .filter(|ndt| !ndt.docs.trim().is_empty())
+            .map(|ndt| ndt.docs.as_ref()),
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => None,
+    }
+}
+
+struct EnumVariantOutput {
+    value: String,
+    strict_keys: Option<BTreeSet<String>>,
+}
+
+#[derive(Debug, Clone)]
+struct DiscriminatorAnalysis {
+    key: String,
+    known_literals: Vec<String>,
+    fallback_variant_idx: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct VariantTypeOverride<'a> {
+    key: &'a str,
+    ty: &'a str,
+}
+
+#[derive(Debug, Clone)]
+enum DiscriminatorValue {
+    StringLiteral(String),
+    String,
+}
+
+fn analyze_discriminator(
+    variants: &[&(Cow<'static, str>, Variant)],
+) -> Option<DiscriminatorAnalysis> {
+    if variants.iter().any(|(name, _)| name.is_empty()) {
+        return None;
+    }
+
+    let mut key = None::<String>;
+    let mut known_literals = BTreeSet::new();
+    let mut fallback_variant_idx = None;
+
+    for (idx, (_, variant)) in variants.iter().enumerate() {
+        let (variant_key, value) = variant_discriminator(variant)?;
+
+        if let Some(expected) = &key {
+            if expected != &variant_key {
+                return None;
+            }
+        } else {
+            key = Some(variant_key.clone());
+        }
+
+        match value {
+            DiscriminatorValue::StringLiteral(value) => {
+                known_literals.insert(value);
+            }
+            DiscriminatorValue::String => {
+                if fallback_variant_idx.replace(idx).is_some() {
+                    return None;
+                }
+            }
+        }
+    }
+
+    if known_literals.is_empty() {
+        return None;
+    }
+
+    Some(DiscriminatorAnalysis {
+        key: key.expect("at least one variant when called"),
+        known_literals: known_literals.into_iter().collect(),
+        fallback_variant_idx,
+    })
+}
+
+fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValue)> {
+    let Fields::Named(named) = &variant.fields else {
+        return None;
+    };
+
+    let (name, field) = named.fields.iter().find(|(_, field)| !field.optional)?;
+    let ty = field.ty.as_ref()?;
+
+    if matches!(ty, DataType::Primitive(Primitive::str)) {
+        return Some((name.to_string(), DiscriminatorValue::String));
+    }
+
+    string_literal_datatype_value(ty)
+        .map(|value| (name.to_string(), DiscriminatorValue::StringLiteral(value)))
+}
+
+fn string_literal_datatype_value(ty: &DataType) -> Option<String> {
+    let DataType::Enum(enm) = ty else {
+        return None;
+    };
+
+    let mut variants = enm.variants.iter();
+    let (name, variant) = variants.next()?;
+    if variants.next().is_some() || !matches!(&variant.fields, Fields::Unit) {
+        return None;
+    }
+
+    Some(name.to_string())
+}
+
+fn exclude_known_literals_type(literals: &[String]) -> Option<String> {
+    if literals.is_empty() {
+        return None;
+    }
+
+    let known = literals
+        .iter()
+        .map(|value| format!("\"{}\"", escape_typescript_string_literal(value.as_str())))
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    Some(format!("Exclude<string, {known}>"))
+}
+
+fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
+    match &variant.fields {
+        Fields::Named(obj) => Some(
+            obj.fields
+                .iter()
+                .filter_map(|(name, field)| {
+                    field
+                        .ty
+                        .as_ref()
+                        .map(|_| sanitise_key(name.clone(), false).to_string())
+                })
+                .collect(),
+        ),
+        _ => None,
+    }
+}
+
+fn has_anonymous_variant(variants: &[&(Cow<'static, str>, Variant)]) -> bool {
+    variants.iter().any(|(name, _)| name.is_empty())
+}
+
+fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
+    let strict_key_universe = variants
+        .iter()
+        .filter_map(|variant| variant.strict_keys.as_ref())
+        .flat_map(|keys| keys.iter().cloned())
+        .collect::<BTreeSet<_>>();
+
+    if strict_key_universe.len() < 2 {
+        return;
+    }
+
+    for variant in variants {
+        let Some(keys) = variant.strict_keys.as_ref() else {
+            continue;
+        };
+
+        let missing_keys = strict_key_universe
+            .iter()
+            .filter(|key| !keys.contains(*key))
+            .map(|key| format!("{key}?: {NEVER}"))
+            .collect::<Vec<_>>();
+
+        if !missing_keys.is_empty() {
+            variant.value = format!("({}) & {{ {} }}", variant.value, missing_keys.join("; "));
+        }
+    }
+}
+
+fn enum_variant_datatype(
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    name: Cow<'static, str>,
+    variant: &Variant,
+    location: Vec<Cow<'static, str>>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+    ty_override: Option<VariantTypeOverride<'_>>,
+) -> Result<Option<String>, Error> {
+    match &variant.fields {
+        Fields::Unit if name.is_empty() => Err(Error::invalid_name(
+            path_string(&location),
+            "anonymous unit enum variants cannot be exported to Typescript",
+        )),
+        Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
+        Fields::Named(_) if name.is_empty() => Err(Error::invalid_name(
+            path_string(&location),
+            "anonymous named-field enum variants cannot be exported to Typescript",
+        )),
+        Fields::Named(obj) => {
+            let mut regular_fields = Vec::new();
+            for (field_name, field) in &obj.fields {
+                let Some(ty) = field.ty.as_ref() else {
+                    continue;
+                };
+
+                let mut other = String::new();
+                let mut field_location = location.clone();
+                field_location.push(field_name.clone());
+                object_field_to_ts(
+                    &mut other,
+                    exporter,
+                    format,
+                    types,
+                    field_name.clone(),
+                    (field, ty),
+                    field_location,
+                    None,
+                    generics,
+                    "",
+                    false,
+                    ty_override
+                        .as_ref()
+                        .filter(|override_ty| override_ty.key == field_name.as_ref())
+                        .map(|override_ty| override_ty.ty),
+                )?;
+
+                let docs = field
+                    .docs
+                    .trim()
+                    .is_empty()
+                    .then(|| inline_reference_docs(types, (field, ty), false))
+                    .flatten()
+                    .unwrap_or(&field.docs);
+
+                regular_fields.push(inner_comments(
+                    field.deprecated.as_ref(),
+                    docs,
+                    other,
+                    true,
+                    prefix,
+                ));
+            }
+
+            Ok(Some(if regular_fields.is_empty() {
+                format!("Record<{STRING}, {NEVER}>")
+            } else {
+                format!("{{ {} }}", regular_fields.join("; "))
+            }))
+        }
+        Fields::Unnamed(obj) => {
+            let fields = obj
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .enumerate()
+                .map(|(idx, ty)| {
+                    let mut out = String::new();
+                    let mut field_location = location.clone();
+                    field_location.push(idx.to_string().into());
+                    datatype_with_inline_attr(
+                        &mut out,
+                        exporter,
+                        format,
+                        types,
+                        ty,
+                        field_location,
+                        None,
+                        "",
+                        generics,
+                        false,
+                    )
+                    .map(|_| out)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(match &fields[..] {
+                [] if obj.fields.is_empty() => Some("[]".to_string()),
+                [] => None,
+                [field] if obj.fields.len() == 1 => Some(field.to_string()),
+                fields => Some(format!("[{}]", fields.join(", "))),
+            })
+        }
+    }
+}
+
 fn enum_dt(
     s: &mut String,
     exporter: &Exporter,
@@ -1462,19 +2087,80 @@ fn enum_dt(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    // TODO: Drop legacy stuff
-    {
-        crate::legacy::enum_datatype(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            e,
+    if e.variants.is_empty() {
+        s.push_str(NEVER);
+        return Ok(());
+    }
+
+    let filtered_variants = e
+        .variants
+        .iter()
+        .filter(|(_, variant)| !variant.skip)
+        .collect::<Vec<_>>();
+
+    let discriminator = analyze_discriminator(&filtered_variants);
+    let fallback_override = discriminator.as_ref().and_then(|discriminator| {
+        discriminator.fallback_variant_idx.and_then(|idx| {
+            exclude_known_literals_type(&discriminator.known_literals)
+                .map(|ty| (idx, discriminator.key.as_str(), ty))
+        })
+    });
+
+    let mut rendered_variants = Vec::with_capacity(filtered_variants.len());
+    for (idx, (variant_name, variant)) in filtered_variants.iter().enumerate() {
+        let variant_override = fallback_override
+            .as_ref()
+            .and_then(|(fallback_idx, key, ty)| {
+                (*fallback_idx == idx).then_some(VariantTypeOverride {
+                    key,
+                    ty: ty.as_str(),
+                })
+            });
+
+        let variant_location = vec![variant_name.clone()];
+        let ts_values = enum_variant_datatype(
+            exporter,
+            None,
             types,
-            s,
+            variant_name.clone(),
+            variant,
+            variant_location,
             prefix,
             generics,
-        )?
+            variant_override,
+        )?;
+
+        rendered_variants.push(EnumVariantOutput {
+            value: ts_values.unwrap_or_else(|| NEVER.to_string()),
+            strict_keys: untagged_strict_keys(variant),
+        });
+    }
+
+    if discriminator.is_none() && !has_anonymous_variant(&filtered_variants) {
+        strictify_enum_variants(&mut rendered_variants);
+    }
+
+    let mut variants = filtered_variants
+        .into_iter()
+        .zip(rendered_variants)
+        .map(|((_, variant), rendered)| {
+            inner_comments(
+                variant.deprecated.as_ref(),
+                &variant.docs,
+                rendered.value,
+                true,
+                prefix,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mut seen = BTreeSet::new();
+    variants.retain(|variant| seen.insert(variant.clone()));
+
+    if variants.is_empty() {
+        s.push_str(NEVER);
+    } else {
+        s.push_str(&variants.join(" | "));
     }
 
     //     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
@@ -1884,16 +2570,28 @@ fn tuple_dt(
     t: &Tuple,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    {
-        s.push_str(&crate::legacy::tuple_datatype(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            t,
-            types,
-            generics,
-        )?);
+    match t.elements.as_slice() {
+        [] => s.push_str(NULL),
+        elements => {
+            s.push('[');
+            for (idx, dt) in elements.iter().enumerate() {
+                if idx != 0 {
+                    s.push_str(", ");
+                }
+                datatype(
+                    s,
+                    exporter,
+                    None,
+                    types,
+                    dt,
+                    vec![idx.to_string().into()],
+                    None,
+                    "",
+                    generics,
+                )?;
+            }
+            s.push(']');
+        }
     }
 
     // match &t.elements()[..] {
@@ -2007,7 +2705,6 @@ fn reference_named_dt(
     r: &NamedReference,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    // TODO: Legacy stuff
     {
         let ndt = types
             .get(r)
@@ -2067,14 +2764,15 @@ fn reference_named_dt(
                     s.push_str(", ");
                 }
 
-                crate::legacy::datatype_inner(
-                    crate::legacy::ExportContext {
-                        cfg: exporter,
-                        path: vec![],
-                    },
-                    dt,
-                    types,
+                datatype(
                     s,
+                    exporter,
+                    None,
+                    types,
+                    dt,
+                    vec![],
+                    None,
+                    "",
                     &scoped_generics,
                 )?;
             }

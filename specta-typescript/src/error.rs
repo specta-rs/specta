@@ -4,8 +4,6 @@ use specta::datatype::OpaqueReference;
 
 use crate::Layout;
 
-use super::legacy::ExportPath;
-
 /// The error type for the TypeScript exporter.
 ///
 /// ## BigInt Forbidden
@@ -124,15 +122,7 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
-    //
-    //
-    // TODO: Break
-    //
-    //
-    BigIntForbiddenLegacy(ExportPath),
-    ForbiddenNameLegacy(ExportPath, &'static str),
-    InvalidNameLegacy(ExportPath, String),
-    FmtLegacy(std::fmt::Error),
+    Fmt(std::fmt::Error),
     UnableToExport(Layout),
 }
 
@@ -187,6 +177,12 @@ impl Error {
                 path,
                 name: name.into(),
             },
+        }
+    }
+
+    pub(crate) fn forbidden_name(path: String, name: &'static str) -> Self {
+        Self {
+            kind: ErrorKind::ForbiddenName { path, name },
         }
     }
 
@@ -246,18 +242,6 @@ impl Error {
         }
     }
 
-    pub(crate) fn forbidden_name_legacy(path: ExportPath, name: &'static str) -> Self {
-        Self {
-            kind: ErrorKind::ForbiddenNameLegacy(path, name),
-        }
-    }
-
-    pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
-        Self {
-            kind: ErrorKind::InvalidNameLegacy(path, name),
-        }
-    }
-
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
         Self {
             kind: ErrorKind::UnableToExport(layout),
@@ -276,7 +260,7 @@ impl From<io::Error> for Error {
 impl From<std::fmt::Error> for Error {
     fn from(error: std::fmt::Error) -> Self {
         Self {
-            kind: ErrorKind::FmtLegacy(error),
+            kind: ErrorKind::Fmt(error),
         }
     }
 }
@@ -293,11 +277,13 @@ impl fmt::Display for Error {
             ),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
-                "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
+                "Attempted to export {} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
+                "Attempted to export {} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
             ),
             ErrorKind::DuplicateTypeName {
                 name,
@@ -361,19 +347,7 @@ impl fmt::Display for Error {
                     write!(f, "Format error: {message}: {source}")
                 }
             }
-            ErrorKind::BigIntForbiddenLegacy(path) => write!(
-                f,
-                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
-            ),
-            ErrorKind::ForbiddenNameLegacy(path, name) => write!(
-                f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
-            ),
-            ErrorKind::InvalidNameLegacy(path, name) => write!(
-                f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
-            ),
-            ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
+            ErrorKind::Fmt(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
                 f,
                 "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
@@ -399,7 +373,7 @@ impl error::Error for Error {
             ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
                 Some(source.as_ref())
             }
-            ErrorKind::FmtLegacy(error) => Some(error),
+            ErrorKind::Fmt(error) => Some(error),
             _ => None,
         }
     }
@@ -412,4 +386,12 @@ fn format_location(location: Location<'static>) -> String {
         location.line(),
         location.column()
     )
+}
+
+fn display_path(path: &str) -> Cow<'_, str> {
+    if path.is_empty() {
+        Cow::Borrowed("")
+    } else {
+        Cow::Owned(format!("{path:?}"))
+    }
 }
