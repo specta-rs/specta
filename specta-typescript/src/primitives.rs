@@ -27,6 +27,55 @@ fn path_string(location: &[Cow<'static, str>]) -> String {
     location.join(".")
 }
 
+fn module_prefixed_type_name(ndt: &NamedDataType) -> String {
+    let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
+    name.push('_');
+    name.push_str(&ndt.name);
+    name
+}
+
+fn exported_type_name<'a>(exporter: &Exporter, ndt: &'a NamedDataType) -> Cow<'a, str> {
+    match exporter.layout {
+        Layout::ModulePrefixedName => Cow::Owned(module_prefixed_type_name(ndt)),
+        _ => ndt.name.clone(),
+    }
+}
+
+fn referenced_type_name<'a>(exporter: &Exporter, ndt: &'a NamedDataType) -> Cow<'a, str> {
+    match exporter.layout {
+        Layout::ModulePrefixedName => Cow::Owned(module_prefixed_type_name(ndt)),
+        Layout::Namespaces => {
+            if ndt.module_path.is_empty() {
+                ndt.name.clone()
+            } else {
+                let mut path =
+                    ndt.module_path
+                        .split("::")
+                        .fold("$s$.".to_string(), |mut s, segment| {
+                            s.push_str(segment);
+                            s.push('.');
+                            s
+                        });
+                path.push_str(&ndt.name);
+                Cow::Owned(path)
+            }
+        }
+        Layout::Files => {
+            let current_module_path = crate::references::current_module_path().unwrap_or_default();
+
+            if ndt.module_path == current_module_path {
+                ndt.name.clone()
+            } else {
+                let mut path = crate::exporter::module_alias(&ndt.module_path);
+                path.push('.');
+                path.push_str(&ndt.name);
+                Cow::Owned(path)
+            }
+        }
+        _ => ndt.name.clone(),
+    }
+}
+
 fn inner_comments(
     deprecated: Option<&Deprecated>,
     docs: &str,
@@ -273,15 +322,7 @@ fn export_single_internal(
         return Ok(());
     }
 
-    let raw_name = match exporter.layout {
-        Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            s.push('_');
-            s.push_str(&ndt.name);
-            Cow::Owned(s)
-        }
-        _ => ndt.name.clone(),
-    };
+    let raw_name = exported_type_name(exporter, ndt);
     let name = sanitise_type_name(&[], &raw_name)?;
 
     let mut comments = String::new();
@@ -882,6 +923,139 @@ impl RenderMode {
     }
 }
 
+fn render_datatype(
+    s: &mut String,
+    ctx: RenderCtx<'_>,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    mode: RenderMode,
+) -> Result<(), Error> {
+    match (mode, dt) {
+        (_, DataType::Primitive(p)) => s.push_str(primitive_dt(p, location)?),
+        (_, DataType::Generic(g)) => write_generic_reference(s, g),
+        (RenderMode::Normal, DataType::List(list)) => {
+            list_dt(s, ctx.exporter, ctx.types, list, ctx.generics)?;
+        }
+        (RenderMode::ShallowInline, DataType::List(list)) => {
+            let mut inner = String::new();
+            render_datatype(&mut inner, ctx, &list.ty, location, mode)?;
+            push_list(s, &inner, list.length);
+        }
+        (RenderMode::Normal, DataType::Map(map)) => {
+            map_dt(
+                s,
+                ctx.exporter,
+                ctx.format,
+                ctx.types,
+                map,
+                location,
+                ctx.generics,
+            )?;
+        }
+        (RenderMode::ShallowInline, DataType::Map(map)) => render_map(
+            s,
+            ctx.exporter,
+            ctx.format,
+            ctx.types,
+            map,
+            location,
+            ctx.parent_name,
+            ctx.prefix,
+            ctx.generics,
+            mode,
+        )?,
+        (_, DataType::Nullable(inner)) => {
+            let mut rendered = String::new();
+            let child_ctx = RenderCtx { prefix: "", ..ctx };
+            render_datatype(&mut rendered, child_ctx, inner, location, mode)?;
+            push_nullable(s, &rendered);
+        }
+        (_, DataType::Struct(st)) => struct_dt(
+            s,
+            ctx.exporter,
+            ctx.format,
+            ctx.types,
+            st,
+            location,
+            ctx.parent_name,
+            ctx.prefix,
+            ctx.generics,
+        )?,
+        (_, DataType::Enum(enm)) => {
+            enum_dt(s, ctx.exporter, ctx.types, enm, ctx.prefix, ctx.generics)?
+        }
+        (RenderMode::Normal, DataType::Tuple(tuple)) => {
+            tuple_dt(s, ctx.exporter, ctx.types, tuple, ctx.generics)?;
+        }
+        (RenderMode::ShallowInline, DataType::Tuple(tuple)) => match tuple.elements.as_slice() {
+            [] => s.push_str(NULL),
+            elements => {
+                s.push('[');
+                for (idx, dt) in elements.iter().enumerate() {
+                    if idx != 0 {
+                        s.push_str(", ");
+                    }
+                    render_datatype(s, ctx, dt, location.clone(), mode)?;
+                }
+                s.push(']');
+            }
+        },
+        (RenderMode::Normal, DataType::Intersection(parts)) => {
+            for (idx, ty) in parts.iter().enumerate() {
+                if idx != 0 {
+                    s.push_str(" & ");
+                }
+                render_datatype(s, ctx, ty, location.clone(), mode)?;
+            }
+        }
+        (RenderMode::ShallowInline, DataType::Intersection(parts)) => intersection_dt(
+            s,
+            ctx.exporter,
+            ctx.format,
+            ctx.types,
+            parts,
+            location,
+            ctx.parent_name,
+            ctx.prefix,
+            ctx.generics,
+            mode,
+        )?,
+        (RenderMode::Normal, DataType::Reference(r)) => reference_dt(
+            s,
+            ctx.exporter,
+            ctx.format,
+            ctx.types,
+            r,
+            location,
+            ctx.prefix,
+            ctx.generics,
+        )?,
+        (RenderMode::ShallowInline, DataType::Reference(r)) => match r {
+            Reference::Named(r) => {
+                let ty = named_reference_ty(ctx.types, r)?;
+                let reference_generics = named_reference_generics(r)?;
+                let child_ctx = RenderCtx {
+                    generics: reference_generics,
+                    ..ctx
+                };
+                render_datatype(s, child_ctx, ty, location, mode)?;
+            }
+            Reference::Opaque(_) => reference_dt(
+                s,
+                ctx.exporter,
+                ctx.format,
+                ctx.types,
+                r,
+                location,
+                ctx.prefix,
+                ctx.generics,
+            )?,
+        },
+    }
+
+    Ok(())
+}
+
 fn needs_array_parens(ty: &str) -> bool {
     ty.contains(' ') && (!ty.ends_with('}') || ty.contains('&') || ty.contains('|'))
 }
@@ -995,125 +1169,20 @@ fn shallow_inline_datatype(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
-        DataType::Generic(g) => write_generic_reference(s, g),
-        DataType::List(list) => {
-            let mut inner = String::new();
-            shallow_inline_datatype(
-                &mut inner,
-                exporter,
-                format,
-                types,
-                &list.ty,
-                location,
-                parent_name,
-                prefix,
-                generics,
-            )?;
-            push_list(s, &inner, list.length);
-        }
-        DataType::Map(map) => render_map(
-            s,
+    render_datatype(
+        s,
+        RenderCtx {
             exporter,
             format,
             types,
-            map,
-            location,
             parent_name,
             prefix,
             generics,
-            RenderMode::ShallowInline,
-        )?,
-        DataType::Nullable(dt) => {
-            let mut inner = String::new();
-            shallow_inline_datatype(
-                &mut inner,
-                exporter,
-                format,
-                types,
-                dt,
-                location,
-                parent_name,
-                prefix,
-                generics,
-            )?;
-            push_nullable(s, &inner);
-        }
-        DataType::Intersection(types_) => intersection_dt(
-            s,
-            exporter,
-            format,
-            types,
-            types_,
-            location,
-            parent_name,
-            prefix,
-            generics,
-            RenderMode::ShallowInline,
-        )?,
-        DataType::Struct(st) => {
-            struct_dt(
-                s,
-                exporter,
-                format,
-                types,
-                st,
-                location,
-                parent_name,
-                prefix,
-                generics,
-            )?;
-        }
-        DataType::Enum(enm) => {
-            enum_dt(s, exporter, types, enm, prefix, generics)?;
-        }
-        DataType::Tuple(tuple) => match tuple.elements.as_slice() {
-            [] => s.push_str("null"),
-            elements => {
-                s.push('[');
-                for (idx, dt) in elements.iter().enumerate() {
-                    if idx != 0 {
-                        s.push_str(", ");
-                    }
-                    shallow_inline_datatype(
-                        s,
-                        exporter,
-                        format,
-                        types,
-                        dt,
-                        location.clone(),
-                        parent_name,
-                        prefix,
-                        generics,
-                    )?;
-                }
-                s.push(']');
-            }
         },
-        DataType::Reference(r) => match r {
-            Reference::Named(r) => {
-                let ty = named_reference_ty(types, r)?;
-                let reference_generics = named_reference_generics(r)?;
-                shallow_inline_datatype(
-                    s,
-                    exporter,
-                    format,
-                    types,
-                    ty,
-                    location,
-                    parent_name,
-                    prefix,
-                    reference_generics,
-                )
-            }
-            Reference::Opaque(_) => {
-                reference_dt(s, exporter, format, types, r, location, prefix, generics)
-            }
-        }?,
-    }
-
-    Ok(())
+        dt,
+        location,
+        RenderMode::ShallowInline,
+    )
 }
 
 fn intersection_dt(
@@ -1210,59 +1279,18 @@ fn inline_datatype(
         }
         DataType::Struct(st) => {
             if !generics.is_empty() {
-                match &st.fields {
-                    Fields::Unit => s.push_str(NULL),
-                    Fields::Named(named) => {
-                        s.push('{');
-                        let mut has_field = false;
-                        for (key, field) in &named.fields {
-                            let Some(field_ty) = field.ty.as_ref() else {
-                                continue;
-                            };
-
-                            has_field = true;
-                            s.push('\n');
-                            s.push_str(prefix);
-                            s.push('\t');
-                            s.push_str(&sanitise_key(key.clone(), false));
-                            if field.optional {
-                                s.push('?');
-                            }
-                            s.push_str(": ");
-                            inline_datatype(
-                                s,
-                                exporter,
-                                format,
-                                types,
-                                field_ty,
-                                location.clone(),
-                                parent_name,
-                                prefix,
-                                depth + 1,
-                                generics,
-                            )?;
-                            s.push(',');
-                        }
-
-                        if has_field {
-                            s.push('\n');
-                            s.push_str(prefix);
-                        }
-
-                        s.push('}');
-                    }
-                    Fields::Unnamed(_) => struct_dt(
-                        s,
-                        exporter,
-                        format,
-                        types,
-                        st,
-                        location,
-                        parent_name,
-                        prefix,
-                        generics,
-                    )?,
-                }
+                inline_struct_with_generics(
+                    s,
+                    exporter,
+                    format,
+                    types,
+                    st,
+                    location,
+                    parent_name,
+                    prefix,
+                    depth,
+                    generics,
+                )?;
             } else {
                 struct_dt(
                     s,
@@ -1317,6 +1345,76 @@ fn inline_datatype(
     Ok(())
 }
 
+fn inline_struct_with_generics(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    st: &Struct,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    depth: usize,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match &st.fields {
+        Fields::Unit => s.push_str(NULL),
+        Fields::Unnamed(_) => struct_dt(
+            s,
+            exporter,
+            format,
+            types,
+            st,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        )?,
+        Fields::Named(named) => {
+            s.push('{');
+            let mut has_field = false;
+
+            for (key, field) in &named.fields {
+                let Some(field_ty) = field.ty.as_ref() else {
+                    continue;
+                };
+
+                has_field = true;
+                s.push('\n');
+                s.push_str(prefix);
+                s.push('\t');
+                s.push_str(&sanitise_key(key.clone(), false));
+                if field.optional {
+                    s.push('?');
+                }
+                s.push_str(": ");
+                inline_datatype(
+                    s,
+                    exporter,
+                    format,
+                    types,
+                    field_ty,
+                    location.clone(),
+                    parent_name,
+                    prefix,
+                    depth + 1,
+                    generics,
+                )?;
+                s.push(',');
+            }
+
+            if has_field {
+                s.push('\n');
+                s.push_str(prefix);
+            }
+
+            s.push('}');
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -1329,65 +1427,20 @@ pub(crate) fn datatype(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
-
-    match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, generics)?,
-        DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
-        DataType::Nullable(def) => {
-            let mut inner = String::new();
-            datatype(
-                &mut inner,
-                exporter,
-                format,
-                types,
-                def,
-                location,
-                parent_name,
-                "",
-                generics,
-            )?;
-
-            push_nullable(s, &inner);
-        }
-        DataType::Struct(st) => struct_dt(
-            s,
+    render_datatype(
+        s,
+        RenderCtx {
             exporter,
             format,
             types,
-            st,
-            location,
             parent_name,
             prefix,
             generics,
-        )?,
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
-        DataType::Intersection(types_) => {
-            for (idx, ty) in types_.iter().enumerate() {
-                if idx != 0 {
-                    s.push_str(" & ");
-                }
-                datatype(
-                    s,
-                    exporter,
-                    format,
-                    types,
-                    ty,
-                    location.clone(),
-                    parent_name,
-                    prefix,
-                    generics,
-                )?;
-            }
-        }
-        DataType::Generic(g) => write_generic_reference(s, g),
-        DataType::Reference(r) => {
-            reference_dt(s, exporter, format, types, r, location, prefix, generics)?
-        }
-    };
-
-    Ok(())
+        },
+        dt,
+        location,
+        RenderMode::Normal,
+    )
 }
 
 fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
@@ -1828,6 +1881,16 @@ fn exclude_known_literals_type(literals: &[String]) -> Option<String> {
     Some(format!("Exclude<string, {known}>"))
 }
 
+fn fallback_discriminator_override(
+    discriminator: Option<&DiscriminatorAnalysis>,
+) -> Option<(usize, &str, String)> {
+    let discriminator = discriminator?;
+    discriminator.fallback_variant_idx.and_then(|idx| {
+        exclude_known_literals_type(&discriminator.known_literals)
+            .map(|ty| (idx, discriminator.key.as_str(), ty))
+    })
+}
+
 fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
     match &variant.fields {
         Fields::Named(obj) => Some(
@@ -2014,12 +2077,7 @@ fn enum_dt(
     let filtered_variants = active_variants(e);
 
     let discriminator = analyze_discriminator(&filtered_variants);
-    let fallback_override = discriminator.as_ref().and_then(|discriminator| {
-        discriminator.fallback_variant_idx.and_then(|idx| {
-            exclude_known_literals_type(&discriminator.known_literals)
-                .map(|ty| (idx, discriminator.key.as_str(), ty))
-        })
-    });
+    let fallback_override = fallback_discriminator_override(discriminator.as_ref());
 
     let mut rendered_variants = Vec::with_capacity(filtered_variants.len());
     for (idx, (variant_name, variant)) in filtered_variants.iter().enumerate() {
@@ -2216,43 +2274,7 @@ fn reference_named_dt(
     // We check it's valid before tracking
     crate::references::track_nr(r);
 
-    let name = match exporter.layout {
-        Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            s.push('_');
-            s.push_str(&ndt.name);
-            Cow::Owned(s)
-        }
-        Layout::Namespaces => {
-            if ndt.module_path.is_empty() {
-                ndt.name.clone()
-            } else {
-                let mut path =
-                    ndt.module_path
-                        .split("::")
-                        .fold("$s$.".to_string(), |mut s, segment| {
-                            s.push_str(segment);
-                            s.push('.');
-                            s
-                        });
-                path.push_str(&ndt.name);
-                Cow::Owned(path)
-            }
-        }
-        Layout::Files => {
-            let current_module_path = crate::references::current_module_path().unwrap_or_default();
-
-            if ndt.module_path == current_module_path {
-                ndt.name.clone()
-            } else {
-                let mut path = crate::exporter::module_alias(&ndt.module_path);
-                path.push('.');
-                path.push_str(&ndt.name);
-                Cow::Owned(path)
-            }
-        }
-        _ => ndt.name.clone(),
-    };
+    let name = referenced_type_name(exporter, ndt);
 
     let (rendered_generics, omit_generics, scoped_generics) =
         resolved_reference_generics(ndt, r, generics)
