@@ -10,9 +10,10 @@ use std::{
 use crate::{
     Types,
     datatype::{
-        DataType, Generic, NamedReference, NamedReferenceType, Reference,
-        generic::GenericDefinition, reference::NamedId,
+        DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
+        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
     },
+    types::InlineResolutionFrame,
 };
 
 /// Resolves any named types created by `func` as inline references.
@@ -207,7 +208,20 @@ impl NamedDataType {
                 h.finish()
             };
 
-            if types.stack.contains(&hash) {
+            let current_ty = types
+                .types
+                .get(&id)
+                .and_then(|ndt| ndt.as_ref())
+                .map(|ndt| RecursiveInlineFrame::new(types, ndt, instantiation_generics))
+                .unwrap_or_else(|| {
+                    RecursiveInlineFrame::from_type_path(
+                        types,
+                        sentinel.into(),
+                        instantiation_generics,
+                    )
+                });
+
+            if let Some(cycle_start) = types.stack.iter().position(|frame| frame.hash == hash) {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
                 if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
@@ -223,7 +237,13 @@ impl NamedDataType {
 
                 return Reference::Named(NamedReference {
                     id,
-                    inner: NamedReferenceType::Recursive,
+                    inner: NamedReferenceType::Recursive(RecursiveInlineType::from_cycle(
+                        types.stack[cycle_start..]
+                            .iter()
+                            .map(|frame| frame.ty.clone())
+                            .chain(std::iter::once(current_ty))
+                            .collect(),
+                    )),
                 });
             }
 
@@ -234,7 +254,10 @@ impl NamedDataType {
             let child_inline = passthrough && caller_inline;
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
-            types.stack.push(hash);
+            types.stack.push(InlineResolutionFrame {
+                hash,
+                ty: current_ty,
+            });
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
             if let Some(prev_inline) = prev_inline {
                 types.should_inline = prev_inline;

@@ -504,7 +504,7 @@ fn apply_datatype_format_children(
                 }
             }
             specta::datatype::NamedReferenceType::Inline { .. }
-            | specta::datatype::NamedReferenceType::Recursive => {}
+            | specta::datatype::NamedReferenceType::Recursive(_) => {}
         },
         DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
@@ -556,7 +556,7 @@ fn contains_generic_reference(dt: &DataType) -> bool {
             NamedReferenceType::Reference { generics, .. } => generics
                 .iter()
                 .any(|(_, generic)| contains_generic_reference(generic)),
-            NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => false,
+            NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => false,
         },
         DataType::Reference(Reference::Opaque(_)) => false,
         DataType::Generic(_) => true,
@@ -596,7 +596,7 @@ fn contains_recursive_reference(dt: &DataType) -> bool {
             .any(|(_, variant)| fields_contain_recursive_reference(&variant.fields)),
         DataType::Tuple(tuple) => tuple.elements.iter().any(contains_recursive_reference),
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-            NamedReferenceType::Recursive => true,
+            NamedReferenceType::Recursive(_) => true,
             NamedReferenceType::Reference { generics, .. } => generics
                 .iter()
                 .any(|(_, generic)| contains_recursive_reference(generic)),
@@ -1048,7 +1048,7 @@ fn reference_to_swift(
 
             let generics = match &r.inner {
                 NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
-                NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &[],
             };
 
             let name = swift.naming.convert(&ndt.name);

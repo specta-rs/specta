@@ -807,7 +807,7 @@ fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, D
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
         NamedReferenceType::Inline { .. } => Ok(&[]),
-        NamedReferenceType::Recursive => Ok(&[]),
+        NamedReferenceType::Recursive(_) => Ok(&[]),
     }
 }
 
@@ -823,10 +823,11 @@ fn named_reference_ty<'a>(
             .and_then(|ndt| ndt.ty.as_ref())
             .ok_or_else(|| Error::dangling_named_reference(path, format!("{r:?}"))),
         NamedReferenceType::Inline { dt, .. } => Ok(dt),
-        NamedReferenceType::Recursive => types
-            .get(r)
-            .and_then(|ndt| ndt.ty.as_ref())
-            .ok_or_else(|| Error::infinite_recursive_inline_type(path, format!("{r:?}"))),
+        NamedReferenceType::Recursive(cycle) => Err(Error::infinite_recursive_inline_type(
+            path,
+            format!("{r:?}"),
+            cycle.clone(),
+        )),
     }
 }
 
@@ -1365,6 +1366,16 @@ fn inline_datatype(
             RenderMode::Normal,
         )?,
         DataType::Reference(r) => {
+            if let Reference::Named(r) = r
+                && let NamedReferenceType::Recursive(cycle) = &r.inner
+            {
+                return Err(Error::infinite_recursive_inline_type(
+                    path_string(&location),
+                    format!("{r:?}"),
+                    cycle.clone(),
+                ));
+            }
+
             if let Reference::Named(r) = r
                 && let Ok(ty) = named_reference_ty(types, r, &location)
             {
@@ -2242,9 +2253,11 @@ fn reference_dt(
                 )
                 .map_err(|err| err.with_inline_trace(types.get(r), inline_path))
             }
-            NamedReferenceType::Recursive => {
-                reference_named_dt(s, exporter, types, r, location, generics)
-            }
+            NamedReferenceType::Recursive(cycle) => Err(Error::infinite_recursive_inline_type(
+                path_string(&location),
+                format!("{r:?}"),
+                cycle.clone(),
+            )),
         },
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r, location),
     }

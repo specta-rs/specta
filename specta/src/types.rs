@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{NamedDataType, NamedId, NamedReference},
+    datatype::{NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -40,7 +40,7 @@ pub struct Types {
     /// arguments for that inline use site. Seeing the same entry twice means an
     /// inline definition has recursively reached itself, so resolution can emit
     /// a recursive reference instead of expanding forever.
-    pub(crate) stack: Vec<u64>,
+    pub(crate) stack: Vec<InlineResolutionFrame>,
 
     /// Whether named types discovered in the current context should be inlined.
     ///
@@ -108,6 +108,12 @@ pub struct Types {
     /// the length is safe to include. This does not fix the core issue, but it
     /// gives the user a way to assert the specific use site is correct.
     pub(crate) has_const_params: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct InlineResolutionFrame {
+    pub(crate) hash: u64,
+    pub(crate) ty: RecursiveInlineFrame,
 }
 
 impl fmt::Debug for Types {

@@ -423,19 +423,19 @@ impl_ndt!(mac_address::MacAddress as str = inline);
 #[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
 const _: () = {
     impl_ndt!(
-        bson::oid::ObjectId as BsonObjectId = inline;
+        bson::oid::ObjectId as BsonObjectId = named;
         bson::Decimal128 as BsonDecimal128 = inline;
         bson::DateTime as BsonDateTime = inline;
         bson::Uuid as str = inline;
-        bson::Timestamp as BsonTimestamp = inline;
-        bson::Binary as BsonBinary = inline;
-        bson::Regex as BsonRegex = inline;
-        bson::JavaScriptCodeWithScope as BsonJavaScriptCodeWithScope = inline;
-        bson::DbPointer as BsonDbPointer = inline;
-        bson::Document as PrimitiveMap<String, bson::Bson> = inline;
-        bson::Bson as Bson = inline;
+        bson::Timestamp as BsonTimestamp = named;
+        bson::Binary as BsonBinary = named;
+        bson::Regex as BsonRegex = named;
+        bson::JavaScriptCodeWithScope as BsonJavaScriptCodeWithScope = named;
+        bson::DbPointer as BsonDbPointer = named;
+        bson::Document as PrimitiveMap<String, bson::Bson> = named;
+        bson::Bson as Bson = named;
         bson::Utf8Lossy<T> as T = passthrough;
-        bson::RawBsonRef<'a,> as Bson = inline;
+        bson::RawBsonRef<'a,> as Bson = passthrough;
     );
 
     struct BsonObjectId;
@@ -877,7 +877,7 @@ const _: () = {
 #[cfg(feature = "either")]
 #[cfg_attr(docsrs, doc(cfg(feature = "either")))]
 const _: () = {
-    impl_ndt!(either::Either<L, R> as Either<L, R> = inline);
+    impl_ndt!(either::Either<L, R> as Either<L, R> = named);
 
     struct Either<L, R>(std::marker::PhantomData<(L, R)>);
     impl<L: Type, R: Type> Type for Either<L, R> {

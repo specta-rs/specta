@@ -778,7 +778,7 @@ fn named_reference_generics(
 ) -> &[(specta::datatype::Generic, DataType)] {
     match &reference.inner {
         NamedReferenceType::Reference { generics, .. } => generics,
-        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &[],
     }
 }
 
@@ -787,7 +787,7 @@ fn named_reference_generics_mut(
 ) -> &mut [(specta::datatype::Generic, DataType)] {
     match &mut reference.inner {
         NamedReferenceType::Reference { generics, .. } => generics,
-        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &mut [],
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &mut [],
     }
 }
 

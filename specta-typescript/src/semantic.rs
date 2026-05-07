@@ -452,7 +452,7 @@ impl Configuration {
                 }
             }
             DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-                NamedReferenceType::Recursive | NamedReferenceType::Reference { .. } => {}
+                NamedReferenceType::Recursive(_) | NamedReferenceType::Reference { .. } => {}
                 NamedReferenceType::Inline { dt, .. } => self.apply_rules_to_dt(types, dt),
             },
             DataType::Reference(Reference::Opaque(_)) => {}
@@ -528,18 +528,6 @@ impl Configuration {
         )
     }
 
-    /// Scan a [`DataType`] tree applying serialize-facing rules.
-    ///
-    /// This is an alias for [`Configuration::apply_serialize`].
-    pub fn apply(
-        &self,
-        types: &Types,
-        dt: &DataType,
-        js_ident: &str,
-    ) -> Option<(Option<DataType>, String)> {
-        self.apply_serialize(types, dt, js_ident)
-    }
-
     fn apply_inner(
         &self,
         transform_for_rule: fn(&Rule) -> &Option<Transform>,
@@ -570,7 +558,7 @@ impl Configuration {
                         js_ident,
                         stack,
                     ),
-                    NamedReferenceType::Recursive => None,
+                    NamedReferenceType::Recursive(_) => None,
                     NamedReferenceType::Reference { .. } => {
                         let ndt = types.get(r)?;
 
@@ -836,7 +824,7 @@ impl Configuration {
     ) -> DataType {
         match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => (**dt).clone(),
-            NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive => types
+            NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive(_) => types
                 .get(reference)
                 .and_then(|ndt| ndt.ty.clone())
                 .unwrap_or_else(|| DataType::Reference(Reference::Named(reference.clone()))),
@@ -977,7 +965,7 @@ fn apply_builtin_remaps(
             };
 
             match &mut reference.inner {
-                NamedReferenceType::Recursive => {}
+                NamedReferenceType::Recursive(_) => {}
                 NamedReferenceType::Inline { dt, .. } => {
                     apply_builtin_remaps(dt, remap_bigint, lossless_bigint, lossless_floats);
                 }

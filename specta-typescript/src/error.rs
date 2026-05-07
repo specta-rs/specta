@@ -1,6 +1,6 @@
 use std::{borrow::Cow, error, fmt, io, panic::Location, path::PathBuf};
 
-use specta::datatype::{NamedDataType, OpaqueReference};
+use specta::datatype::{NamedDataType, OpaqueReference, RecursiveInlineType};
 
 use crate::Layout;
 
@@ -119,7 +119,11 @@ enum ErrorKind {
     /// [`Types`](specta::Types).
     DanglingNamedReference { path: String, reference: String },
     /// Found a recursive named reference while expanding an inline type.
-    InfiniteRecursiveInlineType { path: String, reference: String },
+    InfiniteRecursiveInlineType {
+        path: String,
+        reference: String,
+        cycle: RecursiveInlineType,
+    },
     /// Reached the recursion limit while expanding an inline type.
     InlineRecursionLimitExceeded { path: String },
     /// An error occurred in your exporter framework.
@@ -270,8 +274,16 @@ impl Error {
         Self::new(ErrorKind::DanglingNamedReference { path, reference })
     }
 
-    pub(crate) fn infinite_recursive_inline_type(path: String, reference: String) -> Self {
-        Self::new(ErrorKind::InfiniteRecursiveInlineType { path, reference })
+    pub(crate) fn infinite_recursive_inline_type(
+        path: String,
+        reference: String,
+        cycle: RecursiveInlineType,
+    ) -> Self {
+        Self::new(ErrorKind::InfiniteRecursiveInlineType {
+            path,
+            reference,
+            cycle,
+        })
     }
 
     pub(crate) fn inline_recursion_limit_exceeded(path: String) -> Self {
@@ -359,10 +371,22 @@ impl fmt::Display for Error {
                 "Found dangling named reference {reference} at {}. The referenced type is missing from the resolved type collection.",
                 display_path(path)
             ),
-            ErrorKind::InfiniteRecursiveInlineType { path, reference } => write!(
+            ErrorKind::InfiniteRecursiveInlineType {
+                path,
+                reference,
+                cycle,
+            } => {
+                write!(
+                    f,
+                    "Found infinitely recursive inline named reference {reference} at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
+                    display_path(path)
+                )?;
+                write!(f, "\nInline cycle:\n  {cycle:?}")?;
+                Ok(())
+            }
+            ErrorKind::InlineRecursionLimitExceeded { path } if path.is_empty() => write!(
                 f,
-                "Found infinitely recursive inline named reference {reference} at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
-                display_path(path)
+                "Type recursion limit exceeded while expanding the provided inline type. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
             ),
             ErrorKind::InlineRecursionLimitExceeded { path } => write!(
                 f,

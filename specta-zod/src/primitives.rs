@@ -20,7 +20,7 @@ fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, D
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
         NamedReferenceType::Inline { .. } => Ok(&[]),
-        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
+        NamedReferenceType::Recursive(_) => Err(Error::dangling_named_reference(format!(
             "recursive inline named reference {r:?}"
         ))),
     }
@@ -33,7 +33,7 @@ fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a
             .and_then(|ndt| ndt.ty.as_ref())
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
         NamedReferenceType::Inline { dt, .. } => Ok(dt),
-        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
+        NamedReferenceType::Recursive(_) => Err(Error::dangling_named_reference(format!(
             "recursive inline named reference {r:?}"
         ))),
     }
@@ -850,7 +850,7 @@ fn reference_named_dt(
 
     let mut reference_expr = schema_name;
     let reference_generics = match &r.inner {
-        NamedReferenceType::Recursive => &[],
+        NamedReferenceType::Recursive(_) => &[],
         _ => named_reference_generics(r)?,
     };
     if !reference_generics.is_empty() {

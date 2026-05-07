@@ -1,10 +1,14 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
 
-use crate::datatype::Generic;
+use crate::{
+    Types,
+    datatype::{Generic, Map, NamedDataType, Primitive},
+};
 
 use super::DataType;
 
@@ -36,7 +40,7 @@ pub enum NamedReferenceType {
     ///
     /// Exporters can use this marker to avoid infinitely expanding recursive
     /// inline definitions that they would stack overflow resolving.
-    Recursive,
+    Recursive(RecursiveInlineType),
     /// Inline the contained datatype at the reference site.
     /// These are emitted when `#[specta(inline)]` is used on a field or container.
     #[non_exhaustive]
@@ -50,6 +54,192 @@ pub enum NamedReferenceType {
         /// Concrete generic arguments for this use site.
         generics: Vec<(Generic, DataType)>,
     },
+}
+
+/// Debug-only description of a type in a recursive inline cycle.
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct RecursiveInlineType {
+    cycle: Vec<RecursiveInlineFrame>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RecursiveInlineFrame {
+    type_name: Cow<'static, str>,
+    generics: Vec<Cow<'static, str>>,
+}
+
+impl RecursiveInlineType {
+    pub(crate) fn from_cycle(cycle: Vec<RecursiveInlineFrame>) -> Self {
+        Self { cycle }
+    }
+
+    fn last_frame(&self) -> Option<&RecursiveInlineFrame> {
+        self.cycle.last()
+    }
+}
+
+impl fmt::Debug for RecursiveInlineType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (idx, ty) in self.cycle.iter().enumerate() {
+            if idx != 0 {
+                f.write_str(" -> ")?;
+            }
+            write!(f, "{ty:?}")?;
+        }
+        Ok(())
+    }
+}
+
+impl RecursiveInlineFrame {
+    pub(crate) fn new(
+        types: &Types,
+        ndt: &NamedDataType,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self::new_inner(types, named_type_path(ndt), generics)
+    }
+
+    pub(crate) fn from_type_path(
+        types: &Types,
+        type_name: Cow<'static, str>,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self::new_inner(types, type_name, generics)
+    }
+
+    fn new_inner(
+        types: &Types,
+        type_name: Cow<'static, str>,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self {
+            type_name,
+            generics: generics
+                .iter()
+                .map(|(_, dt)| render_recursive_inline_generic(types, dt))
+                .collect(),
+        }
+    }
+}
+
+impl fmt::Debug for RecursiveInlineFrame {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.type_name)?;
+        if self.generics.is_empty() {
+            return Ok(());
+        }
+
+        f.write_str("<")?;
+        for (idx, generic) in self.generics.iter().enumerate() {
+            if idx != 0 {
+                f.write_str(", ")?;
+            }
+            f.write_str(generic)?;
+        }
+        f.write_str(">")
+    }
+}
+
+fn named_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
+    if ndt.module_path.is_empty() {
+        ndt.name.clone()
+    } else {
+        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
+    }
+}
+
+fn render_recursive_inline_generic(types: &Types, dt: &DataType) -> Cow<'static, str> {
+    match dt {
+        DataType::Primitive(primitive) => Cow::Borrowed(primitive_type_name(primitive)),
+        DataType::Generic(generic) => generic.name().clone(),
+        DataType::Reference(Reference::Named(reference)) => {
+            render_recursive_inline_named(types, reference)
+        }
+        DataType::Reference(Reference::Opaque(reference)) => Cow::Borrowed(reference.type_name()),
+        DataType::List(list) => {
+            let ty = render_recursive_inline_generic(types, &list.ty);
+            match list.length {
+                Some(length) => Cow::Owned(format!("[{ty}; {length}]")),
+                None => Cow::Owned(format!("Vec<{ty}>")),
+            }
+        }
+        DataType::Map(map) => render_recursive_inline_map(types, map),
+        DataType::Nullable(inner) => Cow::Owned(format!(
+            "Option<{}>",
+            render_recursive_inline_generic(types, inner)
+        )),
+        DataType::Tuple(tuple) => Cow::Owned(format!(
+            "({})",
+            tuple
+                .elements
+                .iter()
+                .map(|dt| render_recursive_inline_generic(types, dt).into_owned())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+        dt => Cow::Owned(format!("{dt:?}")),
+    }
+}
+
+fn render_recursive_inline_named(types: &Types, reference: &NamedReference) -> Cow<'static, str> {
+    if let NamedReferenceType::Recursive(cycle) = &reference.inner
+        && let Some(ty) = cycle.last_frame()
+    {
+        return Cow::Owned(format!("{ty:?}"));
+    }
+
+    let Some(ndt) = types.get(reference) else {
+        return Cow::Owned(format!("{reference:?}"));
+    };
+
+    let mut out = named_type_path(ndt).into_owned();
+    if let NamedReferenceType::Reference { generics } = &reference.inner
+        && !generics.is_empty()
+    {
+        out.push('<');
+        out.push_str(
+            &generics
+                .iter()
+                .map(|(_, dt)| render_recursive_inline_generic(types, dt).into_owned())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        out.push('>');
+    }
+    Cow::Owned(out)
+}
+
+fn render_recursive_inline_map(types: &Types, map: &Map) -> Cow<'static, str> {
+    Cow::Owned(format!(
+        "HashMap<{}, {}>",
+        render_recursive_inline_generic(types, map.key_ty()),
+        render_recursive_inline_generic(types, map.value_ty())
+    ))
+}
+
+fn primitive_type_name(primitive: &Primitive) -> &'static str {
+    match primitive {
+        Primitive::i8 => "i8",
+        Primitive::i16 => "i16",
+        Primitive::i32 => "i32",
+        Primitive::i64 => "i64",
+        Primitive::i128 => "i128",
+        Primitive::u8 => "u8",
+        Primitive::u16 => "u16",
+        Primitive::u32 => "u32",
+        Primitive::u64 => "u64",
+        Primitive::u128 => "u128",
+        Primitive::isize => "isize",
+        Primitive::usize => "usize",
+        Primitive::f16 => "f16",
+        Primitive::f32 => "f32",
+        Primitive::f64 => "f64",
+        Primitive::f128 => "f128",
+        Primitive::bool => "bool",
+        Primitive::str => "String",
+        Primitive::char => "char",
+    }
 }
 
 /// Reference to a type not understood by Specta's core datatype model.

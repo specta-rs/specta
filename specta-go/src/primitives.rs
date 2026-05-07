@@ -346,7 +346,7 @@ fn datatype(
 
                 let generics = match &r.inner {
                     NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
-                    NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                    NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &[],
                 };
                 if !generics.is_empty() {
                     s.push('[');

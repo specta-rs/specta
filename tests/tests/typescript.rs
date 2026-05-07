@@ -713,6 +713,30 @@ fn typescript_errors_include_enum_variant_paths() {
 
 #[test]
 fn typescript_errors_include_recursive_inline_error() {
+    let recursive_inline_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveInlineContainer {
+        #[specta(inline)]
+        child: Vec<RecursiveInlineContainer>,
+    }
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<RecursiveInlineContainer>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found infinitely recursive inline named reference NamedReference {{ id: s:test::typescript::RecursiveInlineContainer, inner: Recursive(test::typescript::RecursiveInlineContainer -> std::vec::Vec<test::typescript::RecursiveInlineContainer> -> test::typescript::RecursiveInlineContainer) }} at \"test::typescript::RecursiveInlineContainer.child.child\". Recursive inline types cannot be expanded because they would produce an infinite Typescript type.\nInline cycle:\n  test::typescript::RecursiveInlineContainer -> std::vec::Vec<test::typescript::RecursiveInlineContainer> -> test::typescript::RecursiveInlineContainer\nRust type: test::typescript::RecursiveInlineContainer at {}:{}:{}\nWhile inlining:\n  test::typescript::RecursiveInlineContainer.child -> std::vec::Vec\n  test::typescript::RecursiveInlineContainer.child -> test::typescript::RecursiveInlineContainer\n  test::typescript::RecursiveInlineContainer.child.child -> std::vec::Vec",
+            file!(),
+            recursive_inline_line,
+            14
+        )
+    );
+
     let mut dt = DataType::Primitive(specta::datatype::Primitive::str);
     for _ in 0..25 {
         dt = DataType::Nullable(Box::new(dt));
@@ -722,8 +746,49 @@ fn typescript_errors_include_recursive_inline_error() {
 
     assert_eq!(
         err.to_string(),
-        "Type recursion limit exceeded while expanding an inline Typescript type at <unknown path>. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+        "Type recursion limit exceeded while expanding the provided inline type. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
     );
+}
+
+#[test]
+fn typescript_errors_include_recursive_inline_generic_cycle() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UserId(String);
+
+    let node_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Node<T> {
+        #[specta(inline)]
+        children: Vec<Node<T>>,
+        value: T,
+    }
+
+    let container_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericCycleContainer {
+        #[specta(inline)]
+        node: Node<UserId>,
+    }
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<GenericCycleContainer>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found infinitely recursive inline named reference NamedReference {{ id: s:test::typescript::Node, inner: Recursive(test::typescript::Node<test::typescript::UserId> -> std::vec::Vec<test::typescript::Node<test::typescript::UserId>> -> test::typescript::Node<test::typescript::UserId>) }} at \"test::typescript::GenericCycleContainer.node.children\". Recursive inline types cannot be expanded because they would produce an infinite Typescript type.\nInline cycle:\n  test::typescript::Node<test::typescript::UserId> -> std::vec::Vec<test::typescript::Node<test::typescript::UserId>> -> test::typescript::Node<test::typescript::UserId>\nRust type: test::typescript::GenericCycleContainer at {}:{}:{}\nWhile inlining:\n  test::typescript::GenericCycleContainer.node -> test::typescript::Node\n  test::typescript::GenericCycleContainer.node.children -> std::vec::Vec",
+            file!(),
+            container_line,
+            14
+        )
+    );
+    let _ = node_line;
 }
 
 #[test]

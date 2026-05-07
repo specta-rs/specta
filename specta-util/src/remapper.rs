@@ -150,7 +150,7 @@ impl Remapper {
         };
 
         match &mut reference.inner {
-            NamedReferenceType::Recursive => {}
+            NamedReferenceType::Recursive(_) => {}
             NamedReferenceType::Inline { dt, .. } => self.remap_internal(dt),
             NamedReferenceType::Reference { generics, .. } => {
                 for (_, dt) in generics {

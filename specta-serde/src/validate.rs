@@ -756,6 +756,6 @@ fn named_reference_ty<'a>(
     match &reference.inner {
         NamedReferenceType::Inline { dt, .. } => Some(dt),
         NamedReferenceType::Reference { .. } => types.get(reference)?.ty.as_ref(),
-        NamedReferenceType::Recursive => None,
+        NamedReferenceType::Recursive(_) => None,
     }
 }

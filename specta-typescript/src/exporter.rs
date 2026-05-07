@@ -483,7 +483,7 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
             Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
         }
         NamedReferenceType::Inline { .. } => Ok(None),
-        NamedReferenceType::Recursive => {
+        NamedReferenceType::Recursive(_) => {
             Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
         }
     }
@@ -567,7 +567,7 @@ fn map_datatype_format(
                     })?
                 }
                 NamedReferenceType::Inline { .. } => false,
-                NamedReferenceType::Recursive => false,
+                NamedReferenceType::Recursive(_) => false,
             },
             DataType::Generic(_) => true,
             DataType::Reference(Reference::Opaque(_)) => false,
@@ -679,7 +679,7 @@ fn named_reference_generics_mut(
 ) -> &mut [(specta::datatype::Generic, DataType)] {
     match &mut reference.inner {
         NamedReferenceType::Reference { generics, .. } => generics,
-        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &mut [],
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &mut [],
     }
 }
 

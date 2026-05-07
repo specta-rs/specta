@@ -161,7 +161,7 @@ fn validate_map_key_inner(
                     validate_map_key_inner(dt, types, path, visiting_named_refs)
                         .map_err(|err| err.with_inline_trace(types.get(reference), inline_path))
                 }
-                NamedReferenceType::Recursive => Err(Error::invalid_map_key(
+                NamedReferenceType::Recursive(_) => Err(Error::invalid_map_key(
                     path,
                     format!("recursive inline named map key reference {reference:?}"),
                 )),
