@@ -1,7 +1,7 @@
 [package]
 name = "specta-zod"
 description = "Export your Rust types to Zod schemas for TypeScript"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -26,11 +26,11 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-specta = { version = "=2.0.0-rc.24", path = "../specta" }
+specta = { version = "=2.0.0-rc.25", path = "../specta" }
 serde = { version = "1", default-features = false, optional = true }
-specta-typescript = { version = "=0.0.11", path = "../specta-typescript" }
+specta-typescript = { version = "=0.0.12", path = "../specta-typescript" }
 # TODO: Don't depend on serde
-specta-serde = { version = "=0.0.11", path = "../specta-serde" }
+specta-serde = { version = "=0.0.12", path = "../specta-serde" }
 thiserror = "2" # TODO: Remove this
 
 [dev-dependencies]

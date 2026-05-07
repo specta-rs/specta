@@ -29,7 +29,7 @@ Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
-specta-serde = "0.0.11"
+specta-serde = "0.0.12"
 specta-swift = "0.1"
 ```
 
