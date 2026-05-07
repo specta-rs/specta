@@ -73,37 +73,10 @@ impl RustCAttr {
                     unreachable!("deprecated attribute can't be an expression!")
                 }
                 Some(AttributeValue::Attribute { attr, .. }) => {
-                    let since = attr
-                        .iter()
-                        .find(|attr| attr.key == "since")
-                        .and_then(|v| v.value.as_ref())
-                        .and_then(|v| match v {
-                            AttributeValue::Lit(lit) => Some(lit),
-                            _ => None, // TODO: This should probs be an error
-                        })
-                        .and_then(|lit| match lit {
-                            syn::Lit::Str(s) => Some(s.value()),
-                            _ => None, // TODO: This should probs be an error
-                        });
+                    let since = parse_deprecated_string_attr(attr, "since")?;
+                    let note = parse_deprecated_string_attr(attr, "note")?.unwrap_or_default();
 
-                    let note = attr
-                        .iter()
-                        .find(|attr| attr.key == "note")
-                        .and_then(|v| match v.value.as_ref() {
-                            Some(AttributeValue::Lit(lit)) => Some(lit),
-                            _ => None, // TODO: This should probs be an error
-                        })
-                        .and_then(|lit| match lit {
-                            syn::Lit::Str(s) => Some(s.value()),
-                            _ => None, // TODO: This should probs be an error
-                        })
-                        .unwrap_or_default();
-
-                    deprecated = Some(Deprecated::with_since_note(
-                        // TODO: Use Cow's earlier rather than later
-                        since.map(Into::into),
-                        note.into(),
-                    ));
+                    deprecated = Some(Deprecated::with_since_note(since, note));
                 }
                 None => deprecated = Some(Deprecated::new()),
             }
@@ -112,6 +85,23 @@ impl RustCAttr {
         };
 
         Ok(RustCAttr { doc, deprecated })
+    }
+}
+
+fn parse_deprecated_string_attr(
+    attrs: &[Attribute],
+    key: &str,
+) -> Result<Option<Cow<'static, str>>> {
+    let Some(attr) = attrs.iter().find(|attr| attr.key == key) else {
+        return Ok(None);
+    };
+
+    match &attr.value {
+        Some(AttributeValue::Lit(syn::Lit::Str(s))) => Ok(Some(Cow::Owned(s.value()))),
+        _ => Err(syn::Error::new(
+            attr.value_span(),
+            format!("specta: deprecated `{key}` must be a string literal"),
+        )),
     }
 }
 
