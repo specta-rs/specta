@@ -35,5 +35,6 @@ pub use utils::fs_to_string;
 #[test]
 fn compile_errors() {
     let t = trybuild::TestCases::new();
+    t.compile_fail("tests/macro/associated_items.rs");
     t.compile_fail("tests/macro/compile_error.rs");
 }

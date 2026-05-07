@@ -9,9 +9,8 @@ use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, generics_with_ident_only_and_const_ty, has_associated_type_usage,
-    type_where_clause, type_with_inferred_lifetimes, used_associated_type_paths,
-    used_direct_type_params, used_type_params,
+    generics_with_ident_only, generics_with_ident_only_and_const_ty, type_where_clause,
+    type_with_inferred_lifetimes, used_direct_type_params, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -199,23 +198,19 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let all_generic_type_idents = all_type_param_idents(generics);
     let used_direct_generics =
         used_direct_type_params(&used_generic_types, &all_generic_type_idents);
-    let used_associated_paths = used_associated_type_paths(&used_generic_types);
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
         used_direct_generics,
-        used_associated_paths,
     );
     let build_ty_where_bound = type_where_clause(
         &quote!(#crate_ref::Type),
         used_direct_generics,
-        used_associated_paths,
-    );
-    let build_ty_bounds = generics_with_ident_only_and_const_ty(
         generics,
-        has_associated_type_usage(&used_generic_types),
+        None,
     );
+    let build_ty_bounds = generics_with_ident_only_and_const_ty(generics);
 
     let build_ty_placeholder_args = generics
         .params
@@ -336,17 +331,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let shadow_generic_aliases = if has_associated_type_usage(&used_generic_types) {
-        quote!()
-    } else {
-        quote!(#(#shadow_generics)*)
-    };
-    let ndt_build_ty_args = if has_associated_type_usage(&used_generic_types) {
-        &build_ty_passthrough_args
-    } else {
-        &build_ty_placeholder_args
-    };
-
     let has_generic_default = generics
         .params
         .iter()
@@ -377,9 +361,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let ndt_ty = (!container_attrs.inline).then(|| {
         quote! {
             #(#generic_placeholders)*
-            #shadow_generic_aliases
+            #(#shadow_generics)*
 
-            ndt.ty = Some(build #ndt_build_ty_args (types));
+            ndt.ty = Some(build #build_ty_placeholder_args (types));
         }
     });
     let definition = quote! {

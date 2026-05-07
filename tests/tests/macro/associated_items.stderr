@@ -1,0 +1,23 @@
+error: specta: associated types or constants on generic parameters are not supported
+  --> tests/macro/associated_items.rs:13:12
+   |
+13 |     value: T::Assoc,
+   |            ^^^^^^^^
+
+error: specta: associated types or constants on generic parameters are not supported
+  --> tests/macro/associated_items.rs:19:12
+   |
+19 |     value: <T as MyTrait>::Assoc,
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+error: specta: associated types or constants on generic parameters are not supported
+  --> tests/macro/associated_items.rs:25:26
+   |
+25 |     #[specta(type = [u8; T::LEN])]
+   |                          ^^^^^^
+
+error: specta: associated types or constants on generic parameters are not supported
+  --> tests/macro/associated_items.rs:30:34
+   |
+30 | #[specta(collect = false, type = T::Assoc)]
+   |                                  ^^^^^^^^
