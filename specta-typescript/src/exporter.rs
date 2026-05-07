@@ -1139,6 +1139,10 @@ fn cleanup_stale_files(
     current_files: &HashMap<PathBuf, String>,
     exporter: &Exporter,
 ) -> Result<(), Error> {
+    if !root.exists() {
+        return Ok(());
+    }
+
     for path in collect_existing_files(root)? {
         if current_files.contains_key(&path) || !is_generated_specta_file(&path, exporter)? {
             continue;

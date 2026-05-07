@@ -21,14 +21,8 @@ pub(crate) fn with_module_path<R>(module_path: &str, func: impl FnOnce() -> R) -
         ctx.push(module_path.to_string());
     });
 
-    let guard = Guard;
-    let result = func();
-    std::mem::forget(guard);
-    MODULE_PATH_CONTEXT.with_borrow_mut(|ctx| {
-        ctx.pop();
-    });
-
-    result
+    let _guard = Guard;
+    func()
 }
 
 pub(crate) fn current_module_path() -> Option<String> {
@@ -39,9 +33,15 @@ pub(crate) fn current_module_path() -> Option<String> {
 ///
 /// This can be used for determining the imports required in a particular file.
 pub fn collect_references<R>(func: impl FnOnce() -> R) -> (R, HashSet<NamedReference>) {
-    struct Guard;
+    struct Guard {
+        armed: bool,
+    }
     impl Drop for Guard {
         fn drop(&mut self) {
+            if !self.armed {
+                return;
+            }
+
             REFERENCED_TYPES.with_borrow_mut(|types| {
                 if let Some(v) = types {
                     // Last collection means we can drop all memory
@@ -66,21 +66,23 @@ pub fn collect_references<R>(func: impl FnOnce() -> R) -> (R, HashSet<NamedRefer
         }
     });
 
-    let guard = Guard;
+    let mut guard = Guard { armed: true };
     let result = func();
-    // We only use the guard when unwinding
-    std::mem::forget(guard);
+    let referenced_types = REFERENCED_TYPES.with_borrow_mut(|types| {
+        let contexts = types
+            .as_mut()
+            .expect("COLLECTED_TYPES is unset but it should be set");
+        let referenced_types = contexts
+            .pop()
+            .expect("COLLECTED_TYPES is missing a valid collection context");
+        if contexts.is_empty() {
+            *types = None;
+        }
+        referenced_types
+    });
+    guard.armed = false;
 
-    (
-        result,
-        REFERENCED_TYPES.with_borrow_mut(|types| {
-            types
-                .as_mut()
-                .expect("COLLECTED_TYPES is unset but it should be set")
-                .pop()
-                .expect("COLLECTED_TYPES is missing a valid collection context")
-        }),
-    )
+    (result, referenced_types)
 }
 
 /// Used internally to track a named references.

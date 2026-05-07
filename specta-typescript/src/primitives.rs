@@ -1991,8 +1991,8 @@ fn reference_opaque_dt(
             DataType::Reference(r) => reference_dt(s, exporter, format, types, r, vec![], "", &[])?,
             ty => inline_datatype(s, exporter, format, types, ty, vec![], None, "", 0, &[])?,
         }
-        s.push_str(r#" & { { readonly __brand: ""#);
-        s.push_str(def.brand());
+        s.push_str(r#" & { readonly __brand: ""#);
+        s.push_str(&escape_typescript_string_literal(def.brand()));
         s.push_str("\" }");
         return Ok(());
     }

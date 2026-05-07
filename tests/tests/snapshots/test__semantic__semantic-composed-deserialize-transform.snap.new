@@ -1,5 +1,6 @@
 ---
 source: tests/tests/semantic.rs
+assertion_line: 121
 expression: "transformed_snapshot(&types,\nsemantic.apply_deserialize(&types, &dt, \"payload\"),)"
 ---
 type: <unchanged>

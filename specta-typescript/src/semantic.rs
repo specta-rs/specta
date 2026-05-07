@@ -45,7 +45,10 @@ use specta::{
     datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
 };
 
-use crate::define;
+use crate::{
+    define,
+    legacy::{escape_typescript_string_literal, is_identifier},
+};
 
 /// A JavaScript expression that converts between a semantic
 /// TypeScript runtime value and its JSON-compatible representation.
@@ -600,7 +603,7 @@ impl Configuration {
 
                     for (name, field) in &fields.fields {
                         let Some(field_ty) = &field.ty else { continue };
-                        let field_ident = format!("{js_ident}.{name}");
+                        let field_ident = js_property_access(js_ident, name);
                         let Some((next_ty, runtime)) = self.apply_inner(
                             transform_for_rule,
                             remap_bigint,
@@ -621,7 +624,7 @@ impl Configuration {
                             changed = true;
                         }
                         if runtime != field_ident {
-                            parts.push(format!("{name}:{runtime}"));
+                            parts.push(format!("{}:{runtime}", js_object_key(name)));
                         }
                     }
 
@@ -660,7 +663,7 @@ impl Configuration {
                                 changed = true;
                             }
 
-                            (runtime != field_ident).then_some(format!("{idx}:{runtime}"))
+                            (runtime != field_ident).then_some((idx, runtime))
                         })
                         .collect::<Vec<_>>();
 
@@ -669,7 +672,7 @@ impl Configuration {
                     } else {
                         Some((
                             changed.then_some(DataType::Struct(ty)),
-                            spread_transform(js_ident, parts),
+                            array_transform(js_ident, fields.fields.len(), parts),
                         ))
                     }
                 }
@@ -696,7 +699,7 @@ impl Configuration {
                             ty.elements[idx] = next_ty;
                             changed = true;
                         }
-                        (runtime != ident).then_some(format!("{idx}:{runtime}"))
+                        (runtime != ident).then_some((idx, runtime))
                     })
                     .collect::<Vec<_>>();
 
@@ -705,9 +708,34 @@ impl Configuration {
                 } else {
                     Some((
                         changed.then_some(DataType::Tuple(ty)),
-                        spread_transform(js_ident, parts),
+                        array_transform(js_ident, tuple.elements.len(), parts),
                     ))
                 }
+            }
+            DataType::Map(map) => {
+                let item = "v";
+                let (next_ty, runtime) = self.apply_inner(
+                    transform_for_rule,
+                    remap_bigint,
+                    types,
+                    map.value_ty(),
+                    item,
+                    stack,
+                )?;
+
+                let mut ty = map.clone();
+                let mut changed = false;
+                if let Some(next_ty) = next_ty {
+                    ty.set_value_ty(next_ty);
+                    changed = true;
+                }
+
+                Some((
+                    changed.then_some(DataType::Map(ty)),
+                    format!(
+                        "Object.fromEntries(Object.entries({js_ident}).map(([k,{item}])=>[k,{runtime}]))"
+                    ),
+                ))
             }
             DataType::List(list) => {
                 let item = "i";
@@ -782,8 +810,7 @@ impl Configuration {
                     )),
                 }
             }
-            DataType::Map(_)
-            | DataType::Enum(_)
+            DataType::Enum(_)
             | DataType::Primitive(_)
             | DataType::Generic(_)
             | DataType::Reference(Reference::Opaque(_)) => None,
@@ -851,7 +878,7 @@ impl Configuration {
             && self.lossless_bigint
             && remap_bigint() == deserialize_bigint()
         {
-            format!("new BigInt({runtime})")
+            format!("BigInt({runtime})")
         } else {
             runtime.to_owned()
         };
@@ -1029,4 +1056,32 @@ fn spread_transform(js_ident: &str, mut parts: Vec<String>) -> String {
         parts.insert(0, format!("...{js_ident}"));
     }
     format!("({{{}}})", parts.join(","))
+}
+
+fn array_transform(js_ident: &str, len: usize, parts: Vec<(usize, String)>) -> String {
+    let mut items = (0..len)
+        .map(|idx| format!("{js_ident}[{idx}]"))
+        .collect::<Vec<_>>();
+
+    for (idx, runtime) in parts {
+        items[idx] = runtime;
+    }
+
+    format!("([{}])", items.join(","))
+}
+
+fn js_property_access(base: &str, name: &str) -> String {
+    if is_identifier(name) {
+        format!("{base}.{name}")
+    } else {
+        format!("{base}[\"{}\"]", escape_typescript_string_literal(name))
+    }
+}
+
+fn js_object_key(name: &str) -> Cow<'_, str> {
+    if is_identifier(name) {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(format!("\"{}\"", escape_typescript_string_literal(name)))
+    }
 }

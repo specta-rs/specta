@@ -63,12 +63,17 @@ fn validate_map_key_inner(
                 match fields {
                     Fields::Unit => {}
                     Fields::Unnamed(unnamed) => {
-                        let non_skipped = unnamed
-                            .fields
-                            .iter()
-                            .filter_map(|field| field.ty.as_ref())
-                            .count();
-                        if non_skipped != 1 {
+                        let mut non_skipped =
+                            unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+                        let Some(inner_ty) = non_skipped.next() else {
+                            return Err(Error::invalid_map_key(
+                                &path,
+                                format!(
+                                    "enum key variant '{variant_name}' must serialize as a newtype value"
+                                ),
+                            ));
+                        };
+                        if non_skipped.next().is_some() {
                             return Err(Error::invalid_map_key(
                                 &path,
                                 format!(
@@ -76,6 +81,13 @@ fn validate_map_key_inner(
                                 ),
                             ));
                         }
+
+                        validate_map_key_inner(
+                            inner_ty,
+                            types,
+                            format!("{path}.{variant_name}"),
+                            visiting_named_refs,
+                        )?;
                     }
                     Fields::Named(_) => {
                         return Err(Error::invalid_map_key(
