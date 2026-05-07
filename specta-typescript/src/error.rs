@@ -50,19 +50,18 @@ const BIGINT_DOCS_URL: &str =
 
 #[allow(dead_code)]
 enum ErrorKind {
+    /// A map key type cannot be represented as a valid Typescript index signature.
+    ///
+    /// Typescript map keys must resolve to string-like, number-like, symbol-like, or literal key
+    /// types. Complex structural values cannot safely be represented as object keys.
     InvalidMapKey {
         path: String,
         reason: Cow<'static, str>,
     },
     /// Attempted to export a bigint type but the configuration forbids it.
-    BigIntForbidden {
-        path: String,
-    },
+    BigIntForbidden { path: String },
     /// A type's name conflicts with a reserved keyword in Typescript.
-    ForbiddenName {
-        path: String,
-        name: &'static str,
-    },
+    ForbiddenName { path: String, name: &'static str },
     /// A type's name contains invalid characters or is not valid.
     InvalidName {
         path: String,
@@ -81,37 +80,21 @@ enum ErrorKind {
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
     Io(io::Error),
     /// Failed to read a directory while exporting files.
-    ReadDir {
-        path: PathBuf,
-        source: io::Error,
-    },
+    ReadDir { path: PathBuf, source: io::Error },
     /// Failed to inspect filesystem metadata while exporting files.
-    Metadata {
-        path: PathBuf,
-        source: io::Error,
-    },
+    Metadata { path: PathBuf, source: io::Error },
     /// Failed to remove a stale file while exporting files.
-    RemoveFile {
-        path: PathBuf,
-        source: io::Error,
-    },
+    RemoveFile { path: PathBuf, source: io::Error },
     /// Failed to remove an empty directory while exporting files.
-    RemoveDir {
-        path: PathBuf,
-        source: io::Error,
-    },
+    RemoveDir { path: PathBuf, source: io::Error },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
     /// Found a named reference that cannot be resolved from the provided
     /// [`Types`](specta::Types).
-    DanglingNamedReference {
-        reference: String,
-    },
+    DanglingNamedReference { reference: String },
     /// Found a recursive named reference while expanding an inline type.
-    InfiniteRecursiveInlineType {
-        reference: String,
-    },
+    InfiniteRecursiveInlineType { reference: String },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
@@ -122,6 +105,10 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
+    /// The requested export layout is not supported by the current exporter configuration.
+    ///
+    /// Some layouts require the higher-level [`Exporter`](crate::Exporter) APIs so imports,
+    /// file paths, and module boundaries can be coordinated correctly.
     UnableToExport(Layout),
 }
 

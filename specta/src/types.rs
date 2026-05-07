@@ -144,8 +144,7 @@ impl Types {
     pub fn len(&self) -> usize {
         debug_assert_eq!(
             self.len,
-            self.types.values().filter_map(|ndt| ndt.as_ref())
-                .count(),
+            self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
             "Types count logic mismatch"
         );
 
@@ -156,8 +155,7 @@ impl Types {
     pub fn is_empty(&self) -> bool {
         debug_assert_eq!(
             self.len,
-            self.types.values().filter_map(|ndt| ndt.as_ref())
-                .count(),
+            self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
             "Types count logic mismatch"
         );
 
@@ -200,7 +198,9 @@ impl Types {
     /// [`Types::into_unsorted_iter`] if the order does not matter.
     pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
-            .types.values().filter_map(|ndt| ndt.as_ref())
+            .types
+            .values()
+            .filter_map(|ndt| ndt.as_ref())
             .collect::<Vec<_>>();
         assert_eq!(v.len(), self.len, "Types count logic mismatch");
         v.sort_by(|a, b| {
