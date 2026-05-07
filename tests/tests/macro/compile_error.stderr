@@ -90,6 +90,18 @@ error: specta: unsupported rename rule. Expected one of lowercase, UPPERCASE, Pa
 162 | #[specta(rename_all = "camelCase123")]
     |                       ^^^^^^^^^^^^^^
 
+error: specta: expected boolean literal. Eg. `true` or `false`
+   --> tests/macro/compile_error.rs:168:21
+    |
+168 |     #[specta(skip = "yes")]
+    |                     ^^^^^
+
+error: functions with `#[specta]` must take named arguments
+   --> tests/macro/compile_error.rs:173:28
+    |
+173 | pub fn invalid_destructure((): ()) {}
+    |                            ^^^^^^
+
 error[E0255]: the name `__specta__fn__testing` is defined multiple times
    --> tests/macro/compile_error.rs:160:8
     |
@@ -198,10 +210,10 @@ error: cannot find attribute `serde` in this scope
    = note: `serde` is in scope, but it is a crate, not an attribute
 
 error[E0601]: `main` function not found in crate `$CRATE`
-   --> tests/macro/compile_error.rs:163:40
+   --> tests/macro/compile_error.rs:173:38
     |
-163 | pub fn invalid_function_rename_all() {}
-    |                                        ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+173 | pub fn invalid_destructure((): ()) {}
+    |                                      ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`
   --> tests/macro/compile_error.rs:15:23

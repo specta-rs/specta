@@ -43,7 +43,7 @@ impl ContainerAttr {
         }
 
         if let Some(attr) = attrs.extract("specta", "inline") {
-            result.inline = attr.parse_bool().unwrap_or(true);
+            result.inline = attr.parse_bool_or_true()?;
         }
 
         if let Some(attr) = attrs.extract("specta", "remote") {
@@ -54,10 +54,7 @@ impl ContainerAttr {
         }
 
         if let Some(attr) = attrs.extract("specta", "collect") {
-            result.collect = result
-                .collect
-                .take()
-                .or(Some(attr.parse_bool().unwrap_or(true)));
+            result.collect = result.collect.take().or(Some(attr.parse_bool_or_true()?));
         }
 
         for attr in attrs.extract_all("specta", "skip_attr") {
@@ -65,13 +62,13 @@ impl ContainerAttr {
         }
 
         if let Some(attr) = attrs.extract("specta", "transparent") {
-            result.transparent = attr.parse_bool().unwrap_or(true);
+            result.transparent = attr.parse_bool_or_true()?;
         } else if let Some(attr) = attrs.extract("repr", "transparent") {
-            result.transparent = attr.parse_bool().unwrap_or(true);
+            result.transparent = attr.parse_bool_or_true()?;
         } else if let Some(attr) = attrs.extract("serde", "transparent") {
             // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
             // we make an exception for `#[serde(transparent)]`.
-            result.transparent = attr.parse_bool().unwrap_or(true);
+            result.transparent = attr.parse_bool_or_true()?;
         }
 
         if let Some(attr) = attrs.extract("specta", "bound") {

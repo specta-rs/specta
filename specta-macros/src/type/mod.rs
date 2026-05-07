@@ -33,14 +33,30 @@ pub(super) fn build_runtime_attributes(
     scope: AttributeScope,
     attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
-    _skip_attrs: &[String],
+    skip_attrs: &[String],
 ) -> syn::Result<Option<TokenStream>> {
     #[cfg(feature = "serde")]
-    let serde_insert = serde::lower_runtime_attributes(crate_ref, scope, raw_attrs)?;
+    let serde_insert = serde::lower_runtime_attributes(
+        crate_ref,
+        scope,
+        &raw_attrs
+            .iter()
+            .filter(|attr| {
+                !attr
+                    .path()
+                    .segments
+                    .last()
+                    .is_some_and(|segment| skip_attrs.contains(&segment.ident.to_string()))
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+    )?;
     #[cfg(not(feature = "serde"))]
     let serde_insert: Option<TokenStream> = {
         let _ = crate_ref;
         let _ = scope;
+        let _ = raw_attrs;
+        let _ = skip_attrs;
         None
     };
 
@@ -159,7 +175,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .params
         .iter()
         .any(|param| matches!(param, GenericParam::Const(_)));
-    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref())?;
+    let used_generic_types = used_type_params(
+        generics,
+        data,
+        container_attrs.r#type.as_ref(),
+        &container_attrs.skip_attrs,
+    )?;
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
@@ -210,7 +231,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                 let skip_default = parse_attrs(&t.attrs)?
                     .extract("specta", "skip_default_generic")
-                    .map(|attr| attr.parse_bool().unwrap_or(true))
+                    .map(|attr| attr.parse_bool_or_true())
+                    .transpose()?
                     .unwrap_or(false);
 
                 if !used_generic_types.iter().any(|used| used == i) && !skip_default {
@@ -243,6 +265,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .into_iter()
         .flatten()
         .collect::<(Vec<_>, Vec<_>)>();
+
+    if cfg!(feature = "DO_NOT_USE_collect")
+        && has_const_param
+        && !container_attrs.inline
+        && container_attrs.collect.unwrap_or(true)
+    {
+        return Err(syn::Error::new(
+            raw_ident.span(),
+            "specta: automatic collection does not support const generics; use `#[specta(collect = false)]`",
+        ));
+    }
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect")
         && !container_attrs.inline

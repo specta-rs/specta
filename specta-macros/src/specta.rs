@@ -150,8 +150,28 @@ pub fn attribute(
                 Pat::Ident(ident) => ident.ident.to_token_stream(),
                 Pat::Macro(m) => m.mac.tokens.to_token_stream(),
                 Pat::Struct(s) => s.path.to_token_stream(),
-                Pat::Slice(s) => s.attrs[0].to_token_stream(),
-                Pat::Tuple(s) => s.elems[0].to_token_stream(),
+                Pat::Slice(s) => {
+                    s.attrs
+                        .first()
+                        .map(ToTokens::to_token_stream)
+                        .ok_or_else(|| {
+                            syn::Error::new_spanned(
+                                input,
+                                "functions with `#[specta]` must take named arguments",
+                            )
+                        })?
+                }
+                Pat::Tuple(s) => {
+                    s.elems
+                        .first()
+                        .map(ToTokens::to_token_stream)
+                        .ok_or_else(|| {
+                            syn::Error::new_spanned(
+                                input,
+                                "functions with `#[specta]` must take named arguments",
+                            )
+                        })?
+                }
                 _ => {
                     return Err(syn::Error::new_spanned(
                         input,

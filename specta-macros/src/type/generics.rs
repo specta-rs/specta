@@ -8,7 +8,7 @@ use syn::{
     visit_mut::VisitMut,
 };
 
-use crate::utils::parse_attrs;
+use crate::utils::parse_attrs_with_filter;
 
 use super::{FieldAttr, VariantAttr};
 
@@ -114,6 +114,7 @@ pub fn used_type_params(
     generics: &Generics,
     data: &Data,
     container_type: Option<&Type>,
+    skip_attrs: &[String],
 ) -> syn::Result<Vec<syn::Ident>> {
     let all_generic_type_idents = all_type_param_idents(generics);
 
@@ -139,17 +140,17 @@ pub fn used_type_params(
         match data {
             Data::Struct(data) => {
                 for field in &data.fields {
-                    visit_field_type(&mut visitor, field)?;
+                    visit_field_type(&mut visitor, field, skip_attrs)?;
                 }
             }
             Data::Enum(data) => {
                 for variant in &data.variants {
-                    if variant_is_skipped(variant)? {
+                    if variant_is_skipped(variant, skip_attrs)? {
                         continue;
                     }
 
                     for field in &variant.fields {
-                        visit_field_type(&mut visitor, field)?;
+                        visit_field_type(&mut visitor, field, skip_attrs)?;
                     }
                 }
             }
@@ -175,8 +176,9 @@ pub fn used_type_params(
 fn visit_field_type(
     visitor: &mut GenericTypeUseVisitor<'_>,
     field: &syn::Field,
+    skip_attrs: &[String],
 ) -> syn::Result<()> {
-    let mut attrs = parse_attrs(&field.attrs)?;
+    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
     let attrs = FieldAttr::from_attrs(&mut attrs)?;
 
     if !attrs.skip {
@@ -186,8 +188,8 @@ fn visit_field_type(
     Ok(())
 }
 
-fn variant_is_skipped(variant: &syn::Variant) -> syn::Result<bool> {
-    let mut attrs = parse_attrs(&variant.attrs)?;
+fn variant_is_skipped(variant: &syn::Variant, skip_attrs: &[String]) -> syn::Result<bool> {
+    let mut attrs = parse_attrs_with_filter(&variant.attrs, skip_attrs)?;
     Ok(VariantAttr::from_attrs(&mut attrs)?.skip)
 }
 

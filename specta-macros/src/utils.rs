@@ -86,8 +86,9 @@ impl Attribute {
         }
     }
 
-    pub fn parse_bool(&self) -> Result<bool> {
+    pub fn parse_bool_or_true(&self) -> Result<bool> {
         match &self.value {
+            None => Ok(true),
             Some(AttributeValue::Lit(Lit::Bool(b))) => Ok(b.value()),
             _ => Err(syn::Error::new(
                 self.value_span(),
