@@ -157,7 +157,9 @@ fn validate_map_key_inner(
                     }
                 }
                 NamedReferenceType::Inline { dt, .. } => {
+                    let inline_path = path.clone();
                     validate_map_key_inner(dt, types, path, visiting_named_refs)
+                        .map_err(|err| err.with_inline_trace(types.get(reference), inline_path))
                 }
                 NamedReferenceType::Recursive => Err(Error::invalid_map_key(
                     path,

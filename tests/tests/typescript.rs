@@ -10,10 +10,13 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Reference},
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{ErrorTraceFrame, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
+
+const BIGINT_DOCS_URL: &str =
+    "https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden";
 
 fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     let mut types = Types::default();
@@ -579,6 +582,147 @@ fn typescript_export_bigint_errors() {
         failures.is_empty(),
         "Unexpected TypeScript BigInt export behavior:\n{}",
         failures.join("\n")
+    );
+}
+
+#[test]
+fn typescript_errors_include_named_datatype_and_inline_trace() {
+    let regular_outer_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RegularOuter {
+        value: i128,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineInner {
+        value: i128,
+    }
+
+    let inline_outer_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineOuter {
+        #[specta(inline)]
+        inner: InlineInner,
+    }
+
+    let ts = Typescript::default();
+    let mut types = Types::default();
+    let dt = RegularOuter::definition(&mut types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+    let err = primitives::export(&ts, &types, [ndt].iter(), "").unwrap_err();
+    assert_eq!(
+        err.named_datatype().map(|dt| dt.name.as_ref()),
+        Some("RegularOuter")
+    );
+    assert!(err.trace().is_empty());
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::RegularOuter.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::RegularOuter at {}:{}:{}",
+            file!(),
+            regular_outer_line,
+            14
+        )
+    );
+
+    let mut types = Types::default();
+    let dt = InlineOuter::definition(&mut types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+    let err = primitives::export(&ts, &types, [ndt].iter(), "").unwrap_err();
+    assert_eq!(
+        err.named_datatype().map(|dt| dt.name.as_ref()),
+        Some("InlineOuter")
+    );
+    assert_eq!(err.trace().len(), 1);
+
+    match &err.trace()[0] {
+        ErrorTraceFrame::Inlined {
+            named_datatype,
+            path,
+        } => {
+            assert_eq!(
+                named_datatype.as_deref().map(|dt| dt.name.as_ref()),
+                Some("InlineInner")
+            );
+            assert_eq!(path, "test::typescript::InlineOuter.inner");
+        }
+        _ => panic!("expected inline trace frame"),
+    }
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::InlineOuter.inner.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::InlineOuter at {}:{}:{}\nWhile inlining:\n  test::typescript::InlineOuter.inner -> test::typescript::InlineInner",
+            file!(),
+            inline_outer_line,
+            14
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_enum_variant_paths() {
+    let named_variant_enum_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithNamedVariantBigInt {
+        Variant { value: i128 },
+    }
+
+    let tuple_variant_enum_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithTupleVariantBigInt {
+        Variant(i128),
+    }
+
+    let ts = Typescript::default();
+
+    let types = Types::default().register::<EnumWithNamedVariantBigInt>();
+    let err = ts.export(&types, specta_serde::Format).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::EnumWithNamedVariantBigInt.Variant.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::EnumWithNamedVariantBigInt at {}:{}:{}",
+            file!(),
+            named_variant_enum_line,
+            14
+        )
+    );
+
+    let types = Types::default().register::<EnumWithTupleVariantBigInt>();
+    let err = ts.export(&types, specta_serde::Format).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::EnumWithTupleVariantBigInt.Variant.0\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::EnumWithTupleVariantBigInt at {}:{}:{}",
+            file!(),
+            tuple_variant_enum_line,
+            14
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_recursive_inline_error() {
+    let mut dt = DataType::Primitive(specta::datatype::Primitive::str);
+    for _ in 0..25 {
+        dt = DataType::Nullable(Box::new(dt));
+    }
+
+    let err = primitives::inline(&Typescript::default(), &Types::default(), &dt).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "Attempted to export  but was unable to due to name \"Type recursion limit exceeded during inline expansion\" containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
     );
 }
 

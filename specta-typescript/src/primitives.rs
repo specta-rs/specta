@@ -27,6 +27,14 @@ fn path_string(location: &[Cow<'static, str>]) -> String {
     location.join(".")
 }
 
+fn rust_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
+    if ndt.module_path.is_empty() {
+        ndt.name.clone()
+    } else {
+        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
+    }
+}
+
 fn module_prefixed_type_name(ndt: &NamedDataType) -> String {
     let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
     name.push('_');
@@ -347,11 +355,12 @@ fn export_single_internal(
         format,
         types,
         ndt.ty.as_ref().expect("named datatype must have a body"),
-        vec![ndt.name.clone()],
+        vec![rust_type_path(ndt)],
         Some(ndt.name.as_ref()),
         indent,
         Default::default(),
-    )?;
+    )
+    .map_err(|err| err.with_named_datatype(ndt))?;
     s.push_str(";\n");
 
     Ok(())
@@ -488,7 +497,15 @@ fn append_jsdoc_properties(
                     .retain(|(name, _)| name == variant_name);
 
                 let mut variant_ty = String::new();
-                enum_dt(&mut variant_ty, exporter, types, &one_variant_enum, "", &[])?;
+                enum_dt(
+                    &mut variant_ty,
+                    exporter,
+                    types,
+                    &one_variant_enum,
+                    vec![Cow::Owned(dt_name.to_owned())],
+                    "",
+                    &[],
+                )?;
 
                 push_jsdoc_property(
                     s,
@@ -587,11 +604,12 @@ fn append_typedef_body(
         format,
         types,
         dt.ty.as_ref().expect("named datatype must have a body"),
-        vec![dt.name.clone()],
+        vec![rust_type_path(dt)],
         Some(dt.name.as_ref()),
         &datatype_prefix,
         Default::default(),
-    )?;
+    )
+    .map_err(|err| err.with_named_datatype(dt))?;
 
     if !dt.docs.is_empty() {
         for line in dt.docs.lines() {
@@ -622,7 +640,8 @@ fn append_typedef_body(
     s.push('\n');
 
     if let Some(ty) = &dt.ty {
-        append_jsdoc_properties(s, exporter, format, types, dt.name.as_ref(), ty, indent)?;
+        let dt_path = rust_type_path(dt);
+        append_jsdoc_properties(s, exporter, format, types, dt_path.as_ref(), ty, indent)?;
     }
 
     Ok(())
@@ -732,6 +751,7 @@ pub(crate) fn datatype_with_inline_attr(
     inline: bool,
 ) -> Result<(), Error> {
     if inline {
+        let inline_path = path_string(&location);
         return shallow_inline_datatype(
             s,
             exporter,
@@ -742,7 +762,8 @@ pub(crate) fn datatype_with_inline_attr(
             parent_name,
             prefix,
             generics,
-        );
+        )
+        .map_err(|err| err.with_inline_trace(inline_named_datatype(types, dt), inline_path));
     }
 
     datatype(
@@ -796,6 +817,13 @@ fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a
             .get(r)
             .and_then(|ndt| ndt.ty.as_ref())
             .ok_or_else(|| Error::infinite_recursive_inline_type(format!("{r:?}"))),
+    }
+}
+
+fn inline_named_datatype<'a>(types: &'a Types, dt: &DataType) -> Option<&'a NamedDataType> {
+    match dt {
+        DataType::Reference(Reference::Named(r)) => types.get(r),
+        _ => None,
     }
 }
 
@@ -934,7 +962,7 @@ fn render_datatype(
         (_, DataType::Primitive(p)) => s.push_str(primitive_dt(p, location)?),
         (_, DataType::Generic(g)) => write_generic_reference(s, g),
         (RenderMode::Normal, DataType::List(list)) => {
-            list_dt(s, ctx.exporter, ctx.types, list, ctx.generics)?;
+            list_dt(s, ctx.exporter, ctx.types, list, location, ctx.generics)?;
         }
         (RenderMode::ShallowInline, DataType::List(list)) => {
             let mut inner = String::new();
@@ -981,11 +1009,17 @@ fn render_datatype(
             ctx.prefix,
             ctx.generics,
         )?,
-        (_, DataType::Enum(enm)) => {
-            enum_dt(s, ctx.exporter, ctx.types, enm, ctx.prefix, ctx.generics)?
-        }
+        (_, DataType::Enum(enm)) => enum_dt(
+            s,
+            ctx.exporter,
+            ctx.types,
+            enm,
+            location,
+            ctx.prefix,
+            ctx.generics,
+        )?,
         (RenderMode::Normal, DataType::Tuple(tuple)) => {
-            tuple_dt(s, ctx.exporter, ctx.types, tuple, ctx.generics)?;
+            tuple_dt(s, ctx.exporter, ctx.types, tuple, location, ctx.generics)?;
         }
         (RenderMode::ShallowInline, DataType::Tuple(tuple)) => match tuple.elements.as_slice() {
             [] => s.push_str(NULL),
@@ -1038,7 +1072,9 @@ fn render_datatype(
                     generics: reference_generics,
                     ..ctx
                 };
-                render_datatype(s, child_ctx, ty, location, mode)?;
+                let inline_path = path_string(&location);
+                render_datatype(s, child_ctx, ty, location, mode)
+                    .map_err(|err| err.with_inline_trace(ctx.types.get(r), inline_path))?;
             }
             Reference::Opaque(_) => reference_dt(
                 s,
@@ -1305,8 +1341,8 @@ fn inline_datatype(
                 )?;
             }
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
         DataType::Intersection(types_) => intersection_dt(
             s,
             exporter,
@@ -1324,6 +1360,7 @@ fn inline_datatype(
                 && let Ok(ty) = named_reference_ty(types, r)
             {
                 let reference_generics = named_reference_generics(r)?;
+                let inline_path = path_string(&location);
                 inline_datatype(
                     s,
                     exporter,
@@ -1335,7 +1372,8 @@ fn inline_datatype(
                     prefix,
                     depth + 1,
                     reference_generics,
-                )?;
+                )
+                .map_err(|err| err.with_inline_trace(types.get(r), inline_path))?;
             } else {
                 reference_dt(s, exporter, format, types, r, location, prefix, generics)?;
             }
@@ -1463,19 +1501,12 @@ fn list_dt(
     exporter: &Exporter,
     types: &Types,
     l: &List,
+    location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     let mut dt = String::new();
     datatype(
-        &mut dt,
-        exporter,
-        None,
-        types,
-        &l.ty,
-        vec![],
-        None,
-        "",
-        generics,
+        &mut dt, exporter, None, types, &l.ty, location, None, "", generics,
     )?;
     push_list(s, &dt, l.length);
 
@@ -1991,7 +2022,16 @@ fn enum_variant_datatype(
 
                 let mut other = String::new();
                 let mut field_location = location.clone();
-                field_location.push(field_name.clone());
+                if field_location
+                    .last()
+                    .is_some_and(|location| location == field_name)
+                {
+                    if !matches!(ty, DataType::Struct(_)) {
+                        field_location.push("0".into());
+                    }
+                } else {
+                    field_location.push(field_name.clone());
+                }
                 object_field_to_ts(
                     &mut other,
                     exporter,
@@ -2066,6 +2106,7 @@ fn enum_dt(
     exporter: &Exporter,
     types: &Types,
     e: &Enum,
+    location: Vec<Cow<'static, str>>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
@@ -2090,7 +2131,8 @@ fn enum_dt(
                 })
             });
 
-        let variant_location = vec![variant_name.clone()];
+        let mut variant_location = location.clone();
+        variant_location.push(variant_name.clone());
         let ts_values = enum_variant_datatype(
             exporter,
             None,
@@ -2137,6 +2179,7 @@ fn tuple_dt(
     exporter: &Exporter,
     types: &Types,
     t: &Tuple,
+    location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match t.elements.as_slice() {
@@ -2147,13 +2190,15 @@ fn tuple_dt(
                 if idx != 0 {
                     s.push_str(", ");
                 }
+                let mut element_location = location.clone();
+                element_location.push(idx.to_string().into());
                 datatype(
                     s,
                     exporter,
                     None,
                     types,
                     dt,
-                    vec![idx.to_string().into()],
+                    element_location,
                     None,
                     "",
                     generics,
@@ -2181,9 +2226,13 @@ fn reference_dt(
             NamedReferenceType::Reference { .. } => {
                 reference_named_dt(s, exporter, types, r, generics)
             }
-            NamedReferenceType::Inline { dt, .. } => inline_datatype(
-                s, exporter, format, types, dt, location, None, prefix, 0, generics,
-            ),
+            NamedReferenceType::Inline { dt, .. } => {
+                let inline_path = path_string(&location);
+                inline_datatype(
+                    s, exporter, format, types, dt, location, None, prefix, 0, generics,
+                )
+                .map_err(|err| err.with_inline_trace(types.get(r), inline_path))
+            }
             NamedReferenceType::Recursive => reference_named_dt(s, exporter, types, r, generics),
         },
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r),

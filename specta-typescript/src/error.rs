@@ -1,6 +1,6 @@
 use std::{borrow::Cow, error, fmt, io, panic::Location, path::PathBuf};
 
-use specta::datatype::OpaqueReference;
+use specta::datatype::{NamedDataType, OpaqueReference};
 
 use crate::Layout;
 
@@ -42,6 +42,21 @@ use crate::Layout;
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,
+    named_datatype: Option<Box<NamedDataType>>,
+    trace: Vec<ErrorTraceFrame>,
+}
+
+/// Additional TypeScript exporter context for an [`Error`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum ErrorTraceFrame {
+    /// The exporter was expanding an inline type at `path` when the error occurred.
+    Inlined {
+        /// The named Rust type being inlined, if it could be resolved.
+        named_datatype: Option<Box<NamedDataType>>,
+        /// Field, variant, or variant-field path where the inline expansion occurred.
+        path: String,
+    },
 }
 
 type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
@@ -113,16 +128,50 @@ enum ErrorKind {
 }
 
 impl Error {
+    fn new(kind: ErrorKind) -> Self {
+        Self {
+            kind,
+            named_datatype: None,
+            trace: Vec::new(),
+        }
+    }
+
+    /// The named Rust type being exported when this error occurred, if known.
+    pub fn named_datatype(&self) -> Option<&NamedDataType> {
+        self.named_datatype.as_deref()
+    }
+
+    /// TypeScript exporter traversal context for this error.
+    pub fn trace(&self) -> &[ErrorTraceFrame] {
+        &self.trace
+    }
+
+    pub(crate) fn with_named_datatype(mut self, ndt: &NamedDataType) -> Self {
+        self.named_datatype
+            .get_or_insert_with(|| Box::new(ndt.clone()));
+        self
+    }
+
+    pub(crate) fn with_inline_trace(
+        mut self,
+        ndt: Option<&NamedDataType>,
+        path: impl Into<String>,
+    ) -> Self {
+        self.trace.push(ErrorTraceFrame::Inlined {
+            named_datatype: ndt.map(|ndt| Box::new(ndt.clone())),
+            path: path.into(),
+        });
+        self
+    }
+
     pub(crate) fn invalid_map_key(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::InvalidMapKey {
-                path: path.into(),
-                reason: reason.into(),
-            },
-        }
+        Self::new(ErrorKind::InvalidMapKey {
+            path: path.into(),
+            reason: reason.into(),
+        })
     }
 
     /// Construct an error for framework-specific logic.
@@ -130,12 +179,10 @@ impl Error {
         message: impl Into<Cow<'static, str>>,
         source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::Framework {
-                message: message.into(),
-                source: source.into(),
-            },
-        }
+        Self::new(ErrorKind::Framework {
+            message: message.into(),
+            source: source.into(),
+        })
     }
 
     /// Construct an error for custom format callbacks.
@@ -143,33 +190,25 @@ impl Error {
         message: impl Into<Cow<'static, str>>,
         source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::Format {
-                message: message.into(),
-                source: source.into(),
-            },
-        }
+        Self::new(ErrorKind::Format {
+            message: message.into(),
+            source: source.into(),
+        })
     }
 
     pub(crate) fn bigint_forbidden(path: String) -> Self {
-        Self {
-            kind: ErrorKind::BigIntForbidden { path },
-        }
+        Self::new(ErrorKind::BigIntForbidden { path })
     }
 
     pub(crate) fn invalid_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            kind: ErrorKind::InvalidName {
-                path,
-                name: name.into(),
-            },
-        }
+        Self::new(ErrorKind::InvalidName {
+            path,
+            name: name.into(),
+        })
     }
 
     pub(crate) fn forbidden_name(path: String, name: &'static str) -> Self {
-        Self {
-            kind: ErrorKind::ForbiddenName { path, name },
-        }
+        Self::new(ErrorKind::ForbiddenName { path, name })
     }
 
     pub(crate) fn duplicate_type_name(
@@ -177,69 +216,49 @@ impl Error {
         first: Location<'static>,
         second: Location<'static>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::DuplicateTypeName {
-                name,
-                first: format_location(first),
-                second: format_location(second),
-            },
-        }
+        Self::new(ErrorKind::DuplicateTypeName {
+            name,
+            first: format_location(first),
+            second: format_location(second),
+        })
     }
 
     pub(crate) fn read_dir(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::ReadDir { path, source },
-        }
+        Self::new(ErrorKind::ReadDir { path, source })
     }
 
     pub(crate) fn metadata(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::Metadata { path, source },
-        }
+        Self::new(ErrorKind::Metadata { path, source })
     }
 
     pub(crate) fn remove_file(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::RemoveFile { path, source },
-        }
+        Self::new(ErrorKind::RemoveFile { path, source })
     }
 
     pub(crate) fn remove_dir(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::RemoveDir { path, source },
-        }
+        Self::new(ErrorKind::RemoveDir { path, source })
     }
 
     pub(crate) fn unsupported_opaque_reference(reference: OpaqueReference) -> Self {
-        Self {
-            kind: ErrorKind::UnsupportedOpaqueReference(reference),
-        }
+        Self::new(ErrorKind::UnsupportedOpaqueReference(reference))
     }
 
     pub(crate) fn dangling_named_reference(reference: String) -> Self {
-        Self {
-            kind: ErrorKind::DanglingNamedReference { reference },
-        }
+        Self::new(ErrorKind::DanglingNamedReference { reference })
     }
 
     pub(crate) fn infinite_recursive_inline_type(reference: String) -> Self {
-        Self {
-            kind: ErrorKind::InfiniteRecursiveInlineType { reference },
-        }
+        Self::new(ErrorKind::InfiniteRecursiveInlineType { reference })
     }
 
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
-        Self {
-            kind: ErrorKind::UnableToExport(layout),
-        }
+        Self::new(ErrorKind::UnableToExport(layout))
     }
 }
 
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::Io(error),
-        }
+        Self::new(ErrorKind::Io(error))
     }
 }
 
@@ -329,7 +348,38 @@ impl fmt::Display for Error {
                 f,
                 "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
             ),
+        }?;
+
+        if let Some(ndt) = self.named_datatype() {
+            write!(
+                f,
+                "\nRust type: {}::{} at {}",
+                ndt.module_path,
+                ndt.name,
+                format_location(ndt.location)
+            )?;
         }
+
+        if !self.trace.is_empty() {
+            write!(f, "\nWhile inlining:")?;
+            for frame in self.trace.iter().rev() {
+                match frame {
+                    ErrorTraceFrame::Inlined {
+                        named_datatype,
+                        path,
+                    } => {
+                        write!(f, "\n  {path} -> ")?;
+                        if let Some(ndt) = named_datatype.as_deref() {
+                            write!(f, "{}::{}", ndt.module_path, ndt.name)?;
+                        } else {
+                            write!(f, "<unresolved named type>")?;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

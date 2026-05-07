@@ -712,7 +712,8 @@ fn map_named_datatype_format(
         .ty
         .clone()
         .map(|ty| map_datatype_format_children(format, types, ty))
-        .transpose()?;
+        .transpose()
+        .map_err(|err| err.with_named_datatype(ndt))?;
     Ok(mapped)
 }
 
