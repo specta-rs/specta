@@ -1484,7 +1484,6 @@ pub(crate) fn datatype(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    // TODO: Validating the variant from `dt` can be flattened
     render_datatype(
         s,
         RenderCtx {
@@ -2321,7 +2320,6 @@ fn reference_opaque_dt(
             return Ok(());
         }
 
-        // TODO: Build onto `s` instead of appending a separate string
         match def.ty() {
             DataType::Reference(r) => {
                 reference_dt(s, exporter, format, types, r, location.clone(), "", &[])?
