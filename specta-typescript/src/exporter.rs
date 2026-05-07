@@ -587,7 +587,7 @@ fn map_datatype_format(
                 return map_datatype_format_children(Some(format), types, dt.clone());
             }
             Ok(Cow::Owned(dt)) => return map_datatype_format_children(Some(format), types, dt),
-            Err(err) if err.to_string().contains("Unresolved generic reference") => {
+            Err(err) if is_unresolved_generic_format_error(err.as_ref()) => {
                 return map_datatype_format_children(Some(format), types, dt.clone());
             }
             Err(err) => return Err(Error::format("datatype formatter failed", err)),
@@ -606,6 +606,13 @@ fn map_datatype_format(
         Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone()),
         Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt),
     }
+}
+
+fn is_unresolved_generic_format_error(err: &(dyn std::error::Error + 'static)) -> bool {
+    // The format trait currently erases its concrete error type, so this is the
+    // narrowest compatibility fallback available for formatters that reject
+    // unresolved generics before child mapping has substituted them.
+    err.to_string().contains("Unresolved generic reference")
 }
 
 fn map_datatype_format_children(

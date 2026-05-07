@@ -169,6 +169,10 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
 fn sanitise_type_name(location: &[Cow<'static, str>], ident: &str) -> Result<String, Error> {
     let path = path_string(location);
 
+    if ident.is_empty() {
+        return Err(Error::empty_name(path));
+    }
+
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
         return Err(Error::forbidden_name(path, name));
     }
@@ -331,7 +335,8 @@ fn export_single_internal(
     }
 
     let raw_name = exported_type_name(exporter, ndt);
-    let name = sanitise_type_name(&[], &raw_name)?;
+    let name = sanitise_type_name(&[rust_type_path(ndt)], &raw_name)
+        .map_err(|err| err.with_named_datatype(ndt))?;
 
     let mut comments = String::new();
     js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref());
@@ -806,17 +811,22 @@ fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, D
     }
 }
 
-fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a DataType, Error> {
+fn named_reference_ty<'a>(
+    types: &'a Types,
+    r: &'a NamedReference,
+    location: &[Cow<'static, str>],
+) -> Result<&'a DataType, Error> {
+    let path = path_string(location);
     match &r.inner {
         NamedReferenceType::Reference { .. } => types
             .get(r)
             .and_then(|ndt| ndt.ty.as_ref())
-            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
+            .ok_or_else(|| Error::dangling_named_reference(path, format!("{r:?}"))),
         NamedReferenceType::Inline { dt, .. } => Ok(dt),
         NamedReferenceType::Recursive => types
             .get(r)
             .and_then(|ndt| ndt.ty.as_ref())
-            .ok_or_else(|| Error::infinite_recursive_inline_type(format!("{r:?}"))),
+            .ok_or_else(|| Error::infinite_recursive_inline_type(path, format!("{r:?}"))),
     }
 }
 
@@ -1066,7 +1076,7 @@ fn render_datatype(
         )?,
         (RenderMode::ShallowInline, DataType::Reference(r)) => match r {
             Reference::Named(r) => {
-                let ty = named_reference_ty(ctx.types, r)?;
+                let ty = named_reference_ty(ctx.types, r, &location)?;
                 let reference_generics = named_reference_generics(r)?;
                 let child_ctx = RenderCtx {
                     generics: reference_generics,
@@ -1128,7 +1138,7 @@ fn push_nullable(s: &mut String, inner: &str) {
 fn is_exhaustive_map_key(dt: &DataType, types: &Types) -> bool {
     match dt {
         DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
-        DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r)
+        DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r, &[])
             .map(|ty| is_exhaustive_map_key(ty, types))
             .unwrap_or(false),
         DataType::Reference(Reference::Opaque(_)) => false,
@@ -1356,7 +1366,7 @@ fn inline_datatype(
         )?,
         DataType::Reference(r) => {
             if let Reference::Named(r) = r
-                && let Ok(ty) = named_reference_ty(types, r)
+                && let Ok(ty) = named_reference_ty(types, r, &location)
             {
                 let reference_generics = named_reference_generics(r)?;
                 let inline_path = path_string(&location);
@@ -2003,14 +2013,14 @@ fn enum_variant_datatype(
     ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>, Error> {
     match &variant.fields {
-        Fields::Unit if name.is_empty() => Err(Error::invalid_name(
+        Fields::Unit if name.is_empty() => Err(Error::unsupported_anonymous_enum_variant(
             path_string(&location),
-            "anonymous unit enum variants cannot be exported to Typescript",
+            "unit",
         )),
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
-        Fields::Named(_) if name.is_empty() => Err(Error::invalid_name(
+        Fields::Named(_) if name.is_empty() => Err(Error::unsupported_anonymous_enum_variant(
             path_string(&location),
-            "anonymous named-field enum variants cannot be exported to Typescript",
+            "named-field",
         )),
         Fields::Named(obj) => {
             let mut regular_fields = Vec::new();
@@ -2223,7 +2233,7 @@ fn reference_dt(
     match r {
         Reference::Named(r) => match &r.inner {
             NamedReferenceType::Reference { .. } => {
-                reference_named_dt(s, exporter, types, r, generics)
+                reference_named_dt(s, exporter, types, r, location, generics)
             }
             NamedReferenceType::Inline { dt, .. } => {
                 let inline_path = path_string(&location);
@@ -2232,9 +2242,11 @@ fn reference_dt(
                 )
                 .map_err(|err| err.with_inline_trace(types.get(r), inline_path))
             }
-            NamedReferenceType::Recursive => reference_named_dt(s, exporter, types, r, generics),
+            NamedReferenceType::Recursive => {
+                reference_named_dt(s, exporter, types, r, location, generics)
+            }
         },
-        Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r),
+        Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r, location),
     }
 }
 
@@ -2244,6 +2256,7 @@ fn reference_opaque_dt(
     format: Option<&dyn Format>,
     types: &Types,
     r: &OpaqueReference,
+    location: Vec<Cow<'static, str>>,
 ) -> Result<(), Error> {
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
@@ -2297,8 +2310,21 @@ fn reference_opaque_dt(
 
         // TODO: Build onto `s` instead of appending a separate string
         match def.ty() {
-            DataType::Reference(r) => reference_dt(s, exporter, format, types, r, vec![], "", &[])?,
-            ty => inline_datatype(s, exporter, format, types, ty, vec![], None, "", 0, &[])?,
+            DataType::Reference(r) => {
+                reference_dt(s, exporter, format, types, r, location.clone(), "", &[])?
+            }
+            ty => inline_datatype(
+                s,
+                exporter,
+                format,
+                types,
+                ty,
+                location.clone(),
+                None,
+                "",
+                0,
+                &[],
+            )?,
         }
         s.push_str(r#" & { readonly __brand: ""#);
         s.push_str(&escape_typescript_string_literal(def.brand()));
@@ -2306,7 +2332,10 @@ fn reference_opaque_dt(
         return Ok(());
     }
 
-    Err(Error::unsupported_opaque_reference(r.clone()))
+    Err(Error::unsupported_opaque_reference(
+        path_string(&location),
+        r.clone(),
+    ))
 }
 
 fn reference_named_dt(
@@ -2314,11 +2343,13 @@ fn reference_named_dt(
     exporter: &Exporter,
     types: &Types,
     r: &NamedReference,
+    location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    let path = path_string(&location);
     let ndt = types
         .get(r)
-        .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+        .ok_or_else(|| Error::dangling_named_reference(path.clone(), format!("{r:?}")))?;
     // We check it's valid before tracking
     crate::references::track_nr(r);
 
@@ -2326,7 +2357,7 @@ fn reference_named_dt(
 
     let (rendered_generics, omit_generics, scoped_generics) =
         resolved_reference_generics(ndt, r, generics)
-            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+            .ok_or_else(|| Error::dangling_named_reference(path, format!("{r:?}")))?;
 
     s.push_str(&name);
     if !omit_generics && !rendered_generics.is_empty() {

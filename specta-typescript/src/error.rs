@@ -82,6 +82,13 @@ enum ErrorKind {
         path: String,
         name: Cow<'static, str>,
     },
+    /// A type's name is empty and cannot be emitted as a Typescript type name.
+    EmptyName { path: String },
+    /// Anonymous enum variants cannot be represented by the Typescript exporter.
+    UnsupportedAnonymousEnumVariant {
+        path: String,
+        variant_kind: &'static str,
+    },
     /// Detected multiple items within the same scope with the same name.
     /// Typescript doesn't support this so we error out.
     ///
@@ -104,12 +111,15 @@ enum ErrorKind {
     RemoveDir { path: PathBuf, source: io::Error },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
-    UnsupportedOpaqueReference(OpaqueReference),
+    UnsupportedOpaqueReference {
+        path: String,
+        reference: OpaqueReference,
+    },
     /// Found a named reference that cannot be resolved from the provided
     /// [`Types`](specta::Types).
-    DanglingNamedReference { reference: String },
+    DanglingNamedReference { path: String, reference: String },
     /// Found a recursive named reference while expanding an inline type.
-    InfiniteRecursiveInlineType { reference: String },
+    InfiniteRecursiveInlineType { path: String, reference: String },
     /// Reached the recursion limit while expanding an inline type.
     InlineRecursionLimitExceeded { path: String },
     /// An error occurred in your exporter framework.
@@ -209,6 +219,17 @@ impl Error {
         })
     }
 
+    pub(crate) fn empty_name(path: String) -> Self {
+        Self::new(ErrorKind::EmptyName { path })
+    }
+
+    pub(crate) fn unsupported_anonymous_enum_variant(
+        path: String,
+        variant_kind: &'static str,
+    ) -> Self {
+        Self::new(ErrorKind::UnsupportedAnonymousEnumVariant { path, variant_kind })
+    }
+
     pub(crate) fn forbidden_name(path: String, name: &'static str) -> Self {
         Self::new(ErrorKind::ForbiddenName { path, name })
     }
@@ -241,16 +262,16 @@ impl Error {
         Self::new(ErrorKind::RemoveDir { path, source })
     }
 
-    pub(crate) fn unsupported_opaque_reference(reference: OpaqueReference) -> Self {
-        Self::new(ErrorKind::UnsupportedOpaqueReference(reference))
+    pub(crate) fn unsupported_opaque_reference(path: String, reference: OpaqueReference) -> Self {
+        Self::new(ErrorKind::UnsupportedOpaqueReference { path, reference })
     }
 
-    pub(crate) fn dangling_named_reference(reference: String) -> Self {
-        Self::new(ErrorKind::DanglingNamedReference { reference })
+    pub(crate) fn dangling_named_reference(path: String, reference: String) -> Self {
+        Self::new(ErrorKind::DanglingNamedReference { path, reference })
     }
 
-    pub(crate) fn infinite_recursive_inline_type(reference: String) -> Self {
-        Self::new(ErrorKind::InfiniteRecursiveInlineType { reference })
+    pub(crate) fn infinite_recursive_inline_type(path: String, reference: String) -> Self {
+        Self::new(ErrorKind::InfiniteRecursiveInlineType { path, reference })
     }
 
     pub(crate) fn inline_recursion_limit_exceeded(path: String) -> Self {
@@ -288,6 +309,16 @@ impl fmt::Display for Error {
                 "Attempted to export {} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`",
                 display_path(path)
             ),
+            ErrorKind::EmptyName { path } => write!(
+                f,
+                "Attempted to export {} but was unable to because the Typescript type name is empty. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
+            ),
+            ErrorKind::UnsupportedAnonymousEnumVariant { path, variant_kind } => write!(
+                f,
+                "Attempted to export {} but anonymous {variant_kind} enum variants cannot be exported to Typescript. Try giving the variant a name or changing the enum representation.",
+                display_path(path)
+            ),
             ErrorKind::DuplicateTypeName {
                 name,
                 first,
@@ -317,18 +348,21 @@ impl fmt::Display for Error {
                     path.display()
                 )
             }
-            ErrorKind::UnsupportedOpaqueReference(reference) => write!(
+            ErrorKind::UnsupportedOpaqueReference { path, reference } => write!(
                 f,
-                "Found unsupported opaque reference '{}'. It is not supported by the Typescript exporter.",
-                reference.type_name()
+                "Found unsupported opaque reference '{}' at {}. It is not supported by the Typescript exporter.",
+                reference.type_name(),
+                display_path(path)
             ),
-            ErrorKind::DanglingNamedReference { reference } => write!(
+            ErrorKind::DanglingNamedReference { path, reference } => write!(
                 f,
-                "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
+                "Found dangling named reference {reference} at {}. The referenced type is missing from the resolved type collection.",
+                display_path(path)
             ),
-            ErrorKind::InfiniteRecursiveInlineType { reference } => write!(
+            ErrorKind::InfiniteRecursiveInlineType { path, reference } => write!(
                 f,
-                "Found infinitely recursive inline named reference {reference}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+                "Found infinitely recursive inline named reference {reference} at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
+                display_path(path)
             ),
             ErrorKind::InlineRecursionLimitExceeded { path } => write!(
                 f,
@@ -427,7 +461,7 @@ fn format_location(location: Location<'static>) -> String {
 
 fn display_path(path: &str) -> Cow<'_, str> {
     if path.is_empty() {
-        Cow::Borrowed("")
+        Cow::Borrowed("<unknown path>")
     } else {
         Cow::Owned(format!("{path:?}"))
     }

@@ -722,7 +722,131 @@ fn typescript_errors_include_recursive_inline_error() {
 
     assert_eq!(
         err.to_string(),
-        "Type recursion limit exceeded while expanding an inline Typescript type at . Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+        "Type recursion limit exceeded while expanding an inline Typescript type at <unknown path>. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+    );
+}
+
+#[test]
+fn typescript_errors_use_specific_invalid_shape_messages() {
+    use std::borrow::Cow;
+
+    let anonymous_enum_line = line!() + 1;
+    let mut anonymous_enum = specta::datatype::Enum::default();
+    anonymous_enum.variants.push((
+        Cow::Borrowed(""),
+        specta::datatype::Variant::named()
+            .field(
+                "value",
+                specta::datatype::Field::new(DataType::Primitive(specta::datatype::Primitive::str)),
+            )
+            .build(),
+    ));
+
+    let mut types = Types::default();
+    let ndt =
+        specta::datatype::NamedDataType::new("AnonymousVariantContainer", &mut types, |_, ndt| {
+            ndt.ty = Some(DataType::Enum(anonymous_enum));
+        });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"tests::tests::typescript::AnonymousVariantContainer.\" but anonymous named-field enum variants cannot be exported to Typescript. Try giving the variant a name or changing the enum representation.\nRust type: tests::tests::typescript::AnonymousVariantContainer at {}:{}:{}",
+            file!(),
+            anonymous_enum_line + 13,
+            9
+        )
+    );
+
+    let empty_name_line = line!() + 1;
+    let mut types = Types::default();
+    let ndt = specta::datatype::NamedDataType::new("", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::str));
+    });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"tests::tests::typescript::\" but was unable to because the Typescript type name is empty. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: tests::tests::typescript:: at {}:{}:{}",
+            file!(),
+            empty_name_line + 1,
+            15
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_unsupported_opaque_path() {
+    #[derive(Hash, PartialEq, Eq)]
+    struct UnsupportedOpaque;
+
+    let opaque_line = line!() + 1;
+    let mut types = Types::default();
+    let ndt = specta::datatype::NamedDataType::new("OpaqueContainer", &mut types, |_, ndt| {
+        ndt.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "field",
+                    specta::datatype::Field::new(Reference::opaque(UnsupportedOpaque).into()),
+                )
+                .build(),
+        );
+    });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found unsupported opaque reference 'test::typescript::typescript_errors_include_unsupported_opaque_path::UnsupportedOpaque' at \"tests::tests::typescript::OpaqueContainer.field\". It is not supported by the Typescript exporter.\nRust type: tests::tests::typescript::OpaqueContainer at {}:{}:{}",
+            file!(),
+            opaque_line + 1,
+            15
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_dangling_reference_path() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MissingDependency {
+        value: String,
+    }
+
+    let container_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DanglingContainer {
+        field: MissingDependency,
+    }
+
+    let mut source_types = Types::default();
+    let dt = DanglingContainer::definition(&mut source_types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => source_types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+
+    let err = primitives::export(
+        &Typescript::default(),
+        &Types::default(),
+        [&ndt].into_iter(),
+        "",
+    )
+    .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found dangling named reference NamedReference {{ id: s:test::typescript::MissingDependency, inner: Reference {{ generics: [] }} }} at \"test::typescript::DanglingContainer.field\". The referenced type is missing from the resolved type collection.\nRust type: test::typescript::DanglingContainer at {}:{}:{}",
+            file!(),
+            container_line,
+            14
+        )
     );
 }
 
@@ -875,6 +999,7 @@ fn primitives_inline() {
 #[test]
 fn reserved_names() {
     {
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -887,10 +1012,21 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 
     {
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -901,11 +1037,22 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 
     {
         // Typescript reserved type name
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -918,7 +1065,17 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 }
 
