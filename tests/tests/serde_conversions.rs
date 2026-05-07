@@ -183,6 +183,7 @@ impl From<Wire> for Symmetric {
     }
 }
 
+#[allow(clippy::infallible_try_from)]
 impl<T> TryFrom<GenericWire<T>> for GenericTryFrom<T> {
     type Error = std::convert::Infallible;
 

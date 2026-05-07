@@ -1,6 +1,6 @@
 //! Integration tests for Swift UUID and chrono support.
 
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::Swift;

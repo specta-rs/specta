@@ -171,7 +171,7 @@ impl Hash for Attributes {
 impl fmt::Debug for Attributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut entries = self.0.iter().collect::<Vec<_>>();
-        entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+        entries.sort_by_key(|(left, _)| *left);
 
         let mut map = f.debug_map();
         for (key, value) in entries {

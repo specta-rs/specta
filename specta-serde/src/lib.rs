@@ -2409,6 +2409,8 @@ fn field_is_optional_for_mode(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::panic)]
+
     use serde::{Deserialize, Serialize};
     use specta::{Format as _, Type, Types, datatype::DataType};
 
@@ -2582,7 +2584,7 @@ mod tests {
         fields
             .fields
             .iter()
-            .find_map(|(name, field)| (name == field_name).then(|| field.ty.as_ref()).flatten())
+            .find_map(|(name, field)| (name == field_name).then_some(field.ty.as_ref()).flatten())
             .expect("field should exist")
     }
 

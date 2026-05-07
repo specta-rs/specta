@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
@@ -7,7 +7,7 @@ use specta_swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, S
 ///
 /// This example demonstrates every configuration option available in the Swift exporter,
 /// showing how different settings affect the generated Swift code.
-
+///
 /// Sample types for demonstration
 #[derive(Type)]
 struct User {

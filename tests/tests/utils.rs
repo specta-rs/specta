@@ -33,14 +33,13 @@ pub fn fs_to_string(path: &Path) -> Result<String, std::io::Error> {
 
         output.push_str("════════════════════════════════════════\n");
     } else {
-        fs_to_string_impl(path, path, &mut output, "")?;
+        fs_to_string_impl(path, &mut output, "")?;
     }
 
     Ok(output)
 }
 
 fn fs_to_string_impl(
-    root: &Path,
     current: &Path,
     output: &mut String,
     indent: &str,
@@ -67,7 +66,7 @@ fn fs_to_string_impl(
 
         if entry.is_dir() {
             output.push_str(&format!("{}{}/\n", indent, name));
-            fs_to_string_impl(root, &entry, output, &format!("{}  ", indent))?;
+            fs_to_string_impl(&entry, output, &format!("{}  ", indent))?;
         } else {
             let contents = fs::read(&entry)?;
 

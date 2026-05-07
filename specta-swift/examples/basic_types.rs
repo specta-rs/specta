@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::Swift;
@@ -7,7 +7,7 @@ use specta_swift::Swift;
 ///
 /// This example demonstrates how specta-swift handles fundamental Rust types
 /// and converts them to appropriate Swift types.
-
+///
 /// Basic primitive types
 #[derive(Type)]
 struct Primitives {

@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};

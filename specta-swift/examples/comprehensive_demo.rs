@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::Swift;
@@ -9,7 +9,7 @@ use std::time::Duration;
 /// This example showcases every feature and capability of specta-swift in a single,
 /// realistic application scenario. It demonstrates complex type relationships,
 /// various enum patterns, special types, and advanced features.
-
+///
 /// Main application types for a task management system
 #[derive(Type)]
 struct Task {

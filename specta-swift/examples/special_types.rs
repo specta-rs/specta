@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::Swift;
@@ -9,7 +9,7 @@ use std::time::Duration;
 /// This example demonstrates how specta-swift handles special Rust types
 /// like Duration, UUID, chrono types, and other commonly used types
 /// that need special conversion to Swift equivalents.
-
+///
 /// Struct with Duration fields (will be converted to RustDuration helper)
 #[derive(Type)]
 struct IndexerMetrics {

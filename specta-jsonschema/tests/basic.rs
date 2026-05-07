@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+#![allow(clippy::unwrap_used, missing_docs)]
 
 use std::fs;
 

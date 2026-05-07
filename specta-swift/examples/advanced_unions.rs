@@ -1,4 +1,4 @@
-#![allow(dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
 use specta::{Type, Types};
 use specta_swift::Swift;
@@ -7,7 +7,7 @@ use specta_swift::Swift;
 ///
 /// This example demonstrates how specta-swift handles complex enum scenarios
 /// including nested types, generic enums, and custom Codable implementations.
-
+///
 /// Complex enum with mixed variant types
 #[derive(Type)]
 enum ApiResult<T, E> {

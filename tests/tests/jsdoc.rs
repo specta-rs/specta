@@ -65,14 +65,14 @@ fn export_to() {
                 layout.to_string().to_lowercase(),
                 mode
             );
-            let output = (|| {
+            let output = {
                 let path = temp.path().join(&name);
                 JSDoc::default()
                     .layout(layout)
                     .export_to(&path, &types, format)
                     .unwrap();
                 fs_to_string(&path).map_err(|err| err.to_string())
-            })()
+            }
             .unwrap();
 
             insta::assert_snapshot!(name, output);
