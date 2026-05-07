@@ -50,7 +50,7 @@ pub struct Error {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum ErrorTraceFrame {
-    /// The exporter was expanding an inline type at `path` when the error occurred.
+    /// The exporter was rendering a core-provided inline reference at `path` when the error occurred.
     Inlined {
         /// The named Rust type being inlined, if it could be resolved.
         named_datatype: Option<Box<NamedDataType>>,
@@ -118,13 +118,13 @@ enum ErrorKind {
     /// Found a named reference that cannot be resolved from the provided
     /// [`Types`](specta::Types).
     DanglingNamedReference { path: String, reference: String },
-    /// Found a recursive named reference while expanding an inline type.
+    /// Found a recursive named reference marked by core inline resolution.
     InfiniteRecursiveInlineType {
         path: String,
         reference: String,
         cycle: RecursiveInlineType,
     },
-    /// Reached the recursion limit while expanding an inline type.
+    /// Reached the recursion limit while rendering an anonymous Typescript type.
     InlineRecursionLimitExceeded { path: String },
     /// An error occurred in your exporter framework.
     Framework {

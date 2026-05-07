@@ -371,9 +371,9 @@ fn export_single_internal(
     Ok(())
 }
 
-/// Generate an inlined Typescript string for a specific [`DataType`].
+/// Generate an anonymous Typescript string for a specific [`DataType`].
 ///
-/// This methods leaves all the same things as the [`export`] method up to the user.
+/// This method leaves all the same things as the [`export`] method up to the user.
 ///
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
@@ -753,9 +753,9 @@ pub(crate) fn datatype_with_inline_attr(
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
-    inline: bool,
+    shallow_inline: bool,
 ) -> Result<(), Error> {
-    if inline {
+    if shallow_inline {
         let inline_path = path_string(&location);
         return shallow_inline_datatype(
             s,
@@ -1267,7 +1267,7 @@ fn intersection_dt(
     Ok(())
 }
 
-// Internal function to handle inlining without cloning DataType nodes
+// Render an anonymous type while expanding core-provided inline references.
 fn inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -1366,16 +1366,6 @@ fn inline_datatype(
             RenderMode::Normal,
         )?,
         DataType::Reference(r) => {
-            if let Reference::Named(r) = r
-                && let NamedReferenceType::Recursive(cycle) = &r.inner
-            {
-                return Err(Error::infinite_recursive_inline_type(
-                    path_string(&location),
-                    format!("{r:?}"),
-                    cycle.clone(),
-                ));
-            }
-
             if let Reference::Named(r) = r
                 && let Ok(ty) = named_reference_ty(types, r, &location)
             {
