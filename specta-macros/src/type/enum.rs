@@ -160,7 +160,7 @@ pub fn parse_enum(
             let variant_skip = attrs.skip.then(|| quote!( v.skip = true;));
 
             let variant_docs = (!attrs.common.doc.is_empty()).then(|| {
-                let docs = &container_attrs.common.doc;
+                let docs = &attrs.common.doc;
                 quote! {
                     v.docs = Cow::Borrowed(#docs);
                 }

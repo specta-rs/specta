@@ -48,6 +48,14 @@ impl Parse for AttributeValue {
     }
 }
 
+fn attribute_value_from_expr(expr: &Expr) -> AttributeValue {
+    match expr {
+        Expr::Lit(expr_lit) => AttributeValue::Lit(expr_lit.lit.clone()),
+        Expr::Path(expr_path) => AttributeValue::Path(expr_path.path.clone()),
+        expr => AttributeValue::Expr(expr.clone()),
+    }
+}
+
 #[derive(Clone)]
 pub struct Attribute {
     /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
@@ -309,13 +317,11 @@ pub fn parse_attrs_with_filter(
                 }]
             }
             Meta::NameValue(meta) => {
-                let source = attr_name.clone();
-                let mut parsed: Vec<Attribute> =
-                    syn::parse2::<NestedAttributeList>(meta.to_token_stream().clone())?.attrs;
-                for a in &mut parsed {
-                    a.source = source.clone();
-                }
-                parsed
+                vec![Attribute {
+                    source: attr_name.clone(),
+                    key: ident.clone(),
+                    value: Some(attribute_value_from_expr(&meta.value)),
+                }]
             }
         });
     }

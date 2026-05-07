@@ -52,7 +52,7 @@ pub fn construct_field_with_variant_skip(
     });
 
     let field_docs = (!attrs.common.doc.is_empty()).then(|| {
-        let docs = &container_attrs.common.doc;
+        let docs = &attrs.common.doc;
         quote! {
             field.docs = Cow::Borrowed(#docs);
         }
