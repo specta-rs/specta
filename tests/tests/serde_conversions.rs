@@ -86,6 +86,26 @@ struct SkipSerializingIfOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+enum TupleVariantSkipSerializingIfOnly {
+    Value(#[serde(skip_serializing_if = "Option::is_none")] Option<String>),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldAlias {
+    #[serde(alias = "old_value")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantAlias {
+    #[serde(alias = "OldValue")]
+    Value,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FieldPhaseSpecificRename {
     #[serde(rename(serialize = "serialized_value", deserialize = "deserialized_value"))]
     value: String,
@@ -360,6 +380,46 @@ fn skip_serializing_if_requires_phases() {
             specta_serde::PhasesFormat,
         )
         .expect("PhasesFormat should accept skip_serializing_if");
+}
+
+#[test]
+fn tuple_variant_skip_serializing_if_requires_phases_and_splits_owner() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<TupleVariantSkipSerializingIfOnly>(),
+            specta_serde::Format,
+        )
+        .expect_err("tuple variant field skip_serializing_if should require PhasesFormat");
+    assert!(err.to_string().contains("skip_serializing_if"));
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TupleVariantSkipSerializingIfOnly>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should split tuple variant field skip_serializing_if");
+
+    assert!(rendered.contains("TupleVariantSkipSerializingIfOnly_Serialize"));
+    assert!(rendered.contains("TupleVariantSkipSerializingIfOnly_Deserialize"));
+}
+
+#[test]
+fn aliases_are_rejected_when_not_representable() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FieldAlias>(),
+            specta_serde::Format,
+        )
+        .expect_err("field aliases should not be silently ignored");
+    assert!(err.to_string().contains("alias"));
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<VariantAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("variant aliases should not be silently ignored outside identifier enums");
+    assert!(err.to_string().contains("alias"));
 }
 
 #[test]

@@ -2144,10 +2144,11 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
-                    field
-                        .ty
-                        .as_ref()
-                        .map_or(Ok(false), has_local_phase_difference)
+                    Ok(field_has_local_difference(field)?
+                        || field
+                            .ty
+                            .as_ref()
+                            .map_or(Ok(false), has_local_phase_difference)?)
                 })
         }
         Fields::Named(named) => {

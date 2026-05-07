@@ -207,8 +207,16 @@ fn inner(
             validate_identifier_enum(enm, &path, mode)?;
             validate_enum(enm, types, path.clone(), mode)?;
 
+            let identifier_enum = SerdeContainerAttrs::from_attributes(&enm.attributes)?
+                .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier);
+
             for (variant_name, variant) in &enm.variants {
-                validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
+                validate_variant_attributes(
+                    variant,
+                    format!("{path}::{variant_name}"),
+                    mode,
+                    identifier_enum,
+                )?;
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
@@ -466,12 +474,20 @@ fn validate_variant_attributes(
     variant: &Variant,
     path: String,
     mode: ApplyMode,
+    allow_aliases: bool,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
         return Ok(());
     };
 
     let has_type_override = has_type_override(&variant.attributes);
+
+    if !allow_aliases && !serde_attrs.aliases.is_empty() {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(alias = ...)]` on enum variants is only supported for `variant_identifier` and `field_identifier` enums",
+        ));
+    }
 
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
@@ -517,6 +533,13 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     }
 
     let has_type_override = has_type_override(&field.attributes);
+
+    if !serde_attrs.aliases.is_empty() {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(alias = ...)]` on fields is not currently representable by specta-serde",
+        ));
+    }
 
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;

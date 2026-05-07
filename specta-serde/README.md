@@ -2,11 +2,11 @@
 
 [Serde](https://serde.rs) support for [Specta](https://github.com/specta-rs/specta).
 
-This allows for apply Serde macro attributes on your types to the Specta generated types!
+This applies Serde macro attributes on your types to the Specta generated types.
 
 ## Using with Specta TypeScript
 
-`specta-serde` exposes two format implementation for usage with any of the exporter crates (like  `specta-typescript`):
+`specta-serde` exposes two format implementations for usage with any of the exporter crates, like `specta-typescript`:
 
 - `specta_serde::format`: unified shape for both serialize and deserialize.
 - `specta_serde::format_phases`: split serialize/deserialize shapes.
@@ -41,7 +41,7 @@ You should always prefer `format_phases` where possible as it will generate a mo
 
 ## `format_phases` (split by direction)
 
-Use `format_phases` when the wire format could between serialization and deserialization. This may product two different types `TypeName_Serialize` and `TypeName_Deserialize` to accurately represent both phases. It will produce `TypeName` which is `TypeName_Serialize | TypeName_Deserialize` so the type can be used in a general format when needed.
+Use `format_phases` when the wire format can differ between serialization and deserialization. This may produce two different types, `TypeName_Serialize` and `TypeName_Deserialize`, to accurately represent both phases. It will produce `TypeName` as `TypeName_Serialize | TypeName_Deserialize` so the type can be used in a general format when needed.
 
 This is common with directional serde metadata (`serialize_with`,
 `deserialize_with`, `from`, `into`, `try_from`) or explicit
