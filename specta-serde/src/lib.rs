@@ -1898,6 +1898,40 @@ fn transform_internal_variant(
     match &variant.fields {
         Fields::Unit => {}
         Fields::Named(named) => {
+            // If any named field is `#[serde(flatten)]`, serde merges its
+            // contents at the variant's top level alongside the tag. Mirror
+            // the unnamed-payload path: build an Intersection of `{tag}`,
+            // each flattened field's payload type, and (if any) a struct of
+            // the remaining non-flattened fields. Without this, the flatten
+            // attribute survives to the typescript exporter, which writes
+            // the field literally as `inner: T` instead of merging it.
+            let has_flattened = named
+                .fields
+                .iter()
+                .any(|(_, field)| field_is_flattened(field));
+            if has_flattened {
+                let mut payload_parts: Vec<DataType> = Vec::new();
+                let mut leftover: Vec<(Cow<'static, str>, Field)> = Vec::new();
+                for (name, field) in named.fields.iter().cloned() {
+                    if field_is_flattened(&field) {
+                        if let Some(ty) = field.ty {
+                            payload_parts.push(ty);
+                        }
+                    } else {
+                        leftover.push((name, field));
+                    }
+                }
+                let mut intersection = Vec::with_capacity(payload_parts.len() + 2);
+                intersection.push(named_fields_datatype(fields));
+                if !leftover.is_empty() {
+                    intersection.push(named_fields_datatype(leftover));
+                }
+                intersection.extend(payload_parts);
+                return Ok(clone_variant_with_unnamed_fields(
+                    variant,
+                    vec![Field::new(DataType::Intersection(intersection))],
+                ));
+            }
             fields.extend(named.fields.iter().cloned());
         }
         Fields::Unnamed(unnamed) => {

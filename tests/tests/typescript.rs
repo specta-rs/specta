@@ -1238,4 +1238,12 @@ fn internally_tagged_enum_with_content_variants_renders_correctly() {
         output.contains(r#"type: "A""#) && output.contains(r#"type: "B""#),
         "expected `type: \"A\"` and `type: \"B\"` literals as tag discriminators. Output:\n{output}"
     );
+    // The `inner` field is `#[serde(flatten)]`, so on the wire the inner
+    // struct's fields appear at the top level of the variant -- the TS
+    // shape must be `({ type: "A" } & ItcInner)`, never
+    // `{ type: "A"; inner: ItcInner }`.
+    assert!(
+        !output.contains("inner:"),
+        "rc.25 regression: `#[serde(flatten)]` ignored on struct-variant fields in internally-tagged enums; the inner type is being kept under an `inner:` key instead of merged. Output:\n{output}"
+    );
 }

@@ -600,7 +600,9 @@ export type MyEnumExternal = { Variant: {
 	inner: First,
 } };
 
-export type MyEnumTagged = { type: "Variant"; inner: First };
+export type MyEnumTagged = {
+	type: "Variant",
+} & First;
 
 export type MyEnumUntagged = { inner: First };
 
