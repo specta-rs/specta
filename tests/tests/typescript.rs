@@ -1192,3 +1192,50 @@ fn reserved_names() {
 //
 // Tests for framework primitives (prelude, runtime, runtime imports, etc)
 // Tauri `Channel` tests
+
+#[test]
+fn internally_tagged_enum_with_content_variants_renders_correctly() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct ItcInner {
+        field: String,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedWithContent {
+        A {
+            #[serde(flatten)]
+            inner: ItcInner,
+        },
+        B {
+            #[serde(flatten)]
+            inner: ItcInner,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    let mut types = Types::default();
+    let _ = <ItcInner as Type>::definition(&mut types);
+    let _ = <InternallyTaggedWithContent as Type>::definition(&mut types);
+
+    let output = Typescript::default()
+        .export(&types, &specta_serde::PhasesFormat)
+        .unwrap();
+
+    // Wire format produced by serde at runtime is `{ "type": "A", ...flattened_inner }`
+    // (internally-tagged: tag at top level alongside the variant payload).
+    // The TS bindings must describe that shape -- not the externally-tagged
+    // `{ "A": payload } & { "B"?: never; ... }` shape that rc.25 regressed to
+    // when the enum had a `#[serde(other)]` variant.
+    assert!(
+        !output.contains("A?: never") && !output.contains("B?: never"),
+        "rc.25 regression: variants wrapped in externally-tagged shape with `?: never` exclusions. Output:\n{output}"
+    );
+    assert!(
+        output.contains(r#"type: "A""#) && output.contains(r#"type: "B""#),
+        "expected `type: \"A\"` and `type: \"B\"` literals as tag discriminators. Output:\n{output}"
+    );
+}

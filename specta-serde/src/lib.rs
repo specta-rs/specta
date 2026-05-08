@@ -1423,6 +1423,36 @@ fn enum_repr_already_rewritten(e: &Enum) -> bool {
 }
 
 fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
+    // `transform_internal_variant` produces a tag of type `Primitive::str` when
+    // `widen_tag` is set (the `#[serde(other)]` variant in deserialize phase),
+    // and produces a tuple-variant body of `Intersection<{tag-struct}, payload>`
+    // for non-empty unnamed variants. Without recognizing both shapes, the
+    // second-pass guard on internally-tagged enums containing such variants
+    // fails. The whole enum then gets re-transformed -- this time as
+    // `EnumRepr::External`, because the first pass cleared `e.attributes` --
+    // producing wrong externally-tagged TS bindings for what serde actually
+    // emits as internally-tagged JSON.
+    fn is_rewritten_tag_ty(ty: &DataType) -> bool {
+        is_generated_string_literal_datatype(ty)
+            || matches!(ty, DataType::Primitive(Primitive::str))
+    }
+
+    fn is_rewritten_internal_intersection(ty: &DataType) -> bool {
+        let DataType::Intersection(parts) = ty else {
+            return false;
+        };
+        let Some(DataType::Struct(s)) = parts.first() else {
+            return false;
+        };
+        let Fields::Named(named) = &s.fields else {
+            return false;
+        };
+        named
+            .fields
+            .iter()
+            .any(|(_, field)| field.ty.as_ref().is_some_and(is_rewritten_tag_ty))
+    }
+
     match &variant.fields {
         Fields::Unit => false,
         Fields::Unnamed(fields) if name.is_empty() => unnamed_live_field_count(fields) == 1,
@@ -1430,13 +1460,11 @@ fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
             .fields
             .first()
             .and_then(|field| field.ty.as_ref())
-            .is_some_and(is_generated_string_literal_datatype),
+            .is_some_and(|ty| {
+                is_generated_string_literal_datatype(ty) || is_rewritten_internal_intersection(ty)
+            }),
         Fields::Named(fields) => fields.fields.iter().any(|(field_name, field)| {
-            field_name == name
-                || field
-                    .ty
-                    .as_ref()
-                    .is_some_and(is_generated_string_literal_datatype)
+            field_name == name || field.ty.as_ref().is_some_and(is_rewritten_tag_ty)
         }),
         _ => false,
     }
