@@ -1423,6 +1423,36 @@ fn enum_repr_already_rewritten(e: &Enum) -> bool {
 }
 
 fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
+    // `transform_internal_variant` produces a tag of type `Primitive::str` when
+    // `widen_tag` is set (the `#[serde(other)]` variant in deserialize phase),
+    // and produces a tuple-variant body of `Intersection<{tag-struct}, payload>`
+    // for non-empty unnamed variants. Without recognizing both shapes, the
+    // second-pass guard on internally-tagged enums containing such variants
+    // fails. The whole enum then gets re-transformed -- this time as
+    // `EnumRepr::External`, because the first pass cleared `e.attributes` --
+    // producing wrong externally-tagged TS bindings for what serde actually
+    // emits as internally-tagged JSON.
+    fn is_rewritten_tag_ty(ty: &DataType) -> bool {
+        is_generated_string_literal_datatype(ty)
+            || matches!(ty, DataType::Primitive(Primitive::str))
+    }
+
+    fn is_rewritten_internal_intersection(ty: &DataType) -> bool {
+        let DataType::Intersection(parts) = ty else {
+            return false;
+        };
+        let Some(DataType::Struct(s)) = parts.first() else {
+            return false;
+        };
+        let Fields::Named(named) = &s.fields else {
+            return false;
+        };
+        named
+            .fields
+            .iter()
+            .any(|(_, field)| field.ty.as_ref().is_some_and(is_rewritten_tag_ty))
+    }
+
     match &variant.fields {
         Fields::Unit => false,
         Fields::Unnamed(fields) if name.is_empty() => unnamed_live_field_count(fields) == 1,
@@ -1430,13 +1460,11 @@ fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
             .fields
             .first()
             .and_then(|field| field.ty.as_ref())
-            .is_some_and(is_generated_string_literal_datatype),
+            .is_some_and(|ty| {
+                is_generated_string_literal_datatype(ty) || is_rewritten_internal_intersection(ty)
+            }),
         Fields::Named(fields) => fields.fields.iter().any(|(field_name, field)| {
-            field_name == name
-                || field
-                    .ty
-                    .as_ref()
-                    .is_some_and(is_generated_string_literal_datatype)
+            field_name == name || field.ty.as_ref().is_some_and(is_rewritten_tag_ty)
         }),
         _ => false,
     }
@@ -1870,6 +1898,40 @@ fn transform_internal_variant(
     match &variant.fields {
         Fields::Unit => {}
         Fields::Named(named) => {
+            // If any named field is `#[serde(flatten)]`, serde merges its
+            // contents at the variant's top level alongside the tag. Mirror
+            // the unnamed-payload path: build an Intersection of `{tag}`,
+            // each flattened field's payload type, and (if any) a struct of
+            // the remaining non-flattened fields. Without this, the flatten
+            // attribute survives to the typescript exporter, which writes
+            // the field literally as `inner: T` instead of merging it.
+            let has_flattened = named
+                .fields
+                .iter()
+                .any(|(_, field)| field_is_flattened(field));
+            if has_flattened {
+                let mut payload_parts: Vec<DataType> = Vec::new();
+                let mut leftover: Vec<(Cow<'static, str>, Field)> = Vec::new();
+                for (name, field) in named.fields.iter().cloned() {
+                    if field_is_flattened(&field) {
+                        if let Some(ty) = field.ty {
+                            payload_parts.push(ty);
+                        }
+                    } else {
+                        leftover.push((name, field));
+                    }
+                }
+                let mut intersection = Vec::with_capacity(payload_parts.len() + 2);
+                intersection.push(named_fields_datatype(fields));
+                if !leftover.is_empty() {
+                    intersection.push(named_fields_datatype(leftover));
+                }
+                intersection.extend(payload_parts);
+                return Ok(clone_variant_with_unnamed_fields(
+                    variant,
+                    vec![Field::new(DataType::Intersection(intersection))],
+                ));
+            }
             fields.extend(named.fields.iter().cloned());
         }
         Fields::Unnamed(unnamed) => {

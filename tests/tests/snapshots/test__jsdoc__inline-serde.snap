@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 191
 expression: output
 ---
 i8: number
@@ -425,7 +426,9 @@ Ninth: { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 Tenth: string | "B" | {
 	a: string,
 } | First
-MyEnumTagged: { type: "Variant"; inner: First }
+MyEnumTagged: {
+	type: "Variant",
+} & First
 MyEnumExternal: { Variant: {
 	inner: First,
 } }
