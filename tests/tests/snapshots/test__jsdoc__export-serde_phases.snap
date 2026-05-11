@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 114
 expression: output
 ---
 Issue374: /**
@@ -1060,8 +1061,12 @@ Tenth: /**
 	*/
 
 MyEnumTagged: /**
-	* @typedef {{ type: "Variant"; inner: First }} MyEnumTagged
-	* @property {{ type: "Variant"; inner: First }} Variant
+	* @typedef {{
+	* 	type: "Variant",
+	* } & First} MyEnumTagged
+	* @property {{
+	* 	type: "Variant",
+	* } & First} Variant
 	*/
 
 MyEnumExternal: /**

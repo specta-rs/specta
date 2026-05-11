@@ -1,5 +1,6 @@
 ---
 source: tests/tests/typescript.rs
+assertion_line: 982
 expression: output
 ---
 Issue374: /**  https://github.com/specta-rs/specta/issues/374 */
@@ -540,7 +541,9 @@ Tenth: export type Tenth = string | "B" | {
 	a: string,
 } | First;
 
-MyEnumTagged: export type MyEnumTagged = { type: "Variant"; inner: First };
+MyEnumTagged: export type MyEnumTagged = {
+	type: "Variant",
+} & First;
 
 MyEnumExternal: export type MyEnumExternal = { Variant: {
 	inner: First,
