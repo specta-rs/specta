@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsdoc.rs
-assertion_line: 191
 expression: output
 ---
 Issue374: {
@@ -10,7 +9,7 @@ Issue374: {
 Optional: {
 	a: number | null,
 	b?: number | null,
-	c?: string | null,
+	c?: string,
 	d: boolean,
 }
 StructPhaseSpecificRename: {

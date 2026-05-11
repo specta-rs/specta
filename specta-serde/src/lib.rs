@@ -1199,6 +1199,12 @@ fn rewrite_field_for_phase(
     {
         if let PhaseRewrite::Serialize = mode {
             field.optional = true;
+
+            if attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
+                && let Some(DataType::Nullable(inner)) = field.ty.take()
+            {
+                field.ty = Some(*inner);
+            }
         }
         // The attribute is meaningless on phase-split fields: the _Serialize
         // variant already has `optional = true`, and the _Deserialize variant
@@ -2684,6 +2690,29 @@ mod tests {
     }
 
     #[test]
+    fn skip_serializing_if_option_is_none_omits_null_in_serialize_phase() {
+        let mut types = specta::Types::default();
+        let dt = WithSkipIf::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        let serialize_field = named_field(&serialize, &resolved, "nickname");
+        let deserialize_field = named_field(&deserialize, &resolved, "nickname");
+
+        assert!(serialize_field.optional);
+        assert!(!matches!(
+            serialize_field.ty.as_ref(),
+            Some(DataType::Nullable(_))
+        ));
+        assert!(matches!(
+            deserialize_field.ty.as_ref(),
+            Some(DataType::Nullable(_))
+        ));
+    }
+
+    #[test]
     fn phase_split_field_passes_unified_mode_validation() {
         // Regression test for the interaction with downstream callers (e.g.
         // tauri-specta's `validate_exported_command`) that run unified-mode
@@ -2732,6 +2761,17 @@ mod tests {
     }
 
     fn named_field_type<'a>(dt: &'a DataType, types: &'a Types, field_name: &str) -> &'a DataType {
+        named_field(dt, types, field_name)
+            .ty
+            .as_ref()
+            .expect("field should have a type")
+    }
+
+    fn named_field<'a>(
+        dt: &'a DataType,
+        types: &'a Types,
+        field_name: &str,
+    ) -> &'a specta::datatype::Field {
         let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
             panic!("expected named reference");
         };
@@ -2747,7 +2787,7 @@ mod tests {
         fields
             .fields
             .iter()
-            .find_map(|(name, field)| (name == field_name).then_some(field.ty.as_ref()).flatten())
+            .find_map(|(name, field)| (name == field_name).then_some(field))
             .expect("field should exist")
     }
 

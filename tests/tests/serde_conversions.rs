@@ -86,6 +86,13 @@ struct SkipSerializingIfOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct DefaultedSkipSerializingIfOnly {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum TupleVariantSkipSerializingIfOnly {
     Value(#[serde(skip_serializing_if = "Option::is_none")] Option<String>),
 }
@@ -410,6 +417,23 @@ fn skip_serializing_if_requires_phases() {
             specta_serde::PhasesFormat,
         )
         .expect("PhasesFormat should accept skip_serializing_if");
+}
+
+#[test]
+fn option_is_none_omits_null_in_serialize_phase() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SkipSerializingIfOnly>()
+                .register::<DefaultedSkipSerializingIfOnly>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("PhasesFormat should split skip_serializing_if phases");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-phases-option-is-none-omits-null",
+        rendered
+    );
 }
 
 #[test]

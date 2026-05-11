@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 78
 expression: output
 ---
 std/
