@@ -23,7 +23,6 @@
 )]
 
 mod error;
-mod exporter;
 mod jsonschema;
 mod render;
 mod schema_version;

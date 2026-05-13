@@ -1,14 +1,19 @@
 use std::{borrow::Cow, path::Path};
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 use specta::{Format, Types};
 
-use crate::{Error, SchemaVersion, exporter::Exporter};
+use crate::{Error, SchemaVersion, render::Renderer};
 
 /// JSON Schema exporter.
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-pub struct JsonSchema(Exporter);
+pub struct JsonSchema {
+    schema_version: SchemaVersion,
+    title: Option<Cow<'static, str>>,
+    description: Option<Cow<'static, str>>,
+    comment: Option<Cow<'static, str>>,
+}
 
 impl JsonSchema {
     /// Construct a new exporter with default options.
@@ -18,25 +23,25 @@ impl JsonSchema {
 
     /// Configure the JSON Schema draft version.
     pub fn schema_version(mut self, version: SchemaVersion) -> Self {
-        self.0.schema_version = version;
+        self.schema_version = version;
         self
     }
 
     /// Configure the root schema title.
     pub fn title(mut self, title: impl Into<Cow<'static, str>>) -> Self {
-        self.0.title = Some(title.into());
+        self.title = Some(title.into());
         self
     }
 
     /// Configure the root schema description.
     pub fn description(mut self, description: impl Into<Cow<'static, str>>) -> Self {
-        self.0.description = Some(description.into());
+        self.description = Some(description.into());
         self
     }
 
     /// Configure a root `$comment` value.
     pub fn comment(mut self, comment: impl Into<Cow<'static, str>>) -> Self {
-        self.0.comment = Some(comment.into());
+        self.comment = Some(comment.into());
         self
     }
 
@@ -49,7 +54,37 @@ impl JsonSchema {
 
     /// Export the schema document as a [`serde_json::Value`].
     pub fn export_value(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
-        self.0.export_value(types, &format)
+        let types = format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?;
+        let types = types.as_ref();
+
+        let renderer = Renderer::new(self.schema_version, types);
+        let definitions = renderer.render_definitions()?;
+
+        let mut root = Map::new();
+        root.insert(
+            "$schema".to_string(),
+            Value::String(self.schema_version.uri().to_string()),
+        );
+        if let Some(title) = &self.title {
+            root.insert("title".to_string(), Value::String(title.to_string()));
+        }
+        if let Some(description) = &self.description {
+            root.insert(
+                "description".to_string(),
+                Value::String(description.to_string()),
+            );
+        }
+        if let Some(comment) = &self.comment {
+            root.insert("$comment".to_string(), Value::String(comment.to_string()));
+        }
+        root.insert(
+            self.schema_version.definitions_key().to_string(),
+            Value::Object(definitions),
+        );
+
+        Ok(Value::Object(root))
     }
 
     /// Export the schema document to a single JSON file.
