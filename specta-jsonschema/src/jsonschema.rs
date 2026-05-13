@@ -87,6 +87,40 @@ impl JsonSchema {
         Ok(Value::Object(root))
     }
 
+    /// Export the schema document as a [`serde_json::Value`] with a root `$ref` into the definitions.
+    pub fn export_ref_value(
+        &self,
+        types: &Types,
+        format: impl Format,
+        definition: impl AsRef<str>,
+    ) -> Result<Value, Error> {
+        let mut schema = self.export_value(types, format)?;
+        if let Value::Object(root) = &mut schema {
+            root.insert(
+                "$ref".to_string(),
+                Value::String(format!(
+                    "#/{}/{}",
+                    self.schema_version.definitions_key(),
+                    definition.as_ref().replace('~', "~0").replace('/', "~1")
+                )),
+            );
+        }
+
+        Ok(schema)
+    }
+
+    /// Export the schema document as a pretty-printed JSON string with a root `$ref` into the definitions.
+    pub fn export_ref(
+        &self,
+        types: &Types,
+        format: impl Format,
+        definition: impl AsRef<str>,
+    ) -> Result<String, Error> {
+        Ok(serde_json::to_string_pretty(
+            &self.export_ref_value(types, format, definition)?,
+        )?)
+    }
+
     /// Export the schema document to a single JSON file.
     pub fn export_to(
         &self,

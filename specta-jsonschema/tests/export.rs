@@ -33,6 +33,18 @@ struct Collections {
     map: std::collections::HashMap<String, u32>,
 }
 
+#[derive(Type, Eq, PartialEq, std::hash::Hash)]
+enum Key {
+    A,
+    B,
+}
+
+#[derive(Type)]
+struct MapKeys {
+    chars: std::collections::HashMap<char, u32>,
+    enums: std::collections::HashMap<Key, u32>,
+}
+
 #[derive(Type)]
 enum Status {
     Active,
@@ -58,6 +70,17 @@ struct UsesGenerics {
     count: Wrapper<u32>,
 }
 
+#[derive(Type)]
+struct Nested<T> {
+    value: T,
+}
+
+#[derive(Type)]
+struct UsesNestedGenerics {
+    string: Wrapper<Nested<String>>,
+    number: Wrapper<Nested<u32>>,
+}
+
 #[derive(Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 struct SerdeUser {
@@ -70,6 +93,31 @@ struct SerdeUser {
 enum SerdeMessage {
     Text { body: String },
     Count(u32),
+}
+
+#[derive(Serialize, Deserialize, Type)]
+#[serde(untagged)]
+enum UntaggedValue {
+    Text(String),
+    Object { id: u32 },
+}
+
+#[derive(Serialize, Deserialize, Type)]
+struct FlattenA {
+    a: String,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+struct FlattenB {
+    b: String,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+struct Flattened {
+    #[serde(flatten)]
+    a: FlattenA,
+    #[serde(flatten)]
+    b: FlattenB,
 }
 
 #[test]
@@ -112,12 +160,69 @@ fn exports_draft7_tuple_syntax() {
 
 #[test]
 fn exports_generic_instantiations() {
-    let types = Types::default().register::<UsesGenerics>();
+    let types = Types::default()
+        .register::<UsesGenerics>()
+        .register::<UsesNestedGenerics>();
     let schema = JsonSchema::default()
         .export_value(&types, specta_serde::Format)
         .unwrap();
 
     insta::assert_json_snapshot!(schema);
+}
+
+#[test]
+fn exports_root_ref() {
+    let types = Types::default().register::<User>();
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, specta_serde::Format, "User")
+        .unwrap();
+
+    assert_eq!(schema["$ref"], "#/$defs/User");
+    insta::assert_json_snapshot!(schema);
+}
+
+#[test]
+fn exports_map_key_constraints() {
+    let types = Types::default().register::<MapKeys>();
+    let schema = JsonSchema::default()
+        .export_value(&types, specta_serde::Format)
+        .unwrap();
+
+    insta::assert_json_snapshot!(schema);
+}
+
+#[test]
+fn exports_untagged_enums() {
+    let types = Types::default().register::<UntaggedValue>();
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, specta_serde::Format, "UntaggedValue")
+        .unwrap();
+
+    insta::assert_json_snapshot!(schema);
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!("hello")));
+    assert!(validator.is_valid(&serde_json::json!({ "id": 1 })));
+    assert!(!validator.is_valid(&serde_json::json!({ "Object": { "id": 1 } })));
+}
+
+#[test]
+fn exports_flattened_structs_without_conflicting_additional_properties() {
+    let types = Types::default().register::<Flattened>();
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, specta_serde::Format, "Flattened")
+        .unwrap();
+
+    let flattened = &schema["$defs"]["Flattened"];
+    assert_eq!(flattened["unevaluatedProperties"], false);
+    for part in flattened["allOf"].as_array().unwrap() {
+        assert!(part.get("additionalProperties").is_none());
+    }
+    insta::assert_json_snapshot!(schema);
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({ "a": "a", "b": "b" })));
+    assert!(!validator.is_valid(&serde_json::json!({ "a": "a", "b": "b", "c": "c" })));
 }
 
 #[test]

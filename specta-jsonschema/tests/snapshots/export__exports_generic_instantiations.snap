@@ -4,6 +4,44 @@ expression: schema
 ---
 {
   "$defs": {
+    "Nested": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {}
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Nested",
+      "type": "object"
+    },
+    "Nested_String": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Nested",
+      "type": "object"
+    },
+    "Nested_u32": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Nested",
+      "type": "object"
+    },
     "User": {
       "additionalProperties": false,
       "properties": {
@@ -18,7 +56,6 @@ expression: schema
           ]
         },
         "id": {
-          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
@@ -51,10 +88,53 @@ expression: schema
       "title": "UsesGenerics",
       "type": "object"
     },
+    "UsesNestedGenerics": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "$ref": "#/$defs/Wrapper_Nested_u32"
+        },
+        "string": {
+          "$ref": "#/$defs/Wrapper_Nested_String"
+        }
+      },
+      "required": [
+        "string",
+        "number"
+      ],
+      "title": "UsesNestedGenerics",
+      "type": "object"
+    },
     "Wrapper": {
       "additionalProperties": false,
       "properties": {
         "value": {}
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    },
+    "Wrapper_Nested_String": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Nested_String"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    },
+    "Wrapper_Nested_u32": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Nested_u32"
+        }
       },
       "required": [
         "value"
@@ -79,7 +159,6 @@ expression: schema
       "additionalProperties": false,
       "properties": {
         "value": {
-          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         }

@@ -1,0 +1,53 @@
+---
+source: specta-jsonschema/tests/export.rs
+expression: schema
+---
+{
+  "$defs": {
+    "Key": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "const": "B"
+        }
+      ],
+      "title": "Key"
+    },
+    "MapKeys": {
+      "additionalProperties": false,
+      "properties": {
+        "chars": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "maxLength": 1,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "enums": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Key"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "chars",
+        "enums"
+      ],
+      "title": "MapKeys",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

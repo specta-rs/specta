@@ -12,6 +12,8 @@ use specta::{
 use crate::{Error, SchemaVersion};
 
 const INLINE_RECURSION_LIMIT: usize = 128;
+const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
+const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 
 type Generics = BTreeMap<Cow<'static, str>, DataType>;
 
@@ -117,15 +119,7 @@ impl<'a> Renderer<'a> {
                     object([("type", string("null"))]),
                 ]),
             )])),
-            DataType::Intersection(types) => Ok(object([(
-                "allOf",
-                Value::Array(
-                    types
-                        .iter()
-                        .map(|ty| self.render_datatype(ty, generics, path, depth + 1))
-                        .collect::<Result<_, _>>()?,
-                ),
-            )])),
+            DataType::Intersection(types) => self.render_intersection(types, generics, path, depth),
             DataType::Generic(generic) => generics
                 .get(generic.name())
                 .cloned()
@@ -134,6 +128,69 @@ impl<'a> Renderer<'a> {
             DataType::Reference(reference) => {
                 self.render_reference(reference, generics, path, depth)
             }
+        }
+    }
+
+    fn render_intersection(
+        &mut self,
+        types: &[DataType],
+        generics: &Generics,
+        path: &str,
+        depth: usize,
+    ) -> Result<Value, Error> {
+        let mut schema = Map::new();
+        schema.insert(
+            "allOf".to_string(),
+            Value::Array(
+                types
+                    .iter()
+                    .map(|ty| self.render_datatype_for_intersection(ty, generics, path, depth + 1))
+                    .collect::<Result<_, _>>()?,
+            ),
+        );
+        if self.schema_version.supports_unevaluated_properties() {
+            schema.insert("unevaluatedProperties".to_string(), Value::Bool(false));
+        }
+
+        Ok(Value::Object(schema))
+    }
+
+    fn render_datatype_for_intersection(
+        &mut self,
+        dt: &DataType,
+        generics: &Generics,
+        path: &str,
+        depth: usize,
+    ) -> Result<Value, Error> {
+        match dt {
+            DataType::Struct(strct) => {
+                self.render_fields(&strct.fields, generics, path, depth, false)
+            }
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Reference {
+                    generics: reference_generics,
+                    ..
+                } => {
+                    let ndt = self
+                        .types
+                        .get(reference)
+                        .ok_or_else(|| Error::dangling(path, format!("{reference:?}")))?;
+                    let resolved_generics =
+                        self.resolve_generics(ndt, reference_generics, generics);
+                    match &ndt.ty {
+                        Some(DataType::Struct(strct)) => self.render_fields(
+                            &strct.fields,
+                            &resolved_generics,
+                            path,
+                            depth,
+                            false,
+                        ),
+                        _ => self.render_named_reference(reference, generics, path, depth),
+                    }
+                }
+                _ => self.render_named_reference(reference, generics, path, depth),
+            },
+            _ => self.render_datatype(dt, generics, path, depth),
         }
     }
 
@@ -247,13 +304,42 @@ impl<'a> Renderer<'a> {
             });
         }
 
-        Ok(object([
-            ("type", string("object")),
-            (
-                "additionalProperties",
-                self.render_datatype(map.value_ty(), generics, path, depth + 1)?,
-            ),
-        ]))
+        let mut schema = Map::new();
+        schema.insert("type".to_string(), string("object"));
+        schema.insert(
+            "additionalProperties".to_string(),
+            self.render_datatype(map.value_ty(), generics, path, depth + 1)?,
+        );
+        if let Some(property_names) =
+            self.map_key_schema(map.key_ty(), generics, path, depth + 1)?
+        {
+            schema.insert("propertyNames".to_string(), property_names);
+        }
+
+        Ok(Value::Object(schema))
+    }
+
+    fn map_key_schema(
+        &mut self,
+        dt: &DataType,
+        generics: &Generics,
+        path: &str,
+        depth: usize,
+    ) -> Result<Option<Value>, Error> {
+        Ok(match dt {
+            DataType::Primitive(Primitive::char) => Some(primitive_schema(&Primitive::char)),
+            DataType::Primitive(Primitive::str) => None,
+            DataType::Generic(generic) => generics
+                .get(generic.name())
+                .map(|ty| self.map_key_schema(ty, generics, path, depth))
+                .transpose()?
+                .flatten(),
+            DataType::Reference(Reference::Named(reference)) => {
+                Some(self.render_named_reference(reference, generics, path, depth)?)
+            }
+            DataType::Nullable(inner) => self.map_key_schema(inner, generics, path, depth)?,
+            _ => None,
+        })
     }
 
     fn render_struct(
@@ -263,7 +349,7 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
-        self.render_fields(&strct.fields, generics, path, depth)
+        self.render_fields(&strct.fields, generics, path, depth, true)
     }
 
     fn render_fields(
@@ -272,6 +358,7 @@ impl<'a> Renderer<'a> {
         generics: &Generics,
         path: &str,
         depth: usize,
+        deny_unknown_fields: bool,
     ) -> Result<Value, Error> {
         match fields {
             Fields::Unit => Ok(object([("type", string("null"))])),
@@ -302,7 +389,9 @@ impl<'a> Renderer<'a> {
                 if !required.is_empty() {
                     schema.insert("required".to_string(), Value::Array(required));
                 }
-                schema.insert("additionalProperties".to_string(), Value::Bool(false));
+                if deny_unknown_fields {
+                    schema.insert("additionalProperties".to_string(), Value::Bool(false));
+                }
                 Ok(Value::Object(schema))
             }
         }
@@ -377,7 +466,14 @@ impl<'a> Renderer<'a> {
             .iter()
             .filter(|(_, variant)| !variant.skip)
             .map(|(name, variant)| {
-                self.render_variant(name.as_ref(), variant, generics, path, depth + 1)
+                self.render_variant(
+                    name.as_ref(),
+                    variant,
+                    enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED),
+                    generics,
+                    path,
+                    depth + 1,
+                )
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -392,13 +488,27 @@ impl<'a> Renderer<'a> {
         &mut self,
         name: &str,
         variant: &Variant,
+        untagged: bool,
         generics: &Generics,
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
+        if untagged || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) {
+            return self.render_untagged_variant(variant, generics, path, depth);
+        }
+
         let schema = match &variant.fields {
             Fields::Unit => object([("const", string(name))]),
             Fields::Unnamed(fields) => {
+                if let [field] = fields.fields.as_slice() {
+                    if let Some(ty) = &field.ty {
+                        let payload = self.render_datatype(ty, generics, path, depth + 1)?;
+                        if !schema_has_const(&payload, name) {
+                            return Ok(payload);
+                        }
+                    }
+                }
+
                 let payload =
                     self.render_unnamed_fields(&fields.fields, generics, path, depth + 1)?;
                 if schema_has_const(&payload, name) {
@@ -408,8 +518,13 @@ impl<'a> Renderer<'a> {
                 }
             }
             Fields::Named(fields) => {
-                let payload =
-                    self.render_fields(&Fields::Named(fields.clone()), generics, path, depth + 1)?;
+                let payload = self.render_fields(
+                    &Fields::Named(fields.clone()),
+                    generics,
+                    path,
+                    depth + 1,
+                    true,
+                )?;
                 if schema_has_const(&payload, name) || schema_has_property(&payload, name) {
                     payload
                 } else {
@@ -426,6 +541,35 @@ impl<'a> Renderer<'a> {
             variant.deprecated.as_ref(),
         );
         Ok(schema)
+    }
+
+    fn render_untagged_variant(
+        &mut self,
+        variant: &Variant,
+        generics: &Generics,
+        path: &str,
+        depth: usize,
+    ) -> Result<Value, Error> {
+        match &variant.fields {
+            Fields::Unit => Ok(object([("type", string("null"))])),
+            Fields::Unnamed(fields) => {
+                if let [field] = fields.fields.as_slice() {
+                    return field.ty.as_ref().map_or_else(
+                        || Ok(Value::Object(Map::new())),
+                        |ty| self.render_datatype(ty, generics, path, depth + 1),
+                    );
+                }
+
+                self.render_unnamed_fields(&fields.fields, generics, path, depth + 1)
+            }
+            Fields::Named(fields) => self.render_fields(
+                &Fields::Named(fields.clone()),
+                generics,
+                path,
+                depth + 1,
+                true,
+            ),
+        }
     }
 
     fn external_variant_schema(&self, name: &str, payload: Value) -> Value {
@@ -515,7 +659,13 @@ impl<'a> Renderer<'a> {
             DataType::Reference(Reference::Named(reference)) => self
                 .types
                 .get(reference)
-                .map(|ndt| self.definition_key(ndt, &Generics::new()))
+                .map(|ndt| match &reference.inner {
+                    NamedReferenceType::Reference { generics, .. } => {
+                        let generics = self.resolve_generics(ndt, generics, &Generics::new());
+                        self.definition_key(ndt, &generics)
+                    }
+                    _ => self.definition_key(ndt, &Generics::new()),
+                })
                 .unwrap_or_else(|| "Reference".to_string()),
             DataType::Reference(Reference::Opaque(reference)) => reference.type_name().to_string(),
             other => format!("{other:?}"),
@@ -590,18 +740,15 @@ fn primitive_schema(primitive: &Primitive) -> Value {
         ]),
         Primitive::i8 => integer(Some(i8::MIN.into()), Some(i8::MAX.into()), None),
         Primitive::i16 => integer(Some(i16::MIN.into()), Some(i16::MAX.into()), None),
-        Primitive::i32 => integer(None, None, Some("int32")),
-        Primitive::i64 => integer(None, None, Some("int64")),
+        Primitive::i32 => integer(None, None, None),
+        Primitive::i64 => integer(None, None, None),
         Primitive::i128 | Primitive::isize => integer(None, None, None),
         Primitive::u8 => integer(Some(0), Some(u8::MAX.into()), None),
         Primitive::u16 => integer(Some(0), Some(u16::MAX.into()), None),
-        Primitive::u32 => integer(Some(0), None, Some("uint32")),
-        Primitive::u64 => integer(Some(0), None, Some("uint64")),
+        Primitive::u32 => integer(Some(0), None, None),
+        Primitive::u64 => integer(Some(0), None, None),
         Primitive::u128 | Primitive::usize => integer(Some(0), None, None),
-        Primitive::f16 => number_schema(Some("float16")),
-        Primitive::f32 => number_schema(Some("float")),
-        Primitive::f64 => number_schema(Some("double")),
-        Primitive::f128 => number_schema(Some("float128")),
+        Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => number_schema(None),
     }
 }
 

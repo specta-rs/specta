@@ -10,9 +10,11 @@ expression: schema
       "properties": {
         "map": {
           "additionalProperties": {
-            "format": "uint32",
             "minimum": 0,
             "type": "integer"
+          },
+          "propertyNames": {
+            "type": "string"
           },
           "type": "object"
         },
@@ -29,7 +31,6 @@ expression: schema
               "type": "string"
             },
             {
-              "format": "uint32",
               "minimum": 0,
               "type": "integer"
             }

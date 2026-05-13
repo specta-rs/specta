@@ -35,7 +35,6 @@ expression: schema
           "additionalProperties": false,
           "properties": {
             "data": {
-              "format": "uint32",
               "minimum": 0,
               "type": "integer"
             },
@@ -59,7 +58,6 @@ expression: schema
           "type": "string"
         },
         "userId": {
-          "format": "uint32",
           "minimum": 0,
           "type": "integer"
         }

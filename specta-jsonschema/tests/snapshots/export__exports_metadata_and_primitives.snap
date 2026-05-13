@@ -17,15 +17,12 @@ expression: schema
           "type": "string"
         },
         "f32_field": {
-          "format": "float",
           "type": "number"
         },
         "f64_field": {
-          "format": "double",
           "type": "number"
         },
         "i32_field": {
-          "format": "int32",
           "type": "integer"
         },
         "i8_field": {
@@ -42,7 +39,6 @@ expression: schema
           "type": "integer"
         },
         "u64_field": {
-          "format": "uint64",
           "minimum": 0,
           "type": "integer"
         }
