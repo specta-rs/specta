@@ -1,8 +1,12 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::Types;
+use specta::{Format as FormatTrait, Types};
 
-use crate::{error::Result, primitives::export_type};
+use crate::{
+    error::{Error, Result},
+    primitives::export_type,
+    toposort::topological_sort,
+};
 
 /// ReScript language exporter.
 #[derive(Debug, Clone)]
@@ -48,12 +52,12 @@ impl ReScript {
 
     /// Export all types in the collection to a ReScript string.
     pub fn export(&self, types: &Types) -> Result<String> {
-        let resolved;
-        let processed: &Types = if self.serde {
-            resolved = specta_serde::apply(types.clone())?;
-            resolved.as_types()
+        let processed: Cow<Types> = if self.serde {
+            specta_serde::Format
+                .map_types(types)
+                .map_err(|e| Error::format("serde apply failed", e))?
         } else {
-            types
+            Cow::Borrowed(types)
         };
 
         let mut out = String::new();
@@ -63,13 +67,8 @@ impl ReScript {
             out.push('\n');
         }
 
-        let sorted = processed.into_topological_iter()?;
-
-        for ndt in sorted {
-            if !ndt.requires_reference(processed) {
-                continue;
-            }
-            let rendered = export_type(processed, ndt)?;
+        for ndt in topological_sort(processed.as_ref())? {
+            let rendered = export_type(&processed, ndt)?;
             if !rendered.is_empty() {
                 out.push('\n');
                 out.push_str(&rendered);
@@ -89,3 +88,4 @@ impl ReScript {
         Ok(())
     }
 }
+

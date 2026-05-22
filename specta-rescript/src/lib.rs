@@ -32,6 +32,7 @@
 mod error;
 pub mod primitives;
 mod rescript;
+mod toposort;
 
 pub use error::Error;
 pub use rescript::ReScript;

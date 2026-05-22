@@ -3,7 +3,8 @@ use std::borrow::Cow;
 use specta::{
     Types,
     datatype::{
-        DataType, Deprecated, Fields, GenericReference, NamedDataType, Primitive, Reference,
+        DataType, Deprecated, Fields, Generic, NamedDataType, NamedReferenceType, Primitive,
+        Reference,
     },
 };
 
@@ -46,14 +47,25 @@ fn wrap_generics(params: Vec<String>) -> String {
     }
 }
 
+/// The scope maps each generic parameter to its ReScript name.
+/// Derived from `NamedDataType::generics`.
+type Scope<'a> = &'a [(Generic, Cow<'static, str>)];
+
+fn build_scope(ndt: &NamedDataType) -> Vec<(Generic, Cow<'static, str>)> {
+    ndt.generics
+        .iter()
+        .map(|gd| (gd.reference(), gd.name.clone()))
+        .collect()
+}
+
 /// Renders the active (non-None) field types of an unnamed fields list.
 /// Returns `None` if there are no active fields, `Some(rendered_types)` otherwise.
 fn unnamed_field_types(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<Option<Vec<String>>> {
-    let active: Vec<_> = uf.fields().iter().filter_map(|f| f.ty()).collect();
+    let active: Vec<_> = uf.fields.iter().filter_map(|f| f.ty.as_ref()).collect();
     if active.is_empty() {
         return Ok(None);
     }
@@ -77,15 +89,15 @@ fn unnamed_field_types(
 /// result type. Note that ReScript's result uses `Ok`/`Error` constructors
 /// while Rust uses `Ok`/`Err` — the user's serialization layer handles that.
 fn is_result_enum(e: &specta::datatype::Enum) -> bool {
-    let non_skipped: Vec<_> = e.variants().iter().filter(|(_, v)| !v.skip()).collect();
+    let non_skipped: Vec<_> = e.variants.iter().filter(|(_, v)| !v.skip).collect();
     let [a, b] = non_skipped.as_slice() else {
         return false;
     };
     a.0 == "Ok"
         && b.0 == "Err"
         && [a, b].iter().all(|v| {
-            matches!(v.1.fields(), Fields::Unnamed(uf) if {
-                uf.fields().iter().filter(|f| f.ty().is_some()).count() == 1
+            matches!(&v.1.fields, Fields::Unnamed(uf) if {
+                uf.fields.iter().filter(|f| f.ty.is_some()).count() == 1
             })
         })
 }
@@ -94,11 +106,11 @@ fn is_result_enum(e: &specta::datatype::Enum) -> bool {
 /// one unnamed field. Panics if the invariant is violated (only call after
 /// `is_result_enum` confirmed the shape).
 fn single_unnamed_field_type(variant: &specta::datatype::Variant) -> &DataType {
-    match variant.fields() {
+    match &variant.fields {
         Fields::Unnamed(uf) => uf
-            .fields()
+            .fields
             .iter()
-            .find_map(|f| f.ty())
+            .find_map(|f| f.ty.as_ref())
             .expect("is_result_enum guarantees one active field"),
         _ => unreachable!("is_result_enum guarantees unnamed fields"),
     }
@@ -136,29 +148,11 @@ fn primitive_to_rescript(p: &Primitive) -> Result<String> {
 // Core recursive type renderer
 // ---------------------------------------------------------------------------
 
-/// Check whether a DataType resolves to a string-like primitive, following named references.
-/// Generic keys are treated as string-compatible since Specta maps `HashMap<K, V>` to
-/// dict-like structures where K is expected to be a string type.
-fn is_string_type(types: &Types, dt: &DataType) -> bool {
-    match dt {
-        DataType::Primitive(Primitive::str | Primitive::char) => true,
-        DataType::Reference(Reference::Named(n)) => {
-            if let Some(ndt) = n.get(types) {
-                is_string_type(types, ndt.ty())
-            } else {
-                false
-            }
-        }
-        DataType::Reference(Reference::Generic(_)) => true,
-        _ => false,
-    }
-}
-
 /// Render a `DataType` as an inline ReScript type expression.
 /// Used for field types, generic arguments, and type alias bodies.
 pub fn datatype_to_rescript(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     dt: &DataType,
 ) -> Result<String> {
     match dt {
@@ -167,40 +161,48 @@ pub fn datatype_to_rescript(
             Ok(format!("option<{}>", datatype_to_rescript(types, scope, inner)?))
         }
         DataType::List(l) => {
-            Ok(format!("array<{}>", datatype_to_rescript(types, scope, l.ty())?))
+            Ok(format!("array<{}>", datatype_to_rescript(types, scope, &l.ty)?))
         }
         DataType::Struct(_) => Err(Error::UnsupportedType(
             "Inline anonymous structs are not supported; use a named type".to_string(),
         )),
         DataType::Reference(r) => reference_to_rescript(types, scope, r),
+        DataType::Generic(g) => {
+            let name = scope
+                .iter()
+                .find(|(gr, _)| gr == g)
+                .map(|(_, name)| name.as_ref())
+                .unwrap_or("unknown");
+            Ok(generic_param(name))
+        }
         DataType::Map(m) => {
-            // ReScript's `dict<v>` only supports string keys.
-            if is_string_type(types, m.key_ty()) {
-                Ok(format!(
-                    "dict<{}>",
-                    datatype_to_rescript(types, scope, m.value_ty())?
-                ))
-            } else {
-                Err(Error::InvalidType(
-                    "ReScript dict only supports string keys; non-string map keys are not supported"
-                        .to_string(),
-                ))
-            }
+            // ReScript dict<v> only supports string keys. We can't enforce this at the
+            // generic template level (e.g. HashMap<K,V> always becomes dict<V>), so we
+            // emit dict regardless and trust the caller to use string-keyed maps.
+            Ok(format!(
+                "dict<{}>",
+                datatype_to_rescript(types, scope, m.value_ty())?
+            ))
         }
         DataType::Enum(e) => {
             if is_result_enum(e) {
-                let variants: Vec<_> = e.variants().iter().filter(|(_, v)| !v.skip()).collect();
+                let variants: Vec<_> = e.variants.iter().filter(|(_, v)| !v.skip).collect();
                 let ok_ty = single_unnamed_field_type(&variants[0].1);
                 let err_ty = single_unnamed_field_type(&variants[1].1);
                 let ok_str = datatype_to_rescript(types, scope, ok_ty)?;
                 let err_str = datatype_to_rescript(types, scope, err_ty)?;
                 return Ok(format!("result<{}, {}>", ok_str, err_str));
             }
-            if e.is_string_enum() {
+            let all_unit = e
+                .variants
+                .iter()
+                .filter(|(_, v)| !v.skip)
+                .all(|(_, v)| matches!(v.fields, Fields::Unit));
+            if all_unit {
                 let variants: Vec<String> = e
-                    .variants()
+                    .variants
                     .iter()
-                    .filter(|(_, v)| !v.skip())
+                    .filter(|(_, v)| !v.skip)
                     .map(|(name, _)| format!("#{}", name))
                     .collect();
                 return Ok(format!("[ {} ]", variants.join(" | ")));
@@ -210,7 +212,7 @@ pub fn datatype_to_rescript(
             ))
         }
         DataType::Tuple(t) => {
-            let elems = t.elements();
+            let elems = &t.elements;
             match elems.len() {
                 0 => Ok("unit".to_string()),
                 1 => datatype_to_rescript(types, scope, &elems[0]),
@@ -223,12 +225,15 @@ pub fn datatype_to_rescript(
                 }
             }
         }
+        DataType::Intersection(_) => Err(Error::UnsupportedType(
+            "Intersection types are not supported by the ReScript exporter".to_string(),
+        )),
     }
 }
 
 fn render_unnamed_fields(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<String> {
     match unnamed_field_types(types, scope, uf)? {
@@ -240,109 +245,37 @@ fn render_unnamed_fields(
 
 fn reference_to_rescript(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     r: &Reference,
 ) -> Result<String> {
     match r {
         Reference::Named(n) => {
-            let ndt = n
-                .get(types)
-                .ok_or_else(|| Error::InvalidType("Reference to unknown named type".to_string()))?;
-
-            // Inline types are rendered by substituting their generics and rendering the body.
-            if n.inline() {
-                return render_with_substitution(types, scope, ndt.ty(), n.generics(), ndt.generics());
+            match &n.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    datatype_to_rescript(types, scope, dt)
+                }
+                NamedReferenceType::Reference { generics, .. } => {
+                    let ndt = types
+                        .get(n)
+                        .ok_or_else(|| Error::InvalidType("Reference to unknown named type".to_string()))?;
+                    let base_name = type_name(&ndt.name);
+                    let rendered_generics = generics
+                        .iter()
+                        .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok(format!("{}{}", base_name, wrap_generics(rendered_generics)))
+                }
+                NamedReferenceType::Recursive(_) => {
+                    let ndt = types.get(n);
+                    let name = ndt.map(|n| n.name.as_ref()).unwrap_or("unknown");
+                    Ok(type_name(name))
+                }
             }
-
-            let base_name = type_name(ndt.name());
-
-            let generics = n
-                .generics()
-                .iter()
-                .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
-                .collect::<Result<Vec<_>>>()?;
-            Ok(format!("{}{}", base_name, wrap_generics(generics)))
-        }
-        Reference::Generic(g) => {
-            let name = scope
-                .iter()
-                .find(|(gr, _)| gr == g)
-                .map(|(_, name)| name.as_ref())
-                .unwrap_or("unknown");
-            Ok(generic_param(name))
         }
         Reference::Opaque(o) => Err(Error::UnsupportedType(format!(
             "Opaque reference '{}' is not supported by the ReScript exporter",
             o.type_name()
         ))),
-    }
-}
-
-/// Render a DataType with generic parameters substituted by concrete types.
-///
-/// Used when inlining a named type: `subs` maps each `GenericReference` in
-/// the type body to a concrete `DataType`, while `ndt_generics` provides the
-/// ordered generic parameter ids so we can resolve `Reference::Generic(g)`.
-fn render_with_substitution(
-    types: &Types,
-    outer_scope: &[(GenericReference, Cow<'static, str>)],
-    dt: &DataType,
-    subs: &[(GenericReference, DataType)],
-    ndt_generics: &[(GenericReference, Cow<'static, str>)],
-) -> Result<String> {
-    match dt {
-        DataType::Reference(Reference::Generic(g)) => {
-            // Substitute the generic with the concrete type from subs.
-            if let Some((_, concrete)) = subs.iter().find(|(gr, _)| gr == g) {
-                datatype_to_rescript(types, outer_scope, concrete)
-            } else {
-                // Fall back: render as generic param name from ndt_generics.
-                let name = ndt_generics
-                    .iter()
-                    .find(|(gr, _)| gr == g)
-                    .map(|(_, name)| name.as_ref())
-                    .unwrap_or("unknown");
-                Ok(generic_param(name))
-            }
-        }
-        DataType::Primitive(p) => primitive_to_rescript(p),
-        DataType::Nullable(inner) => Ok(format!(
-            "option<{}>",
-            render_with_substitution(types, outer_scope, inner, subs, ndt_generics)?
-        )),
-        DataType::List(l) => Ok(format!(
-            "array<{}>",
-            render_with_substitution(types, outer_scope, l.ty(), subs, ndt_generics)?
-        )),
-        DataType::Map(m) => {
-            if is_string_type(types, m.key_ty()) {
-                Ok(format!(
-                    "dict<{}>",
-                    render_with_substitution(types, outer_scope, m.value_ty(), subs, ndt_generics)?
-                ))
-            } else {
-                Err(Error::InvalidType(
-                    "ReScript dict only supports string keys; non-string map keys are not supported"
-                        .to_string(),
-                ))
-            }
-        }
-        DataType::Tuple(t) => {
-            let elems = t.elements();
-            match elems.len() {
-                0 => Ok("unit".to_string()),
-                1 => render_with_substitution(types, outer_scope, &elems[0], subs, ndt_generics),
-                _ => {
-                    let parts = elems
-                        .iter()
-                        .map(|e| render_with_substitution(types, outer_scope, e, subs, ndt_generics))
-                        .collect::<Result<Vec<_>>>()?;
-                    Ok(format!("({})", parts.join(", ")))
-                }
-            }
-        }
-        DataType::Reference(r) => reference_to_rescript(types, outer_scope, r),
-        _ => datatype_to_rescript(types, outer_scope, dt),
     }
 }
 
@@ -352,10 +285,10 @@ fn render_with_substitution(
 
 fn render_struct_body(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     s: &specta::datatype::Struct,
 ) -> Result<String> {
-    match s.fields() {
+    match &s.fields {
         Fields::Unit => Ok("unit".to_string()),
         Fields::Unnamed(uf) => render_unnamed_fields(types, scope, uf),
         Fields::Named(nf) => {
@@ -371,15 +304,15 @@ fn render_struct_body(
 
 fn render_named_fields(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     nf: &specta::datatype::NamedFields,
 ) -> Result<Vec<String>> {
-    nf.fields()
+    nf.fields
         .iter()
-        .filter_map(|(name, field)| field.ty().map(|ty| (name, field, ty)))
+        .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, field, ty)))
         .map(|(name, field, ty)| {
             let ty_str = datatype_to_rescript(types, scope, ty)?;
-            let final_ty = if field.optional() {
+            let final_ty = if field.optional {
                 format!("option<{}>", ty_str)
             } else {
                 ty_str
@@ -391,7 +324,7 @@ fn render_named_fields(
 
 /// Format a `Deprecated` into a human-readable note string.
 fn deprecated_msg(dep: &Deprecated) -> &str {
-    dep.note().map(|n| n.as_ref()).unwrap_or("deprecated")
+    dep.note.as_deref().unwrap_or("deprecated")
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +338,7 @@ fn deprecated_msg(dep: &Deprecated) -> &str {
 /// - `variant_lines`: one string per variant, e.g. `"Circle(float)"` or `"Idle"`
 fn render_enum_variants(
     types: &Types,
-    scope: &[(GenericReference, Cow<'static, str>)],
+    scope: Scope<'_>,
     e: &specta::datatype::Enum,
     enum_rescript_name: &str,
     generics_decl: &str,
@@ -413,12 +346,12 @@ fn render_enum_variants(
     let mut auxiliary: Vec<String> = Vec::new();
     let mut variant_lines: Vec<String> = Vec::new();
 
-    for (variant_name, variant) in e.variants() {
-        if variant.skip() {
+    for (variant_name, variant) in &e.variants {
+        if variant.skip {
             continue;
         }
 
-        match variant.fields() {
+        match &variant.fields {
             Fields::Unit => {
                 variant_lines.push(variant_name.to_string());
             }
@@ -431,7 +364,7 @@ fn render_enum_variants(
                 variant_lines.push(line);
             }
 
-            Fields::Named(nf) if nf.fields().is_empty() => {
+            Fields::Named(nf) if nf.fields.is_empty() => {
                 variant_lines.push(variant_name.to_string());
             }
 
@@ -468,24 +401,28 @@ fn render_enum_variants(
 /// May return multiple `type` declarations (separated by newlines) when an
 /// enum has variants with named fields that need auxiliary record types.
 pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
+    let Some(ty) = &dt.ty else {
+        return Ok(String::new());
+    };
+
     let mut out = String::new();
 
     // Doc comment
     out.extend(
-        dt.docs()
+        dt.docs
             .lines()
             .map(|l| format!("// {}\n", l.trim_start())),
     );
 
     // Deprecated comment
-    if let Some(dep) = dt.deprecated() {
+    if let Some(dep) = &dt.deprecated {
         out.push_str(&format!("// @deprecated {}\n", deprecated_msg(dep)));
     }
 
-    let rescript_name = type_name(dt.name());
+    let rescript_name = type_name(&dt.name);
 
     // Derive scope from the generics of this named type.
-    let scope = dt.generics();
+    let scope = build_scope(dt);
 
     // Generic parameter list: e.g. `<'a, 'b>`
     let generics_decl = wrap_generics(
@@ -495,17 +432,17 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
             .collect(),
     );
 
-    match dt.ty() {
+    match ty {
         DataType::Struct(s) => out.push_str(&format!(
             "type {}{} = {}\n",
             rescript_name,
             generics_decl,
-            render_struct_body(types, scope, s)?
+            render_struct_body(types, &scope, s)?
         )),
         DataType::Enum(e) => {
             // Result detection runs first
             if is_result_enum(e) {
-                let body = datatype_to_rescript(types, scope, dt.ty())?;
+                let body = datatype_to_rescript(types, &scope, ty)?;
                 out.push_str(&format!(
                     "type {}{} = {}\n",
                     rescript_name, generics_decl, body
@@ -515,16 +452,16 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
 
             // All unit variants -> polymorphic variants
             let all_unit = e
-                .variants()
+                .variants
                 .iter()
-                .filter(|(_, v)| !v.skip())
-                .all(|(_, v)| matches!(v.fields(), Fields::Unit));
+                .filter(|(_, v)| !v.skip)
+                .all(|(_, v)| matches!(v.fields, Fields::Unit));
 
             if all_unit {
                 let variants: Vec<String> = e
-                    .variants()
+                    .variants
                     .iter()
-                    .filter(|(_, v)| !v.skip())
+                    .filter(|(_, v)| !v.skip)
                     .map(|(name, _)| format!("#{}", name))
                     .collect();
                 out.push_str(&format!(
@@ -536,7 +473,7 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
             } else {
                 // Data variants — may need auxiliary record types
                 let (auxiliary, variant_lines) =
-                    render_enum_variants(types, scope, e, &rescript_name, &generics_decl)?;
+                    render_enum_variants(types, &scope, e, &rescript_name, &generics_decl)?;
 
                 out.extend(auxiliary.iter().map(|aux| format!("{}\n", aux)));
                 out.push_str(&format!("type {}{} =\n", rescript_name, generics_decl));
@@ -545,7 +482,7 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
         }
 
         other => {
-            let body = datatype_to_rescript(types, scope, other)?;
+            let body = datatype_to_rescript(types, &scope, other)?;
             out.push_str(&format!(
                 "type {}{} = {}\n",
                 rescript_name, generics_decl, body

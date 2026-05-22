@@ -18,7 +18,6 @@ mod format;
 pub mod function;
 #[doc(hidden)]
 pub mod internal;
-mod error;
 mod r#type;
 mod types;
 

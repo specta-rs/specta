@@ -15,13 +15,26 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// Circular reference detected in type definitions.
-    #[error(transparent)]
-    CircularReference(#[from] specta::CircularReference),
+    /// Circular reference detected during topological sort.
+    #[error("Topological sort error: {0}")]
+    TopoSort(String),
+
+    /// Format or serde error.
+    #[error("Format error: {message}: {source}")]
+    Format {
+        message: &'static str,
+        source: specta::FormatError,
+    },
 
     /// Serde validation error.
     #[error("Serde validation error: {0}")]
     SerdeValidation(#[from] specta_serde::Error),
+}
+
+impl Error {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
+        Self::Format { message, source }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
