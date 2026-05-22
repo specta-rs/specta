@@ -4,11 +4,14 @@ use super::StructBuilder;
 
 use super::{NamedFields, UnnamedFields};
 
-/// represents a Rust [struct](https://doc.rust-lang.org/std/keyword.struct.html).
+/// Runtime representation of a Rust [`struct`](https://doc.rust-lang.org/std/keyword.struct.html).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Struct {
-    pub(crate) fields: Fields,
-    pub(crate) attributes: Attributes,
+    /// Field layout for the struct.
+    pub fields: Fields,
+    /// Runtime attributes attached to the struct container.
+    pub attributes: Attributes,
 }
 
 // Do not implement `Default` for `Struct` as it's unclear what that would be. `Unit`, yes but still.
@@ -22,7 +25,7 @@ impl Struct {
         }
     }
 
-    /// Construct a named struct.
+    /// Starts building a struct with named fields.
     pub fn named() -> StructBuilder<NamedFields> {
         StructBuilder {
             fields: NamedFields {
@@ -31,38 +34,13 @@ impl Struct {
         }
     }
 
-    /// Construct an unnamed struct.
+    /// Starts building a tuple struct with unnamed fields.
     pub fn unnamed() -> StructBuilder<UnnamedFields> {
         StructBuilder {
             fields: UnnamedFields {
                 fields: Default::default(),
             },
         }
-    }
-
-    /// Get a immutable reference to the fields of the struct.
-    pub fn fields(&self) -> &Fields {
-        &self.fields
-    }
-
-    /// Get a mutable reference to the fields of the struct.
-    pub fn fields_mut(&mut self) -> &mut Fields {
-        &mut self.fields
-    }
-
-    /// Set the fields of the struct.
-    pub fn set_fields(&mut self, fields: Fields) {
-        self.fields = fields;
-    }
-
-    /// Get a immutable reference to the attributes of the struct.
-    pub fn attributes(&self) -> &Attributes {
-        &self.attributes
-    }
-
-    /// Get a mutable reference to the attributes of the struct.
-    pub fn attributes_mut(&mut self) -> &mut Attributes {
-        &mut self.attributes
     }
 }
 

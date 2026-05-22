@@ -25,22 +25,27 @@ enum AdjacentOther {
 }
 
 #[test]
-fn serde_other_requires_apply_phases() {
-    let err = specta_serde::apply(Types::default().register::<InternalOther>())
-        .expect_err("#[serde(other)] should require apply_phases");
+fn serde_other_requires_phases_format() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<InternalOther>(),
+            specta_serde::Format,
+        )
+        .expect_err("#[serde(other)] should require PhasesFormat");
 
     assert!(
         err.to_string()
-            .contains("`#[serde(other)]` requires `apply_phases`")
+            .contains("`#[serde(other)]` requires `PhasesFormat`")
     );
 }
 
 #[test]
 fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
-    let types = specta_serde::apply_phases(Types::default().register::<InternalOther>())
-        .expect("apply_phases should support internally tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<InternalOther>(),
+            specta_serde::PhasesFormat,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-internal-tag-typescript", ts);
@@ -48,10 +53,11 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
 
 #[test]
 fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
-    let types = specta_serde::apply_phases(Types::default().register::<AdjacentOther>())
-        .expect("apply_phases should support adjacently tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<AdjacentOther>(),
+            specta_serde::PhasesFormat,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-adjacent-tag-typescript", ts);

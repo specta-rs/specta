@@ -53,24 +53,6 @@ where
 /// [`fmt::Debug`] so attributes remain comparable, hashable, and printable as
 /// part of the surrounding datatype graph.
 ///
-/// # Examples
-///
-/// ```rust
-/// use specta::datatype::Attributes;
-///
-/// let mut attrs = Attributes::default();
-/// attrs.insert("serde.rename", String::from("user_name"));
-/// attrs.insert("serde.skip", true);
-///
-/// assert_eq!(attrs.len(), 2);
-/// assert!(attrs.contains_key("serde.rename"));
-/// assert_eq!(
-///     attrs.get_named_as::<String>("serde.rename"),
-///     Some(&String::from("user_name"))
-/// );
-/// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
-/// assert_eq!(attrs.get_named_as::<u32>("serde.skip"), None);
-/// ```
 #[derive(Default)]
 pub struct Attributes(HashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
 
@@ -102,16 +84,6 @@ impl Attributes {
     /// [`Clone`], [`Eq`], [`Hash`], and [`fmt::Debug`] so the containing
     /// [`Attributes`] remains cloneable, comparable, hashable, and printable.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use specta::datatype::Attributes;
-    ///
-    /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.default", true);
-    ///
-    /// assert_eq!(attrs.get_named_as::<bool>("serde.default"), Some(&true));
-    /// ```
     pub fn insert<T>(&mut self, key: impl Into<Cow<'static, str>>, value: T)
     where
         T: Any + Clone + Eq + Hash + fmt::Debug + Send + Sync + 'static,
@@ -125,23 +97,15 @@ impl Attributes {
     /// If both collections contain the same key, the value from `other`
     /// replaces the existing entry in `self`.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use specta::datatype::Attributes;
-    ///
-    /// let mut base = Attributes::default();
-    /// base.insert("serde.rename", String::from("first_name"));
-    ///
-    /// let mut extra = Attributes::default();
-    /// extra.insert("serde.skip", true);
-    ///
-    /// base.extend(extra);
-    ///
-    /// assert_eq!(base.get_named_as::<bool>("serde.skip"), Some(&true));
-    /// ```
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.0);
+    }
+
+    /// Removes the entry under `key`, returning `true` when an entry was
+    /// present.
+    ///
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.0.remove(key).is_some()
     }
 
     /// Returns `true` if an attribute entry is present for `key`.
@@ -154,17 +118,6 @@ impl Attributes {
     /// This is useful when the expected type is not known until runtime.
     /// Prefer [`Attributes::get_named_as`] when you know the concrete type.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use specta::datatype::Attributes;
-    ///
-    /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.rename", String::from("user_name"));
-    ///
-    /// let value = attrs.get_named("serde.rename").unwrap();
-    /// assert_eq!(value.downcast_ref::<String>(), Some(&String::from("user_name")));
-    /// ```
     pub fn get_named(&self, key: &str) -> Option<&dyn Any> {
         self.0.get(key).map(|value| value.value_any())
     }
@@ -174,17 +127,6 @@ impl Attributes {
     /// Returns `None` when the key is missing or when the stored value has a
     /// different type than `T`.
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use specta::datatype::Attributes;
-    ///
-    /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.skip", true);
-    ///
-    /// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
-    /// assert_eq!(attrs.get_named_as::<String>("serde.skip"), None);
-    /// ```
     pub fn get_named_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
         self.0
             .get(key)
@@ -229,7 +171,7 @@ impl Hash for Attributes {
 impl fmt::Debug for Attributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut entries = self.0.iter().collect::<Vec<_>>();
-        entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+        entries.sort_by_key(|(left, _)| *left);
 
         let mut map = f.debug_map();
         for (key, value) in entries {

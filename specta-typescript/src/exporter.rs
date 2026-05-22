@@ -9,11 +9,19 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Types,
-    datatype::{DataType, NamedDataType, Reference},
+    Format, Types,
+    datatype::{DataType, Fields, NamedDataType, NamedReference, NamedReferenceType, Reference},
 };
 
 use crate::{Branded, Error, primitives, references};
+
+fn rust_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
+    if ndt.module_path.is_empty() {
+        ndt.name.clone()
+    } else {
+        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
+    }
+}
 
 /// Allows configuring the format of the final types file
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -177,47 +185,53 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, resolved_types: &ResolvedTypes) -> Result<String, Error> {
-        let types = resolved_types.as_types();
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
+        fn inner(exporter: Exporter, types: &Types, format: &dyn Format) -> Result<String, Error> {
+            let types = format_types(types, &format)?;
+            let types = types.as_ref();
 
-        if let Layout::Files = self.layout {
-            return Err(Error::unable_to_export(self.layout));
-        }
-        if let Layout::Namespaces = self.layout
-            && self.jsdoc
-        {
-            return Err(Error::unable_to_export(self.layout));
+            if let Layout::Files = exporter.layout {
+                return Err(Error::export_requires_export_to(exporter.layout));
+            }
+            if let Layout::Namespaces = exporter.layout
+                && exporter.jsdoc
+            {
+                return Err(Error::jsdoc_namespaces_unsupported());
+            }
+
+            let mut out = render_file_header(&exporter)?;
+
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Ok(Cow::default());
+            if let Some(framework_runtime) = &exporter.framework_runtime {
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: &exporter,
+                    format: Some(&format),
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: "",
+                    types,
+                });
+            }
+            let runtime = runtime?;
+
+            // Framework runtime
+            if !runtime.is_empty() {
+                out += "\n";
+            }
+            out += &runtime;
+            if !runtime.is_empty() {
+                out += "\n";
+            }
+
+            // User types (if not included in framework runtime)
+            if !has_manually_exported_user_types {
+                render_types(&mut out, &exporter, Some(&format), types, "")?;
+            }
+
+            Ok(out)
         }
 
-        let mut out = render_file_header(self)?;
-
-        let mut has_manually_exported_user_types = false;
-        let mut runtime = Ok(Cow::default());
-        if let Some(framework_runtime) = &self.framework_runtime {
-            runtime = (framework_runtime.0)(FrameworkExporter {
-                exporter: self,
-                has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                files_root_types: "",
-                types: resolved_types,
-            });
-        }
-        let runtime = runtime?;
-
-        // Framework runtime
-        if !runtime.is_empty() {
-            out += "\n";
-        }
-        out += &runtime;
-        if !runtime.is_empty() {
-            out += "\n";
-        }
-
-        // User types (if not included in framework runtime)
-        if !has_manually_exported_user_types {
-            render_types(&mut out, self, types, "")?;
-        }
-
-        Ok(out)
+        inner(self.clone(), types, &format)
     }
 
     /// Export the types to a specific file/folder.
@@ -228,206 +242,533 @@ impl Exporter {
     pub fn export_to(
         &self,
         path: impl AsRef<Path>,
-        resolved_types: &ResolvedTypes,
+        types: &Types,
+        format: impl Format,
     ) -> Result<(), Error> {
-        let types = resolved_types.as_types();
-        let path = path.as_ref();
-
-        if self.layout != Layout::Files {
-            let result = self.export(resolved_types)?;
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            };
-            std::fs::write(path, result)?;
-            return Ok(());
-        }
-
-        fn export(
-            exporter: &Exporter,
-            types: &Types,
-            module: &mut Module,
-            s: &mut String,
+        fn inner(
+            exporter: Exporter,
             path: &Path,
-            files: &mut HashMap<PathBuf, String>,
-        ) -> Result<bool, Error> {
-            module.types.sort_by(|a, b| {
-                a.name()
-                    .cmp(b.name())
-                    .then(a.module_path().cmp(b.module_path()))
-                    .then(a.location().cmp(&b.location()))
-            });
-            let (rendered_types_result, referenced_types) =
-                references::with_module_path(module.module_path.as_ref(), || {
-                    references::collect_references(|| {
-                        let mut rendered = String::new();
-                        let exports = render_flat_types(
-                            &mut rendered,
-                            exporter,
-                            types,
-                            module.types.iter().copied(),
-                            "",
-                        )?;
-                        Ok::<_, Error>((rendered, exports))
-                    })
+            types: &Types,
+            format: &dyn Format,
+        ) -> Result<(), Error> {
+            let formatted_types = format_types(types, &format)?;
+            let types = formatted_types.as_ref();
+
+            if exporter.layout != Layout::Files {
+                let mut result = render_file_header(&exporter)?;
+
+                let mut has_manually_exported_user_types = false;
+                let mut runtime = Ok(Cow::default());
+                if let Some(framework_runtime) = &exporter.framework_runtime {
+                    runtime = (framework_runtime.0)(FrameworkExporter {
+                        exporter: &exporter,
+                        format: Some(&format),
+                        has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                        files_root_types: "",
+                        types,
+                    });
+                }
+                let runtime = runtime?;
+
+                if !runtime.is_empty() {
+                    result.push('\n');
+                    result.push_str(&runtime);
+                    result.push('\n');
+                }
+
+                if !has_manually_exported_user_types {
+                    render_types(&mut result, &exporter, Some(&format), types, "")?;
+                }
+
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|source| Error::create_dir(parent.to_path_buf(), source))?;
+                };
+                std::fs::write(path, result)
+                    .map_err(|source| Error::write_file(path.to_path_buf(), source))?;
+                return Ok(());
+            }
+
+            fn export(
+                exporter: &Exporter,
+                format: Option<&dyn Format>,
+                types: &Types,
+                module: &mut Module,
+                s: &mut String,
+                path: &Path,
+                files: &mut HashMap<PathBuf, String>,
+            ) -> Result<bool, Error> {
+                module.types.sort_by(|a, b| {
+                    a.name
+                        .cmp(&b.name)
+                        .then(a.module_path.cmp(&b.module_path))
+                        .then(a.location.cmp(&b.location))
                 });
-            let (rendered_types, exports) = rendered_types_result?;
-
-            let import_paths = referenced_types
-                .into_iter()
-                .filter_map(|r| {
-                    r.get(types)
-                        .map(|ndt| ndt.module_path().as_ref().to_string())
-                })
-                .filter(|module_path| module_path != module.module_path.as_ref())
-                .collect::<BTreeSet<_>>();
-            if !import_paths.is_empty() {
-                s.push('\n');
-                s.push_str(&module_import_block(
-                    exporter,
-                    module.module_path.as_ref(),
-                    &import_paths,
-                ));
-            }
-
-            if !import_paths.is_empty() && !rendered_types.is_empty() {
-                s.push('\n');
-            }
-
-            s.push_str(&rendered_types);
-
-            for (name, module) in &mut module.children {
-                // This doesn't account for `NamedDataType::requires_reference`
-                // but we keep it for performance.
-                if module.types.is_empty() && module.children.is_empty() {
-                    continue;
-                }
-
-                let mut path = path.join(name);
-                let mut out = render_file_header(exporter)?;
-
-                let has_types = export(exporter, types, module, &mut out, &path, files)?;
-                if has_types {
-                    path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
-                    files.insert(path, out);
-                }
-            }
-
-            Ok(!exports.is_empty())
-        }
-
-        let mut files = HashMap::new();
-        let mut runtime_path = path.join("index");
-        runtime_path.set_extension(if self.jsdoc { "js" } else { "ts" });
-
-        let mut root_types = String::new();
-        export(
-            self,
-            types,
-            &mut build_module_graph(types),
-            &mut root_types,
-            path,
-            &mut files,
-        )?;
-
-        {
-            let mut has_manually_exported_user_types = false;
-            let mut runtime = Cow::default();
-            let mut runtime_references = HashSet::new();
-            if let Some(framework_runtime) = &self.framework_runtime {
-                let (runtime_result, referenced_types) = references::with_module_path("", || {
-                    references::collect_references(|| {
-                        (framework_runtime.0)(FrameworkExporter {
-                            exporter: self,
-                            has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                            files_root_types: &root_types,
-                            types: resolved_types,
+                let (rendered_types_result, referenced_types) =
+                    references::with_module_path(module.module_path.as_ref(), || {
+                        references::collect_references(|| {
+                            let mut rendered = String::new();
+                            let exports = render_flat_types(
+                                &mut rendered,
+                                exporter,
+                                format,
+                                types,
+                                module.types.iter().copied(),
+                                "",
+                            )?;
+                            Ok::<_, Error>((rendered, exports))
                         })
-                    })
-                });
-                runtime = runtime_result?;
-                runtime_references = referenced_types;
-            }
+                    });
+                let (rendered_types, exports) = rendered_types_result?;
 
-            let should_export_user_types =
-                !has_manually_exported_user_types && !root_types.is_empty();
+                let import_paths = referenced_types
+                    .into_iter()
+                    .map(|r| reference_module_path(types, &r))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .filter(|module_path| module_path != module.module_path.as_ref())
+                    .collect::<BTreeSet<_>>();
+                if !import_paths.is_empty() {
+                    s.push('\n');
+                    s.push_str(&module_import_block(
+                        exporter,
+                        module.module_path.as_ref(),
+                        &import_paths,
+                    ));
+                }
 
-            if !runtime.is_empty() || should_export_user_types {
-                files.insert(runtime_path, {
-                    let mut out = render_file_header(self)?;
-                    let mut body = String::new();
+                if !import_paths.is_empty() && !rendered_types.is_empty() {
+                    s.push('\n');
+                }
 
-                    // Framework runtime
-                    if !runtime.is_empty() {
-                        body.push_str(&runtime);
+                s.push_str(&rendered_types);
+
+                for (name, module) in &mut module.children {
+                    // This doesn't account for `NamedDataType::requires_reference`
+                    // but we keep it for performance.
+                    if module.types.is_empty() && module.children.is_empty() {
+                        continue;
                     }
 
-                    // User types (if not included in framework runtime)
-                    if should_export_user_types {
-                        if !body.is_empty() {
-                            body.push('\n');
+                    let mut path = path.join(name);
+                    let mut out = render_file_header(exporter)?;
+
+                    let has_types =
+                        export(exporter, format, types, module, &mut out, &path, files)?;
+                    if has_types {
+                        path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+                        files.insert(path, out);
+                    }
+                }
+
+                Ok(!exports.is_empty())
+            }
+
+            let mut files = HashMap::new();
+            let mut runtime_path = path.join("index");
+            runtime_path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+
+            let mut root_types = String::new();
+            export(
+                &exporter,
+                Some(&format),
+                types,
+                &mut build_module_graph(types),
+                &mut root_types,
+                path,
+                &mut files,
+            )?;
+
+            {
+                let mut has_manually_exported_user_types = false;
+                let mut runtime = Cow::default();
+                let mut runtime_references = HashSet::new();
+                if let Some(framework_runtime) = &exporter.framework_runtime {
+                    let (runtime_result, referenced_types) =
+                        references::with_module_path("", || {
+                            references::collect_references(|| {
+                                (framework_runtime.0)(FrameworkExporter {
+                                    exporter: &exporter,
+                                    format: Some(&format),
+                                    has_manually_exported_user_types:
+                                        &mut has_manually_exported_user_types,
+                                    files_root_types: &root_types,
+                                    types,
+                                })
+                            })
+                        });
+                    runtime = runtime_result?;
+                    runtime_references = referenced_types;
+                }
+
+                let should_export_user_types =
+                    !has_manually_exported_user_types && !root_types.is_empty();
+
+                if !runtime.is_empty() || should_export_user_types {
+                    files.insert(runtime_path, {
+                        let mut out = render_file_header(&exporter)?;
+                        let mut body = String::new();
+
+                        // Framework runtime
+                        if !runtime.is_empty() {
+                            body.push_str(&runtime);
                         }
 
-                        body.push_str(&root_types);
-                    }
+                        // User types (if not included in framework runtime)
+                        if should_export_user_types {
+                            if !body.is_empty() {
+                                body.push('\n');
+                            }
 
-                    let import_paths = runtime_references
-                        .into_iter()
-                        .filter_map(|r| {
-                            r.get(types)
-                                .map(|ndt| ndt.module_path().as_ref().to_string())
-                        })
-                        .filter(|module_path| !module_path.is_empty())
-                        .collect::<BTreeSet<_>>();
+                            body.push_str(&root_types);
+                        }
 
-                    let import_paths = import_paths
-                        .into_iter()
-                        .filter(|module_path| {
-                            !body.contains(&module_import_statement(self, "", module_path))
-                        })
-                        .collect::<BTreeSet<_>>();
+                        let import_paths = runtime_references
+                            .into_iter()
+                            .map(|r| reference_module_path(types, &r))
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter()
+                            .flatten()
+                            .filter(|module_path| !module_path.is_empty())
+                            .collect::<BTreeSet<_>>();
 
-                    if !import_paths.is_empty() {
-                        out.push('\n');
-                        out.push_str(&module_import_block(self, "", &import_paths));
-                    }
+                        let import_paths = import_paths
+                            .into_iter()
+                            .filter(|module_path| {
+                                !body.contains(&module_import_statement(&exporter, "", module_path))
+                            })
+                            .collect::<BTreeSet<_>>();
 
-                    if !body.is_empty() {
-                        out.push('\n');
                         if !import_paths.is_empty() {
                             out.push('\n');
+                            out.push_str(&module_import_block(&exporter, "", &import_paths));
                         }
-                        out.push_str(&body);
-                    }
 
-                    out
-                });
-            }
-        }
+                        if !body.is_empty() {
+                            out.push('\n');
+                            if !import_paths.is_empty() {
+                                out.push('\n');
+                            }
+                            out.push_str(&body);
+                        }
 
-        match path.metadata() {
-            Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
-                if source.kind() == std::io::ErrorKind::NotFound {
-                    Ok(())
-                } else {
-                    Err(Error::remove_file(path.to_path_buf(), source))
+                        out
+                    });
                 }
+            }
+
+            match path.metadata() {
+                Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
+                    if source.kind() == std::io::ErrorKind::NotFound {
+                        Ok(())
+                    } else {
+                        Err(Error::remove_file(path.to_path_buf(), source))
+                    }
+                })?,
+                Ok(_) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(source) => {
+                    return Err(Error::metadata(path.to_path_buf(), source));
+                }
+            }
+
+            for (path, content) in &files {
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|source| Error::create_dir(parent.to_path_buf(), source))?;
+                }
+                std::fs::write(path, content)
+                    .map_err(|source| Error::write_file(path.clone(), source))?;
+            }
+
+            cleanup_stale_files(path, &files, &exporter)?;
+
+            Ok(())
+        }
+
+        inner(self.clone(), path.as_ref(), types, &format)
+    }
+}
+
+fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<String>, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .map(|ndt| Some(ndt.module_path.as_ref().to_string()))
+            .ok_or_else(|| {
+                Error::dangling_named_reference("import resolution".to_string(), format!("{r:?}"))
+            }),
+        NamedReferenceType::Inline { .. } => Ok(None),
+        NamedReferenceType::Recursive(_) => types
+            .get(r)
+            .map(|ndt| Some(ndt.module_path.as_ref().to_string()))
+            .ok_or_else(|| {
+                Error::dangling_named_reference("import resolution".to_string(), format!("{r:?}"))
+            }),
+    }
+}
+
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    Ok(
+        match format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?
+        {
+            Cow::Borrowed(_) => Cow::Borrowed(types),
+            Cow::Owned(types) => Cow::Owned(types),
+        },
+    )
+}
+
+fn map_datatype_format(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    path: &[Cow<'static, str>],
+) -> Result<DataType, Error> {
+    if matches!(dt, DataType::Generic(_)) {
+        return Ok(dt.clone());
+    }
+
+    fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
+        Ok(match dt {
+            DataType::Primitive(_) => false,
+            DataType::List(list) => contains_generic_reference(&list.ty)?,
+            DataType::Map(map) => {
+                contains_generic_reference(map.key_ty())?
+                    || contains_generic_reference(map.value_ty())?
+            }
+            DataType::Nullable(inner) => contains_generic_reference(inner)?,
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Unit => false,
+                Fields::Unnamed(unnamed) => unnamed
+                    .fields
+                    .iter()
+                    .filter_map(|field| field.ty.as_ref())
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
+                Fields::Named(named) => named
+                    .fields
+                    .iter()
+                    .filter_map(|(_, field)| field.ty.as_ref())
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
+            },
+            DataType::Enum(enm) => enm.variants.iter().try_fold(false, |found, (_, variant)| {
+                let variant_found = match &variant.fields {
+                    Fields::Unit => false,
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields
+                        .iter()
+                        .filter_map(|field| field.ty.as_ref())
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
+                    Fields::Named(named) => named
+                        .fields
+                        .iter()
+                        .filter_map(|(_, field)| field.ty.as_ref())
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
+                };
+
+                Ok::<_, Error>(found || variant_found)
             })?,
-            Ok(_) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(Error::metadata(path.to_path_buf(), source));
+            DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => {
+                    generics.iter().try_fold(false, |found, (_, dt)| {
+                        Ok::<_, Error>(found || contains_generic_reference(dt)?)
+                    })?
+                }
+                NamedReferenceType::Inline { .. } => false,
+                NamedReferenceType::Recursive(_) => false,
+            },
+            DataType::Generic(_) => true,
+            DataType::Reference(Reference::Opaque(_)) => false,
+            DataType::Intersection(types) => types.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+        })
+    }
+
+    if contains_generic_reference(dt)? {
+        let Some(format) = format else {
+            return map_datatype_format_children(None, types, dt.clone(), path);
+        };
+
+        match format.map_type(types, dt) {
+            Ok(Cow::Borrowed(dt)) => {
+                return map_datatype_format_children(Some(format), types, dt.clone(), path);
+            }
+            Ok(Cow::Owned(dt)) => {
+                return map_datatype_format_children(Some(format), types, dt, path);
+            }
+            Err(err) if is_unresolved_generic_format_error(err.as_ref()) => {
+                return map_datatype_format_children(Some(format), types, dt.clone(), path);
+            }
+            Err(err) => {
+                return Err(Error::format_at(
+                    "datatype formatter failed",
+                    path.join("."),
+                    err,
+                ));
             }
         }
-
-        for (path, content) in &files {
-            path.parent().map(std::fs::create_dir_all).transpose()?;
-            std::fs::write(path, content)?;
-        }
-
-        cleanup_stale_files(path, &files)?;
-
-        Ok(())
     }
+
+    let Some(format) = format else {
+        return Ok(dt.clone());
+    };
+
+    let mapped = format
+        .map_type(types, dt)
+        .map_err(|err| Error::format_at("datatype formatter failed", path.join("."), err))?;
+
+    match mapped {
+        Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone(), path),
+        Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt, path),
+    }
+}
+
+fn is_unresolved_generic_format_error(err: &(dyn std::error::Error + 'static)) -> bool {
+    // The format trait currently erases its concrete error type, so this is the
+    // narrowest compatibility fallback available for formatters that reject
+    // unresolved generics before child mapping has substituted them.
+    err.to_string().contains("Unresolved generic reference")
+}
+
+fn map_datatype_format_children(
+    format: Option<&dyn Format>,
+    types: &Types,
+    mut dt: DataType,
+    path: &[Cow<'static, str>],
+) -> Result<DataType, Error> {
+    match &mut dt {
+        DataType::Primitive(_) => {}
+        DataType::List(list) => {
+            let child_path = format_path(path, "<list_item>");
+            *list.ty = map_datatype_format(format, types, &list.ty, &child_path)?;
+        }
+        DataType::Map(map) => {
+            let key_path = format_path(path, "<map_key>");
+            let value_path = format_path(path, "<map_value>");
+            let key = map_datatype_format(format, types, map.key_ty(), &key_path)?;
+            let value = map_datatype_format(format, types, map.value_ty(), &value_path)?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = map_datatype_format(format, types, inner, path)?;
+        }
+        DataType::Struct(strct) => map_datatype_fields(format, types, &mut strct.fields, path)?,
+        DataType::Enum(enm) => {
+            for (variant_name, variant) in &mut enm.variants {
+                let variant_path = format_path(path, variant_name.clone());
+                map_datatype_fields(format, types, &mut variant.fields, &variant_path)?;
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for (idx, element) in tuple.elements.iter_mut().enumerate() {
+                let element_path = format_path(path, idx.to_string());
+                *element = map_datatype_format(format, types, element, &element_path)?;
+            }
+        }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                *ty = map_datatype_format(format, types, ty, path)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                **dt = map_datatype_format(format, types, dt, path)?;
+            }
+
+            for (_, dt) in named_reference_generics_mut(reference) {
+                *dt = map_datatype_format(format, types, dt, path)?;
+            }
+        }
+        DataType::Generic(_) => {}
+        DataType::Reference(Reference::Opaque(reference)) => {
+            if let Some(branded) = reference.downcast_ref::<Branded>() {
+                dt = Reference::opaque(Branded::new(
+                    branded.brand().clone(),
+                    map_datatype_format(format, types, branded.ty(), path)?,
+                ))
+                .into();
+            }
+        }
+    }
+
+    Ok(dt)
+}
+
+fn format_path(
+    path: &[Cow<'static, str>],
+    segment: impl Into<Cow<'static, str>>,
+) -> Vec<Cow<'static, str>> {
+    let mut path = path.to_vec();
+    path.push(segment.into());
+    path
+}
+
+fn named_reference_generics_mut(
+    reference: &mut NamedReference,
+) -> &mut [(specta::datatype::Generic, DataType)] {
+    match &mut reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &mut [],
+    }
+}
+
+fn map_datatype_fields(
+    format: Option<&dyn Format>,
+    types: &Types,
+    fields: &mut Fields,
+    path: &[Cow<'static, str>],
+) -> Result<(), Error> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for (idx, field) in unnamed.fields.iter_mut().enumerate() {
+                if let Some(ty) = field.ty.as_mut() {
+                    let field_path = format_path(path, idx.to_string());
+                    *ty = map_datatype_format(format, types, ty, &field_path)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (name, field) in &mut named.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    let field_path = format_path(path, name.clone());
+                    *ty = map_datatype_format(format, types, ty, &field_path)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn map_named_datatype_format(
+    format: Option<&dyn Format>,
+    types: &Types,
+    ndt: &NamedDataType,
+) -> Result<NamedDataType, Error> {
+    let mut mapped = ndt.clone();
+    mapped.ty = ndt
+        .ty
+        .clone()
+        .map(|ty| map_datatype_format_children(format, types, ty, &[rust_type_path(ndt)]))
+        .transpose()
+        .map_err(|err| err.with_named_datatype(ndt))?;
+    Ok(mapped)
 }
 
 impl AsRef<Exporter> for Exporter {
@@ -445,8 +786,9 @@ impl AsMut<Exporter> for Exporter {
 /// Reference to Typescript language exporter for branded type callbacks.
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
+    pub(crate) format: Option<&'a dyn Format>,
     /// Collected types currently being exported.
-    pub types: &'a ResolvedTypes,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for BrandedTypeExporter<'_> {
@@ -472,23 +814,34 @@ impl Deref for BrandedTypeExporter<'_> {
 impl BrandedTypeExporter<'_> {
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        primitives::inline(self, self.types, dt)
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::inline(self, self.types, &mapped)
     }
 
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        primitives::reference(self, self.types, r)
+        let mapped = map_datatype_format(
+            self.format,
+            self.types,
+            &DataType::Reference(r.clone()),
+            &[],
+        )?;
+        match mapped {
+            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
+            dt => primitives::inline(self, self.types, &dt),
+        }
     }
 }
 
 /// Reference to Typescript language exporter for framework
 pub struct FrameworkExporter<'a> {
     exporter: &'a Exporter,
+    format: Option<&'a dyn Format>,
     has_manually_exported_user_types: &'a mut bool,
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a ResolvedTypes,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -512,7 +865,7 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within the [`ResolvedTypes`](specta::ResolvedTypes).
+    /// Render the types within the [`Types`](specta::Types).
     ///
     /// This will only work if used within [`Exporter::framework_runtime`].
     /// It allows frameworks to intersperse their user types into their runtime code.
@@ -521,7 +874,8 @@ impl FrameworkExporter<'_> {
         render_types(
             &mut s,
             self.exporter,
-            self.types.as_types(),
+            self.format,
+            self.types,
             self.files_root_types,
         )?;
         *self.has_manually_exported_user_types = true;
@@ -530,12 +884,22 @@ impl FrameworkExporter<'_> {
 
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        primitives::inline(self, self.types, dt)
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::inline(self, self.types, &mapped)
     }
 
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        primitives::reference(self, self.types, r)
+        let mapped = map_datatype_format(
+            self.format,
+            self.types,
+            &DataType::Reference(r.clone()),
+            &[],
+        )?;
+        match mapped {
+            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
+            dt => primitives::inline(self, self.types, &dt),
+        }
     }
 
     /// [primitives::export]
@@ -544,7 +908,10 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
-        primitives::export(self, self.types, ndts, indent)
+        let mapped = ndts
+            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
+            .collect::<Result<Vec<_>, _>>()?;
+        primitives::export(self, self.types, mapped.iter(), indent)
     }
 }
 
@@ -562,7 +929,7 @@ fn build_module_graph(types: &Types) -> Module<'_> {
             module_path: Default::default(),
         },
         |mut ns, ndt| {
-            let path = ndt.module_path();
+            let path = &ndt.module_path;
 
             if path.is_empty() {
                 ns.types.push(ndt);
@@ -607,21 +974,20 @@ fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
 fn render_types(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     files_user_types: &str,
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
-                module.types.iter().any(|ndt| ndt.requires_reference(types))
-                    || module
-                        .children
-                        .values()
-                        .any(|child| has_renderable_content(child, types))
+            fn has_renderable_content(module: &Module<'_>) -> bool {
+                module.types.iter().any(|ndt| ndt.ty.is_some())
+                    || module.children.values().any(has_renderable_content)
             }
 
             fn export<'a>(
                 exporter: &Exporter,
+                format: Option<&dyn Format>,
                 types: &Types,
                 s: &mut String,
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
@@ -631,7 +997,7 @@ fn render_types(
                 let content_indent = "\t".repeat(depth + 1);
 
                 for (name, module) in module {
-                    if !has_renderable_content(module, types) {
+                    if !has_renderable_content(module) {
                         continue;
                     }
 
@@ -646,21 +1012,29 @@ fn render_types(
 
                     // Types
                     module.types.sort_by(|a, b| {
-                        a.name()
-                            .cmp(b.name())
-                            .then(a.module_path().cmp(b.module_path()))
-                            .then(a.location().cmp(&b.location()))
+                        a.name
+                            .cmp(&b.name)
+                            .then(a.module_path.cmp(&b.module_path))
+                            .then(a.location.cmp(&b.location))
                     });
                     render_flat_types(
                         s,
                         exporter,
+                        format,
                         types,
                         module.types.iter().copied(),
                         &content_indent,
                     )?;
 
                     // Namespaces
-                    export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
+                    export(
+                        exporter,
+                        format,
+                        types,
+                        s,
+                        module.children.iter_mut(),
+                        depth + 1,
+                    )?;
 
                     s.push_str(&namespace_indent);
                     s.push_str("}\n");
@@ -676,15 +1050,13 @@ fn render_types(
                 for name in module
                     .children
                     .iter()
-                    .filter_map(|(name, module)| {
-                        has_renderable_content(module, types).then_some(*name)
-                    })
+                    .filter_map(|(name, module)| has_renderable_content(module).then_some(*name))
                     .chain(
                         module
                             .types
                             .iter()
-                            .filter(|ndt| ndt.requires_reference(types))
-                            .map(|ndt| ndt.name().as_ref()),
+                            .filter(|ndt| ndt.ty.is_some())
+                            .map(|ndt| ndt.name.as_ref()),
                     )
                 {
                     reexports.push_str("export import ");
@@ -696,11 +1068,18 @@ fn render_types(
                 reexports
             };
 
-            export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
+            export(
+                exporter,
+                format,
+                types,
+                s,
+                [(&"$s$", &mut module)].into_iter(),
+                0,
+            )?;
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, format, types, types.into_sorted_iter(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.
@@ -719,6 +1098,7 @@ fn render_types(
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
@@ -726,22 +1106,18 @@ fn render_flat_types<'a>(
     let mut exports = HashMap::with_capacity(ndts.len());
 
     let ndts = ndts
-        .filter(|ndt| ndt.requires_reference(types))
+        .filter(|ndt| ndt.ty.is_some())
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
-            if let Some(other) = exports.insert(export_name.to_string(), ndt.location()) {
-                return Err(Error::duplicate_type_name(
-                    export_name,
-                    ndt.location(),
-                    other,
-                ));
+            if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
+                return Err(Error::duplicate_type_name(export_name, ndt.location, other));
             }
 
             Ok(ndt)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
+    primitives::export_internal(s, exporter, format, types, ndts.into_iter(), indent)?;
 
     Ok(exports)
 }
@@ -776,11 +1152,13 @@ fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, Error> {
     Ok(files)
 }
 
-fn is_generated_specta_file(path: &Path) -> Result<bool, Error> {
+fn is_generated_specta_file(path: &Path, exporter: &Exporter) -> Result<bool, Error> {
     match std::fs::read_to_string(path) {
-        Ok(contents) => Ok(contents.contains("generated by Specta")),
+        Ok(contents) => Ok((!exporter.framework_prelude.is_empty()
+            && contents.contains(exporter.framework_prelude.as_ref()))
+            || contents.contains("generated by Specta")),
         Err(err) if err.kind() == std::io::ErrorKind::InvalidData => Ok(false),
-        Err(source) => Err(Error::from(source)),
+        Err(source) => Err(Error::read_file(path.to_path_buf(), source)),
     }
 }
 
@@ -821,9 +1199,17 @@ fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), Error> {
 }
 
 /// Delete stale files and clean up empty directories
-fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) -> Result<(), Error> {
+fn cleanup_stale_files(
+    root: &Path,
+    current_files: &HashMap<PathBuf, String>,
+    exporter: &Exporter,
+) -> Result<(), Error> {
+    if !root.exists() {
+        return Ok(());
+    }
+
     for path in collect_existing_files(root)? {
-        if current_files.contains_key(&path) || !is_generated_specta_file(&path)? {
+        if current_files.contains_key(&path) || !is_generated_specta_file(&path, exporter)? {
             continue;
         }
 
@@ -844,12 +1230,12 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
 fn exported_type_name(exporter: &Exporter, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
         Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             s.push('_');
-            s.push_str(ndt.name());
+            s.push_str(&ndt.name);
             Cow::Owned(s)
         }
-        _ => ndt.name().clone(),
+        _ => ndt.name.clone(),
     }
 }
 

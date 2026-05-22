@@ -1,8 +1,5 @@
 use std::{borrow::Cow, error, fmt};
 
-/// Result type for `specta-serde` operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
 /// Error type for serde transformation and validation failures.
 #[non_exhaustive]
 pub struct Error {
@@ -19,10 +16,6 @@ enum ErrorKind {
         path: String,
         variant: String,
         reason: Cow<'static, str>,
-    },
-    UnresolvedGenericReference {
-        path: String,
-        generic: String,
     },
     InvalidEnumRepresentation {
         reason: Cow<'static, str>,
@@ -90,18 +83,6 @@ impl Error {
                 path: path.into(),
                 variant: variant.into(),
                 reason: reason.into(),
-            },
-        }
-    }
-
-    pub(crate) fn unresolved_generic_reference(
-        path: impl Into<String>,
-        generic: impl Into<String>,
-    ) -> Self {
-        Self {
-            kind: ErrorKind::UnresolvedGenericReference {
-                path: path.into(),
-                generic: generic.into(),
             },
         }
     }
@@ -237,10 +218,6 @@ impl fmt::Display for Error {
                 f,
                 "Invalid internally tagged enum at '{path}', variant '{variant}': {reason}"
             ),
-            ErrorKind::UnresolvedGenericReference { path, generic } => write!(
-                f,
-                "Unresolved generic reference '{generic}' while validating '{path}'"
-            ),
             ErrorKind::InvalidEnumRepresentation { reason } => {
                 write!(f, "Invalid serde enum representation: {reason}")
             }
@@ -272,7 +249,7 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use apply_phases for asymmetric serde conversions"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use PhasesFormat for asymmetric serde conversions"
             ),
             ErrorKind::InvalidConversionUsage { path, reason } => {
                 write!(

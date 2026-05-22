@@ -2,17 +2,20 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
-Issue374: Issue374
-Optional: Optional
-StructPhaseSpecificRename: StructPhaseSpecificRename
-Range<i32>: {
-	start: number,
-	end: number,
-}
-RangeInclusive<i32>: {
-	start: number,
-	end: number,
-}
+Issue374: Issue374_Serialize
+Optional: Optional_Serialize
+StructPhaseSpecificRename: StructPhaseSpecificRenameSerialize
+StructWithAlias: StructWithAlias_Serialize
+StructWithMultipleAliases: StructWithMultipleAliases_Serialize
+StructWithAliasAndRename: StructWithAliasAndRename_Serialize
+EnumWithVariantAlias: EnumWithVariantAlias_Serialize
+EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases_Serialize
+EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename_Serialize
+InternallyTaggedWithAlias: InternallyTaggedWithAlias_Serialize
+AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias_Serialize
+UntaggedWithAlias: UntaggedWithAlias_Serialize
+Range<i32>: Range<number>
+RangeInclusive<i32>: RangeInclusive<number>
 String: string
 PathBuf: string
 IpAddr: string
@@ -25,7 +28,7 @@ Cow<'static, str>: string
 Cow<'static, i32>: number
 Vec<i32>: number[]
 Vec<MyEnum>: MyEnum[]
-Result<String, i32>: ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }
+Result<String, i32>: Result<string, number>
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 PhantomData<()>: null
 PhantomData<String>: null
@@ -92,7 +95,7 @@ TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
-Struct: Struct
+Struct: StructNew
 Struct2: Struct2
 Enum: Enum
 Enum2: Enum2
@@ -171,15 +174,6 @@ InternallyTaggedF: InternallyTaggedF
 InternallyTaggedH: InternallyTaggedH
 InternallyTaggedL: InternallyTaggedL
 InternallyTaggedM: InternallyTaggedM
-StructWithAlias: StructWithAlias
-StructWithMultipleAliases: StructWithMultipleAliases
-StructWithAliasAndRename: StructWithAliasAndRename
-EnumWithVariantAlias: EnumWithVariantAlias
-EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases
-EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename
-InternallyTaggedWithAlias: InternallyTaggedWithAlias
-AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias
-UntaggedWithAlias: UntaggedWithAlias
 Issue221UntaggedSafe: Issue221UntaggedSafe
 Issue221UntaggedMixed: Issue221UntaggedMixed
 EmptyEnum: EmptyEnum
@@ -220,7 +214,19 @@ InlineGenericNested<String>: [string, string[], [string, string], { [key in stri
 } }) & { Unnamed?: never }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
+GenericDefault: GenericDefault
+ChainedGenericDefault: ChainedGenericDefault
+ChainedGenericDefault<String, String>: ChainedGenericDefault
+ChainedGenericDefault<i32>: ChainedGenericDefault<number, number>
+ChainedGenericDefault<String, i32>: ChainedGenericDefault<string, number>
+GenericDefaultSkipped: GenericDefaultSkipped<string>
+GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
+ConstGenericInNonConstContainer: ConstGenericInNonConstContainer
+ConstGenericInConstContainer: ConstGenericInConstContainer
+NamedConstGenericContainer: NamedConstGenericContainer
+InlineConstGenericContainer: InlineConstGenericContainer
+InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer
 TestCollectionRegister: TestCollectionRegister
 TestCollectionRegister: TestCollectionRegister
 specta_typescript::Any: any
@@ -229,3 +235,7 @@ specta_typescript::Unknown: unknown
 specta_typescript::Unknown<String>: unknown
 specta_typescript::Never: never
 specta_typescript::Never<String>: never
+specta_typescript::Number: number
+specta_typescript::Number<i128>: number
+specta_typescript::BigInt: bigint
+specta_typescript::BigInt<i128>: bigint

@@ -1,4 +1,6 @@
-use specta::{ResolvedTypes, Type, Types};
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -59,10 +61,8 @@ fn test_comprehensive_export() {
         .register::<UserRole>()
         .register::<ApiResponse<String>>()
         .register::<ApiResult<String, String>>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -112,10 +112,8 @@ fn test_comprehensive_export() {
 #[test]
 fn test_naming_conventions() {
     let types = Types::default().register::<User>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     // Test PascalCase for type names
     assert!(output.contains("struct User"));
@@ -128,15 +126,13 @@ fn test_naming_conventions() {
 #[test]
 fn test_swift_configuration() {
     let types = Types::default().register::<User>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     // Test with custom configuration
     let swift = Swift::new()
         .header("// Custom header")
         .naming(specta_swift::NamingConvention::SnakeCase)
         .optionals(specta_swift::OptionalStyle::Optional);
 
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Snake case output:\n{}", output);
 

@@ -10,7 +10,7 @@ Specta provides a system for type introspection and a set of language exporters 
 - Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`.
-
+ 
 ## Ecosystem
 
 Specta can be used in your application either directly or through a library which simplifies the process of using it.
@@ -18,6 +18,7 @@ Specta can be used in your application either directly or through a library whic
 - [rspc](https://github.com/specta-rs/rspc) - A framework for building typesafe web backends in Rust
 - [tauri-specta](https://github.com/specta-rs/tauri-specta) - Completely typesafe Tauri commands
 - [TauRPC](https://github.com/MatsDK/TauRPC) - Typesafe IPC layer for Tauri applications
+- [orpc-rs](https://github.com/ahonn/orpc-rs) - Rust implementation of [oRPC](https://orpc.dev) — type-safe RPC with first-class Tauri support.
 
 ## Languages
 

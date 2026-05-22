@@ -1,12 +1,12 @@
 //! Primitives provide building blocks for Specta-based libraries.
 
-use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
+use std::{borrow::Cow, fmt::Write as _};
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{
         DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
-        OpaqueReference, Primitive, Reference, Struct, Tuple,
+        NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
 };
 
@@ -14,85 +14,48 @@ use crate::{
     BigIntExportBehavior, Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES,
 };
 
-thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>)>> = const { RefCell::new(Vec::new()) };
-    static TYPE_RENDER_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
-    static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
-}
+pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
-struct TypeRenderGuard;
-
-impl Drop for TypeRenderGuard {
-    fn drop(&mut self) {
-        TYPE_RENDER_STACK.with(|stack| {
-            stack.borrow_mut().pop();
-        });
+fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { generics, .. } => Ok(generics),
+        NamedReferenceType::Inline { .. } => Ok(&[]),
+        NamedReferenceType::Recursive(_) => Err(Error::dangling_named_reference(format!(
+            "recursive inline named reference {r:?}"
+        ))),
     }
 }
 
-struct GenericScopeGuard;
-
-impl Drop for GenericScopeGuard {
-    fn drop(&mut self) {
-        GENERIC_NAME_STACK.with(|stack| {
-            stack.borrow_mut().pop();
-        });
+fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a DataType, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
+        NamedReferenceType::Inline { dt, .. } => Ok(dt),
+        NamedReferenceType::Recursive(_) => Err(Error::dangling_named_reference(format!(
+            "recursive inline named reference {r:?}"
+        ))),
     }
-}
-
-fn push_type_render_stack(
-    module_path: Cow<'static, str>,
-    name: Cow<'static, str>,
-) -> TypeRenderGuard {
-    TYPE_RENDER_STACK.with(|stack| {
-        stack.borrow_mut().push((module_path, name));
-    });
-    TypeRenderGuard
-}
-
-fn push_generic_scope(generics: &[(GenericReference, Cow<'static, str>)]) -> GenericScopeGuard {
-    GENERIC_NAME_STACK.with(|stack| {
-        stack.borrow_mut().push(generics.to_vec());
-    });
-    GenericScopeGuard
-}
-
-fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>> {
-    GENERIC_NAME_STACK.with(|stack| {
-        stack.borrow().iter().rev().find_map(|scope| {
-            scope
-                .iter()
-                .find(|(candidate, _)| candidate == generic)
-                .map(|(_, name)| name.clone())
-        })
-    })
-}
-
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child.iter().cloned().chain(unshadowed_parent).collect()
 }
 
 /// Generate a group of `export const XSchema = ...` declarations for named types.
 pub fn export<'a>(
     exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types.as_types(), ndts, indent)?;
+    let mut type_render_stack = TypeRenderStack::new();
+    export_internal(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        ndts,
+        indent,
+        &mut type_render_stack,
+    )?;
     Ok(s)
 }
 
@@ -102,12 +65,13 @@ pub(crate) fn export_internal<'a>(
     types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     for (index, ndt) in ndts.enumerate() {
         if index != 0 {
             s.push('\n');
         }
-        export_single_internal(s, exporter, types, ndt, indent)?;
+        export_single_internal(s, exporter, types, ndt, indent, type_render_stack)?;
     }
 
     Ok(())
@@ -119,111 +83,132 @@ fn export_single_internal(
     types: &Types,
     ndt: &NamedDataType,
     indent: &str,
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let base_name = exported_type_name(exporter, ndt);
-    let name_path = if ndt.module_path().is_empty() {
-        ndt.name().to_string()
+    let name_path = if ndt.module_path.is_empty() {
+        ndt.name.to_string()
     } else {
-        format!("{}::{}", ndt.module_path(), ndt.name())
+        format!("{}::{}", ndt.module_path, ndt.name)
     };
     validate_type_name(&base_name, name_path)?;
     let schema_name = format!("{base_name}Schema");
 
-    let _guard = push_type_render_stack(ndt.module_path().clone(), ndt.name().clone());
-    let _generic_scope = push_generic_scope(ndt.generics());
+    let Some(ty) = &ndt.ty else {
+        return Ok(());
+    };
 
-    if ndt.generics().is_empty() {
+    type_render_stack.push((ndt.module_path.clone(), ndt.name.clone()));
+
+    let result = (|| {
+        if ndt.generics.is_empty() {
+            let mut schema_expr = String::new();
+            datatype(
+                &mut schema_expr,
+                exporter,
+                types,
+                ty,
+                vec![ndt.name.clone()],
+                &[],
+                false,
+                type_render_stack,
+            )?;
+
+            writeln!(s, "{indent}export const {schema_name} = {schema_expr};")?;
+            writeln!(
+                s,
+                "{indent}export type {base_name} = z.infer<typeof {schema_name}>;"
+            )?;
+            return Ok(());
+        }
+
+        let generic_names = ndt
+            .generics
+            .iter()
+            .map(|generic| generic.name.as_ref().to_string())
+            .collect::<Vec<_>>();
+
+        let generic_params = generic_names
+            .iter()
+            .map(|name| format!("{name} extends z.ZodTypeAny"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let fn_params = generic_names.join(", ");
+
         let mut schema_expr = String::new();
         datatype(
             &mut schema_expr,
             exporter,
             types,
-            ndt.ty(),
-            vec![ndt.name().clone()],
+            ty,
+            vec![ndt.name.clone()],
             &[],
             false,
+            type_render_stack,
         )?;
 
-        writeln!(s, "{indent}export const {schema_name} = {schema_expr};")?;
         writeln!(
             s,
-            "{indent}export type {base_name} = z.infer<typeof {schema_name}>;"
+            "{indent}export const {schema_name} = <{generic_params}>({fn_params}) => {schema_expr};"
         )?;
-        return Ok(());
-    }
 
-    let generic_names = ndt
-        .generics()
-        .iter()
-        .map(|(_, name)| name.as_ref().to_string())
-        .collect::<Vec<_>>();
+        let alias_params = generic_names.join(", ");
+        let infer_args = generic_names
+            .iter()
+            .map(|name| format!("z.ZodType<{name}>"))
+            .collect::<Vec<_>>()
+            .join(", ");
 
-    let generic_params = generic_names
-        .iter()
-        .map(|name| format!("{name} extends z.ZodTypeAny"))
-        .collect::<Vec<_>>()
-        .join(", ");
+        writeln!(
+            s,
+            "{indent}export type {base_name}<{alias_params}> = z.infer<ReturnType<typeof {schema_name}<{infer_args}>>>;"
+        )?;
 
-    let fn_params = generic_names.join(", ");
+        Ok(())
+    })();
 
-    let mut schema_expr = String::new();
-    datatype(
-        &mut schema_expr,
-        exporter,
-        types,
-        ndt.ty(),
-        vec![ndt.name().clone()],
-        &[],
-        false,
-    )?;
-
-    writeln!(
-        s,
-        "{indent}export const {schema_name} = <{generic_params}>({fn_params}) => {schema_expr};"
-    )?;
-
-    let alias_params = generic_names.join(", ");
-    let infer_args = generic_names
-        .iter()
-        .map(|name| format!("z.ZodType<{name}>"))
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    writeln!(
-        s,
-        "{indent}export type {base_name}<{alias_params}> = z.infer<ReturnType<typeof {schema_name}<{infer_args}>>>;"
-    )?;
-
-    Ok(())
+    type_render_stack.pop();
+    result
 }
 
 /// Generate an inline Zod expression for a [`DataType`].
-pub fn inline(
-    exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
-    dt: &DataType,
-) -> Result<String, Error> {
+///
+/// If you are using a custom format such as `specta_serde::Format`, this helper does not apply
+/// datatype mapping automatically. Map both the full [`Types`] graph and any top-level
+/// [`DataType`] values before calling this helper.
+pub fn inline(exporter: &dyn AsRef<Zod>, types: &Types, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
+    let mut type_render_stack = TypeRenderStack::new();
     datatype(
         &mut s,
         exporter.as_ref(),
-        types.as_types(),
+        types,
         dt,
         vec![],
         &[],
         false,
+        &mut type_render_stack,
     )?;
     Ok(s)
 }
 
 /// Generate a Zod expression for a [`Reference`].
-pub fn reference(
-    exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
-    r: &Reference,
-) -> Result<String, Error> {
+///
+/// If you are using a custom format such as `specta_serde::Format`, this helper does not apply
+/// datatype mapping automatically.
+pub fn reference(exporter: &dyn AsRef<Zod>, types: &Types, r: &Reference) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types.as_types(), r, vec![], &[])?;
+    let mut type_render_stack = TypeRenderStack::new();
+    reference_dt(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        r,
+        vec![],
+        &[],
+        &mut type_render_stack,
+    )?;
     Ok(s)
 }
 
@@ -235,8 +220,18 @@ pub(crate) fn datatype_with_inline_attr(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
     inline: bool,
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
-    datatype(s, exporter, types, dt, location, generics, inline)
+    datatype(
+        s,
+        exporter,
+        types,
+        dt,
+        location,
+        generics,
+        inline,
+        type_render_stack,
+    )
 }
 
 fn datatype(
@@ -247,11 +242,12 @@ fn datatype(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
     force_inline_ref: bool,
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
+        DataType::List(l) => list_dt(s, exporter, types, l, location, generics, type_render_stack)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics, type_render_stack)?,
         DataType::Nullable(def) => {
             let mut inner = String::new();
             datatype(
@@ -262,34 +258,82 @@ fn datatype(
                 location,
                 generics,
                 force_inline_ref,
+                type_render_stack,
             )?;
             write!(s, "{inner}.nullable()")?;
         }
-        DataType::Struct(st) => struct_dt(s, exporter, types, st, location, generics)?,
-        DataType::Enum(enm) => enum_dt(s, exporter, types, enm, location, generics)?,
-        DataType::Tuple(tuple) => tuple_dt(s, exporter, types, tuple, location, generics)?,
+        DataType::Struct(st) => struct_dt(
+            s,
+            exporter,
+            types,
+            st,
+            location,
+            generics,
+            type_render_stack,
+        )?,
+        DataType::Enum(enm) => enum_dt(
+            s,
+            exporter,
+            types,
+            enm,
+            location,
+            generics,
+            type_render_stack,
+        )?,
+        DataType::Tuple(tuple) => tuple_dt(
+            s,
+            exporter,
+            types,
+            tuple,
+            location,
+            generics,
+            type_render_stack,
+        )?,
         DataType::Reference(r) => {
             if force_inline_ref {
                 match r {
                     Reference::Named(named) => {
-                        let ndt = named
-                            .get(types)
-                            .ok_or_else(|| Error::dangling_named_reference(format!("{named:?}")))?;
-                        let combined_generics = merged_generics(generics, named.generics());
+                        let ty = named_reference_ty(types, named)?;
+                        let reference_generics = named_reference_generics(named)?;
                         datatype(
                             s,
                             exporter,
                             types,
-                            ndt.ty(),
+                            ty,
                             location,
-                            &combined_generics,
+                            reference_generics,
                             false,
+                            type_render_stack,
                         )?;
                     }
-                    _ => reference_dt(s, exporter, types, r, location, generics)?,
+                    _ => {
+                        reference_dt(s, exporter, types, r, location, generics, type_render_stack)?
+                    }
                 }
             } else {
-                reference_dt(s, exporter, types, r, location, generics)?;
+                reference_dt(s, exporter, types, r, location, generics, type_render_stack)?;
+            }
+        }
+        DataType::Generic(g) => generic_dt(s, g),
+        DataType::Intersection(intersection) => {
+            let mut parts = Vec::with_capacity(intersection.len());
+            for ty in intersection {
+                let mut part = String::new();
+                datatype(
+                    &mut part,
+                    exporter,
+                    types,
+                    ty,
+                    location.clone(),
+                    generics,
+                    false,
+                    type_render_stack,
+                )?;
+                parts.push(part);
+            }
+            s.push_str(&parts.join(".and("));
+            for _ in 1..parts.len() {
+                s.push(')');
             }
         }
     }
@@ -324,11 +368,21 @@ fn list_dt(
     l: &List,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let mut dt = String::new();
-    datatype(&mut dt, exporter, types, l.ty(), location, generics, false)?;
+    datatype(
+        &mut dt,
+        exporter,
+        types,
+        &l.ty,
+        location,
+        generics,
+        false,
+        type_render_stack,
+    )?;
 
-    if let Some(length) = l.length() {
+    if let Some(length) = l.length {
         s.push_str("z.tuple([");
         for n in 0..length {
             if n != 0 {
@@ -351,6 +405,7 @@ fn map_dt(
     m: &Map,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let mut key = String::new();
     datatype(
@@ -361,6 +416,7 @@ fn map_dt(
         location.clone(),
         generics,
         false,
+        type_render_stack,
     )?;
     let mut value = String::new();
     datatype(
@@ -371,6 +427,7 @@ fn map_dt(
         location,
         generics,
         false,
+        type_render_stack,
     )?;
 
     write!(s, "z.record({key}, {value})")?;
@@ -384,8 +441,9 @@ fn tuple_dt(
     t: &Tuple,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
-    match t.elements() {
+    match t.elements.as_slice() {
         [] => s.push_str("z.null()"),
         elements => {
             s.push_str("z.tuple([");
@@ -393,7 +451,16 @@ fn tuple_dt(
                 if i != 0 {
                     s.push_str(", ");
                 }
-                datatype(s, exporter, types, dt, location.clone(), generics, false)?;
+                datatype(
+                    s,
+                    exporter,
+                    types,
+                    dt,
+                    location.clone(),
+                    generics,
+                    false,
+                    type_render_stack,
+                )?;
             }
             s.push_str("])");
         }
@@ -409,19 +476,20 @@ fn struct_dt(
     st: &Struct,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
-    match st.fields() {
+    match &st.fields {
         Fields::Unit => s.push_str("z.null()"),
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>();
 
             match fields.as_slice() {
                 [] => s.push_str("z.tuple([])"),
-                [(field, ty)] if unnamed.fields().len() == 1 => {
+                [(field, ty)] if unnamed.fields.len() == 1 => {
                     datatype_with_inline_attr(
                         s,
                         exporter,
@@ -429,12 +497,13 @@ fn struct_dt(
                         ty,
                         location,
                         generics,
-                        field.inline(),
+                        false,
+                        type_render_stack,
                     )?;
                 }
                 fields => {
                     s.push_str("z.tuple([");
-                    for (i, (field, ty)) in fields.iter().enumerate() {
+                    for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
                             s.push_str(", ");
                         }
@@ -445,7 +514,8 @@ fn struct_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline(),
+                            false,
+                            type_render_stack,
                         )?;
                     }
                     s.push_str("])");
@@ -454,9 +524,9 @@ fn struct_dt(
         }
         Fields::Named(named) => {
             let all_fields = named
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, field, ty)))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, field, ty)))
                 .collect::<Vec<_>>();
 
             if all_fields.is_empty() {
@@ -464,8 +534,7 @@ fn struct_dt(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, field, _)| field.flatten());
+            let non_flattened = all_fields.iter().collect::<Vec<_>>();
 
             let mut schema = String::from("z.object({");
             for (name, field, ty) in &non_flattened {
@@ -479,9 +548,10 @@ fn struct_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline(),
+                    false,
+                    type_render_stack,
                 )?;
-                if field.optional() {
+                if field.optional {
                     write!(schema, "{value}.optional(),")?;
                 } else {
                     write!(schema, "{value},")?;
@@ -492,25 +562,7 @@ fn struct_dt(
             }
             schema.push_str("})");
 
-            let mut sections = vec![schema];
-            for (_, field, ty) in flattened {
-                let mut value = String::new();
-                datatype_with_inline_attr(
-                    &mut value,
-                    exporter,
-                    types,
-                    ty,
-                    location.clone(),
-                    generics,
-                    field.inline(),
-                )?;
-                sections.push(value);
-            }
-
-            s.push_str(&sections.join(".and("));
-            for _ in 1..sections.len() {
-                s.push(')');
-            }
+            s.push_str(&schema);
         }
     }
 
@@ -524,11 +576,12 @@ fn enum_dt(
     e: &Enum,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let variants = e
-        .variants()
+        .variants
         .iter()
-        .filter(|(_, variant)| !variant.skip())
+        .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| {
             enum_variant_dt(
                 exporter,
@@ -537,6 +590,7 @@ fn enum_dt(
                 variant,
                 location.clone(),
                 generics,
+                type_render_stack,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -567,11 +621,12 @@ fn enum_variant_dt(
     variant: &specta::datatype::Variant,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<Option<String>, Error> {
-    match variant.fields() {
+    match &variant.fields {
         Fields::Unit => Ok(Some(format!("z.literal(\"{}\")", escape_string(name)))),
         Fields::Named(named) => {
-            if named.fields().iter().all(|(_, field)| field.ty().is_none()) {
+            if named.fields.iter().all(|(_, field)| field.ty.is_none()) {
                 return Ok(Some("z.object({}).strict()".to_string()));
             }
 
@@ -579,12 +634,12 @@ fn enum_variant_dt(
             let mut has_field = false;
             let mut flattened_sections = Vec::new();
 
-            for (field_name, field) in named.fields() {
-                let Some(ty) = field.ty() else {
+            for (field_name, field) in &named.fields {
+                let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
 
-                if field.flatten() {
+                if false {
                     let mut value = String::new();
                     datatype_with_inline_attr(
                         &mut value,
@@ -593,7 +648,8 @@ fn enum_variant_dt(
                         ty,
                         location.clone(),
                         generics,
-                        field.inline(),
+                        false,
+                        type_render_stack,
                     )?;
                     flattened_sections.push(value);
                     continue;
@@ -608,11 +664,12 @@ fn enum_variant_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline(),
+                    false,
+                    type_render_stack,
                 )?;
 
                 let key = sanitise_key(field_name);
-                if field.optional() {
+                if field.optional {
                     write!(schema, "\n\t{key}: {value}.optional(),")?;
                 } else {
                     write!(schema, "\n\t{key}: {value},")?;
@@ -639,20 +696,20 @@ fn enum_variant_dt(
         }
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>();
 
             Ok(match fields.as_slice() {
                 [] => {
-                    if unnamed.fields().is_empty() {
+                    if unnamed.fields.is_empty() {
                         Some("z.tuple([])".to_string())
                     } else {
                         None
                     }
                 }
-                [(field, ty)] if unnamed.fields().len() == 1 => {
+                [(field, ty)] if unnamed.fields.len() == 1 => {
                     let mut out = String::new();
                     datatype_with_inline_attr(
                         &mut out,
@@ -661,13 +718,14 @@ fn enum_variant_dt(
                         ty,
                         location,
                         generics,
-                        field.inline(),
+                        false,
+                        type_render_stack,
                     )?;
                     Some(out)
                 }
                 fields => {
                     let mut out = String::from("z.tuple([");
-                    for (i, (field, ty)) in fields.iter().enumerate() {
+                    for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
                             out.push_str(", ");
                         }
@@ -679,7 +737,8 @@ fn enum_variant_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline(),
+                            false,
+                            type_render_stack,
                         )?;
                         out.push_str(&item);
                     }
@@ -698,29 +757,18 @@ fn reference_dt(
     r: &Reference,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match r {
-        Reference::Named(r) => reference_named_dt(s, exporter, types, r, location, generics),
-        Reference::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Reference(Reference::Generic(inner)) if inner == g)
-                {
-                    let generic_name = resolve_generic_name(g)
-                        .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-                    s.push_str(generic_name.as_ref());
-                } else {
-                    datatype(s, exporter, types, resolved_dt, location, generics, false)?;
-                }
-            } else {
-                let generic_name = resolve_generic_name(g)
-                    .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-                s.push_str(generic_name.as_ref());
-            }
-
-            Ok(())
+        Reference::Named(r) => {
+            reference_named_dt(s, exporter, types, r, location, generics, type_render_stack)
         }
         Reference::Opaque(r) => reference_opaque_dt(s, r),
     }
+}
+
+fn generic_dt(s: &mut String, g: &GenericReference) {
+    s.push_str(g.name());
 }
 
 fn reference_opaque_dt(s: &mut String, r: &OpaqueReference) -> Result<(), Error> {
@@ -751,78 +799,65 @@ fn reference_named_dt(
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
-    let ndt = r
-        .get(types)
+    let ndt = types
+        .get(r)
         .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
-    let _generic_scope = push_generic_scope(ndt.generics());
-
-    if r.inline() {
-        let inline_key = (
-            ndt.module_path().clone(),
-            ndt.name().clone(),
-            r.generics().to_vec(),
+    if matches!(r.inner, NamedReferenceType::Inline { .. }) {
+        let ty = named_reference_ty(types, r)?;
+        let reference_generics = named_reference_generics(r)?;
+        return datatype(
+            s,
+            exporter,
+            types,
+            ty,
+            location,
+            reference_generics,
+            false,
+            type_render_stack,
         );
-        let already_inlining = INLINE_REFERENCE_STACK
-            .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
-
-        if !already_inlining {
-            INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-            let combined_generics = merged_generics(generics, r.generics());
-            let result = datatype(
-                s,
-                exporter,
-                types,
-                ndt.ty(),
-                location,
-                &combined_generics,
-                false,
-            );
-            INLINE_REFERENCE_STACK.with(|stack| {
-                stack.borrow_mut().pop();
-            });
-            return result;
-        }
     }
 
     crate::references::track_nr(r);
 
     let schema_name = match exporter.layout {
-        Layout::FlatFile => format!("{}Schema", ndt.name()),
+        Layout::FlatFile => format!("{}Schema", ndt.name),
         Layout::ModulePrefixedName => {
-            let mut name = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             if !name.is_empty() {
                 name.push('_');
             }
-            name.push_str(ndt.name());
+            name.push_str(&ndt.name);
             name.push_str("Schema");
             name
         }
         Layout::Files => {
             let current_module_path = crate::references::current_module_path().unwrap_or_default();
-            let base = format!("{}Schema", ndt.name());
-            if ndt.module_path() == &current_module_path {
+            let base = format!("{}Schema", ndt.name);
+            if ndt.module_path == current_module_path {
                 base
             } else {
-                format!("{}.{}", crate::zod::module_alias(ndt.module_path()), base)
+                format!("{}.{}", crate::zod::module_alias(&ndt.module_path), base)
             }
         }
     };
 
-    let should_lazy = TYPE_RENDER_STACK.with(|stack| {
-        stack
-            .borrow()
-            .iter()
-            .any(|(module, name)| module == ndt.module_path() && name == ndt.name())
-    });
+    let should_lazy = type_render_stack
+        .iter()
+        .any(|(module, name)| module == &ndt.module_path && name == &ndt.name);
 
     let mut reference_expr = schema_name;
-    if !r.generics().is_empty() {
+    let reference_generics = match &r.inner {
+        NamedReferenceType::Recursive(_) => &[],
+        _ => named_reference_generics(r)?,
+    };
+    if !reference_generics.is_empty() {
         let scoped_generics = generics
             .iter()
             .filter(|(parent_generic, _)| {
-                !r.generics()
+                !reference_generics
                     .iter()
                     .any(|(child_generic, _)| child_generic == parent_generic)
             })
@@ -830,7 +865,7 @@ fn reference_named_dt(
             .collect::<Vec<_>>();
 
         reference_expr.push('(');
-        for (i, (_, v)) in r.generics().iter().enumerate() {
+        for (i, (_, v)) in reference_generics.iter().enumerate() {
             if i != 0 {
                 reference_expr.push_str(", ");
             }
@@ -843,6 +878,7 @@ fn reference_named_dt(
                 vec![],
                 &scoped_generics,
                 false,
+                type_render_stack,
             )?;
             reference_expr.push_str(&generic_schema);
         }
@@ -860,13 +896,13 @@ fn reference_named_dt(
 
 fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
-        Layout::FlatFile | Layout::Files => ndt.name().clone(),
+        Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             if !s.is_empty() {
                 s.push('_');
             }
-            s.push_str(ndt.name());
+            s.push_str(&ndt.name);
             Cow::Owned(s)
         }
     }

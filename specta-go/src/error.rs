@@ -3,12 +3,32 @@ use std::{error, fmt, io};
 use crate::Layout;
 
 #[derive(Debug)]
+/// Errors that can occur during Go code generation.
 pub enum Error {
+    /// IO error during file operations.
     Io(io::Error),
+    /// Formatting error while writing generated code.
     Fmt(fmt::Error),
-    Serde(specta_serde::Error),
-    ForbiddenName { path: String, name: String },
-    BigIntForbidden { path: String },
+    /// Custom format callback failed.
+    Format {
+        /// Context describing which format callback failed.
+        message: &'static str,
+        /// The underlying format error.
+        source: specta::FormatError,
+    },
+    /// A generated Go identifier used a forbidden name.
+    ForbiddenName {
+        /// Path to the type or field containing the forbidden name.
+        path: String,
+        /// The forbidden Go identifier.
+        name: String,
+    },
+    /// A BigInt value was encountered but cannot be represented in Go.
+    BigIntForbidden {
+        /// Path to the unsupported BigInt value.
+        path: String,
+    },
+    /// The configured layout cannot be exported by this operation.
     UnableToExport(Layout),
 }
 
@@ -17,7 +37,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Fmt(e) => write!(f, "Fmt error: {e}"),
-            Error::Serde(e) => write!(f, "Serde error: {e}"),
+            Error::Format { message, source } => write!(f, "Format error: {message}: {source}"),
             Error::ForbiddenName { path, name } => {
                 write!(f, "Forbidden name: {name} in {path}")
             }
@@ -45,8 +65,8 @@ impl From<fmt::Error> for Error {
     }
 }
 
-impl From<specta_serde::Error> for Error {
-    fn from(e: specta_serde::Error) -> Self {
-        Self::Serde(e)
+impl Error {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
+        Self::Format { message, source }
     }
 }

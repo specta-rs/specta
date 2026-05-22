@@ -12,39 +12,10 @@ export type RangeInclusive<T> = {
 	end: T,
 };
 
-export type String = string;
-
-export type PathBuf = string;
-
-export type IpAddr = string;
-
-export type Ipv4Addr = string;
-
-export type Ipv6Addr = string;
-
-export type SocketAddr = string;
-
-export type SocketAddrV4 = string;
-
-export type SocketAddrV6 = string;
-
-export type Cow<T> = T;
-
-export type Cow<T> = T;
-
-export type Vec<T> = T[];
-
-export type Vec<T> = T[];
-
-export type Result<T, E> = T | E;
-
-export type Vec<T> = T[];
-
-export type PhantomData<T> = null;
-
-export type PhantomData<T> = null;
-
-export type Infallible = never;
+export type Result<T, E> = {
+	ok: T,
+	err: E,
+};
 
 export type Unit1 = null;
 
@@ -111,8 +82,8 @@ export type InlineEnumField = {
 
 export type InlineOptionalType = {
 	optional_field: {
-		a: string,
-	} | null,
+	a: string,
+} | null,
 };
 
 export type Rename = "OneWord" | "TwoWords";
@@ -122,12 +93,6 @@ export type TransparentType = TransparentTypeInner;
 export type TransparentType2 = null;
 
 export type TransparentTypeWithOverride = string;
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type Vec<T> = T[];
 
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -140,13 +105,9 @@ export type FlattenOnNestedEnum = {
 
 export type MyEmptyInput = Record<string, never>;
 
-export type String = string;
-
 export type ExtraBracketsInTupleVariant = string;
 
 export type ExtraBracketsInUnnamedStruct = string;
-
-export type Vec<T> = T[];
 
 export type InlineTuple = {
 	demo: [string, boolean],
@@ -154,13 +115,9 @@ export type InlineTuple = {
 
 export type InlineTuple2 = {
 	demo: [{
-		demo: [string, boolean],
-	}, boolean],
+	demo: [string, boolean],
+}, boolean],
 };
-
-export type Box<T> = T;
-
-export type Box<T> = T;
 
 export type SkippedFieldWithinVariant = never | string;
 
@@ -286,17 +243,7 @@ export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-export type HashMap<K, V> = { [key in K]: V };
-
 export type Regular = { [key in string]: null };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
 
 export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
 
@@ -408,13 +355,13 @@ number |
  */
 a: number };
 
-// Some single-line comment
+/**  Some single-line comment */
 export type SingleLineComment = 
-// Some single-line comment
+/**  Some single-line comment */
 number | 
-// Some single-line comment
+/**  Some single-line comment */
 { 
-// Some single-line comment
+/**  Some single-line comment */
 a: number };
 
 export type Demo<A, B> = {
@@ -441,12 +388,6 @@ export type Demo<A, B> = {
 	a: A,
 	b: B,
 };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
 
 export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
@@ -564,30 +505,6 @@ export type InternallyTaggedH = InternallyTaggedHInner;
 export type InternallyTaggedL = "A" | "B";
 
 export type InternallyTaggedM = "A" | "B";
-
-export type StructWithAlias = {
-	field: string,
-};
-
-export type StructWithMultipleAliases = {
-	field: string,
-};
-
-export type StructWithAliasAndRename = {
-	field: string,
-};
-
-export type EnumWithVariantAlias = "Variant" | "Other";
-
-export type EnumWithMultipleVariantAliases = "Variant" | "Other";
-
-export type EnumWithVariantAliasAndRename = "Variant" | "Other";
-
-export type InternallyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-export type AdjacentlyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
-
-export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
@@ -712,10 +629,6 @@ export type GenericStruct2<T> = {
 	h: ([([T, T]), ([T, T]), ([T, T])])[],
 };
 
-export type InlineGenericNewtype<T> = T;
-
-export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | T | { value: T }];
-
 export type InlineFlattenGenericsG<T> = {
 	t: T,
 };
@@ -728,8 +641,88 @@ export type InlineFlattenGenerics = {
 	t: InlineFlattenGenericsG<string>,
 };
 
+export type GenericDefault<T = string> = {
+	value: T,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type GenericDefaultSkipped<T> = {
+	value: T,
+};
+
+export type GenericDefaultSkippedNonType<T> = {
+	value: number,
+};
+
 export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
+};
+
+export type ConstGenericInNonConstContainer = {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
+};
+
+export type ConstGenericInConstContainer = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+export type NamedConstGenericContainer = {
+	a: NamedConstGeneric,
+	b: NamedConstGeneric,
+	d: [number, number],
+};
+
+export type InlineConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	d: [number, number],
+};
+
+export type InlineRecursiveConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	d: [number, number],
 };
 
 export type TestCollectionRegister = never;

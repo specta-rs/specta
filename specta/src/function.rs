@@ -1,6 +1,9 @@
-//! Support for exporting Rust function.
+//! Support for collecting Rust function signatures.
 //!
-//! TODO: Docs. Talk about how Specta doesn't export functions but it helps you to.
+//! Specta does not export callable functions by itself. Instead, it records the
+//! names, arguments, return types, docs, and deprecation metadata needed by
+//! framework crates to generate bindings for their own function or command
+//! systems.
 
 mod arg;
 mod result;

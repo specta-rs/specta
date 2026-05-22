@@ -7,7 +7,11 @@ use specta::{
 
 /// Convert a NamedDataType to a JSON Schema definition
 pub fn export(js: &JsonSchema, types: &Types, ndt: &NamedDataType) -> Result<Value, Error> {
-    datatype_to_schema(js, types, ndt.ty(), true)
+    let Some(ty) = &ndt.ty else {
+        return Ok(json!({}));
+    };
+
+    datatype_to_schema(js, types, ty, true)
 }
 
 /// Convert a DataType to a JSON Schema, optionally as a reference
@@ -34,9 +38,9 @@ pub fn datatype_to_schema(
 
         // List/Array
         DataType::List(list) => {
-            let items = datatype_to_schema(js, types, list.ty(), false)?;
+            let items = datatype_to_schema(js, types, &list.ty, false)?;
 
-            if let Some(len) = list.length() {
+            if let Some(len) = list.length {
                 // Fixed-length array (tuple-like)
                 Ok(json!({
                     "type": "array",
@@ -65,7 +69,7 @@ pub fn datatype_to_schema(
         }
 
         // Struct
-        DataType::Struct(s) => struct_to_schema(js, types, s, is_definition),
+        DataType::Struct(s) => struct_to_schema(js, types, s),
 
         // Enum
         DataType::Enum(e) => enum_to_schema(js, types, e),
@@ -79,8 +83,12 @@ pub fn datatype_to_schema(
                 Reference::Named(r) => {
                     if is_definition {
                         // When exporting a definition, inline it
-                        if let Some(referenced_ndt) = r.get(types) {
-                            datatype_to_schema(js, types, referenced_ndt.ty(), true)
+                        if let Some(referenced_ndt) = types.get(r) {
+                            let Some(ty) = &referenced_ndt.ty else {
+                                return Ok(json!({}));
+                            };
+
+                            datatype_to_schema(js, types, ty, true)
                         } else {
                             Err(Error::InvalidReference(
                                 "Reference not found in Types".to_string(),
@@ -89,9 +97,9 @@ pub fn datatype_to_schema(
                     } else {
                         // Use $ref for references
                         let defs_key = js.schema_version.definitions_key();
-                        if let Some(referenced_ndt) = r.get(types) {
+                        if let Some(referenced_ndt) = types.get(r) {
                             Ok(json!({
-                                "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name())
+                                "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name)
                             }))
                         } else {
                             Err(Error::InvalidReference(
@@ -103,11 +111,15 @@ pub fn datatype_to_schema(
                 Reference::Opaque(_) => Err(Error::UnsupportedDataType(
                     "Opaque references are not supported by JSON Schema exporter".to_string(),
                 )),
-                // JsonSchema doesn't have generics, so we use a placeholder,
-                // This should typically be resolved before export.
-                Reference::Generic(_) => Ok(json!({})), // Empty schema accepts anything
             }
         }
+        DataType::Generic(_) => Ok(json!({})), // Empty schema accepts anything
+        DataType::Intersection(intersection) => Ok(json!({
+            "allOf": intersection
+                .iter()
+                .map(|ty| datatype_to_schema(js, types, ty, false))
+                .collect::<Result<Vec<_>, _>>()?
+        })),
     }
 }
 
@@ -140,13 +152,8 @@ fn primitive_to_schema(p: &Primitive) -> Value {
     }
 }
 
-fn struct_to_schema(
-    js: &JsonSchema,
-    types: &Types,
-    s: &Struct,
-    _is_definition: bool,
-) -> Result<Value, Error> {
-    match s.fields() {
+fn struct_to_schema(js: &JsonSchema, types: &Types, s: &Struct) -> Result<Value, Error> {
+    match &s.fields {
         Fields::Unit => {
             // Unit struct = null
             Ok(json!({"type": "null"}))
@@ -154,9 +161,9 @@ fn struct_to_schema(
         Fields::Unnamed(fields) => {
             // Tuple struct - represent as array
             let items: Result<Vec<_>, _> = fields
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .map(|(_, ty)| datatype_to_schema(js, types, ty, false))
                 .collect();
 
@@ -175,14 +182,14 @@ fn struct_to_schema(
             let mut required = Vec::new();
 
             for (name, (field, ty)) in fields
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
             {
                 let schema = datatype_to_schema(js, types, ty, false)?;
                 properties.insert(name.clone().into_owned(), schema);
 
-                if !field.optional() {
+                if !field.optional {
                     required.push(Value::String(name.clone().into_owned()));
                 }
             }
@@ -205,9 +212,9 @@ fn struct_to_schema(
 
 fn enum_to_schema(js: &JsonSchema, types: &Types, e: &Enum) -> Result<Value, Error> {
     let variants: Result<Vec<_>, _> = e
-        .variants()
+        .variants
         .iter()
-        .filter(|(_, variant)| !variant.skip())
+        .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| variant_to_schema(js, types, name, variant))
         .collect();
 
@@ -237,7 +244,7 @@ fn variant_to_schema(
     // Get enum representation from attributes
     // For now, default to external tagging
 
-    match variant.fields() {
+    match &variant.fields {
         Fields::Unit => {
             // Unit variant = string literal
             Ok(json!({"const": name}))
@@ -245,9 +252,9 @@ fn variant_to_schema(
         Fields::Unnamed(fields) => {
             // Tuple variant with external tagging: { "VariantName": [...] }
             let items: Result<Vec<_>, _> = fields
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .map(|(_, ty)| datatype_to_schema(js, types, ty, false))
                 .collect();
 
@@ -286,14 +293,14 @@ fn variant_to_schema(
             let mut required = Vec::new();
 
             for (field_name, (field, ty)) in fields
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
             {
                 let schema = datatype_to_schema(js, types, ty, false)?;
                 properties.insert(field_name.clone().into_owned(), schema);
 
-                if !field.optional() {
+                if !field.optional {
                     required.push(Value::String(field_name.clone().into_owned()));
                 }
             }
@@ -323,13 +330,13 @@ fn variant_to_schema(
 }
 
 fn tuple_to_schema(js: &JsonSchema, types: &Types, t: &Tuple) -> Result<Value, Error> {
-    if t.elements().is_empty() {
+    if t.elements.is_empty() {
         // Empty tuple = null
         return Ok(json!({"type": "null"}));
     }
 
     let items: Result<Vec<_>, _> = t
-        .elements()
+        .elements
         .iter()
         .map(|ty| datatype_to_schema(js, types, ty, false))
         .collect();

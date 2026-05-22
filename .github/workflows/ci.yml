@@ -29,6 +29,8 @@ jobs:
         run: cargo build --all-features
       - name: Run tests
         run: cargo test --all-features
+      - name: Build without default features
+        run: cargo build --all --no-default-features
 
   clippy:
     runs-on: ubuntu-latest

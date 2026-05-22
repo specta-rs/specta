@@ -7,10 +7,10 @@
 //! # Usage
 //!
 //! ```rust
-//! use specta::{Type, Types};
+//! use specta::Types;
 //! use specta_go::Go;
 //!
-//! #[derive(Type)]
+//! #[derive(specta::Type)]
 //! pub struct MyType {
 //!     pub field: String,
 //! }
@@ -18,7 +18,7 @@
 //! let types = Types::default().register::<MyType>();
 //!
 //! Go::default()
-//!     .export_to("./bindings.go", &types)
+//!     .export_to("./bindings.go", &types, specta_serde::Format)
 //!     .unwrap();
 //! ```
 
@@ -34,4 +34,4 @@ mod primitives;
 mod reserved_names;
 
 pub use error::Error;
-pub use go::{Go, Layout, SerdeMode};
+pub use go::{Go, Layout};

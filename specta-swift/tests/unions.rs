@@ -1,4 +1,6 @@
-use specta::{ResolvedTypes, Type, Types};
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -104,10 +106,8 @@ fn test_enum_with_nested_structs() {
         .register::<UserType>()
         .register::<ApiResult<String, String>>()
         .register::<ComplexUnion>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -148,10 +148,8 @@ fn test_enum_with_nested_structs() {
 #[test]
 fn test_swift_union_syntax() {
     let types = Types::default().register::<UserType>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UserType Swift code:\n{}", output);
 

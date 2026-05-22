@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
+    datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;
@@ -10,27 +10,45 @@ use crate::Error;
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
     path: String,
 ) -> Result<(), Error> {
-    validate_map_key_inner(
-        key_ty,
-        types,
-        generics,
-        path,
-        &mut HashSet::new(),
-        &mut HashSet::new(),
-    )
+    validate_map_key_inner(key_ty, types, path, &mut HashSet::new())
 }
 
 fn validate_map_key_inner(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
     path: String,
     visiting_named_refs: &mut HashSet<Reference>,
-    visiting_generic_refs: &mut HashSet<(GenericReference, DataType)>,
 ) -> Result<(), Error> {
+    fn unwrap_synthetic_variant_fields<'a>(
+        variant_name: &str,
+        fields: &'a Fields,
+    ) -> Option<&'a Fields> {
+        let Fields::Named(named) = fields else {
+            return None;
+        };
+
+        let mut live_fields = named
+            .fields
+            .iter()
+            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name.as_ref(), ty)));
+        let (field_name, DataType::Enum(inner)) = live_fields.next()? else {
+            return None;
+        };
+
+        if field_name != variant_name || live_fields.next().is_some() {
+            return None;
+        }
+
+        match inner.variants.as_slice() {
+            [(inner_name, inner_variant)] if inner_name == variant_name => {
+                Some(&inner_variant.fields)
+            }
+            _ => None,
+        }
+    }
+
     match key_ty {
         DataType::Primitive(primitive) if primitive_is_valid_key(primitive.clone()) => Ok(()),
         DataType::Primitive(other) => Err(Error::invalid_map_key(
@@ -38,16 +56,24 @@ fn validate_map_key_inner(
             invalid_primitive_reason(other.clone()),
         )),
         DataType::Enum(enm) => {
-            for (variant_name, variant) in enm.variants() {
-                match variant.fields() {
+            for (variant_name, variant) in &enm.variants {
+                let fields = unwrap_synthetic_variant_fields(variant_name, &variant.fields)
+                    .unwrap_or(&variant.fields);
+
+                match fields {
                     Fields::Unit => {}
                     Fields::Unnamed(unnamed) => {
-                        let non_skipped = unnamed
-                            .fields()
-                            .iter()
-                            .filter_map(|field| field.ty())
-                            .count();
-                        if non_skipped != 1 {
+                        let mut non_skipped =
+                            unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+                        let Some(inner_ty) = non_skipped.next() else {
+                            return Err(Error::invalid_map_key(
+                                &path,
+                                format!(
+                                    "enum key variant '{variant_name}' must serialize as a newtype value"
+                                ),
+                            ));
+                        };
+                        if non_skipped.next().is_some() {
                             return Err(Error::invalid_map_key(
                                 &path,
                                 format!(
@@ -55,6 +81,13 @@ fn validate_map_key_inner(
                                 ),
                             ));
                         }
+
+                        validate_map_key_inner(
+                            inner_ty,
+                            types,
+                            format!("{path}.{variant_name}"),
+                            visiting_named_refs,
+                        )?;
                     }
                     Fields::Named(_) => {
                         return Err(Error::invalid_map_key(
@@ -70,14 +103,14 @@ fn validate_map_key_inner(
             Ok(())
         }
         DataType::Struct(strct) => {
-            let Fields::Unnamed(unnamed) = strct.fields() else {
+            let Fields::Unnamed(unnamed) = &strct.fields else {
                 return Err(Error::invalid_map_key(
                     path,
                     "struct keys must serialize as a newtype struct to be valid serde_json map keys",
                 ));
             };
 
-            let mut non_skipped = unnamed.fields().iter().filter_map(|field| field.ty());
+            let mut non_skipped = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
             let Some(inner_ty) = non_skipped.next() else {
                 return Err(Error::invalid_map_key(
                     path,
@@ -92,14 +125,7 @@ fn validate_map_key_inner(
                 ));
             }
 
-            validate_map_key_inner(
-                inner_ty,
-                types,
-                generics,
-                path,
-                visiting_named_refs,
-                visiting_generic_refs,
-            )
+            validate_map_key_inner(inner_ty, types, path, visiting_named_refs)
         }
         DataType::Reference(Reference::Named(reference)) => {
             let reference_key = Reference::Named(reference.clone());
@@ -110,66 +136,133 @@ fn validate_map_key_inner(
                 ));
             }
 
-            let result = if let Some(ndt) = reference.get(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
-                validate_map_key_inner(
-                    ndt.ty(),
-                    types,
-                    &merged_generics,
+            let result = match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => {
+                    if let Some(ndt) = types.get(reference) {
+                        if let Some(ty) = ndt.ty.as_ref() {
+                            let mut ty = ty.clone();
+                            substitute_generics(&mut ty, generics);
+                            validate_map_key_inner(&ty, types, path, visiting_named_refs)
+                        } else {
+                            Err(Error::dangling_named_reference(
+                                path,
+                                format!("{reference:?}"),
+                            ))
+                        }
+                    } else {
+                        Err(Error::dangling_named_reference(
+                            path,
+                            format!("{reference:?}"),
+                        ))
+                    }
+                }
+                NamedReferenceType::Inline { dt, .. } => {
+                    let inline_path = path.clone();
+                    validate_map_key_inner(dt, types, path, visiting_named_refs)
+                        .map_err(|err| err.with_inline_trace(types.get(reference), inline_path))
+                }
+                NamedReferenceType::Recursive(_) => Err(Error::invalid_map_key(
                     path,
-                    visiting_named_refs,
-                    visiting_generic_refs,
-                )
-            } else {
-                Err(Error::invalid_map_key(
-                    path,
-                    format!("unresolved named map key reference {reference:?}"),
-                ))
+                    format!("recursive inline named map key reference {reference:?}"),
+                )),
             };
 
             visiting_named_refs.remove(&reference_key);
             result
         }
-        DataType::Reference(Reference::Generic(generic)) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                return Ok(());
-            };
-
-            if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic) {
-                return Ok(());
+        DataType::Generic(_) => Ok(()),
+        DataType::Reference(Reference::Opaque(r)) => {
+            // `define(literal)` is the user-facing escape hatch for inserting a
+            // verbatim TypeScript expression into the type graph. Treat it as
+            // valid for map keys -- the caller is asserting that `literal` is
+            // a serializable JSON map key, and rejecting it forces them to
+            // duplicate the bigint-style rewrite already done by libraries
+            // like taurpc (which converts `i64` -> `define("number")` to
+            // satisfy the BigInt-forbidden filter). Other opaque flavors --
+            // Tauri channels, branded types -- still fail loudly.
+            if r.downcast_ref::<crate::opaque::Define>().is_some() {
+                Ok(())
+            } else {
+                Err(Error::invalid_map_key(
+                    path,
+                    "opaque references cannot be validated as serde_json map keys",
+                ))
             }
-
-            let resolved = resolve_generics_in_datatype(ty, generics);
-            let generic_state = (generic.clone(), resolved.clone());
-            if !visiting_generic_refs.insert(generic_state.clone()) {
-                return Ok(());
-            }
-
-            let result = validate_map_key_inner(
-                &resolved,
-                types,
-                generics,
-                path,
-                visiting_named_refs,
-                visiting_generic_refs,
-            );
-            visiting_generic_refs.remove(&generic_state);
-
-            result
         }
-        DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
-            path,
-            "opaque references cannot be validated as serde_json map keys",
-        )),
         DataType::Tuple(_) => Err(Error::invalid_map_key(
             path,
             "tuple keys are not supported by serde_json map key serialization",
         )),
-        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => {
-            Err(Error::invalid_map_key(
-                path,
-                "collection, map, and nullable keys are not supported by serde_json map key serialization",
-            ))
+        DataType::List(_)
+        | DataType::Map(_)
+        | DataType::Nullable(_)
+        | DataType::Intersection(_) => Err(Error::invalid_map_key(
+            path,
+            "collection, map, and nullable keys are not supported by serde_json map key serialization",
+        )),
+    }
+}
+
+fn substitute_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
+    match dt {
+        DataType::Generic(generic) => {
+            if let Some((_, ty)) = generics.iter().find(|(reference, _)| reference == generic) {
+                *dt = ty.clone();
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                substitute_field_generics(&mut variant.fields, generics);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in &mut tuple.elements {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Reference {
+                generics: reference_generics,
+                ..
+            } = &mut reference.inner
+            {
+                for (_, ty) in reference_generics {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        DataType::Intersection(types) => {
+            for ty in types {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType)]) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
         }
     }
 }
@@ -204,128 +297,4 @@ fn invalid_primitive_reason(primitive: Primitive) -> &'static str {
         }
         _ => "unsupported primitive key type for serde_json map key serialization",
     }
-}
-
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child
-        .iter()
-        .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
-        .chain(unshadowed_parent)
-        .collect()
-}
-
-fn resolve_generics_in_datatype(
-    dt: &DataType,
-    generics: &[(GenericReference, DataType)],
-) -> DataType {
-    fn resolve(
-        dt: &DataType,
-        generics: &[(GenericReference, DataType)],
-        visiting: &mut Vec<GenericReference>,
-    ) -> DataType {
-        match dt {
-            DataType::Primitive(_) => dt.clone(),
-            DataType::List(list) => {
-                let mut out = list.clone();
-                out.set_ty(resolve(list.ty(), generics, visiting));
-                DataType::List(out)
-            }
-            DataType::Map(map) => {
-                let mut out = map.clone();
-                out.set_key_ty(resolve(map.key_ty(), generics, visiting));
-                out.set_value_ty(resolve(map.value_ty(), generics, visiting));
-                DataType::Map(out)
-            }
-            DataType::Nullable(inner) => {
-                DataType::Nullable(Box::new(resolve(inner, generics, visiting)))
-            }
-            DataType::Struct(strct) => {
-                let mut out = strct.clone();
-                match out.fields_mut() {
-                    Fields::Unit => {}
-                    Fields::Unnamed(unnamed) => {
-                        for field in unnamed.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
-                                *ty = resolve(ty, generics, visiting);
-                            }
-                        }
-                    }
-                    Fields::Named(named) => {
-                        for (_, field) in named.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
-                                *ty = resolve(ty, generics, visiting);
-                            }
-                        }
-                    }
-                }
-                DataType::Struct(out)
-            }
-            DataType::Enum(enm) => {
-                let mut out = enm.clone();
-                for (_, variant) in out.variants_mut() {
-                    match variant.fields_mut() {
-                        Fields::Unit => {}
-                        Fields::Unnamed(unnamed) => {
-                            for field in unnamed.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
-                                    *ty = resolve(ty, generics, visiting);
-                                }
-                            }
-                        }
-                        Fields::Named(named) => {
-                            for (_, field) in named.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
-                                    *ty = resolve(ty, generics, visiting);
-                                }
-                            }
-                        }
-                    }
-                }
-                DataType::Enum(out)
-            }
-            DataType::Tuple(tuple) => {
-                let mut out = tuple.clone();
-                for element in out.elements_mut() {
-                    *element = resolve(element, generics, visiting);
-                }
-                DataType::Tuple(out)
-            }
-            DataType::Reference(Reference::Generic(generic)) => {
-                if visiting.iter().any(|seen| seen == generic) {
-                    return dt.clone();
-                }
-
-                if let Some((_, resolved)) =
-                    generics.iter().find(|(candidate, _)| candidate == generic)
-                {
-                    if matches!(resolved, DataType::Reference(Reference::Generic(inner)) if inner == generic)
-                    {
-                        dt.clone()
-                    } else {
-                        visiting.push(generic.clone());
-                        let out = resolve(resolved, generics, visiting);
-                        visiting.pop();
-                        out
-                    }
-                } else {
-                    dt.clone()
-                }
-            }
-            DataType::Reference(_) => dt.clone(),
-        }
-    }
-
-    resolve(dt, generics, &mut Vec::new())
 }

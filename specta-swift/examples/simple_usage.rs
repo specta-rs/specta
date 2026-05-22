@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -31,12 +33,15 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     // Export to Swift with default settings
     let swift = Swift::default();
     swift
-        .export_to("./examples/generated/SimpleTypes.swift", &resolved)
+        .export_to(
+            "./examples/generated/SimpleTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
 
     println!("Simple types exported to SimpleTypes.swift");
@@ -48,7 +53,11 @@ fn main() {
         .optionals(specta_swift::OptionalStyle::Optional);
 
     custom_swift
-        .export_to("./examples/generated/CustomTypes.swift", &resolved)
+        .export_to(
+            "./examples/generated/CustomTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
 
     println!("Custom types exported to CustomTypes.swift");

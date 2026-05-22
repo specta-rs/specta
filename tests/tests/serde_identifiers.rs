@@ -22,36 +22,45 @@ enum FieldIdentifier {
 
 #[test]
 fn identifier_apply_requires_phases() {
-    let err = specta_serde::apply(Types::default().register::<VariantIdentifier>())
-        .expect_err("variant_identifier should require apply_phases");
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<VariantIdentifier>(),
+            specta_serde::Format,
+        )
+        .expect_err("variant_identifier should require PhasesFormat");
     assert!(
         err.to_string()
-            .contains("identifier enums require `apply_phases`")
+            .contains("identifier enums require `PhasesFormat`")
     );
 
-    let err = specta_serde::apply(Types::default().register::<FieldIdentifier>())
-        .expect_err("field_identifier should require apply_phases");
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FieldIdentifier>(),
+            specta_serde::Format,
+        )
+        .expect_err("field_identifier should require PhasesFormat");
     assert!(
         err.to_string()
-            .contains("identifier enums require `apply_phases`")
+            .contains("identifier enums require `PhasesFormat`")
     );
 }
 
 #[test]
-fn identifier_apply_phases_exports_deserialize_union() {
-    let variant_types =
-        specta_serde::apply_phases(Types::default().register::<VariantIdentifier>())
-            .expect("variant_identifier should be supported by apply_phases");
+fn identifier_phases_format_exports_deserialize_union() {
     let variant_ts = Typescript::default()
-        .export(&variant_types)
+        .export(
+            &Types::default().register::<VariantIdentifier>(),
+            specta_serde::PhasesFormat,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-variant-typescript", variant_ts);
 
-    let field_types = specta_serde::apply_phases(Types::default().register::<FieldIdentifier>())
-        .expect("field_identifier should be supported by apply_phases");
     let field_ts = Typescript::default()
-        .export(&field_types)
+        .export(
+            &Types::default().register::<FieldIdentifier>(),
+            specta_serde::PhasesFormat,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-field-typescript", field_ts);

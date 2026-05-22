@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     iter,
     path::Path,
@@ -6,13 +7,16 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Type, Types,
+    Format, Type, Types,
     datatype::{DataType, Reference},
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{ErrorTraceFrame, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
+
+const BIGINT_DOCS_URL: &str =
+    "https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden";
 
 fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     let mut types = Types::default();
@@ -25,16 +29,40 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
         specta_typescript::Unknown<String>,
         specta_typescript::Never,
         specta_typescript::Never<String>,
+        specta_typescript::Number,
+        specta_typescript::Number<i128>,
+        specta_typescript::BigInt,
+        specta_typescript::BigInt<i128>,
     );
     let _ = <HashMap<specta_typescript::Any, ()> as Type>::definition(&mut types);
 
     (types, dts)
 }
 
-fn phase_collections() -> [(
+pub type PhaseCollection = (
     &'static str,
-    Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
-); 3] {
+    Box<dyn Format>,
+    Vec<(&'static str, DataType)>,
+    Types,
+);
+
+struct IdentityFormat;
+
+impl Format for IdentityFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
+    }
+
+    fn map_type(
+        &'_ self,
+        _: &Types,
+        dt: &DataType,
+    ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+        Ok(Cow::Owned(dt.clone()))
+    }
+}
+
+pub fn phase_collections() -> Vec<PhaseCollection> {
     let (types, dts) = {
         let (mut types, mut dts) = crate::types();
         let (types2, dts2) = typescript_types();
@@ -49,45 +77,24 @@ fn phase_collections() -> [(
         (types2, dts2)
     };
 
-    [
-        (
-            "raw",
-            Ok((
-                dts.clone(),
-                ResolvedTypes::from_resolved_types(types.clone()),
-            )),
-        ),
-        (
-            "serde",
-            specta_serde::apply(types).map(|types| (dts, types)),
-        ),
+    vec![
+        ("raw", Box::new(IdentityFormat), dts.clone(), types.clone()),
+        ("serde", Box::new(specta_serde::Format), dts, types),
         (
             "serde_phases",
-            specta_serde::apply_phases(phased_types).map(|types| (phased_dts, types)),
+            Box::new(specta_serde::PhasesFormat),
+            phased_dts,
+            phased_types,
         ),
     ]
 }
 
-fn phase_output(
-    result: Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
-    f: impl FnOnce(&[(&'static str, DataType)], &ResolvedTypes) -> Result<String, String>,
-) -> String {
-    result.map_or_else(
-        |err| format!("ERROR: {err}"),
-        |(dts, types)| f(&dts, &types).unwrap_or_else(|err| format!("ERROR: {err}")),
-    )
-}
-
 #[test]
 fn typescript_export() {
-    for (mode, result) in phase_collections() {
+    for (mode, format, _, types) in phase_collections() {
         insta::assert_snapshot!(
             format!("ts-export-{mode}"),
-            phase_output(result, |_, types| {
-                Typescript::default()
-                    .export(&types)
-                    .map_err(|err| err.to_string())
-            })
+            Typescript::default().export(&types, format).unwrap()
         );
     }
 }
@@ -114,32 +121,33 @@ fn typescript_export_serde_errors() {
         let mut types = Types::default();
         let dt = T::definition(&mut types);
 
-        for mode in ["serde", "serde_phases"] {
-            let types = match mode {
-                "serde" => specta_serde::apply(types.clone()),
-                _ => specta_serde::apply_phases(types.clone()),
-            };
-
-            let types = match types {
-                Ok(types) => types,
-                Err(err) => {
-                    assert_expected_error(failures, name, mode, "apply", expected_error, err);
-                    continue;
-                }
-            };
-
-            if let Err(err) = specta_serde::validate(&dt, &types) {
-                assert_expected_error(failures, name, mode, "validate", expected_error, err);
-                continue;
-            }
-
-            match Typescript::default().export(&types) {
+        for (mode, format) in [
+            ("serde", Box::new(specta_serde::Format) as Box<dyn Format>),
+            ("serde_phases", Box::new(specta_serde::PhasesFormat)),
+        ] {
+            match Typescript::default().export(&types, format) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
                 Err(err) => {
                     assert_expected_error(failures, name, mode, "export", expected_error, err)
                 }
+            }
+        }
+    }
+
+    fn assert_serde_export_ok<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+
+        for (mode, format) in [
+            ("serde", Box::new(specta_serde::Format) as Box<dyn Format>),
+            ("serde_phases", Box::new(specta_serde::PhasesFormat)),
+        ] {
+            if let Err(err) = format.map_type(&types, &dt) {
+                failures.push(format!(
+                    "{name} ({mode}) [map_type]: expected export to succeed, got '{err}'"
+                ));
             }
         }
     }
@@ -266,7 +274,27 @@ fn typescript_export_serde_errors() {
         demo: HashMap<RecursiveMapKeyTrick, String>,
     }
 
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedBoxedStruct {
+        // Regression test for https://github.com/specta-rs/specta/issues/482
+        // `Box<T>` is transparent to serde, so this must validate like `T`.
+        A(Box<InternallyTaggedBoxedStructPayload>),
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct InternallyTaggedBoxedStructPayload {
+        message: String,
+    }
+
     let mut failures = Vec::new();
+
+    assert_serde_export_ok::<InternallyTaggedBoxedStruct>(
+        &mut failures,
+        "InternallyTaggedBoxedStruct",
+    );
 
     // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedB::A containing a string"
     assert_serde_error::<InternallyTaggedB>(
@@ -388,9 +416,8 @@ fn typescript_export_bigint_errors() {
         let ts = Typescript::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&ts, &resolved, &dt) {
+        match primitives::inline(&ts, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -401,11 +428,11 @@ fn typescript_export_bigint_errors() {
             Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
         }
 
-        if resolved.as_types().is_empty() {
+        if types.is_empty() {
             return;
         }
 
-        match ts.export(&resolved) {
+        match ts.export(&types, specta_serde::Format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -421,9 +448,8 @@ fn typescript_export_bigint_errors() {
         let ts = Typescript::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&ts, &resolved, &dt) {
+        match primitives::inline(&ts, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -560,6 +586,336 @@ fn typescript_export_bigint_errors() {
 }
 
 #[test]
+fn typescript_errors_include_named_datatype_and_inline_trace() {
+    let regular_outer_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RegularOuter {
+        value: i128,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineInner {
+        value: i128,
+    }
+
+    let inline_outer_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineOuter {
+        #[specta(inline)]
+        inner: InlineInner,
+    }
+
+    let ts = Typescript::default();
+    let mut types = Types::default();
+    let dt = RegularOuter::definition(&mut types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+    let err = primitives::export(&ts, &types, [ndt].iter(), "").unwrap_err();
+    assert_eq!(
+        err.named_datatype().map(|dt| dt.name.as_ref()),
+        Some("RegularOuter")
+    );
+    assert!(err.trace().is_empty());
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::RegularOuter.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::RegularOuter at {}:{}:{}",
+            file!(),
+            regular_outer_line,
+            14
+        )
+    );
+
+    let mut types = Types::default();
+    let dt = InlineOuter::definition(&mut types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+    let err = primitives::export(&ts, &types, [ndt].iter(), "").unwrap_err();
+    assert_eq!(
+        err.named_datatype().map(|dt| dt.name.as_ref()),
+        Some("InlineOuter")
+    );
+    assert_eq!(err.trace().len(), 1);
+
+    match &err.trace()[0] {
+        ErrorTraceFrame::Inlined {
+            named_datatype,
+            path,
+        } => {
+            assert_eq!(
+                named_datatype.as_deref().map(|dt| dt.name.as_ref()),
+                Some("InlineInner")
+            );
+            assert_eq!(path, "test::typescript::InlineOuter.inner");
+        }
+        _ => panic!("expected inline trace frame"),
+    }
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::InlineOuter.inner.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::InlineOuter at {}:{}:{}\nWhile inlining:\n  test::typescript::InlineOuter.inner -> test::typescript::InlineInner",
+            file!(),
+            inline_outer_line,
+            14
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_enum_variant_paths() {
+    let named_variant_enum_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithNamedVariantBigInt {
+        Variant { value: i128 },
+    }
+
+    let tuple_variant_enum_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithTupleVariantBigInt {
+        Variant(i128),
+    }
+
+    let ts = Typescript::default();
+
+    let types = Types::default().register::<EnumWithNamedVariantBigInt>();
+    let err = ts.export(&types, specta_serde::Format).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::EnumWithNamedVariantBigInt.Variant.value\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::EnumWithNamedVariantBigInt at {}:{}:{}",
+            file!(),
+            named_variant_enum_line,
+            14
+        )
+    );
+
+    let types = Types::default().register::<EnumWithTupleVariantBigInt>();
+    let err = ts.export(&types, specta_serde::Format).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"test::typescript::EnumWithTupleVariantBigInt.Variant.0\" but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation.\nRust type: test::typescript::EnumWithTupleVariantBigInt at {}:{}:{}",
+            file!(),
+            tuple_variant_enum_line,
+            14
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_recursive_inline_error() {
+    let recursive_inline_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveInlineContainer {
+        #[specta(inline)]
+        child: Vec<RecursiveInlineContainer>,
+    }
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<RecursiveInlineContainer>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found infinitely recursive inline named reference NamedReference {{ id: s:test::typescript::RecursiveInlineContainer, inner: Recursive(test::typescript::RecursiveInlineContainer -> std::vec::Vec<test::typescript::RecursiveInlineContainer> -> test::typescript::RecursiveInlineContainer) }} at \"test::typescript::RecursiveInlineContainer.child.child\". Recursive inline types cannot be expanded because they would produce an infinite Typescript type.\nInline cycle:\n  test::typescript::RecursiveInlineContainer -> std::vec::Vec<test::typescript::RecursiveInlineContainer> -> test::typescript::RecursiveInlineContainer\nRust type: test::typescript::RecursiveInlineContainer at {}:{}:{}\nWhile inlining:\n  test::typescript::RecursiveInlineContainer.child -> std::vec::Vec\n  test::typescript::RecursiveInlineContainer.child -> test::typescript::RecursiveInlineContainer\n  test::typescript::RecursiveInlineContainer.child.child -> std::vec::Vec",
+            file!(),
+            recursive_inline_line,
+            14
+        )
+    );
+
+    let mut dt = DataType::Primitive(specta::datatype::Primitive::str);
+    for _ in 0..25 {
+        dt = DataType::Nullable(Box::new(dt));
+    }
+
+    let err = primitives::inline(&Typescript::default(), &Types::default(), &dt).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "Type recursion limit exceeded while expanding the provided inline type. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+    );
+}
+
+#[test]
+fn typescript_errors_include_recursive_inline_generic_cycle() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UserId(String);
+
+    let node_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Node<T> {
+        #[specta(inline)]
+        children: Vec<Node<T>>,
+        value: T,
+    }
+
+    let container_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericCycleContainer {
+        #[specta(inline)]
+        node: Node<UserId>,
+    }
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<GenericCycleContainer>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found infinitely recursive inline named reference NamedReference {{ id: s:test::typescript::Node, inner: Recursive(test::typescript::Node<test::typescript::UserId> -> std::vec::Vec<test::typescript::Node<test::typescript::UserId>> -> test::typescript::Node<test::typescript::UserId>) }} at \"test::typescript::GenericCycleContainer.node.children\". Recursive inline types cannot be expanded because they would produce an infinite Typescript type.\nInline cycle:\n  test::typescript::Node<test::typescript::UserId> -> std::vec::Vec<test::typescript::Node<test::typescript::UserId>> -> test::typescript::Node<test::typescript::UserId>\nRust type: test::typescript::GenericCycleContainer at {}:{}:{}\nWhile inlining:\n  test::typescript::GenericCycleContainer.node -> test::typescript::Node\n  test::typescript::GenericCycleContainer.node.children -> std::vec::Vec",
+            file!(),
+            container_line,
+            14
+        )
+    );
+    let _ = node_line;
+}
+
+#[test]
+fn typescript_errors_use_specific_invalid_shape_messages() {
+    use std::borrow::Cow;
+
+    let anonymous_enum_line = line!() + 1;
+    let mut anonymous_enum = specta::datatype::Enum::default();
+    anonymous_enum.variants.push((
+        Cow::Borrowed(""),
+        specta::datatype::Variant::named()
+            .field(
+                "value",
+                specta::datatype::Field::new(DataType::Primitive(specta::datatype::Primitive::str)),
+            )
+            .build(),
+    ));
+
+    let mut types = Types::default();
+    let ndt =
+        specta::datatype::NamedDataType::new("AnonymousVariantContainer", &mut types, |_, ndt| {
+            ndt.ty = Some(DataType::Enum(anonymous_enum));
+        });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"tests::tests::typescript::AnonymousVariantContainer.\" but anonymous named-field enum variants cannot be exported to Typescript. Try giving the variant a name or changing the enum representation.\nRust type: tests::tests::typescript::AnonymousVariantContainer at {}:{}:{}",
+            file!(),
+            anonymous_enum_line + 13,
+            9
+        )
+    );
+
+    let empty_name_line = line!() + 1;
+    let mut types = Types::default();
+    let ndt = specta::datatype::NamedDataType::new("", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::str));
+    });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Attempted to export \"tests::tests::typescript::\" but was unable to because the Typescript type name is empty. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: tests::tests::typescript:: at {}:{}:{}",
+            file!(),
+            empty_name_line + 1,
+            15
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_unsupported_opaque_path() {
+    #[derive(Hash, PartialEq, Eq)]
+    struct UnsupportedOpaque;
+
+    let opaque_line = line!() + 1;
+    let mut types = Types::default();
+    let ndt = specta::datatype::NamedDataType::new("OpaqueContainer", &mut types, |_, ndt| {
+        ndt.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "field",
+                    specta::datatype::Field::new(Reference::opaque(UnsupportedOpaque).into()),
+                )
+                .build(),
+        );
+    });
+
+    let err =
+        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found unsupported opaque reference 'test::typescript::typescript_errors_include_unsupported_opaque_path::UnsupportedOpaque' at \"tests::tests::typescript::OpaqueContainer.field\". It is not supported by the Typescript exporter.\nRust type: tests::tests::typescript::OpaqueContainer at {}:{}:{}",
+            file!(),
+            opaque_line + 1,
+            15
+        )
+    );
+}
+
+#[test]
+fn typescript_errors_include_dangling_reference_path() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MissingDependency {
+        value: String,
+    }
+
+    let container_line = line!() + 1;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DanglingContainer {
+        field: MissingDependency,
+    }
+
+    let mut source_types = Types::default();
+    let dt = DanglingContainer::definition(&mut source_types);
+    let ndt = match dt {
+        DataType::Reference(Reference::Named(r)) => source_types.get(&r).unwrap().to_owned(),
+        _ => panic!("expected named reference"),
+    };
+
+    let err = primitives::export(
+        &Typescript::default(),
+        &Types::default(),
+        [&ndt].into_iter(),
+        "",
+    )
+    .unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "Found dangling named reference NamedReference {{ id: s:test::typescript::MissingDependency, inner: Reference {{ generics: [] }} }} at \"test::typescript::DanglingContainer.field\". The referenced type is missing from the resolved type collection.\nRust type: test::typescript::DanglingContainer at {}:{}:{}",
+            file!(),
+            container_line,
+            14
+        )
+    );
+}
+
+#[test]
 fn typescript_export_to() {
     let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&temp).unwrap();
@@ -571,16 +927,21 @@ fn typescript_export_to() {
         Layout::ModulePrefixedName,
         Layout::Namespaces,
     ] {
-        for (mode, result) in phase_collections() {
-            let name = format!("ts-export-to-{}-{mode}", layout.to_string().to_lowercase());
-            let output = phase_output(result, |_, types| {
+        for (mode, format, _, types) in phase_collections() {
+            let name = format!(
+                "ts-export-to-{}-{}",
+                layout.to_string().to_lowercase(),
+                mode
+            );
+            let output = {
                 let path = temp.path().join(&name);
                 Typescript::default()
                     .layout(layout)
-                    .export_to(&path, &types)
-                    .map_err(|err| err.to_string())?;
+                    .export_to(&path, &types, format)
+                    .unwrap();
                 fs_to_string(&path).map_err(|err| err.to_string())
-            });
+            }
+            .unwrap();
 
             insta::assert_snapshot!(name, output);
         }
@@ -594,25 +955,29 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_export() {
-    for (mode, result) in phase_collections() {
-        let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default();
+    for (mode, format, dts, types) in phase_collections() {
+        let types = format.map_types(&types).unwrap().into_owned();
 
-            dts.iter()
-                .filter_map(|(name, ty)| match ty {
-                    DataType::Reference(Reference::Named(reference)) => {
-                        reference.get(types.as_types()).map(|ty| (name, ty))
-                    }
-                    _ => None,
-                })
-                .map(|(name, ty)| {
-                    primitives::export(&ts, types, iter::once(ty), "")
-                        .map(|ty| format!("{name}: {ty}"))
-                })
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let mut ndt = match dt {
+                    DataType::Reference(Reference::Named(r)) => types.get(r).unwrap().to_owned(),
+                    _ => return None,
+                };
+
+                if let Some(ty) = &mut ndt.ty {
+                    *ty = format.map_type(&types, ty).unwrap().into_owned();
+                }
+
+                Some(
+                    primitives::export(&Typescript::default(), &types, [ndt].iter(), "")
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("export-{mode}"), output);
     }
@@ -620,65 +985,56 @@ fn primitives_export() {
 
 #[test]
 fn primitives_export_many() {
-    for (mode, result) in phase_collections() {
-        let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default();
-            let ndts = dts
-                .iter()
+    for (mode, format, dts, types) in phase_collections() {
+        let types = format.map_types(&types).unwrap().into_owned();
+
+        let output = primitives::export(
+            &Typescript::default(),
+            &types,
+            dts.iter()
                 .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).cloned(),
                     _ => None,
                 })
-                .collect::<Vec<_>>();
-
-            primitives::export(&ts, types, ndts.into_iter(), "").map_err(|err| err.to_string())
-        });
+                .map(|mut ndt| {
+                    if let Some(ty) = &mut ndt.ty {
+                        *ty = format.map_type(&types, ty).unwrap().into_owned();
+                    }
+                    ndt
+                })
+                .collect::<Vec<_>>()
+                .iter(),
+            "",
+        )
+        .unwrap();
 
         insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
 }
 
 #[test]
-fn primitives_export_allows_generic_hashmap_definition() {
-    for (mode, result) in phase_collections() {
-        let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default();
-            let hash_map = dts
-                .iter()
-                .find_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r
-                        .get(types.as_types())
-                        .filter(|ndt| ndt.name() == "HashMap"),
-                    _ => None,
-                })
-                .expect("HashMap should be registered in shared test fixtures");
-
-            primitives::export(&ts, types, iter::once(hash_map), "").map_err(|err| err.to_string())
-        });
-
-        assert!(
-            !output.starts_with("ERROR:"),
-            "unexpected error while exporting generic HashMap in {mode}: {output}"
-        );
-        assert!(output.contains("export type HashMap<K, V> = { [key in K]: V };"));
-    }
-}
-
-#[test]
 fn primitives_reference() {
-    for (mode, result) in phase_collections() {
-        let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default();
-            dts.iter()
-                .filter_map(|(s, ty)| match ty {
-                    DataType::Reference(r) => Some((s, r)),
-                    _ => None,
-                })
-                .map(|(s, ty)| primitives::reference(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+    for (mode, format, dts, types) in phase_collections() {
+        let types = format.map_types(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
+
+                let reference = match dt {
+                    DataType::Reference(reference) => reference.clone(),
+                    _ => return None,
+                };
+
+                Some(
+                    primitives::reference(&Typescript::default(), &types, &reference)
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
@@ -686,15 +1042,20 @@ fn primitives_reference() {
 
 #[test]
 fn primitives_inline() {
-    for (mode, result) in phase_collections() {
-        let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default();
-            dts.iter()
-                .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+    for (mode, format, dts, types) in phase_collections() {
+        let types = format.map_types(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .map(|(name, dt)| {
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
+
+                primitives::inline(&Typescript::default(), &types, &dt)
+                    .map(|ty| format!("{name}: {ty}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
@@ -703,6 +1064,7 @@ fn primitives_inline() {
 #[test]
 fn reserved_names() {
     {
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -712,15 +1074,24 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        let resolved = ResolvedTypes::from_resolved_types(types.clone());
-
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 
     {
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -728,16 +1099,25 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        let resolved = ResolvedTypes::from_resolved_types(types.clone());
-
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 
     {
         // Typescript reserved type name
+        let line = line!() + 1;
         #[derive(Type)]
         #[specta(collect = false)]
         #[allow(non_camel_case_types)]
@@ -747,12 +1127,20 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        let resolved = ResolvedTypes::from_resolved_types(types.clone());
-
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        assert_eq!(
+            primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+                .unwrap_err()
+                .to_string(),
+            format!(
+                "Attempted to export \"test::typescript::enum\" but was unable to due to name \"enum\" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`\nRust type: test::typescript::enum at {}:{}:{}",
+                file!(),
+                line,
+                18
+            )
+        );
     }
 }
 
@@ -804,3 +1192,58 @@ fn reserved_names() {
 //
 // Tests for framework primitives (prelude, runtime, runtime imports, etc)
 // Tauri `Channel` tests
+
+#[test]
+fn internally_tagged_enum_with_content_variants_renders_correctly() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct ItcInner {
+        field: String,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedWithContent {
+        A {
+            #[serde(flatten)]
+            inner: ItcInner,
+        },
+        B {
+            #[serde(flatten)]
+            inner: ItcInner,
+        },
+        #[serde(other)]
+        Unknown,
+    }
+
+    let mut types = Types::default();
+    let _ = <ItcInner as Type>::definition(&mut types);
+    let _ = <InternallyTaggedWithContent as Type>::definition(&mut types);
+
+    let output = Typescript::default()
+        .export(&types, &specta_serde::PhasesFormat)
+        .unwrap();
+
+    // Wire format produced by serde at runtime is `{ "type": "A", ...flattened_inner }`
+    // (internally-tagged: tag at top level alongside the variant payload).
+    // The TS bindings must describe that shape -- not the externally-tagged
+    // `{ "A": payload } & { "B"?: never; ... }` shape that rc.25 regressed to
+    // when the enum had a `#[serde(other)]` variant.
+    assert!(
+        !output.contains("A?: never") && !output.contains("B?: never"),
+        "rc.25 regression: variants wrapped in externally-tagged shape with `?: never` exclusions. Output:\n{output}"
+    );
+    assert!(
+        output.contains(r#"type: "A""#) && output.contains(r#"type: "B""#),
+        "expected `type: \"A\"` and `type: \"B\"` literals as tag discriminators. Output:\n{output}"
+    );
+    // The `inner` field is `#[serde(flatten)]`, so on the wire the inner
+    // struct's fields appear at the top level of the variant -- the TS
+    // shape must be `({ type: "A" } & ItcInner)`, never
+    // `{ type: "A"; inner: ItcInner }`.
+    assert!(
+        !output.contains("inner:"),
+        "rc.25 regression: `#[serde(flatten)]` ignored on struct-variant fields in internally-tagged enums; the inner type is being kept under an `inner:` key instead of merged. Output:\n{output}"
+    );
+}

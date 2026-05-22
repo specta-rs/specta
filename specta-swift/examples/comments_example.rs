@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -106,10 +108,9 @@ fn main() {
     let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<User>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!(
         "Generated Swift code with comprehensive comments:\n{}",
@@ -118,7 +119,11 @@ fn main() {
 
     // Also write to file for inspection
     swift
-        .export_to("./examples/generated/CommentsExample.swift", &resolved)
+        .export_to(
+            "./examples/generated/CommentsExample.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("\nComments example written to CommentsExample.swift");
 }

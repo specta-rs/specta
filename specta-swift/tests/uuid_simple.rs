@@ -1,4 +1,6 @@
-use specta::{ResolvedTypes, Type, Types};
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 // Test with UUID - this should work now that we have the uuid feature enabled
@@ -18,9 +20,8 @@ struct WithChrono {
 #[test]
 fn test_uuid_support() {
     let types = Types::default().register::<WithUuid>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -32,9 +33,8 @@ fn test_uuid_support() {
 #[test]
 fn test_chrono_support() {
     let types = Types::default().register::<WithChrono>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Chrono support test:\n{}", output);
 

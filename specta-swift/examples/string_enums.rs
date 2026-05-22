@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -5,7 +7,7 @@ use specta_swift::Swift;
 ///
 /// This example demonstrates how specta-swift handles string enums, mixed enums,
 /// and generates appropriate Codable implementations for different enum patterns.
-
+///
 /// Simple string enum (will be converted to Swift String enum with Codable)
 #[derive(Type)]
 enum HttpStatus {
@@ -176,18 +178,21 @@ fn main() {
         .register::<Result<String, String>>()
         .register::<EventType>()
         .register::<FileType>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/StringEnums.swift", &resolved)
+        .export_to(
+            "./examples/generated/StringEnums.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("✅ String enums exported to StringEnums.swift");
 

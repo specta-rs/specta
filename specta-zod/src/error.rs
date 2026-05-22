@@ -51,9 +51,6 @@ enum ErrorKind {
     DanglingNamedReference {
         reference: String,
     },
-    UnresolvedGenericReference {
-        reference: String,
-    },
     Framework {
         message: Cow<'static, str>,
         source: FrameworkSource,
@@ -149,15 +146,21 @@ impl Error {
         }
     }
 
-    pub(crate) fn unresolved_generic_reference(reference: String) -> Self {
-        Self {
-            kind: ErrorKind::UnresolvedGenericReference { reference },
-        }
-    }
-
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
         Self {
             kind: ErrorKind::UnableToExport(layout),
+        }
+    }
+
+    pub(crate) fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: specta::FormatError,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::Framework {
+                message: message.into(),
+                source,
+            },
         }
     }
 }
@@ -233,10 +236,6 @@ impl fmt::Display for Error {
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
-            ),
-            ErrorKind::UnresolvedGenericReference { reference } => write!(
-                f,
-                "Found unresolved generic reference {reference}. The generic is missing from the active named type scope."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

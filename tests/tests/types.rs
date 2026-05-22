@@ -40,7 +40,9 @@ macro_rules! types {
 
         // This allows us to end-to-end test primitives.
         // Many types won't be directly added to the `Types`, as they are not named.
-        specta::datatype::NamedDataType::new("Primitives", vec![], s.build()).register(&mut types);
+        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, ndt| {
+            ndt.ty = Some(s.build());
+        });
 
         // Test `selection!`
         {
@@ -340,18 +342,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InternallyTaggedL,
         InternallyTaggedM,
 
-        // Alias
-        StructWithAlias,
-        StructWithMultipleAliases,
-        StructWithAliasAndRename,
-
-        EnumWithVariantAlias,
-        EnumWithMultipleVariantAliases,
-        EnumWithVariantAliasAndRename,
-
-        InternallyTaggedWithAlias,
-        AdjacentlyTaggedWithAlias,
-        UntaggedWithAlias,
         Issue221UntaggedSafe,
         Issue221UntaggedMixed,
 
@@ -401,7 +391,22 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineGenericNested<String>,
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
+        GenericDefault,
+        ChainedGenericDefault,
+        ChainedGenericDefault<String, String>,
+        ChainedGenericDefault<i32>,
+        ChainedGenericDefault<String, i32>,
+        GenericDefaultSkipped,
+        GenericDefaultSkippedNonType,
         GenericParameterOrderPreserved,
+
+        // Tests for handling of const generics
+        // Especially when inlining and flattening as it changes.
+        ConstGenericInNonConstContainer,
+        ConstGenericInConstContainer,
+        NamedConstGenericContainer,
+        InlineConstGenericContainer,
+        InlineRecursiveConstGenericContainer,
 
         // Test that the types don't get duplicated in the type map.
         // (these will be duplicated in dts tests as that doesn't use the typemap)
@@ -420,6 +425,17 @@ pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
         Issue374,
         Optional,
         StructPhaseSpecificRename,
+
+        // Alias. These are deserialize-only and require PhasesFormat.
+        StructWithAlias,
+        StructWithMultipleAliases,
+        StructWithAliasAndRename,
+        EnumWithVariantAlias,
+        EnumWithMultipleVariantAliases,
+        EnumWithVariantAliasAndRename,
+        InternallyTaggedWithAlias,
+        AdjacentlyTaggedWithAlias,
+        UntaggedWithAlias,
     );
 
     (types, dts)
@@ -2255,6 +2271,37 @@ struct InlineFlattenGenerics {
     t: InlineFlattenGenericsG<String>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefault<T = String> {
+    value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ChainedGenericDefault<T = String, U = T> {
+    first: T,
+    second: U,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkipped<#[specta(skip_default_generic)] T = String> {
+    value: T,
+}
+
+struct GenericDefaultSkippedNonTypeDefault;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkippedNonType<
+    #[specta(skip_default_generic)] T = GenericDefaultSkippedNonTypeDefault,
+> {
+    value: i32,
+    #[specta(skip)]
+    _phantom: PhantomData<T>,
+}
+
 // #[test]
 // fn default() {
 //     #[derive(Type)]
@@ -2341,6 +2388,85 @@ struct Pair<Z, A> {
 #[specta(collect = false)]
 struct GenericParameterOrderPreserved {
     pair: Pair<i32, String>,
+}
+
+const CONST_LEN: usize = 1;
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInNonConstContainer {
+    data: [u32; CONST_LEN],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+// This is a duplicate of `NamedConstGeneric` but we keep it separate as it's a better test
+// or the global export ty that is registered.
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInConstContainer<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGeneric<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGenericContainer {
+    a: NamedConstGeneric,
+    b: NamedConstGeneric<2>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineConstGenericContainer {
+    #[specta(inline)]
+    b: InlineConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineConstGeneric<3>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+    e: Box<InlineRecursiveConstGeneric<4>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGenericContainer {
+    #[specta(inline)]
+    b: InlineRecursiveConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineRecursiveConstGeneric<3>,
+    d: [u8; 2],
 }
 
 // mod type_overrides {
@@ -2526,7 +2652,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_b = TransparentB::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
@@ -2540,7 +2666,7 @@ fn struct_collects_all_transparent_field_types() {
     UsesTransparent::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"UsesTransparent"));
@@ -2550,10 +2676,11 @@ fn struct_collects_all_transparent_field_types() {
 
 #[test]
 fn container_default_marks_all_fields_optional_in_unified_mode() {
-    let types = specta_serde::apply(Types::default().register::<ContainerDefault>())
-        .expect("container-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<ContainerDefault>(),
+            specta_serde::Format,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-default-container-typescript", ts);
@@ -2561,10 +2688,11 @@ fn container_default_marks_all_fields_optional_in_unified_mode() {
 
 #[test]
 fn field_default_still_marks_only_that_field_optional() {
-    let types = specta_serde::apply(Types::default().register::<FieldDefault>())
-        .expect("field-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<FieldDefault>(),
+            specta_serde::Format,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-default-field-typescript", ts);
@@ -2572,10 +2700,11 @@ fn field_default_still_marks_only_that_field_optional() {
 
 #[test]
 fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
-    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntagged>())
-        .expect("mixed tagged and untagged variants should export when they share one shape");
     let ts = specta_typescript::Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<MixedTaggedAndUntagged>(),
+            specta_serde::Format,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-typescript", ts);
@@ -2583,35 +2712,23 @@ fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
 
 #[test]
 fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
-    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedStruct>())
-        .expect(
-            "mixed tagged and untagged struct variants should export when they share one shape",
-        );
     let ts = specta_typescript::Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<MixedTaggedAndUntaggedStruct>(),
+            specta_serde::Format,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-struct-typescript", ts);
 }
 
 #[test]
-fn phased_mixed_untagged_variants_require_apply_phases() {
-    let err = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedPhased>())
-        .expect_err("phase-specific mixed untagged variants should require apply_phases");
-
-    assert!(
-        err.to_string().contains("apply_phases"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
 fn phased_mixed_untagged_variants_split_per_phase() {
-    let types =
-        specta_serde::apply_phases(Types::default().register::<MixedTaggedAndUntaggedPhased>())
-            .expect("apply_phases should support phase-specific mixed untagged variants");
     let ts = specta_typescript::Typescript::default()
-        .export(&types)
+        .export(
+            &Types::default().register::<MixedTaggedAndUntaggedPhased>(),
+            specta_serde::PhasesFormat,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);

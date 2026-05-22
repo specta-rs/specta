@@ -28,13 +28,13 @@ pub enum Primitive {
     u128,
     /// [`usize`] primitive.
     usize,
-    /// [`f16`] primitive.
+    /// [`f16`] primitive (nightly-only).
     f16,
     /// [`f32`] primitive.
     f32,
     /// [`f64`] primitive.
     f64,
-    /// [`f128`] primitive.
+    /// [`f128`] primitive (nightly-only).
     f128,
     /// [`bool`] primitive.
     bool,

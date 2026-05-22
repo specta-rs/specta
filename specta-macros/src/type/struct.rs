@@ -14,52 +14,10 @@ pub fn decode_field_attrs<'a>(
 ) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let raw_attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
-    let mut attrs = raw_attrs.clone();
+    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
-    // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
-    // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-    if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
-        match &attr.value {
-            None
-            | Some(crate::utils::AttributeValue::Lit(_))
-            | Some(crate::utils::AttributeValue::Path(_)) => {
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-            Some(crate::utils::AttributeValue::Expr(_)) => {
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-            Some(crate::utils::AttributeValue::Attribute {
-                attr: inner_attrs, ..
-            }) => {
-                if let Some(inner_attr) = inner_attrs.first() {
-                    if let Some(message) = migration_hint(Scope::Field, &inner_attr.key.to_string())
-                    {
-                        return Err(syn::Error::new(inner_attr.key.span(), message));
-                    }
-
-                    return Err(syn::Error::new(
-                        inner_attr.key.span(),
-                        format!(
-                            "specta: Found unsupported field attribute '{}'",
-                            inner_attr.key
-                        ),
-                    ));
-                }
-                return Err(syn::Error::new(
-                    attr.key.span(),
-                    "specta: invalid formatted attribute",
-                ));
-            }
-        }
-    }
+    reject_unknown_specta_attrs(&attrs, Scope::Field)?;
 
     Ok((field_attrs, &field.attrs))
 }

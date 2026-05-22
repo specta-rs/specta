@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
@@ -7,7 +9,7 @@ use std::time::Duration;
 /// This example demonstrates how specta-swift handles special Rust types
 /// like Duration, UUID, chrono types, and other commonly used types
 /// that need special conversion to Swift equivalents.
-
+///
 /// Struct with Duration fields (will be converted to RustDuration helper)
 #[derive(Type)]
 struct IndexerMetrics {
@@ -140,18 +142,21 @@ fn main() {
         .register::<ApiResponse>()
         .register::<JobStatus>()
         .register::<SystemHealth>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/SpecialTypes.swift", &resolved)
+        .export_to(
+            "./examples/generated/SpecialTypes.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("✅ Special types exported to SpecialTypes.swift");
 

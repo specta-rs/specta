@@ -19,6 +19,7 @@ mod jsdoc;
 mod layouts;
 mod legacy_impls;
 mod references;
+mod semantic;
 mod serde_conversions;
 mod serde_identifiers;
 mod serde_other;
@@ -34,5 +35,6 @@ pub use utils::fs_to_string;
 #[test]
 fn compile_errors() {
     let t = trybuild::TestCases::new();
+    t.compile_fail("tests/macro/associated_items.rs");
     t.compile_fail("tests/macro/compile_error.rs");
 }

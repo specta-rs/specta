@@ -37,7 +37,6 @@ use specta::datatype::DataType;
 /// # Notes
 ///
 /// - The struct must be a tuple struct with exactly one field
-/// - The `Type` implementation is currently a `todo!()` placeholder
 /// - The `as "name"` syntax is optional; if omitted, the struct name is used
 #[macro_export]
 macro_rules! branded {

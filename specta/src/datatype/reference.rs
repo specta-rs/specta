@@ -1,125 +1,269 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
 
-use crate::{Types, datatype::NamedDataType};
+use crate::{
+    Types,
+    datatype::{Generic, Map, NamedDataType, Primitive},
+};
 
 use super::DataType;
 
-/// Reference to another type.
+/// Reference to another datatype.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// Reference to a named type collected in a [`Types`].
+    /// Reference to a named type collected in a [`Types`](crate::Types).
+    ///
+    /// This can either render as a named reference, such as `TypeName<T>`, or as
+    /// an inlined datatype depending on [`NamedReference::inner`].
     Named(NamedReference),
-    /// Reference to a generic type parameter.
-    Generic(GenericReference),
     /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// Reference to a [NamedDataType].
+/// Reference to a [`NamedDataType`](crate::datatype::NamedDataType).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub(crate) generics: Vec<(GenericReference, DataType)>,
-    pub(crate) inline: bool,
+    /// How this named type should be referenced at the use site.
+    pub inner: NamedReferenceType,
 }
 
-impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [Types].
-    ///
-    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
-    /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref()
-    }
-
-    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &[(GenericReference, DataType)] {
-        &self.generics
-    }
-
-    /// Get the generic parameters set on this reference as mutable references.
-    pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
-        &mut self.generics
-    }
-
-    /// Get whether this reference should be inlined
-    pub fn inline(&self) -> bool {
-        self.inline
-    }
-}
-
-/// Reference to a generic parameter a parent [NamedDataType].
-/// This is resolved to a concrete type by the language exporter.
+/// Use-site representation for a [`NamedReference`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GenericReference {
-    pub(crate) id: TypeId,
+pub enum NamedReferenceType {
+    /// Recursive reference encountered while resolving an inline type.
+    ///
+    /// Exporters can use this marker to avoid infinitely expanding recursive
+    /// inline definitions that they would stack overflow resolving.
+    Recursive(RecursiveInlineType),
+    /// Inline the contained datatype at the reference site.
+    /// These are emitted when `#[specta(inline)]` is used on a field or container.
+    #[non_exhaustive]
+    Inline {
+        /// Datatype to render in place of the named reference.
+        dt: Box<DataType>,
+    },
+    /// Render a reference to the named datatype.
+    #[non_exhaustive]
+    Reference {
+        /// Concrete generic arguments for this use site.
+        generics: Vec<(Generic, DataType)>,
+    },
 }
 
-impl GenericReference {
-    /// Build a new [GenericReference] for a generic type parameter marker.
-    /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
-    pub const fn new<T: ?Sized + 'static>() -> Self {
+/// Debug-only description of a type in a recursive inline cycle.
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct RecursiveInlineType {
+    cycle: Vec<RecursiveInlineFrame>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RecursiveInlineFrame {
+    type_name: Cow<'static, str>,
+    generics: Vec<Cow<'static, str>>,
+}
+
+impl RecursiveInlineType {
+    pub(crate) fn from_cycle(cycle: Vec<RecursiveInlineFrame>) -> Self {
+        Self { cycle }
+    }
+
+    fn last_frame(&self) -> Option<&RecursiveInlineFrame> {
+        self.cycle.last()
+    }
+}
+
+impl fmt::Debug for RecursiveInlineType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (idx, ty) in self.cycle.iter().enumerate() {
+            if idx != 0 {
+                f.write_str(" -> ")?;
+            }
+            write!(f, "{ty:?}")?;
+        }
+        Ok(())
+    }
+}
+
+impl RecursiveInlineFrame {
+    pub(crate) fn new(
+        types: &Types,
+        ndt: &NamedDataType,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self::new_inner(types, named_type_path(ndt), generics)
+    }
+
+    pub(crate) fn from_type_path(
+        types: &Types,
+        type_name: Cow<'static, str>,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self::new_inner(types, type_name, generics)
+    }
+
+    fn new_inner(
+        types: &Types,
+        type_name: Cow<'static, str>,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
         Self {
-            id: TypeId::of::<T>(),
+            type_name,
+            generics: generics
+                .iter()
+                .map(|(_, dt)| render_recursive_inline_generic(types, dt))
+                .collect(),
         }
     }
+}
 
-    /// Compare two [GenericReference]s for equality.
-    /// If this returns true they are both a reference to the same generic type.
-    pub fn eq<T: ?Sized + 'static>(&self) -> bool {
-        self.id == TypeId::of::<T>()
+impl fmt::Debug for RecursiveInlineFrame {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.type_name)?;
+        if self.generics.is_empty() {
+            return Ok(());
+        }
+
+        f.write_str("<")?;
+        for (idx, generic) in self.generics.iter().enumerate() {
+            if idx != 0 {
+                f.write_str(", ")?;
+            }
+            f.write_str(generic)?;
+        }
+        f.write_str(">")
     }
 }
 
-impl From<GenericReference> for DataType {
-    fn from(v: GenericReference) -> Self {
-        DataType::Reference(Reference::Generic(v))
+fn named_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
+    if ndt.module_path.is_empty() {
+        ndt.name.clone()
+    } else {
+        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
     }
 }
 
-/// Reference to a type not understood by Specta's core.
+fn render_recursive_inline_generic(types: &Types, dt: &DataType) -> Cow<'static, str> {
+    match dt {
+        DataType::Primitive(primitive) => Cow::Borrowed(primitive_type_name(primitive)),
+        DataType::Generic(generic) => generic.name().clone(),
+        DataType::Reference(Reference::Named(reference)) => {
+            render_recursive_inline_named(types, reference)
+        }
+        DataType::Reference(Reference::Opaque(reference)) => Cow::Borrowed(reference.type_name()),
+        DataType::List(list) => {
+            let ty = render_recursive_inline_generic(types, &list.ty);
+            match list.length {
+                Some(length) => Cow::Owned(format!("[{ty}; {length}]")),
+                None => Cow::Owned(format!("Vec<{ty}>")),
+            }
+        }
+        DataType::Map(map) => render_recursive_inline_map(types, map),
+        DataType::Nullable(inner) => Cow::Owned(format!(
+            "Option<{}>",
+            render_recursive_inline_generic(types, inner)
+        )),
+        DataType::Tuple(tuple) => Cow::Owned(format!(
+            "({})",
+            tuple
+                .elements
+                .iter()
+                .map(|dt| render_recursive_inline_generic(types, dt).into_owned())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+        dt => Cow::Owned(format!("{dt:?}")),
+    }
+}
+
+fn render_recursive_inline_named(types: &Types, reference: &NamedReference) -> Cow<'static, str> {
+    if let NamedReferenceType::Recursive(cycle) = &reference.inner
+        && let Some(ty) = cycle.last_frame()
+    {
+        return Cow::Owned(format!("{ty:?}"));
+    }
+
+    let Some(ndt) = types.get(reference) else {
+        return Cow::Owned(format!("{reference:?}"));
+    };
+
+    let mut out = named_type_path(ndt).into_owned();
+    if let NamedReferenceType::Reference { generics } = &reference.inner
+        && !generics.is_empty()
+    {
+        out.push('<');
+        out.push_str(
+            &generics
+                .iter()
+                .map(|(_, dt)| render_recursive_inline_generic(types, dt).into_owned())
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        out.push('>');
+    }
+    Cow::Owned(out)
+}
+
+fn render_recursive_inline_map(types: &Types, map: &Map) -> Cow<'static, str> {
+    Cow::Owned(format!(
+        "HashMap<{}, {}>",
+        render_recursive_inline_generic(types, map.key_ty()),
+        render_recursive_inline_generic(types, map.value_ty())
+    ))
+}
+
+fn primitive_type_name(primitive: &Primitive) -> &'static str {
+    match primitive {
+        Primitive::i8 => "i8",
+        Primitive::i16 => "i16",
+        Primitive::i32 => "i32",
+        Primitive::i64 => "i64",
+        Primitive::i128 => "i128",
+        Primitive::u8 => "u8",
+        Primitive::u16 => "u16",
+        Primitive::u32 => "u32",
+        Primitive::u64 => "u64",
+        Primitive::u128 => "u128",
+        Primitive::isize => "isize",
+        Primitive::usize => "usize",
+        Primitive::f16 => "f16",
+        Primitive::f32 => "f32",
+        Primitive::f64 => "f64",
+        Primitive::f128 => "f128",
+        Primitive::bool => "bool",
+        Primitive::str => "String",
+        Primitive::char => "char",
+    }
+}
+
+/// Reference to a type not understood by Specta's core datatype model.
 ///
 /// These are implemented by the language exporter to implement cool features like
 /// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
 /// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
+/// # Invariants
+///
+/// Equality and hashing are delegated to the stored opaque state. If two opaque
+/// references should be distinct, their state values must compare and hash
+/// distinctly.
+///
+/// This is an advanced feature designed for language exporters and framework
+/// integrations. Most end users should prefer ordinary [`DataType`] variants.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
-
-pub(crate) fn tauri() -> Reference {
-    Reference::Opaque(OpaqueReference(Arc::new(TauriChannelReferenceInner)))
-}
 
 trait DynOpaqueReference: Any + Send + Sync {
     fn type_name(&self) -> &'static str;
     fn hash(&self, hasher: &mut dyn hash::Hasher);
     fn eq(&self, other: &dyn Any) -> bool;
     fn as_any(&self) -> &dyn Any;
-}
-
-#[derive(PartialEq, Eq)]
-struct TauriChannelReferenceInner;
-impl DynOpaqueReference for TauriChannelReferenceInner {
-    fn type_name(&self) -> &'static str {
-        "tauri::ipc::Channel"
-    }
-    fn hash(&self, hasher: &mut dyn hash::Hasher) {
-        hasher.write_u64(0);
-    }
-    fn eq(&self, other: &dyn Any) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .map(|other| self == other)
-            .unwrap_or_default()
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 #[derive(Debug)]
@@ -165,53 +309,45 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
-    /// Get the Rust type name of the stored opaque state.
+    /// Returns the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
-    /// Get the [`TypeId`] of the stored opaque state.
+    /// Returns the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
-    /// Attempt to downcast the opaque state to `T`.
+    /// Attempts to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
 }
 
 impl Reference {
-    /// Construct a new reference to an opaque type.
+    /// Constructs a new reference to an opaque type.
     ///
-    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    /// An opaque type cannot be represented with the core [`DataType`] model and
+    /// requires specific exporter integration.
     ///
-    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
+    /// Opaque [`Reference`]s are compared using the state's [`PartialEq`]
+    /// implementation. For example, `Reference::opaque(()) ==
+    /// Reference::opaque(())`, so unique references need unique state.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
         Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
     }
 
-    /// Compare if two references point to the same type.
+    /// Returns whether two references point to the same underlying type.
     ///
-    /// This is different from using `Eq`, `PartialEq`, or `Hash` as those compare the [Reference].
-    /// A [Reference] contains generics, inline and other attributes which this ignores.
+    /// This differs from [`Eq`], [`PartialEq`], and [`Hash`] because those compare
+    /// the full [`Reference`] which includes generic arguments and inline state.
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
-            (Reference::Generic(a), Reference::Generic(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
-    }
-
-    /// Convert an existing [Reference] into an inlined one.
-    ///
-    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
-    pub fn inline(mut self) -> Reference {
-        if let Reference::Named(n) = &mut self {
-            n.inline = true;
-        }
-        self
     }
 }
 

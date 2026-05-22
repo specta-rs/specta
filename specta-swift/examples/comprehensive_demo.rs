@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
@@ -7,7 +9,7 @@ use std::time::Duration;
 /// This example showcases every feature and capability of specta-swift in a single,
 /// realistic application scenario. It demonstrates complex type relationships,
 /// various enum patterns, special types, and advanced features.
-
+///
 /// Main application types for a task management system
 #[derive(Type)]
 struct Task {
@@ -386,9 +388,8 @@ fn main() {
 
     // Export with default settings
     let total_types = types.len();
-    let resolved = specta_serde::apply(types).unwrap();
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code (first 2000 characters):\n");
     let preview = if output.len() > 2000 {
@@ -403,7 +404,11 @@ fn main() {
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/ComprehensiveDemo.swift", &resolved)
+        .export_to(
+            "./examples/generated/ComprehensiveDemo.swift",
+            &types,
+            specta_serde::Format,
+        )
         .unwrap();
     println!("✅ Comprehensive demo exported to ComprehensiveDemo.swift");
 

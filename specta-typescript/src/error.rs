@@ -1,10 +1,8 @@
 use std::{borrow::Cow, error, fmt, io, panic::Location, path::PathBuf};
 
-use specta::datatype::OpaqueReference;
+use specta::datatype::{NamedDataType, OpaqueReference, RecursiveInlineType};
 
 use crate::Layout;
-
-use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
 ///
@@ -15,28 +13,50 @@ use super::legacy::ExportPath;
 ///
 /// This guard exists because `JSON.parse` will truncate large integers to fit into a JavaScript `number` type so we explicitly forbid exporting them.
 ///
+/// We take the stance that correctness matters more than developer experience as people using Rust generally strive for correctness.
+///
 /// If you encounter this error, there are a few common migration paths (in order of preference):
 ///
-/// 1. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
+/// 1. Use a Specta-based framework which can handle these types
+///     - None currently exist but it would theoretically be possible refer to [#203](https://github.com/specta-rs/specta/issues/203#issuecomment-4387573925) for more information.
+///
+/// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
 ///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
 ///    - This approach forces your application code to handle overflow/underflow values explicitly
 ///    - Downside is that it can introduce annoying glue code and doesn't actually work if your need large values.
 ///
-/// 2. Serialize the value as a string
-///     - This can be done using `#[specta(type = String)]` combined with a Serde `#[serde(with = "...")]` attribute.
-///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS.
+/// 3. Serialize the value as a string
+///     - This can be done using `#[specta(type = String)]` for the type combined with a Serde `#[serde(with = "...")]` attribute for runtime.
+///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS but this will support numbers of any size losslessly.
 ///
-/// 3. Use a Specta-based framework
-///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
-///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+/// 4. **UNSAFE:** Accept precision loss on per-field basis
+///     - Accept that large numbers may be deserialized differently than they are in Rust and use `#[specta(type = specta_typescript::Number)]` to bypass this warning on a per-field basis.
+///     - Marking each field explicitly encodes the decision similar to an `unsafe` block, ensuring everyone working on your codebase is aware of the risk and where it exists within the codebase.
+///     - This doesn't work for external implementations like `serde_json::Value` which contain `BigInt`'s as you don't control the definition.
 ///
-/// 4. UNSAFE: Accept precision loss
-///     - Accept that large numbers may be deserialized differently and use `#[specta(type = f64)]` to bypass this warning on a per-field basis.
-///     - This can't be set globally as it is designed intentionally to introduce friction, as you are accepting the risk of data loss which is not okay.
+/// 5. **UNSAFE:** Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
+///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
+///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
+///     - Refer to discussion around this on [#481](https://github.com/specta-rs/specta/issues/481).
 ///
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,
+    named_datatype: Option<Box<NamedDataType>>,
+    trace: Vec<ErrorTraceFrame>,
+}
+
+/// Additional TypeScript exporter context for an [`Error`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum ErrorTraceFrame {
+    /// The exporter was rendering a core-provided inline reference at `path` when the error occurred.
+    Inlined {
+        /// The named Rust type being inlined, if it could be resolved.
+        named_datatype: Option<Box<NamedDataType>>,
+        /// Field, variant, or variant-field path where the inline expansion occurred.
+        path: String,
+    },
 }
 
 type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
@@ -45,6 +65,10 @@ const BIGINT_DOCS_URL: &str =
 
 #[allow(dead_code)]
 enum ErrorKind {
+    /// A map key type cannot be represented as a valid Typescript index signature.
+    ///
+    /// Typescript map keys must resolve to string-like, number-like, symbol-like, or literal key
+    /// types. Complex structural values cannot safely be represented as object keys.
     InvalidMapKey {
         path: String,
         reason: Cow<'static, str>,
@@ -62,6 +86,15 @@ enum ErrorKind {
     InvalidName {
         path: String,
         name: Cow<'static, str>,
+    },
+    /// A type's name is empty and cannot be emitted as a Typescript type name.
+    EmptyName {
+        path: String,
+    },
+    /// Anonymous enum variants cannot be represented by the Typescript exporter.
+    UnsupportedAnonymousEnumVariant {
+        path: String,
+        variant_kind: &'static str,
     },
     /// Detected multiple items within the same scope with the same name.
     /// Typescript doesn't support this so we error out.
@@ -95,47 +128,107 @@ enum ErrorKind {
         path: PathBuf,
         source: io::Error,
     },
+    /// Failed to create an output directory while exporting files.
+    CreateDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to write an output file while exporting files.
+    WriteFile {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to read a generated file while exporting files.
+    ReadFile {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
-    UnsupportedOpaqueReference(OpaqueReference),
+    UnsupportedOpaqueReference {
+        path: String,
+        reference: OpaqueReference,
+    },
     /// Found a named reference that cannot be resolved from the provided
-    /// [`ResolvedTypes`](specta::ResolvedTypes).
+    /// [`Types`](specta::Types).
     DanglingNamedReference {
+        path: String,
         reference: String,
     },
-    /// Found a generic reference that cannot be resolved to a declared generic name.
-    UnresolvedGenericReference {
+    /// Found a recursive named reference marked by core inline resolution.
+    InfiniteRecursiveInlineType {
+        path: String,
         reference: String,
+        cycle: RecursiveInlineType,
+    },
+    /// Reached the recursion limit while rendering an anonymous Typescript type.
+    InlineRecursionLimitExceeded {
+        path: String,
     },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
-
-    //
-    //
-    // TODO: Break
-    //
-    //
-    BigIntForbiddenLegacy(ExportPath),
-    ForbiddenNameLegacy(ExportPath, &'static str),
-    InvalidNameLegacy(ExportPath, String),
-    FmtLegacy(std::fmt::Error),
-    UnableToExport(Layout),
+    /// An error occurred in a format callback.
+    Format {
+        message: Cow<'static, str>,
+        path: Option<String>,
+        source: FrameworkSource,
+    },
+    /// The requested export layout is not supported by the current exporter configuration.
+    ///
+    /// Some layouts require the higher-level [`Exporter`](crate::Exporter) APIs so imports,
+    /// file paths, and module boundaries can be coordinated correctly.
+    ExportRequiresExportTo(Layout),
+    JsdocNamespacesUnsupported,
 }
 
 impl Error {
+    fn new(kind: ErrorKind) -> Self {
+        Self {
+            kind,
+            named_datatype: None,
+            trace: Vec::new(),
+        }
+    }
+
+    /// The named Rust type being exported when this error occurred, if known.
+    pub fn named_datatype(&self) -> Option<&NamedDataType> {
+        self.named_datatype.as_deref()
+    }
+
+    /// TypeScript exporter traversal context for this error.
+    pub fn trace(&self) -> &[ErrorTraceFrame] {
+        &self.trace
+    }
+
+    pub(crate) fn with_named_datatype(mut self, ndt: &NamedDataType) -> Self {
+        self.named_datatype
+            .get_or_insert_with(|| Box::new(ndt.clone()));
+        self
+    }
+
+    pub(crate) fn with_inline_trace(
+        mut self,
+        ndt: Option<&NamedDataType>,
+        path: impl Into<String>,
+    ) -> Self {
+        self.trace.push(ErrorTraceFrame::Inlined {
+            named_datatype: ndt.map(|ndt| Box::new(ndt.clone())),
+            path: path.into(),
+        });
+        self
+    }
+
     pub(crate) fn invalid_map_key(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::InvalidMapKey {
-                path: path.into(),
-                reason: reason.into(),
-            },
-        }
+        Self::new(ErrorKind::InvalidMapKey {
+            path: path.into(),
+            reason: reason.into(),
+        })
     }
 
     /// Construct an error for framework-specific logic.
@@ -143,27 +236,60 @@ impl Error {
         message: impl Into<Cow<'static, str>>,
         source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::Framework {
-                message: message.into(),
-                source: source.into(),
-            },
-        }
+        Self::new(ErrorKind::Framework {
+            message: message.into(),
+            source: source.into(),
+        })
+    }
+
+    /// Construct an error for custom format callbacks.
+    pub(crate) fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self::new(ErrorKind::Format {
+            message: message.into(),
+            path: None,
+            source: source.into(),
+        })
+    }
+
+    pub(crate) fn format_at(
+        message: impl Into<Cow<'static, str>>,
+        path: impl Into<String>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self::new(ErrorKind::Format {
+            message: message.into(),
+            path: Some(path.into()),
+            source: source.into(),
+        })
     }
 
     pub(crate) fn bigint_forbidden(path: String) -> Self {
-        Self {
-            kind: ErrorKind::BigIntForbidden { path },
-        }
+        Self::new(ErrorKind::BigIntForbidden { path })
     }
 
     pub(crate) fn invalid_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            kind: ErrorKind::InvalidName {
-                path,
-                name: name.into(),
-            },
-        }
+        Self::new(ErrorKind::InvalidName {
+            path,
+            name: name.into(),
+        })
+    }
+
+    pub(crate) fn empty_name(path: String) -> Self {
+        Self::new(ErrorKind::EmptyName { path })
+    }
+
+    pub(crate) fn unsupported_anonymous_enum_variant(
+        path: String,
+        variant_kind: &'static str,
+    ) -> Self {
+        Self::new(ErrorKind::UnsupportedAnonymousEnumVariant { path, variant_kind })
+    }
+
+    pub(crate) fn forbidden_name(path: String, name: &'static str) -> Self {
+        Self::new(ErrorKind::ForbiddenName { path, name })
     }
 
     pub(crate) fn duplicate_type_name(
@@ -171,89 +297,77 @@ impl Error {
         first: Location<'static>,
         second: Location<'static>,
     ) -> Self {
-        Self {
-            kind: ErrorKind::DuplicateTypeName {
-                name,
-                first: format_location(first),
-                second: format_location(second),
-            },
-        }
+        Self::new(ErrorKind::DuplicateTypeName {
+            name,
+            first: format_location(first),
+            second: format_location(second),
+        })
     }
 
     pub(crate) fn read_dir(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::ReadDir { path, source },
-        }
+        Self::new(ErrorKind::ReadDir { path, source })
     }
 
     pub(crate) fn metadata(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::Metadata { path, source },
-        }
+        Self::new(ErrorKind::Metadata { path, source })
     }
 
     pub(crate) fn remove_file(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::RemoveFile { path, source },
-        }
+        Self::new(ErrorKind::RemoveFile { path, source })
     }
 
     pub(crate) fn remove_dir(path: PathBuf, source: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::RemoveDir { path, source },
-        }
+        Self::new(ErrorKind::RemoveDir { path, source })
     }
 
-    pub(crate) fn unsupported_opaque_reference(reference: OpaqueReference) -> Self {
-        Self {
-            kind: ErrorKind::UnsupportedOpaqueReference(reference),
-        }
+    pub(crate) fn create_dir(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::CreateDir { path, source })
     }
 
-    pub(crate) fn dangling_named_reference(reference: String) -> Self {
-        Self {
-            kind: ErrorKind::DanglingNamedReference { reference },
-        }
+    pub(crate) fn write_file(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::WriteFile { path, source })
     }
 
-    pub(crate) fn unresolved_generic_reference(reference: String) -> Self {
-        Self {
-            kind: ErrorKind::UnresolvedGenericReference { reference },
-        }
+    pub(crate) fn read_file(path: PathBuf, source: io::Error) -> Self {
+        Self::new(ErrorKind::ReadFile { path, source })
     }
 
-    pub(crate) fn forbidden_name_legacy(path: ExportPath, name: &'static str) -> Self {
-        Self {
-            kind: ErrorKind::ForbiddenNameLegacy(path, name),
-        }
+    pub(crate) fn unsupported_opaque_reference(path: String, reference: OpaqueReference) -> Self {
+        Self::new(ErrorKind::UnsupportedOpaqueReference { path, reference })
     }
 
-    pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
-        Self {
-            kind: ErrorKind::InvalidNameLegacy(path, name),
-        }
+    pub(crate) fn dangling_named_reference(path: String, reference: String) -> Self {
+        Self::new(ErrorKind::DanglingNamedReference { path, reference })
     }
 
-    pub(crate) fn unable_to_export(layout: Layout) -> Self {
-        Self {
-            kind: ErrorKind::UnableToExport(layout),
-        }
+    pub(crate) fn infinite_recursive_inline_type(
+        path: String,
+        reference: String,
+        cycle: RecursiveInlineType,
+    ) -> Self {
+        Self::new(ErrorKind::InfiniteRecursiveInlineType {
+            path,
+            reference,
+            cycle,
+        })
+    }
+
+    pub(crate) fn inline_recursion_limit_exceeded(path: String) -> Self {
+        Self::new(ErrorKind::InlineRecursionLimitExceeded { path })
+    }
+
+    pub(crate) fn export_requires_export_to(layout: Layout) -> Self {
+        Self::new(ErrorKind::ExportRequiresExportTo(layout))
+    }
+
+    pub(crate) fn jsdoc_namespaces_unsupported() -> Self {
+        Self::new(ErrorKind::JsdocNamespacesUnsupported)
     }
 }
 
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
-        Self {
-            kind: ErrorKind::Io(error),
-        }
-    }
-}
-
-impl From<std::fmt::Error> for Error {
-    fn from(error: std::fmt::Error) -> Self {
-        Self {
-            kind: ErrorKind::FmtLegacy(error),
-        }
+        Self::new(ErrorKind::Io(error))
     }
 }
 
@@ -269,11 +383,23 @@ impl fmt::Display for Error {
             ),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
-                "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
+                "Attempted to export {} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
+                "Attempted to export {} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
+            ),
+            ErrorKind::EmptyName { path } => write!(
+                f,
+                "Attempted to export {} but was unable to because the Typescript type name is empty. Try renaming it or using `#[specta(rename = \"new name\")]`",
+                display_path(path)
+            ),
+            ErrorKind::UnsupportedAnonymousEnumVariant { path, variant_kind } => write!(
+                f,
+                "Attempted to export {} but anonymous {variant_kind} enum variants cannot be exported to Typescript. Try giving the variant a name or changing the enum representation.",
+                display_path(path)
             ),
             ErrorKind::DuplicateTypeName {
                 name,
@@ -304,18 +430,51 @@ impl fmt::Display for Error {
                     path.display()
                 )
             }
-            ErrorKind::UnsupportedOpaqueReference(reference) => write!(
+            ErrorKind::CreateDir { path, source } => {
+                write!(
+                    f,
+                    "Failed to create directory '{}': {source}",
+                    path.display()
+                )
+            }
+            ErrorKind::WriteFile { path, source } => {
+                write!(f, "Failed to write file '{}': {source}", path.display())
+            }
+            ErrorKind::ReadFile { path, source } => {
+                write!(f, "Failed to read file '{}': {source}", path.display())
+            }
+            ErrorKind::UnsupportedOpaqueReference { path, reference } => write!(
                 f,
-                "Found unsupported opaque reference '{}'. It is not supported by the Typescript exporter.",
-                reference.type_name()
+                "Found unsupported opaque reference '{}' at {}. It is not supported by the Typescript exporter.",
+                reference.type_name(),
+                display_path(path)
             ),
-            ErrorKind::DanglingNamedReference { reference } => write!(
+            ErrorKind::DanglingNamedReference { path, reference } => write!(
                 f,
-                "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
+                "Found dangling named reference {reference} at {}. The referenced type is missing from the resolved type collection.",
+                display_path(path)
             ),
-            ErrorKind::UnresolvedGenericReference { reference } => write!(
+            ErrorKind::InfiniteRecursiveInlineType {
+                path,
+                reference,
+                cycle,
+            } => {
+                write!(
+                    f,
+                    "Found infinitely recursive inline named reference {reference} at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
+                    display_path(path)
+                )?;
+                write!(f, "\nInline cycle:\n  {cycle:?}")?;
+                Ok(())
+            }
+            ErrorKind::InlineRecursionLimitExceeded { path } if path.is_empty() => write!(
                 f,
-                "Found unresolved generic reference {reference}. The generic is missing from the active named type scope."
+                "Type recursion limit exceeded while expanding the provided inline type. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
+            ),
+            ErrorKind::InlineRecursionLimitExceeded { path } => write!(
+                f,
+                "Type recursion limit exceeded while expanding an inline Typescript type at {}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type.",
+                display_path(path)
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();
@@ -327,24 +486,65 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
-            ErrorKind::BigIntForbiddenLegacy(path) => write!(
+            ErrorKind::Format {
+                message,
+                path,
+                source,
+            } => {
+                let source = source.to_string();
+                let location = path
+                    .as_deref()
+                    .filter(|path| !path.is_empty())
+                    .map(|path| format!(" at {}", display_path(path)))
+                    .unwrap_or_default();
+                if message.is_empty() && source.is_empty() {
+                    write!(f, "Format error{location}")
+                } else if source.is_empty() {
+                    write!(f, "Format error{location}: {message}")
+                } else {
+                    write!(f, "Format error{location}: {message}: {source}")
+                }
+            }
+            ErrorKind::ExportRequiresExportTo(layout) => write!(
                 f,
-                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
+                "Unable to export layout {layout} as a single string. Use `Exporter::export_to` with a directory path for file-based exports."
             ),
-            ErrorKind::ForbiddenNameLegacy(path, name) => write!(
+            ErrorKind::JsdocNamespacesUnsupported => write!(
                 f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
+                "Unable to export JSDoc with the Namespaces layout. Disable JSDoc or use FlatFile, ModulePrefixedName, or Files layout."
             ),
-            ErrorKind::InvalidNameLegacy(path, name) => write!(
+        }?;
+
+        if let Some(ndt) = self.named_datatype() {
+            write!(
                 f,
-                "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
-            ),
-            ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
-            ErrorKind::UnableToExport(layout) => write!(
-                f,
-                "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
-            ),
+                "\nRust type: {}::{} at {}",
+                ndt.module_path,
+                ndt.name,
+                format_location(ndt.location)
+            )?;
         }
+
+        if !self.trace.is_empty() {
+            write!(f, "\nWhile inlining:")?;
+            for frame in self.trace.iter().rev() {
+                match frame {
+                    ErrorTraceFrame::Inlined {
+                        named_datatype,
+                        path,
+                    } => {
+                        write!(f, "\n  {path} -> ")?;
+                        if let Some(ndt) = named_datatype.as_deref() {
+                            write!(f, "{}::{}", ndt.module_path, ndt.name)?;
+                        } else {
+                            write!(f, "<unresolved named type>")?;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -361,9 +561,13 @@ impl error::Error for Error {
             ErrorKind::ReadDir { source, .. }
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
-            | ErrorKind::RemoveDir { source, .. } => Some(source),
-            ErrorKind::Framework { source, .. } => Some(source.as_ref()),
-            ErrorKind::FmtLegacy(error) => Some(error),
+            | ErrorKind::RemoveDir { source, .. }
+            | ErrorKind::CreateDir { source, .. }
+            | ErrorKind::WriteFile { source, .. }
+            | ErrorKind::ReadFile { source, .. } => Some(source),
+            ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
+                Some(source.as_ref())
+            }
             _ => None,
         }
     }
@@ -376,4 +580,12 @@ fn format_location(location: Location<'static>) -> String {
         location.line(),
         location.column()
     )
+}
+
+fn display_path(path: &str) -> Cow<'_, str> {
+    if path.is_empty() {
+        Cow::Borrowed("<unknown path>")
+    } else {
+        Cow::Owned(format!("{path:?}"))
+    }
 }

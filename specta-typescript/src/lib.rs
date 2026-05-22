@@ -2,18 +2,18 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-typescript` to your project:
+//! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.23 --features derive,export
-//! cargo add specta-typescript@0.0.10
-//! cargo add specta-serde@0.0.10
+//! cargo add specta@2.0.0-rc.25 --features derive,collect
+//! cargo add specta-serde@0.0.12
+//! cargo add specta-typescript@0.0.12
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{ResolvedTypes, Type, Types};
+//! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
 //!
 //! #[derive(Type)]
@@ -30,16 +30,18 @@
 //! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//! let resolved_types = ResolvedTypes::from_resolved_types(types);
-//!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &resolved_types)
+//!     .export_to(
+//!         "./bindings.ts",
+//!         &types,
+//!         specta_serde::Format,
+//!     )
 //!     .unwrap();
 //! ```
 //!
 //! Now your setup with Specta!
 //!
-//! If you get tired of listing all your types manually? Checkout `specta::collect`!
+//! If you get tired of listing all your types manually? Checkout [`specta::collect`]!
 //!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -51,20 +53,20 @@ mod branded;
 mod error;
 mod exporter;
 mod jsdoc;
-mod legacy; // TODO: Remove this
 mod map_keys;
 mod opaque;
 pub mod primitives;
 mod references;
 pub(crate) mod reserved_names;
+pub mod semantic;
 mod types;
 mod typescript;
 
 pub use branded::Branded;
-pub use error::Error;
+pub use error::{Error, ErrorTraceFrame};
 pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;
-pub use types::{Any, Never, Unknown};
+pub use types::{Any, BigInt, Never, Number, Unknown};
 pub use typescript::Typescript;

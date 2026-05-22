@@ -29,7 +29,7 @@ Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
-specta-serde = "0.0.10"
+specta-serde = "0.0.12"
 specta-swift = "0.1"
 ```
 
@@ -70,10 +70,11 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
-    swift.export_to("./Types.swift", &resolved).unwrap();
+    swift
+        .export_to("./Types.swift", &types, specta_serde::format)
+        .unwrap();
 }
 ```
 
@@ -244,12 +245,10 @@ let swift = Swift::new()
 ### Serde Integration
 
 ```rust
-let resolved = specta_serde::apply(types).unwrap();
-
 let swift = Swift::new()
     .add_protocol("CustomDebugStringConvertible");
 
-let output = swift.export(&resolved).unwrap();
+let output = swift.export(&types, specta_serde::format).unwrap();
 ```
 
 ## Type Mapping

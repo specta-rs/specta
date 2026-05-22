@@ -7,9 +7,9 @@
 //! Add `specta`, `specta-serde`, and `specta-swift` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.23 --features derive,export
-//! cargo add specta-serde@0.0.10
-//! cargo add specta-swift@0.0.1
+//! cargo add specta@2.0.0-rc.25 --features derive,collect
+//! cargo add specta-serde@0.0.12
+//! cargo add specta-swift@0.0.3
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
@@ -31,16 +31,15 @@
 //! let types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//! let resolved = specta_serde::apply(types).unwrap();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &resolved)
+//!     .export_to("./Types.swift", &types, specta_serde::Format)
 //!     .unwrap();
 //! ```
 //!
 //! Now you're set up with Specta Swift!
 //!
-//! If you get tired of listing all your types, checkout the `specta::collect` function.
+//! If you get tired of listing all your types, checkout [`specta::collect`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",

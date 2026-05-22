@@ -1,18 +1,16 @@
 use proc_macro2::TokenStream;
-use quote::quote;
-use std::collections::{HashSet, hash_map::Entry};
+use quote::{ToTokens, quote};
+use std::collections::HashSet;
 use syn::{
-    ConstParam, Data, GenericParam, Generics, LifetimeParam, Type, TypeParam, TypePath,
-    WhereClause, parse_quote,
+    ConstParam, Data, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause,
+    parse_quote,
     visit::{self, Visit},
+    visit_mut::VisitMut,
 };
 
-#[derive(Default)]
-pub struct UsedTypeParams {
-    pub direct: Vec<syn::Ident>,
-    pub associated: Vec<TypePath>,
-    pub conservative: bool,
-}
+use crate::utils::parse_attrs_with_filter;
+
+use super::{FieldAttr, VariantAttr};
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
@@ -43,6 +41,36 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
+pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<TokenStream> {
+    generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
+        .then(|| {
+            use GenericParam::*;
+
+            generics.params.iter().filter_map(|param| match param {
+                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
+                Lifetime(_) => None,
+                Const(ConstParam {
+                    const_token,
+                    ident,
+                    colon_token,
+                    ty,
+                    ..
+                }) => Some(quote!(#const_token #ident #colon_token #ty)),
+            })
+        })
+        .map(|gs| quote!(<#(#gs),*>))
+}
+
+pub fn build_type_where_clause(
+    ty: &TokenStream,
+    used_generic_types: &[syn::Ident],
+) -> Option<WhereClause> {
+    type_predicates(ty, used_generic_types).map(|preds| parse_quote! { where #(#preds),* })
+}
+
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
@@ -56,7 +84,21 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
+pub fn type_with_inferred_lifetimes(ty: &Type) -> Type {
+    let mut ty = ty.clone();
+    InferredLifetimeVisitor.visit_type_mut(&mut ty);
+    ty
+}
+
+struct InferredLifetimeVisitor;
+
+impl VisitMut for InferredLifetimeVisitor {
+    fn visit_lifetime_mut(&mut self, lifetime: &mut syn::Lifetime) {
+        *lifetime = syn::Lifetime::new("'_", lifetime.apostrophe);
+    }
+}
+
+fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
     generics
         .params
         .iter()
@@ -68,16 +110,16 @@ pub fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
 }
 
 // Code adopted from ts-rs. Thanks to it's original author!
-// Additional associated-type handling inspired by Serde's derive bound collection.
 pub fn used_type_params(
     generics: &Generics,
     data: &Data,
     container_type: Option<&Type>,
-) -> UsedTypeParams {
+    skip_attrs: &[String],
+) -> syn::Result<Vec<syn::Ident>> {
     let all_generic_type_idents = all_type_param_idents(generics);
 
     if all_generic_type_idents.is_empty() {
-        return UsedTypeParams::default();
+        return Ok(Vec::new());
     }
 
     let known_generics = all_generic_type_idents
@@ -88,8 +130,8 @@ pub fn used_type_params(
     let mut visitor = GenericTypeUseVisitor {
         known_generics: &known_generics,
         used_generics: HashSet::new(),
-        associated_type_usage: Vec::new(),
         conservative: false,
+        unsupported_associated_item: None,
     };
 
     if let Some(container_type) = container_type {
@@ -98,13 +140,17 @@ pub fn used_type_params(
         match data {
             Data::Struct(data) => {
                 for field in &data.fields {
-                    visitor.visit_type(&field.ty);
+                    visit_field_type(&mut visitor, field, skip_attrs)?;
                 }
             }
             Data::Enum(data) => {
                 for variant in &data.variants {
+                    if variant_is_skipped(variant, skip_attrs)? {
+                        continue;
+                    }
+
                     for field in &variant.fields {
-                        visitor.visit_type(&field.ty);
+                        visit_field_type(&mut visitor, field, skip_attrs)?;
                     }
                 }
             }
@@ -112,61 +158,39 @@ pub fn used_type_params(
         }
     }
 
-    if visitor.conservative {
-        return UsedTypeParams {
-            direct: all_generic_type_idents,
-            associated: Vec::new(),
-            conservative: true,
-        };
+    if let Some(err) = visitor.unsupported_associated_item {
+        return Err(err);
     }
 
-    let direct = all_generic_type_idents
+    if visitor.conservative {
+        return Ok(all_generic_type_idents);
+    }
+
+    Ok(all_generic_type_idents
         .iter()
         .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
         .cloned()
-        .collect();
-
-    let mut associated = Vec::new();
-    let mut seen = std::collections::HashMap::<String, ()>::new();
-    for path in visitor.associated_type_usage {
-        let key = quote!(#path).to_string();
-        match seen.entry(key) {
-            Entry::Vacant(v) => {
-                v.insert(());
-                associated.push(path);
-            }
-            Entry::Occupied(_) => {}
-        }
-    }
-
-    UsedTypeParams {
-        direct,
-        associated,
-        conservative: false,
-    }
+        .collect())
 }
 
-pub fn has_associated_type_usage(used_generic_types: &UsedTypeParams) -> bool {
-    !used_generic_types.associated.is_empty()
+fn visit_field_type(
+    visitor: &mut GenericTypeUseVisitor<'_>,
+    field: &syn::Field,
+    skip_attrs: &[String],
+) -> syn::Result<()> {
+    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
+    let attrs = FieldAttr::from_attrs(&mut attrs)?;
+
+    if !attrs.skip {
+        visitor.visit_type(attrs.r#type.as_ref().unwrap_or(&field.ty));
+    }
+
+    Ok(())
 }
 
-pub fn used_direct_type_params<'a>(
-    used_generic_types: &'a UsedTypeParams,
-    all_generic_type_idents: &'a [syn::Ident],
-) -> &'a [syn::Ident] {
-    if used_generic_types.conservative {
-        all_generic_type_idents
-    } else {
-        &used_generic_types.direct
-    }
-}
-
-pub fn used_associated_type_paths(used_generic_types: &UsedTypeParams) -> &[TypePath] {
-    if used_generic_types.conservative {
-        &[]
-    } else {
-        &used_generic_types.associated
-    }
+fn variant_is_skipped(variant: &syn::Variant, skip_attrs: &[String]) -> syn::Result<bool> {
+    let mut attrs = parse_attrs_with_filter(&variant.attrs, skip_attrs)?;
+    Ok(VariantAttr::from_attrs(&mut attrs)?.skip)
 }
 
 pub fn add_type_to_where_clause(
@@ -174,25 +198,16 @@ pub fn add_type_to_where_clause(
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
-    associated_type_usage: &[TypePath],
 ) -> Option<WhereClause> {
     if let Some(where_clause) = merge_custom_bounds(generics, custom_bounds) {
         return Some(where_clause);
     }
 
-    if used_generic_types.is_empty() && associated_type_usage.is_empty() {
+    if used_generic_types.is_empty() {
         return generics.where_clause.clone();
     }
 
-    let generic_preds = used_generic_types
-        .iter()
-        .map(|ident| parse_quote!(#ident : #ty));
-    let associated_preds = associated_type_usage
-        .iter()
-        .map(|path| parse_quote!(#path : #ty));
-    let preds = generic_preds
-        .chain(associated_preds)
-        .collect::<Vec<syn::WherePredicate>>();
+    let preds = type_predicates(ty, used_generic_types)?;
 
     match &generics.where_clause {
         None => Some(parse_quote! { where #(#preds),* }),
@@ -201,6 +216,18 @@ pub fn add_type_to_where_clause(
             Some(parse_quote! { where #(#bounds,)* #(#preds),* })
         }
     }
+}
+
+fn type_predicates(
+    ty: &TokenStream,
+    used_generic_types: &[syn::Ident],
+) -> Option<Vec<syn::WherePredicate>> {
+    (!used_generic_types.is_empty()).then(|| {
+        used_generic_types
+            .iter()
+            .map(|ident| parse_quote!(#ident : #ty))
+            .collect()
+    })
 }
 
 fn merge_custom_bounds(
@@ -227,26 +254,13 @@ fn merge_custom_bounds(
 struct GenericTypeUseVisitor<'a> {
     known_generics: &'a HashSet<String>,
     used_generics: HashSet<String>,
-    associated_type_usage: Vec<TypePath>,
     conservative: bool,
+    unsupported_associated_item: Option<syn::Error>,
 }
 
 impl Visit<'_> for GenericTypeUseVisitor<'_> {
     fn visit_type_path(&mut self, node: &syn::TypePath) {
-        if let Some(first) = node.path.segments.first()
-            && self.known_generics.contains(&first.ident.to_string())
-            && node.path.segments.len() > 1
-        {
-            self.associated_type_usage.push(node.clone());
-        }
-
-        if let Some(qself) = &node.qself
-            && let syn::Type::Path(syn::TypePath { qself: None, path }) = qself.ty.as_ref()
-            && let Some(first) = path.segments.first()
-            && self.known_generics.contains(&first.ident.to_string())
-        {
-            self.associated_type_usage.push(node.clone());
-        }
+        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
 
         if node.qself.is_none()
             && node.path.leading_colon.is_none()
@@ -262,12 +276,50 @@ impl Visit<'_> for GenericTypeUseVisitor<'_> {
         visit::visit_type_path(self, node);
     }
 
+    fn visit_expr_path(&mut self, node: &syn::ExprPath) {
+        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
+
+        visit::visit_expr_path(self, node);
+    }
+
     fn visit_type(&mut self, node: &syn::Type) {
         match node {
             syn::Type::Macro(_) | syn::Type::Verbatim(_) => {
                 self.conservative = true;
             }
             _ => visit::visit_type(self, node),
+        }
+    }
+}
+
+impl GenericTypeUseVisitor<'_> {
+    fn reject_unsupported_associated_path(
+        &mut self,
+        path: &syn::Path,
+        qself: &Option<syn::QSelf>,
+        tokens: &impl ToTokens,
+    ) {
+        let direct_associated_item = path
+            .segments
+            .first()
+            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()))
+            && path.segments.len() > 1;
+
+        let qualified_associated_item = qself
+            .as_ref()
+            .and_then(|qself| match qself.ty.as_ref() {
+                syn::Type::Path(syn::TypePath { qself: None, path }) => path.segments.first(),
+                _ => None,
+            })
+            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()));
+
+        if direct_associated_item || qualified_associated_item {
+            self.unsupported_associated_item.get_or_insert_with(|| {
+                syn::Error::new_spanned(
+                    tokens,
+                    "specta: associated types or constants on generic parameters are not supported",
+                )
+            });
         }
     }
 }
