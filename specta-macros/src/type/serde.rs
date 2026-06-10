@@ -210,6 +210,21 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
         target.variant_identifier = true;
     } else if meta.path.is_ident("field_identifier") {
         target.field_identifier = true;
+    } else if meta.path.is_ident("bound") {
+        parse_bound(&meta)?;
+    }
+
+    Ok(())
+}
+
+fn parse_bound(meta: &ParseNestedMeta<'_>) -> Result<()> {
+    if meta.input.peek(syn::Token![=]) {
+        let _: syn::Expr = meta.value()?.parse()?;
+    } else {
+        meta.parse_nested_meta(|meta| {
+            let _: syn::Expr = meta.value()?.parse()?;
+            Ok(())
+        })?;
     }
 
     Ok(())
