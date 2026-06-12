@@ -2248,6 +2248,7 @@ dependencies = [
  "smallvec",
  "smol_str 0.3.6",
  "specta",
+ "specta-jsonschema",
  "specta-serde",
  "specta-swift",
  "specta-typescript",
