@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
@@ -212,6 +212,8 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
         target.field_identifier = true;
     } else if meta.path.is_ident("bound") {
         parse_bound(&meta)?;
+    } else {
+        skip_unused_meta(&meta)?;
     }
 
     Ok(())
@@ -228,6 +230,25 @@ fn parse_bound(meta: &ParseNestedMeta<'_>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Consume the value of any other serde attribute Specta has no use for
+/// (eg. `crate`, `remote`, `expecting`) so parsing can continue past it.
+/// Serde validates its own attributes.
+/// https://github.com/specta-rs/specta/issues/494
+fn skip_unused_meta(meta: &ParseNestedMeta<'_>) -> Result<()> {
+    meta.input.step(|cursor| {
+        let mut rest = *cursor;
+        while let Some((tt, next)) = rest.token_tree() {
+            if let TokenTree::Punct(punct) = &tt
+                && punct.as_char() == ','
+            {
+                break;
+            }
+            rest = next;
+        }
+        Ok(((), rest))
+    })
 }
 
 fn parse_variant_meta(target: &mut VariantAttrs, meta: ParseNestedMeta<'_>) -> Result<()> {
@@ -265,6 +286,10 @@ fn parse_variant_meta(target: &mut VariantAttrs, meta: ParseNestedMeta<'_>) -> R
         target.other = true;
     } else if meta.path.is_ident("untagged") {
         target.untagged = true;
+    } else if meta.path.is_ident("bound") {
+        parse_bound(&meta)?;
+    } else {
+        skip_unused_meta(&meta)?;
     }
 
     Ok(())
@@ -302,6 +327,10 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
     } else if meta.path.is_ident("with") {
         target.has_with = true;
         parse_string_assignment(&meta)?;
+    } else if meta.path.is_ident("bound") {
+        parse_bound(&meta)?;
+    } else {
+        skip_unused_meta(&meta)?;
     }
 
     Ok(())
