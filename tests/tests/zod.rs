@@ -247,10 +247,10 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_empty_named_shapes_are_strict() {
     let empty_struct = export_for::<EmptyStruct>().unwrap();
-    assert!(empty_struct.contains("z.object({}).strict()"));
+    assert!(empty_struct.contains("z.strictObject({})"));
 
     let empty_variant = export_for::<EmptyNamedVariant>().unwrap();
-    assert!(empty_variant.contains("z.object({}).strict()"));
+    assert!(empty_variant.contains("z.strictObject({})"));
 }
 
 #[test]
@@ -328,6 +328,38 @@ fn zod_layout_files_errors_on_export() {
         .export(&types, specta_serde::Format)
         .unwrap_err();
     assert!(err.to_string().contains("Unable to export layout Files"));
+}
+
+#[test]
+fn zod_integers_use_z_int() {
+    // Zod 4: integers validate with `z.int()`; plain `z.number()` accepts floats.
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Ints {
+        signed: i32,
+        unsigned: u8,
+        floating: f64,
+    }
+
+    let out = export_for::<Ints>().unwrap();
+    assert!(out.contains("signed: z.int()"));
+    assert!(out.contains("unsigned: z.int()"));
+    assert!(out.contains("floating: z.number()"));
+}
+
+#[test]
+fn zod_generic_schema_uses_zod_type() {
+    // Zod 4 eliminated `z.ZodTypeAny`; the generic constraint must be `z.ZodType`.
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericWrapper<T> {
+        value: T,
+    }
+
+    let types = Types::default().register::<GenericWrapper<String>>();
+    let out = Zod::default().export(&types, specta_serde::Format).unwrap();
+    assert!(out.contains("extends z.ZodType"));
+    assert!(!out.contains("ZodTypeAny"));
 }
 
 fn temp_dir() -> TempDir {
