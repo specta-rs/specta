@@ -10,9 +10,7 @@ use specta::{
     },
 };
 
-use crate::{
-    BigIntExportBehavior, Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES,
-};
+use crate::{Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES};
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
@@ -245,7 +243,7 @@ fn datatype(
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => list_dt(s, exporter, types, l, location, generics, type_render_stack)?,
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics, type_render_stack)?,
         DataType::Nullable(def) => {
@@ -341,22 +339,15 @@ fn datatype(
     Ok(())
 }
 
-fn primitive_dt(
-    b: &BigIntExportBehavior,
-    p: &Primitive,
-    location: Vec<Cow<'static, str>>,
-) -> Result<&'static str, Error> {
+fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
     use Primitive::*;
 
     Ok(match p {
         i8 | i16 | i32 | u8 | u16 | u32 => "z.int()",
         f16 | f32 | f64 | f128 => "z.number()",
-        usize | isize | i64 | u64 | i128 | u128 => match b {
-            BigIntExportBehavior::String => "z.string()",
-            BigIntExportBehavior::Number => "z.number()",
-            BigIntExportBehavior::BigInt => "z.bigint()",
-            BigIntExportBehavior::Fail => return Err(Error::bigint_forbidden(location.join("."))),
-        },
+        usize | isize | i64 | u64 | i128 | u128 => {
+            return Err(Error::bigint_forbidden(location.join(".")));
+        }
         Primitive::bool => "z.boolean()",
         str | char => "z.string()",
     })
