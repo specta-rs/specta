@@ -28,7 +28,7 @@ insta = "1.48.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 either = { version = "1.16", default-features = false }
 ulid = { version = "1.2", default-features = false, features = [] }
-glam = { version = "0.33", default-features = false, features = ["std"] }
+glam = { version = "0.33", default-features = false, features = ["std", "all-types"] }
 ordered-float = { version = ">=3, <6", default-features = false }
 heapless = { version = ">=0.7, <0.10", default-features = false }
 semver = { version = "1", default-features = false }
