@@ -141,7 +141,7 @@ bson = { version = "3", optional = true, default-features = false, features = ["
 bytes = { version = "1", optional = true, default-features = false, features = [] }
 uhlc = { version = "0.9", optional = true, default-features = false, features = [] }
 bytesize = { version = "2", optional = true, default-features = false, features = [] }
-glam = { version = "0.33", optional = true, default-features = false, features = ["std"] }
+glam = { version = "0.33", optional = true, default-features = false, features = ["std", "all-types"] }
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 url = { version = "2", optional = true, default-features = false }
 either = { version = "1", optional = true, default-features = false }
