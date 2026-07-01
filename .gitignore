@@ -22,3 +22,6 @@ node_modules
 
 # Used by examples as a place to export files.
 /specta-typescript/out
+
+# insta pending snapshots — review with `cargo insta`, never commit
+*.snap.new
