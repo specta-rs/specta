@@ -24,11 +24,11 @@ thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-insta = "1.47"
+insta = "1.48"
 trybuild = "1.0"
 specta-serde = { version = "=0.0.12", path = "../specta-serde" }
-uuid = "1.23.1"
-chrono = { version = "0.4.44", features = ["clock"] }
+uuid = "1.23.4"
+chrono = { version = "0.4.45", features = ["clock"] }
 
 [[example]]
 name = "basic_types"
