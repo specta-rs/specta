@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use specta::{Type, Types};
-use specta_typescript::Typescript;
+use specta_typescript::{Typescript, semantic::Configuration};
 
 #[derive(Debug)]
 struct ErrorStackRootError;
@@ -107,6 +107,15 @@ struct LegacyImplWithBigints {
     glam_usizevec4: glam::USizeVec4,
 }
 
+#[derive(Type, serde::Serialize)]
+#[serde(tag = "type", content = "data")]
+enum SerdeJsonValueEnum {
+    // Regression test for https://github.com/specta-rs/specta/issues/498.
+    Json(serde_json::Value),
+    Bytes(Vec<u8>),
+    Empty,
+}
+
 #[test]
 fn legacy_impls() {
     insta::assert_snapshot!(
@@ -116,6 +125,20 @@ fn legacy_impls() {
                 &Types::default().register::<LegacyImpls>(),
                 specta_serde::Format
             )
+            .unwrap()
+    );
+}
+
+#[test]
+fn serde_json_value_exports_from_enum_variant() {
+    let types = Configuration::empty()
+        .enable_lossless_bigints()
+        .apply_types(&Types::default().register::<SerdeJsonValueEnum>())
+        .into_owned();
+
+    insta::assert_snapshot!(
+        Typescript::default()
+            .export(&types, specta_serde::Format)
             .unwrap()
     );
 }
