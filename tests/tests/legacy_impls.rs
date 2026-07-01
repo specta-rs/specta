@@ -147,6 +147,26 @@ fn serde_json_value_does_not_recurse_when_exported() {
 }
 
 #[test]
+fn serde_json_number_exports_as_number() {
+    // Regression test for https://github.com/specta-rs/specta/issues/500.
+    // `serde_json::Number` is a JSON number (an IEEE-754 double on the wire), not a raw
+    // `i64`/`u64`, so it exports as `number` instead of tripping the BigInt guard.
+    #[derive(Type)]
+    struct HasJsonNumber {
+        n: serde_json::Number,
+    }
+
+    insta::assert_snapshot!(
+        Typescript::default()
+            .export(
+                &Types::default().register::<HasJsonNumber>(),
+                specta_serde::Format
+            )
+            .unwrap()
+    );
+}
+
+#[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
         .export(
@@ -211,9 +231,6 @@ fn legacy_impl_individual_bigint_errors() {
 
     bigint_wrapper!(BsonDocumentBigint, bson::Document);
     bigint_wrapper!(BsonValueBigint, bson::Bson);
-    bigint_wrapper!(SerdeJsonMapBigint, serde_json::Map<String, serde_json::Value>);
-    bigint_wrapper!(SerdeJsonValueBigint, serde_json::Value);
-    bigint_wrapper!(SerdeJsonNumberBigint, serde_json::Number);
     bigint_wrapper!(SerdeYamlMappingBigint, serde_yaml::Mapping);
     bigint_wrapper!(SerdeYamlTaggedBigint, serde_yaml::value::TaggedValue);
     bigint_wrapper!(SerdeYamlValueBigint, serde_yaml::Value);
@@ -241,18 +258,9 @@ fn legacy_impl_individual_bigint_errors() {
             "bson::Bson",
             assert_bigint_export_error::<BsonValueBigint> as fn(&mut Vec<String>, &str),
         ),
-        (
-            "serde_json::Map<String, serde_json::Value>",
-            assert_bigint_export_error::<SerdeJsonMapBigint> as fn(&mut Vec<String>, &str),
-        ),
-        (
-            "serde_json::Value",
-            assert_bigint_export_error::<SerdeJsonValueBigint> as fn(&mut Vec<String>, &str),
-        ),
-        (
-            "serde_json::Number",
-            assert_bigint_export_error::<SerdeJsonNumberBigint> as fn(&mut Vec<String>, &str),
-        ),
+        // serde_json::Number now exports as a plain `number` (#500), and serde_json::Value /
+        // serde_json::Map are gated only by the separate inline-recursion issue (#498, fixed
+        // by #503) — neither is a BigInt-guard case anymore, so they don't belong here.
         (
             "serde_yaml::Mapping",
             assert_bigint_or_invalid_map_key_error::<SerdeYamlMappingBigint>

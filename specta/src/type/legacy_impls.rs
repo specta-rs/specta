@@ -135,30 +135,14 @@ const _: () = {
 
     struct SerdeNumber;
     impl Type for SerdeNumber {
+        // `serde_json::Number` serializes as a bare JSON number, not a tagged
+        // `{i64}|{u64}|{f64}` union, and is never null (`Number::from_f64` rejects
+        // NaN/Infinity). A JSON number is an IEEE-754 double, so the wire-accurate
+        // representation is a single `f64` primitive. This both fixes the export (a JSON
+        // number is not a raw `i64`/`u64`, so it no longer trips the BigInt guard, #500)
+        // and matches how the value actually round-trips through `JSON.parse`.
         fn definition(_: &mut Types) -> DataType {
-            DataType::Enum(Enum {
-                variants: vec![
-                    (
-                        "f64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::f64)))
-                            .build(),
-                    ),
-                    (
-                        "i64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::i64)))
-                            .build(),
-                    ),
-                    (
-                        "u64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::u64)))
-                            .build(),
-                    ),
-                ],
-                attributes: Attributes::default(),
-            })
+            DataType::Primitive(Primitive::f64)
         }
     }
 };
