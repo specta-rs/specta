@@ -6,7 +6,8 @@ use specta::{
     datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::Typescript;
-use specta_zod::{BigIntExportBehavior, Layout, Zod, primitives};
+use specta_util::Remapper;
+use specta_zod::{Layout, Zod, define, primitives};
 use tempfile::TempDir;
 
 macro_rules! for_bigint_types {
@@ -133,10 +134,7 @@ fn zod_export_smoke() {
     }
 
     let types = Types::default().register::<Demo>();
-    let out = Zod::default()
-        .bigint(BigIntExportBehavior::Number)
-        .export(&types, specta_serde::Format)
-        .unwrap();
+    let out = Zod::default().export(&types, specta_serde::Format).unwrap();
 
     assert!(out.contains("import { z } from \"zod\";"));
     assert!(out.contains("export const DemoSchema"));
@@ -146,7 +144,7 @@ fn zod_export_smoke() {
 #[test]
 fn zod_primitives_smoke() {
     let (types, dts) = crate::types();
-    let zod = Zod::default().bigint(BigIntExportBehavior::Number);
+    let zod = Zod::default();
 
     for (_, ty) in &dts {
         let rendered = primitives::inline(&zod, &types, ty).unwrap();
@@ -166,24 +164,27 @@ fn zod_primitives_smoke() {
 }
 
 #[test]
-fn zod_bigint_export_behaviors() {
+fn zod_bigint_forbidden_by_default() {
     for_bigint_types!(T -> |_| {
-        assert!(inline_for::<T>(&Zod::default()).is_err());
-        assert!(inline_for::<T>(&Zod::default().bigint(BigIntExportBehavior::Fail)).is_err());
-
-        assert_eq!(
-            inline_for::<T>(&Zod::default().bigint(BigIntExportBehavior::String)).unwrap(),
-            "z.string()"
-        );
-        assert_eq!(
-            inline_for::<T>(&Zod::default().bigint(BigIntExportBehavior::Number)).unwrap(),
-            "z.number()"
-        );
-        assert_eq!(
-            inline_for::<T>(&Zod::default().bigint(BigIntExportBehavior::BigInt)).unwrap(),
-            "z.bigint()"
+        assert!(
+            inline_for::<T>(&Zod::default()).is_err(),
+            "bigint-style primitives must be forbidden by default"
         );
     });
+}
+
+#[test]
+fn zod_bigint_override_via_define() {
+    // `specta_zod::define` is the escape hatch for the forbidden bigint
+    // primitives: remap them to a Zod schema of your choosing, mirroring the
+    // Typescript exporter's `define`.
+    let remapper = Remapper::new().rule(Primitive::i64.into(), define("z.bigint()").into());
+    let dt = remapper.remap_dt(Primitive::i64.into());
+
+    assert_eq!(
+        primitives::inline(&Zod::default(), &Types::default(), &dt).unwrap(),
+        "z.bigint()"
+    );
 }
 
 #[test]
@@ -196,7 +197,8 @@ fn zod_bigint_errors_propagate_from_nested_types() {
     ] {
         let err = err.expect_err("bigint export should be rejected by default");
         assert!(
-            err.to_string().contains("forbids exporting BigInt types"),
+            err.to_string()
+                .contains("forbids exporting BigInt-style types"),
             "unexpected error: {err}"
         );
     }
@@ -247,10 +249,10 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_empty_named_shapes_are_strict() {
     let empty_struct = export_for::<EmptyStruct>().unwrap();
-    assert!(empty_struct.contains("z.object({}).strict()"));
+    assert!(empty_struct.contains("z.strictObject({})"));
 
     let empty_variant = export_for::<EmptyNamedVariant>().unwrap();
-    assert!(empty_variant.contains("z.object({}).strict()"));
+    assert!(empty_variant.contains("z.strictObject({})"));
 }
 
 #[test]
@@ -328,6 +330,38 @@ fn zod_layout_files_errors_on_export() {
         .export(&types, specta_serde::Format)
         .unwrap_err();
     assert!(err.to_string().contains("Unable to export layout Files"));
+}
+
+#[test]
+fn zod_integers_use_z_int() {
+    // Zod 4: integers validate with `z.int()`; plain `z.number()` accepts floats.
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Ints {
+        signed: i32,
+        unsigned: u8,
+        floating: f64,
+    }
+
+    let out = export_for::<Ints>().unwrap();
+    assert!(out.contains("signed: z.int()"));
+    assert!(out.contains("unsigned: z.int()"));
+    assert!(out.contains("floating: z.number()"));
+}
+
+#[test]
+fn zod_generic_schema_uses_zod_type() {
+    // Zod 4 eliminated `z.ZodTypeAny`; the generic constraint must be `z.ZodType`.
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericWrapper<T> {
+        value: T,
+    }
+
+    let types = Types::default().register::<GenericWrapper<String>>();
+    let out = Zod::default().export(&types, specta_serde::Format).unwrap();
+    assert!(out.contains("extends z.ZodType"));
+    assert!(!out.contains("ZodTypeAny"));
 }
 
 fn temp_dir() -> TempDir {
