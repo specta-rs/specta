@@ -16,6 +16,7 @@ mod bound;
 mod errors;
 mod functions;
 mod jsdoc;
+mod jsonschema;
 mod layouts;
 mod legacy_impls;
 mod references;
