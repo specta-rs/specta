@@ -18,6 +18,7 @@ mod functions;
 mod jsdoc;
 mod layouts;
 mod legacy_impls;
+mod maybe_undefined;
 mod references;
 mod semantic;
 mod serde_conversions;
