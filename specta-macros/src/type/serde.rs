@@ -1,6 +1,6 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
-use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
+use syn::{Attribute, Expr, LitStr, Meta, Result, Token, Type, meta::ParseNestedMeta, token};
 
 use super::AttributeScope;
 
@@ -210,8 +210,23 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
         target.variant_identifier = true;
     } else if meta.path.is_ident("field_identifier") {
         target.field_identifier = true;
+    } else {
+        skip_unknown_meta(&meta)?;
     }
 
+    Ok(())
+}
+
+/// serde owns and validates its attribute namespace, so keys specta does not model (e.g.
+/// container `remote`/`bound`/`expecting`, variant `bound`, field `getter`) are ignored - but
+/// their value must still be consumed, or `parse_nested_meta` fails the whole derive with
+/// "expected `,`" on the leftover tokens.
+fn skip_unknown_meta(meta: &ParseNestedMeta<'_>) -> Result<()> {
+    if meta.input.peek(Token![=]) {
+        meta.value()?.parse::<Expr>()?;
+    } else if meta.input.peek(token::Paren) {
+        meta.input.parse::<TokenTree>()?;
+    }
     Ok(())
 }
 
@@ -250,6 +265,8 @@ fn parse_variant_meta(target: &mut VariantAttrs, meta: ParseNestedMeta<'_>) -> R
         target.other = true;
     } else if meta.path.is_ident("untagged") {
         target.untagged = true;
+    } else {
+        skip_unknown_meta(&meta)?;
     }
 
     Ok(())
@@ -287,6 +304,8 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
     } else if meta.path.is_ident("with") {
         target.has_with = true;
         parse_string_assignment(&meta)?;
+    } else {
+        skip_unknown_meta(&meta)?;
     }
 
     Ok(())
