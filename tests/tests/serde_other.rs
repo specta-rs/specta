@@ -24,6 +24,15 @@ enum AdjacentOther {
     Other,
 }
 
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+enum ExternalOther {
+    #[serde(rename = "known")]
+    Known,
+    #[serde(other)]
+    Other,
+}
+
 #[test]
 fn serde_other_requires_phases_format() {
     let err = Typescript::default()
@@ -61,4 +70,16 @@ fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-adjacent-tag-typescript", ts);
+}
+
+#[test]
+fn serde_other_external_tag_widens_deserialize_tag_to_string() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<ExternalOther>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-other-external-tag-typescript", ts);
 }
