@@ -10,7 +10,7 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Reference},
 };
-use specta_typescript::{ErrorTraceFrame, Layout, Typescript, primitives};
+use specta_typescript::{ErrorTraceFrame, Exporter, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -97,6 +97,63 @@ fn typescript_export() {
             Typescript::default().export(&types, format).unwrap()
         );
     }
+}
+
+#[test]
+fn typescript_with_raw_exports_runtime() {
+    let exported = Typescript::default()
+        .with_raw("export const queryClient = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};"));
+}
+
+#[test]
+fn typescript_with_raw_exports_multiple_runtime_snippets() {
+    let exported = Typescript::default()
+        .with_raw("export const queryClient = {};")
+        .with_raw("export const queryOptions = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};\nexport const queryOptions = {};"));
+}
+
+#[test]
+fn typescript_with_raw_exports_with_framework_runtime() {
+    let exported = Exporter::from(Typescript::default().with_raw("export const queryClient = {};"))
+        .framework_runtime(|_| Ok(Cow::Borrowed("export const invoke = {};")))
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const invoke = {};\nexport const queryClient = {};"));
+}
+
+#[test]
+fn typescript_with_raw_exports_to_files_layout() {
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    Typescript::default()
+        .layout(Layout::Files)
+        .with_raw("export const queryClient = {};")
+        .export_to(temp.path(), &Types::default(), IdentityFormat)
+        .unwrap();
+
+    let exported = std::fs::read_to_string(temp.path().join("index.ts")).unwrap();
+    assert!(exported.contains("export const queryClient = {};"));
+}
+
+#[test]
+fn jsdoc_with_raw_exports_runtime() {
+    let exported = specta_typescript::JSDoc::default()
+        .with_raw("export const queryClient = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};"));
 }
 
 #[test]
