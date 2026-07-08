@@ -46,6 +46,11 @@ impl Typescript {
         Self(self.0.layout(layout))
     }
 
+    /// Add raw TypeScript code that is exported as part of the bindings.
+    pub fn with_raw(self, raw: impl Into<Cow<'static, str>>) -> Self {
+        Self(self.0.with_raw(raw))
+    }
+
     /// Configure how `specta_typescript::branded!` types are rendered.
     ///
     /// See [`Exporter::branded_type_impl`] for details.
