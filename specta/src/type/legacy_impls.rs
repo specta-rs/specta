@@ -87,7 +87,7 @@ const _: () = {
 
     impl_ndt!(
         serde_json::Map<K, V> as PrimitiveMap<K, V> = passthrough;
-        serde_json::Value as SerdeValue = inline;
+        serde_json::Value as SerdeValue = named;
         serde_json::Number as SerdeNumber = inline;
     );
 
@@ -136,29 +136,7 @@ const _: () = {
     struct SerdeNumber;
     impl Type for SerdeNumber {
         fn definition(_: &mut Types) -> DataType {
-            DataType::Enum(Enum {
-                variants: vec![
-                    (
-                        "f64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::f64)))
-                            .build(),
-                    ),
-                    (
-                        "i64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::i64)))
-                            .build(),
-                    ),
-                    (
-                        "u64".into(),
-                        Variant::unnamed()
-                            .field(Field::new(DataType::Primitive(Primitive::u64)))
-                            .build(),
-                    ),
-                ],
-                attributes: Attributes::default(),
-            })
+            DataType::Primitive(Primitive::f64)
         }
     }
 };
