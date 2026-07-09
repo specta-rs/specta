@@ -189,7 +189,7 @@ impl fmt::Display for Error {
         match &self.kind {
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because serializer compatibility is unknown. Configure `BigIntExportBehavior` to allow this."
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,

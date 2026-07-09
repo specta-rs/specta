@@ -1382,7 +1382,7 @@ fn rewrite_enum_repr_for_phase(
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {
-                    transform_external_variant(serialized_name.clone(), &variant)?
+                    transform_external_variant(serialized_name.clone(), &variant, widen_tag)?
                 }
                 EnumRepr::Internal { tag } => transform_internal_variant(
                     serialized_name.clone(),
@@ -1467,7 +1467,9 @@ fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
             .first()
             .and_then(|field| field.ty.as_ref())
             .is_some_and(|ty| {
-                is_generated_string_literal_datatype(ty) || is_rewritten_internal_intersection(ty)
+                is_generated_string_literal_datatype(ty)
+                    || matches!(ty, DataType::Primitive(Primitive::str))
+                    || is_rewritten_internal_intersection(ty)
             }),
         Fields::Named(fields) => fields.fields.iter().any(|(field_name, field)| {
             field_name == name || field.ty.as_ref().is_some_and(is_rewritten_tag_ty)
@@ -1836,6 +1838,7 @@ fn select_conversion_target(
 fn transform_external_variant(
     serialized_name: String,
     variant: &Variant,
+    widen_tag: bool,
 ) -> Result<Variant, Error> {
     let skipped_only_unnamed = match &variant.fields {
         Fields::Unnamed(unnamed) => unnamed_fields_all_skipped(unnamed),
@@ -1845,11 +1848,19 @@ fn transform_external_variant(
     Ok(match &variant.fields {
         Fields::Unit => clone_variant_with_unnamed_fields(
             variant,
-            vec![Field::new(string_literal_datatype(serialized_name))],
+            vec![Field::new(if widen_tag {
+                DataType::Primitive(Primitive::str)
+            } else {
+                string_literal_datatype(serialized_name)
+            })],
         ),
         _ if skipped_only_unnamed => clone_variant_with_unnamed_fields(
             variant,
-            vec![Field::new(string_literal_datatype(serialized_name))],
+            vec![Field::new(if widen_tag {
+                DataType::Primitive(Primitive::str)
+            } else {
+                string_literal_datatype(serialized_name)
+            })],
         ),
         _ => {
             let payload = variant_payload_field(variant)

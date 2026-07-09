@@ -648,10 +648,13 @@ fn validate_other_variant(
         ));
     }
 
-    if !matches!(repr, EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }) {
+    if !matches!(
+        repr,
+        EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }
+    ) {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`#[serde(other)]` requires a tagged enum representation (`tag` with optional `content`)",
+            "`#[serde(other)]` requires a tagged enum representation",
         ));
     }
 

@@ -289,9 +289,12 @@ pub fn parse_attrs_with_filter(
             .clone()
             .ident;
 
-        // Skip attributes that are in the skip list
+        // Skip attributes that are in the skip list. `#[tracing::instrument]`
+        // accepts shorthand syntax such as `%value` that is not valid for
+        // Specta's generic metadata parser and should never be interpreted as
+        // Specta configuration.
         let attr_name = ident.to_string();
-        if skip_attrs.contains(&attr_name) {
+        if attr_name == "instrument" || skip_attrs.contains(&attr_name) {
             continue;
         }
 
