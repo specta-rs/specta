@@ -1,0 +1,7421 @@
+---
+source: tests/tests/jsonschema.rs
+assertion_line: 17
+expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).unwrap()"
+---
+{
+  "$defs": {
+    "A": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/B"
+        },
+        "b": {
+          "additionalProperties": false,
+          "properties": {
+            "b": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "b"
+          ],
+          "type": "object"
+        },
+        "c": {
+          "$ref": "#/$defs/B"
+        },
+        "d": {
+          "additionalProperties": false,
+          "properties": {
+            "flattened": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "flattened"
+          ],
+          "type": "object"
+        },
+        "e": {
+          "additionalProperties": false,
+          "properties": {
+            "generic_flattened": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "generic_flattened"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "title": "A",
+      "type": "object"
+    },
+    "AGenericStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/Demo_T_bool"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "AGenericStruct",
+      "type": "object"
+    },
+    "AGenericStruct_u32": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/Demo_u32_bool"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "AGenericStruct",
+      "type": "object"
+    },
+    "ActualType": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/GenericType_String"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "ActualType",
+      "type": "object"
+    },
+    "AdjacentlyTagged": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "method"
+              ],
+              "type": "object"
+            },
+            "t": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "t",
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c": {
+              "type": "string"
+            },
+            "t": {
+              "const": "C"
+            }
+          },
+          "required": [
+            "t",
+            "c"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AdjacentlyTagged"
+    },
+    "AdjacentlyTaggedWithAlias": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Serialize"
+        },
+        {
+          "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Deserialize"
+        }
+      ],
+      "title": "AdjacentlyTaggedWithAlias"
+    },
+    "AdjacentlyTaggedWithAlias_Deserialize": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "allOf": [
+                {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bruh": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "bruh"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              ],
+              "unevaluatedProperties": false
+            },
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "other": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "other"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AdjacentlyTaggedWithAlias_Deserialize"
+    },
+    "AdjacentlyTaggedWithAlias_Serialize": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "other": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "other"
+              ],
+              "type": "object"
+            },
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AdjacentlyTaggedWithAlias_Serialize"
+    },
+    "B": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "B",
+      "type": "object"
+    },
+    "BasicEnum": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "const": "B"
+        }
+      ],
+      "title": "BasicEnum"
+    },
+    "BoxFlattened": {
+      "allOf": [
+        {
+          "properties": {
+            "a": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "BoxFlattened",
+      "unevaluatedProperties": false
+    },
+    "BoxInline": {
+      "additionalProperties": false,
+      "properties": {
+        "c": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "c"
+      ],
+      "title": "BoxInline",
+      "type": "object"
+    },
+    "BoxedInner": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "BoxedInner",
+      "type": "object"
+    },
+    "BracedStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "BracedStruct",
+      "type": "array"
+    },
+    "ChainedGenericDefault_String_String": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "string"
+        },
+        "second": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "ChainedGenericDefault",
+      "type": "object"
+    },
+    "ChainedGenericDefault_String_T": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "string"
+        },
+        "second": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "ChainedGenericDefault",
+      "type": "object"
+    },
+    "ChainedGenericDefault_String_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "string"
+        },
+        "second": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "ChainedGenericDefault",
+      "type": "object"
+    },
+    "ChainedGenericDefault_i32_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "integer"
+        },
+        "second": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "ChainedGenericDefault",
+      "type": "object"
+    },
+    "CommentedEnum": {
+      "description": " Some triple-slash comment\n Some more triple-slash comment",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": " Some triple-slash comment\n Some more triple-slash comment",
+          "properties": {
+            "A": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": " Some triple-slash comment\n Some more triple-slash comment",
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "description": " Some triple-slash comment\n Some more triple-slash comment",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "CommentedEnum"
+    },
+    "CommentedStruct": {
+      "additionalProperties": false,
+      "description": " Some triple-slash comment\n Some more triple-slash comment",
+      "properties": {
+        "a": {
+          "description": " Some triple-slash comment\n Some more triple-slash comment",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "CommentedStruct",
+      "type": "object"
+    },
+    "ConstGenericInConstContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "data": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "data",
+        "a",
+        "d"
+      ],
+      "title": "ConstGenericInConstContainer",
+      "type": "object"
+    },
+    "ConstGenericInNonConstContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "data": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "data",
+        "a",
+        "d"
+      ],
+      "title": "ConstGenericInNonConstContainer",
+      "type": "object"
+    },
+    "Container1": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "items": {
+            "$ref": "#/$defs/Generic1_u32"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "baz": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Generic1_String"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "foo": {
+          "$ref": "#/$defs/Generic1_u32"
+        }
+      },
+      "required": [
+        "foo",
+        "bar",
+        "baz"
+      ],
+      "title": "Container1",
+      "type": "object"
+    },
+    "ContainerTypeOverrideEnum": {
+      "title": "ContainerTypeOverrideEnum",
+      "type": "string"
+    },
+    "ContainerTypeOverrideGeneric": {
+      "title": "ContainerTypeOverrideGeneric",
+      "type": "string"
+    },
+    "ContainerTypeOverrideStruct": {
+      "title": "ContainerTypeOverrideStruct",
+      "type": "string"
+    },
+    "ContainerTypeOverrideToGeneric": {
+      "title": "ContainerTypeOverrideToGeneric"
+    },
+    "ContainerTypeOverrideToGeneric_i32": {
+      "title": "ContainerTypeOverrideToGeneric",
+      "type": "integer"
+    },
+    "ContainerTypeOverrideTuple": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "ContainerTypeOverrideTuple",
+      "type": "array"
+    },
+    "ContainerTypeOverrideTupleGeneric": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {},
+        {
+          "type": "string"
+        }
+      ],
+      "title": "ContainerTypeOverrideTupleGeneric",
+      "type": "array"
+    },
+    "ContainerTypeOverrideTupleGeneric_i32": {
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "ContainerTypeOverrideTupleGeneric",
+      "type": "array"
+    },
+    "D": {
+      "additionalProperties": false,
+      "properties": {
+        "flattened": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "flattened"
+      ],
+      "title": "D",
+      "type": "object"
+    },
+    "Demo": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {},
+        "b": {}
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Demo",
+      "type": "object"
+    },
+    "Demo_T_bool": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {},
+        "b": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Demo",
+      "type": "object"
+    },
+    "Demo_u32_bool": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "b": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Demo",
+      "type": "object"
+    },
+    "Demo_u8_bool": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "b": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Demo",
+      "type": "object"
+    },
+    "DeprecatedEnumVariants": {
+      "oneOf": [
+        {
+          "const": "A",
+          "deprecated": true
+        },
+        {
+          "const": "B",
+          "deprecated": true
+        },
+        {
+          "const": "C",
+          "deprecated": true
+        }
+      ],
+      "title": "DeprecatedEnumVariants"
+    },
+    "DeprecatedFields": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "deprecated": true,
+          "type": "string"
+        },
+        "c": {
+          "deprecated": true,
+          "type": "string"
+        },
+        "d": {
+          "deprecated": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "title": "DeprecatedFields",
+      "type": "object"
+    },
+    "DeprecatedTupleVariant": {
+      "items": false,
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "DeprecatedTupleVariant",
+      "type": "array"
+    },
+    "DeprecatedType": {
+      "additionalProperties": false,
+      "deprecated": true,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "DeprecatedType",
+      "type": "object"
+    },
+    "DeprecatedTypeWithMsg": {
+      "additionalProperties": false,
+      "deprecated": true,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "DeprecatedTypeWithMsg",
+      "type": "object"
+    },
+    "DeprecatedTypeWithMsg2": {
+      "additionalProperties": false,
+      "deprecated": true,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "DeprecatedTypeWithMsg2",
+      "type": "object"
+    },
+    "DoubleFlattened": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/ToBeFlattened"
+        },
+        "b": {
+          "$ref": "#/$defs/ToBeFlattened"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "DoubleFlattened",
+      "type": "object"
+    },
+    "Eight": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "B"
+        }
+      ],
+      "title": "Eight"
+    },
+    "EmptyEnum": false,
+    "EmptyEnumTagged": false,
+    "EmptyEnumTaggedWContent": false,
+    "EmptyEnumUntagged": false,
+    "EmptyStruct": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "EmptyStruct",
+      "type": "object"
+    },
+    "EmptyStructWithTag": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "const": "EmptyStructWithTag"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "EmptyStructWithTag",
+      "type": "object"
+    },
+    "Enum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Enum"
+    },
+    "Enum2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "C"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "enumField": {
+              "type": "null"
+            },
+            "t": {
+              "const": "D"
+            }
+          },
+          "required": [
+            "t",
+            "enumField"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Enum2"
+    },
+    "Enum3": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "type": "string"
+        },
+        "t": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "t",
+        "b"
+      ],
+      "title": "Enum3",
+      "type": "object"
+    },
+    "EnumMacroAttributes": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bbb": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "bbb"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cccc": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "cccc"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "D": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "string"
+                },
+                "bbbbbb": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "bbbbbb"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "D"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "EnumMacroAttributes"
+    },
+    "EnumReferenceRecordKey": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/BasicEnum"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "EnumReferenceRecordKey",
+      "type": "object"
+    },
+    "EnumRenameAllUppercase": {
+      "oneOf": [
+        {
+          "const": "HELLOWORLD"
+        },
+        {
+          "const": "VARIANTB"
+        },
+        {
+          "const": "TESTINGWORDS"
+        }
+      ],
+      "title": "EnumRenameAllUppercase"
+    },
+    "EnumWithMultipleVariantAliases": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/EnumWithMultipleVariantAliases_Serialize"
+        },
+        {
+          "$ref": "#/$defs/EnumWithMultipleVariantAliases_Deserialize"
+        }
+      ],
+      "title": "EnumWithMultipleVariantAliases"
+    },
+    "EnumWithMultipleVariantAliases_Deserialize": {
+      "oneOf": [
+        {
+          "const": "Variant"
+        },
+        {
+          "const": "bruh"
+        },
+        {
+          "const": "alternative"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithMultipleVariantAliases_Deserialize"
+    },
+    "EnumWithMultipleVariantAliases_Serialize": {
+      "oneOf": [
+        {
+          "const": "Variant"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithMultipleVariantAliases_Serialize"
+    },
+    "EnumWithVariantAlias": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/EnumWithVariantAlias_Serialize"
+        },
+        {
+          "$ref": "#/$defs/EnumWithVariantAlias_Deserialize"
+        }
+      ],
+      "title": "EnumWithVariantAlias"
+    },
+    "EnumWithVariantAliasAndRename": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/EnumWithVariantAliasAndRename_Serialize"
+        },
+        {
+          "$ref": "#/$defs/EnumWithVariantAliasAndRename_Deserialize"
+        }
+      ],
+      "title": "EnumWithVariantAliasAndRename"
+    },
+    "EnumWithVariantAliasAndRename_Deserialize": {
+      "oneOf": [
+        {
+          "const": "renamed_variant"
+        },
+        {
+          "const": "bruh"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithVariantAliasAndRename_Deserialize"
+    },
+    "EnumWithVariantAliasAndRename_Serialize": {
+      "oneOf": [
+        {
+          "const": "renamed_variant"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithVariantAliasAndRename_Serialize"
+    },
+    "EnumWithVariantAlias_Deserialize": {
+      "oneOf": [
+        {
+          "const": "Variant"
+        },
+        {
+          "const": "bruh"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithVariantAlias_Deserialize"
+    },
+    "EnumWithVariantAlias_Serialize": {
+      "oneOf": [
+        {
+          "const": "Variant"
+        },
+        {
+          "const": "Other"
+        }
+      ],
+      "title": "EnumWithVariantAlias_Serialize"
+    },
+    "ExternallyTagged": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "method"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "C": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "C"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ExternallyTagged"
+    },
+    "ExtraBracketsInTupleVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "ExtraBracketsInTupleVariant",
+      "type": "object"
+    },
+    "ExtraBracketsInUnnamedStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "ExtraBracketsInUnnamedStruct",
+      "type": "array"
+    },
+    "First": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "First",
+      "type": "object"
+    },
+    "FlattenA": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "FlattenA",
+      "type": "object"
+    },
+    "FlattenB": {
+      "allOf": [
+        {
+          "properties": {
+            "c": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "a": {
+              "type": "integer"
+            },
+            "b": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "a",
+            "b"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "FlattenB",
+      "unevaluatedProperties": false
+    },
+    "FlattenC": {
+      "allOf": [
+        {
+          "properties": {
+            "c": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "a": {
+              "type": "integer"
+            },
+            "b": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "a",
+            "b"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "FlattenC",
+      "unevaluatedProperties": false
+    },
+    "FlattenD": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/FlattenA"
+        },
+        "c": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a",
+        "c"
+      ],
+      "title": "FlattenD",
+      "type": "object"
+    },
+    "FlattenE": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "allOf": [
+            {
+              "properties": {
+                "c": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "c"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "a": {
+                  "type": "integer"
+                },
+                "b": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "b"
+              ],
+              "type": "object"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "d": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b",
+        "d"
+      ],
+      "title": "FlattenE",
+      "type": "object"
+    },
+    "FlattenEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "tag": {
+              "const": "One"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "tag": {
+              "const": "Two"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "tag": {
+              "const": "Three"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "FlattenEnum"
+    },
+    "FlattenEnumStruct": {
+      "allOf": [
+        {
+          "properties": {
+            "outer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "outer"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FlattenEnum"
+        }
+      ],
+      "title": "FlattenEnumStruct",
+      "unevaluatedProperties": false
+    },
+    "FlattenF": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "allOf": [
+            {
+              "properties": {
+                "c": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "c"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "a": {
+                  "type": "integer"
+                },
+                "b": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "b"
+              ],
+              "type": "object"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "d": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b",
+        "d"
+      ],
+      "title": "FlattenF",
+      "type": "object"
+    },
+    "FlattenG": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "$ref": "#/$defs/FlattenB"
+        },
+        "d": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b",
+        "d"
+      ],
+      "title": "FlattenG",
+      "type": "object"
+    },
+    "FlattenOnNestedEnum": {
+      "allOf": [
+        {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/NestedEnum"
+        }
+      ],
+      "title": "FlattenOnNestedEnum",
+      "unevaluatedProperties": false
+    },
+    "FlattenedInner": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Inner"
+        }
+      ],
+      "title": "FlattenedInner",
+      "unevaluatedProperties": false
+    },
+    "Fourth": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/First"
+        },
+        "b": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Fourth",
+      "type": "object"
+    },
+    "Generic1": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {},
+        "values": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "Generic1",
+      "type": "object"
+    },
+    "Generic1_String": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "Generic1",
+      "type": "object"
+    },
+    "Generic1_Tuple_": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "null"
+        },
+        "values": {
+          "items": {
+            "type": "null"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "Generic1",
+      "type": "object"
+    },
+    "Generic1_u32": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "values": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "Generic1",
+      "type": "object"
+    },
+    "Generic2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {}
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "items": false,
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {},
+                {},
+                {}
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "C": {
+              "items": {},
+              "type": "array"
+            }
+          },
+          "required": [
+            "C"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "D": {
+              "items": {
+                "items": {
+                  "items": {},
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "D"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "E": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {},
+                "b": {},
+                "c": {}
+              },
+              "required": [
+                "a",
+                "b",
+                "c"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "E"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "X": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "X"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Y": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Y"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Z": {
+              "items": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Z"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Generic2"
+    },
+    "Generic2_Tuple__String_i32": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "items": false,
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "C": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "C"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "D": {
+              "items": {
+                "items": {
+                  "items": {
+                    "type": "null"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "D"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "E": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "null"
+                },
+                "b": {
+                  "type": "string"
+                },
+                "c": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "b",
+                "c"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "E"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "X": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "X"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Y": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Y"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Z": {
+              "items": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "Z"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Generic2"
+    },
+    "GenericAutoBound": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {},
+        "values": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "GenericAutoBound",
+      "type": "object"
+    },
+    "GenericAutoBound2": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {},
+        "values": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "GenericAutoBound2",
+      "type": "object"
+    },
+    "GenericAutoBound2_Tuple_": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "null"
+        },
+        "values": {
+          "items": {
+            "type": "null"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "GenericAutoBound2",
+      "type": "object"
+    },
+    "GenericAutoBound_Tuple_": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "null"
+        },
+        "values": {
+          "items": {
+            "type": "null"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "values"
+      ],
+      "title": "GenericAutoBound",
+      "type": "object"
+    },
+    "GenericDefaultSkipped": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {}
+      },
+      "required": [
+        "value"
+      ],
+      "title": "GenericDefaultSkipped",
+      "type": "object"
+    },
+    "GenericDefaultSkippedNonType": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "GenericDefaultSkippedNonType",
+      "type": "object"
+    },
+    "GenericDefaultSkipped_String": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "GenericDefaultSkipped",
+      "type": "object"
+    },
+    "GenericDefault_String": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "GenericDefault",
+      "type": "object"
+    },
+    "GenericFlattened": {
+      "additionalProperties": false,
+      "properties": {
+        "generic_flattened": {}
+      },
+      "required": [
+        "generic_flattened"
+      ],
+      "title": "GenericFlattened",
+      "type": "object"
+    },
+    "GenericNewType1": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "items": {
+            "items": {},
+            "type": "array"
+          },
+          "type": "array"
+        }
+      ],
+      "title": "GenericNewType1",
+      "type": "array"
+    },
+    "GenericNewType1_Tuple_": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "items": {
+            "items": {
+              "type": "null"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      ],
+      "title": "GenericNewType1",
+      "type": "array"
+    },
+    "GenericParameterOrderPreserved": {
+      "additionalProperties": false,
+      "properties": {
+        "pair": {
+          "$ref": "#/$defs/Pair_String_i32"
+        }
+      },
+      "required": [
+        "pair"
+      ],
+      "title": "GenericParameterOrderPreserved",
+      "type": "object"
+    },
+    "GenericStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "arg": {}
+      },
+      "required": [
+        "arg"
+      ],
+      "title": "GenericStruct",
+      "type": "object"
+    },
+    "GenericStruct2": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {},
+        "b": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {},
+            {}
+          ],
+          "type": "array"
+        },
+        "c": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {},
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {},
+                {}
+              ],
+              "type": "array"
+            }
+          ],
+          "type": "array"
+        },
+        "d": {
+          "items": {},
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "e": {
+          "items": {
+            "items": false,
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {},
+              {}
+            ],
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "f": {
+          "items": {},
+          "type": "array"
+        },
+        "g": {
+          "items": {
+            "items": {},
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "h": {
+          "items": {
+            "items": {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {},
+                {}
+              ],
+              "type": "array"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h"
+      ],
+      "title": "GenericStruct2",
+      "type": "object"
+    },
+    "GenericStruct2_Tuple_": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "null"
+        },
+        "b": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "type": "array"
+        },
+        "c": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "null"
+            },
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "type": "array"
+            }
+          ],
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "type": "null"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "e": {
+          "items": {
+            "items": false,
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "f": {
+          "items": {
+            "type": "null"
+          },
+          "type": "array"
+        },
+        "g": {
+          "items": {
+            "items": {
+              "type": "null"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "h": {
+          "items": {
+            "items": {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "type": "array"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h"
+      ],
+      "title": "GenericStruct2",
+      "type": "object"
+    },
+    "GenericStruct_String": {
+      "additionalProperties": false,
+      "properties": {
+        "arg": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "arg"
+      ],
+      "title": "GenericStruct",
+      "type": "object"
+    },
+    "GenericStruct_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "arg": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "arg"
+      ],
+      "title": "GenericStruct",
+      "type": "object"
+    },
+    "GenericTuple": {
+      "items": false,
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {},
+        {
+          "items": {},
+          "type": "array"
+        },
+        {
+          "items": {
+            "items": {},
+            "type": "array"
+          },
+          "type": "array"
+        }
+      ],
+      "title": "GenericTuple",
+      "type": "array"
+    },
+    "GenericTupleStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {}
+      ],
+      "title": "GenericTupleStruct",
+      "type": "array"
+    },
+    "GenericTupleStruct_String": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "GenericTupleStruct",
+      "type": "array"
+    },
+    "GenericTuple_Tuple_": {
+      "items": false,
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "type": "null"
+          },
+          "type": "array"
+        },
+        {
+          "items": {
+            "items": {
+              "type": "null"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        }
+      ],
+      "title": "GenericTuple",
+      "type": "array"
+    },
+    "GenericType": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {}
+      ],
+      "title": "GenericType"
+    },
+    "GenericType_String": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "GenericType"
+    },
+    "HasGenericAlias": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "HasGenericAlias",
+      "type": "array"
+    },
+    "InlineConstGenericContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "d": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "data": {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            }
+          },
+          "required": [
+            "data",
+            "a",
+            "d"
+          ],
+          "type": "object"
+        },
+        "c": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "d": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "data": {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "data",
+            "a",
+            "d"
+          ],
+          "type": "object"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "b",
+        "c",
+        "d"
+      ],
+      "title": "InlineConstGenericContainer",
+      "type": "object"
+    },
+    "InlineEnumField": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "InlineEnumField",
+      "type": "object"
+    },
+    "InlineFlattenGenerics": {
+      "allOf": [
+        {
+          "properties": {
+            "g": {
+              "$ref": "#/$defs/InlineFlattenGenericsG_String"
+            },
+            "gi": {
+              "additionalProperties": false,
+              "properties": {
+                "t": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "t"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "g",
+            "gi"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "t": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InlineFlattenGenerics",
+      "unevaluatedProperties": false
+    },
+    "InlineFlattenGenericsG": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {}
+      },
+      "required": [
+        "t"
+      ],
+      "title": "InlineFlattenGenericsG",
+      "type": "object"
+    },
+    "InlineFlattenGenericsG_String": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "t"
+      ],
+      "title": "InlineFlattenGenericsG",
+      "type": "object"
+    },
+    "InlineFlattenGenericsG_Tuple_": {
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "t"
+      ],
+      "title": "InlineFlattenGenericsG",
+      "type": "object"
+    },
+    "InlineOptionalType": {
+      "additionalProperties": false,
+      "properties": {
+        "optional_field": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "optional_field"
+      ],
+      "title": "InlineOptionalType",
+      "type": "object"
+    },
+    "InlineRecursiveConstGeneric": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "data": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "e": {
+          "$ref": "#/$defs/InlineRecursiveConstGeneric"
+        }
+      },
+      "required": [
+        "data",
+        "a",
+        "d",
+        "e"
+      ],
+      "title": "InlineRecursiveConstGeneric",
+      "type": "object"
+    },
+    "InlineRecursiveConstGenericContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "d": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "data": {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "e": {
+              "$ref": "#/$defs/InlineRecursiveConstGeneric"
+            }
+          },
+          "required": [
+            "data",
+            "a",
+            "d",
+            "e"
+          ],
+          "type": "object"
+        },
+        "c": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "d": {
+              "items": {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "data": {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "e": {
+              "$ref": "#/$defs/InlineRecursiveConstGeneric"
+            }
+          },
+          "required": [
+            "data",
+            "a",
+            "d",
+            "e"
+          ],
+          "type": "object"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "b",
+        "c",
+        "d"
+      ],
+      "title": "InlineRecursiveConstGenericContainer",
+      "type": "object"
+    },
+    "InlineStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "ref_struct": {
+          "$ref": "#/$defs/SimpleStruct"
+        },
+        "val": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ref_struct",
+        "val"
+      ],
+      "title": "InlineStruct",
+      "type": "object"
+    },
+    "InlineTuple": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "demo"
+      ],
+      "title": "InlineTuple",
+      "type": "object"
+    },
+    "InlineTuple2": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "demo": {
+                  "items": false,
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ],
+                  "type": "array"
+                }
+              },
+              "required": [
+                "demo"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "demo"
+      ],
+      "title": "InlineTuple2",
+      "type": "object"
+    },
+    "InlinerStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "dont_inline_this": {
+          "$ref": "#/$defs/RefStruct"
+        },
+        "inline_this": {
+          "additionalProperties": false,
+          "properties": {
+            "ref_struct": {
+              "$ref": "#/$defs/SimpleStruct"
+            },
+            "val": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "ref_struct",
+            "val"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "inline_this",
+        "dont_inline_this"
+      ],
+      "title": "InlinerStruct",
+      "type": "object"
+    },
+    "Inner": {
+      "allOf": [
+        {
+          "properties": {
+            "a": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FlattenedInner"
+        }
+      ],
+      "title": "Inner",
+      "unevaluatedProperties": false
+    },
+    "InternallyTaggedD": {
+      "const": "A",
+      "title": "InternallyTaggedD"
+    },
+    "InternallyTaggedE": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "InternallyTaggedE",
+      "type": "object"
+    },
+    "InternallyTaggedF": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "InternallyTaggedF",
+      "type": "object"
+    },
+    "InternallyTaggedFInner": {
+      "title": "InternallyTaggedFInner",
+      "type": "null"
+    },
+    "InternallyTaggedH": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "InternallyTaggedH",
+      "type": "object"
+    },
+    "InternallyTaggedHInner": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "null"
+        }
+      ],
+      "title": "InternallyTaggedHInner",
+      "type": "array"
+    },
+    "InternallyTaggedL": {
+      "const": "A",
+      "title": "InternallyTaggedL"
+    },
+    "InternallyTaggedLInner": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InternallyTaggedLInner"
+    },
+    "InternallyTaggedM": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "InternallyTaggedM",
+      "type": "object"
+    },
+    "InternallyTaggedMInner": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "InternallyTaggedMInner"
+    },
+    "InternallyTaggedWithAlias": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/InternallyTaggedWithAlias_Serialize"
+        },
+        {
+          "$ref": "#/$defs/InternallyTaggedWithAlias_Deserialize"
+        }
+      ],
+      "title": "InternallyTaggedWithAlias"
+    },
+    "InternallyTaggedWithAlias_Deserialize": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "other": {
+              "type": "integer"
+            },
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type",
+            "other"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InternallyTaggedWithAlias_Deserialize"
+    },
+    "InternallyTaggedWithAlias_Serialize": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "other": {
+              "type": "integer"
+            },
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type",
+            "other"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InternallyTaggedWithAlias_Serialize"
+    },
+    "InvalidToValidType": {
+      "additionalProperties": false,
+      "properties": {
+        "cause": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cause"
+      ],
+      "title": "InvalidToValidType",
+      "type": "object"
+    },
+    "Issue221External": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "b": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "b"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Issue221External"
+    },
+    "Issue221UntaggedMixed": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "b": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "values": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "values"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Issue221UntaggedMixed"
+    },
+    "Issue221UntaggedSafe": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "b": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "b"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Issue221UntaggedSafe"
+    },
+    "Issue281": {
+      "additionalProperties": false,
+      "properties": {
+        "default_unity_arguments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "default_unity_arguments"
+      ],
+      "title": "Issue281",
+      "type": "object"
+    },
+    "Issue374": {
+      "description": " https://github.com/specta-rs/specta/issues/374",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Issue374_Serialize"
+        },
+        {
+          "$ref": "#/$defs/Issue374_Deserialize"
+        }
+      ],
+      "title": "Issue374"
+    },
+    "Issue374_Deserialize": {
+      "additionalProperties": false,
+      "description": " https://github.com/specta-rs/specta/issues/374",
+      "properties": {
+        "bar": {
+          "type": "boolean"
+        },
+        "foo": {
+          "type": "boolean"
+        }
+      },
+      "title": "Issue374_Deserialize",
+      "type": "object"
+    },
+    "Issue374_Serialize": {
+      "additionalProperties": false,
+      "description": " https://github.com/specta-rs/specta/issues/374",
+      "properties": {
+        "bar": {
+          "type": "boolean"
+        },
+        "foo": {
+          "type": "boolean"
+        }
+      },
+      "title": "Issue374_Serialize",
+      "type": "object"
+    },
+    "KebabCase": {
+      "additionalProperties": false,
+      "properties": {
+        "test-ing": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "test-ing"
+      ],
+      "title": "KebabCase",
+      "type": "object"
+    },
+    "LifetimeGenericEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Borrowed": {}
+          },
+          "required": [
+            "Borrowed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Owned": {}
+          },
+          "required": [
+            "Owned"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "LifetimeGenericEnum"
+    },
+    "LifetimeGenericEnum_i32": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Borrowed": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Borrowed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Owned": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Owned"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "LifetimeGenericEnum"
+    },
+    "LifetimeGenericStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "borrowed": {
+          "items": {},
+          "type": "array"
+        },
+        "owned": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "required": [
+        "borrowed",
+        "owned"
+      ],
+      "title": "LifetimeGenericStruct",
+      "type": "object"
+    },
+    "LifetimeGenericStruct_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "borrowed": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "owned": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "borrowed",
+        "owned"
+      ],
+      "title": "LifetimeGenericStruct",
+      "type": "object"
+    },
+    "LoadProjectEvent": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "projectName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "projectName"
+              ],
+              "type": "object"
+            },
+            "event": {
+              "const": "started"
+            }
+          },
+          "required": [
+            "event",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "progress": {
+                  "type": "integer"
+                },
+                "projectName": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "projectName",
+                "status",
+                "progress"
+              ],
+              "type": "object"
+            },
+            "event": {
+              "const": "progressTest"
+            }
+          },
+          "required": [
+            "event",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "projectName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "projectName"
+              ],
+              "type": "object"
+            },
+            "event": {
+              "const": "finished"
+            }
+          },
+          "required": [
+            "event",
+            "data"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "LoadProjectEvent"
+    },
+    "MacroEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Demo": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Demo"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Demo2": {
+              "additionalProperties": false,
+              "properties": {
+                "demo2": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "demo2"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Demo2"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MacroEnum"
+    },
+    "MacroStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "MacroStruct",
+      "type": "array"
+    },
+    "MacroStruct2": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "demo"
+      ],
+      "title": "MacroStruct2",
+      "type": "object"
+    },
+    "MaybeValidKey": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {}
+      ],
+      "title": "MaybeValidKey",
+      "type": "array"
+    },
+    "MaybeValidKey_MaybeValidKey_String": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/MaybeValidKey_String"
+        }
+      ],
+      "title": "MaybeValidKey",
+      "type": "array"
+    },
+    "MaybeValidKey_String": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "MaybeValidKey",
+      "type": "array"
+    },
+    "MyEmptyInput": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "MyEmptyInput",
+      "type": "object"
+    },
+    "MyEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MyEnum"
+    },
+    "MyEnumAdjacent": {
+      "additionalProperties": false,
+      "properties": {
+        "c": {
+          "additionalProperties": false,
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/First"
+            }
+          },
+          "required": [
+            "inner"
+          ],
+          "type": "object"
+        },
+        "t": {
+          "const": "Variant"
+        }
+      },
+      "required": [
+        "t",
+        "c"
+      ],
+      "title": "MyEnumAdjacent",
+      "type": "object"
+    },
+    "MyEnumExternal": {
+      "additionalProperties": false,
+      "properties": {
+        "Variant": {
+          "additionalProperties": false,
+          "properties": {
+            "inner": {
+              "$ref": "#/$defs/First"
+            }
+          },
+          "required": [
+            "inner"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "Variant"
+      ],
+      "title": "MyEnumExternal",
+      "type": "object"
+    },
+    "MyEnumTagged": {
+      "const": "Variant",
+      "title": "MyEnumTagged"
+    },
+    "MyEnumUntagged": {
+      "additionalProperties": false,
+      "properties": {
+        "inner": {
+          "$ref": "#/$defs/First"
+        }
+      },
+      "required": [
+        "inner"
+      ],
+      "title": "MyEnumUntagged",
+      "type": "object"
+    },
+    "NamedConstGeneric": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "data": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "data",
+        "a",
+        "d"
+      ],
+      "title": "NamedConstGeneric",
+      "type": "object"
+    },
+    "NamedConstGenericContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/NamedConstGeneric"
+        },
+        "b": {
+          "$ref": "#/$defs/NamedConstGeneric"
+        },
+        "d": {
+          "items": {
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "d"
+      ],
+      "title": "NamedConstGenericContainer",
+      "type": "object"
+    },
+    "NestedEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "a"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "b"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "NestedEnum"
+    },
+    "Ninth": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c": {
+              "type": "string"
+            },
+            "t": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "t",
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            },
+            "t": {
+              "const": "C"
+            }
+          },
+          "required": [
+            "t",
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "c": {
+              "$ref": "#/$defs/First"
+            },
+            "t": {
+              "const": "D"
+            }
+          },
+          "required": [
+            "t",
+            "c"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Ninth"
+    },
+    "NonOptional": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      ],
+      "title": "NonOptional",
+      "type": "array"
+    },
+    "Optional": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Optional_Serialize"
+        },
+        {
+          "$ref": "#/$defs/Optional_Deserialize"
+        }
+      ],
+      "title": "Optional"
+    },
+    "OptionalInEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "C": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "C"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "OptionalInEnum"
+    },
+    "OptionalOnNamedField": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      ],
+      "title": "OptionalOnNamedField",
+      "type": "array"
+    },
+    "OptionalOnTransparentNamedField": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "items": false,
+          "maxItems": 1,
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "OptionalOnTransparentNamedField",
+      "type": "object"
+    },
+    "Optional_Deserialize": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "c": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "d": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "c"
+      ],
+      "title": "Optional_Deserialize",
+      "type": "object"
+    },
+    "Optional_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "b": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "c": {
+          "type": "string"
+        },
+        "d": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "a",
+        "d"
+      ],
+      "title": "Optional_Serialize",
+      "type": "object"
+    },
+    "OverridenStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "overriden_field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "overriden_field"
+      ],
+      "title": "OverridenStruct",
+      "type": "object"
+    },
+    "Pair": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {},
+        "second": {}
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "Pair",
+      "type": "object"
+    },
+    "Pair_String_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "first": {
+          "type": "integer"
+        },
+        "second": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "first",
+        "second"
+      ],
+      "title": "Pair",
+      "type": "object"
+    },
+    "PlaceholderInnerField": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "PlaceholderInnerField",
+      "type": "object"
+    },
+    "Primitives": {
+      "additionalProperties": false,
+      "properties": {
+        "&'static [MyEnum; 6]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "maxItems": 6,
+          "minItems": 6,
+          "type": "array"
+        },
+        "&'static [MyEnum]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "type": "array"
+        },
+        "&'static [i32; 0]": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "minItems": 0,
+          "type": "array"
+        },
+        "&'static [i32; 1]": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array"
+        },
+        "&'static [i32; 3]": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "&'static [i32]": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "&'static bool": {
+          "type": "boolean"
+        },
+        "&'static i32": {
+          "type": "integer"
+        },
+        "&'static str": {
+          "type": "string"
+        },
+        "&[&str]": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "((String, i32), (bool, char, bool), ())": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "items": false,
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "maxLength": 1,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "type": "array"
+        },
+        "()": {
+          "type": "null"
+        },
+        "(String)": {
+          "type": "string"
+        },
+        "(String, i32)": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "(String, i32, bool)": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        },
+        "(String,)": {
+          "items": false,
+          "maxItems": 1,
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "(Vec<i32>, Vec<bool>)": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "boolean"
+              },
+              "type": "array"
+            }
+          ],
+          "type": "array"
+        },
+        "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": {
+          "items": false,
+          "maxItems": 12,
+          "minItems": 12,
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        },
+        "A": {
+          "$ref": "#/$defs/A"
+        },
+        "AGenericStruct<u32>": {
+          "$ref": "#/$defs/AGenericStruct_u32"
+        },
+        "ActualType": {
+          "$ref": "#/$defs/ActualType"
+        },
+        "AdjacentlyTagged": {
+          "$ref": "#/$defs/AdjacentlyTagged"
+        },
+        "Another<bool>": {
+          "$ref": "#/$defs/Demo_u8_bool"
+        },
+        "Box<String>": {
+          "type": "string"
+        },
+        "Box<str>": {
+          "type": "string"
+        },
+        "BoxFlattened": {
+          "$ref": "#/$defs/BoxFlattened"
+        },
+        "BoxInline": {
+          "$ref": "#/$defs/BoxInline"
+        },
+        "BracedStruct": {
+          "$ref": "#/$defs/BracedStruct"
+        },
+        "ChainedGenericDefault": {
+          "$ref": "#/$defs/ChainedGenericDefault_String_String"
+        },
+        "ChainedGenericDefault<String, String>": {
+          "$ref": "#/$defs/ChainedGenericDefault_String_String"
+        },
+        "ChainedGenericDefault<String, i32>": {
+          "$ref": "#/$defs/ChainedGenericDefault_String_i32"
+        },
+        "ChainedGenericDefault<i32>": {
+          "$ref": "#/$defs/ChainedGenericDefault_i32_i32"
+        },
+        "CommentedEnum": {
+          "$ref": "#/$defs/CommentedEnum"
+        },
+        "CommentedStruct": {
+          "$ref": "#/$defs/CommentedStruct"
+        },
+        "ConstGenericInConstContainer": {
+          "$ref": "#/$defs/ConstGenericInConstContainer"
+        },
+        "ConstGenericInNonConstContainer": {
+          "$ref": "#/$defs/ConstGenericInNonConstContainer"
+        },
+        "Container1": {
+          "$ref": "#/$defs/Container1"
+        },
+        "ContainerTypeOverrideEnum": {
+          "$ref": "#/$defs/ContainerTypeOverrideEnum"
+        },
+        "ContainerTypeOverrideGeneric<Box<dyn Any>>": {
+          "$ref": "#/$defs/ContainerTypeOverrideGeneric"
+        },
+        "ContainerTypeOverrideStruct": {
+          "$ref": "#/$defs/ContainerTypeOverrideStruct"
+        },
+        "ContainerTypeOverrideToGeneric<i32>": {
+          "$ref": "#/$defs/ContainerTypeOverrideToGeneric_i32"
+        },
+        "ContainerTypeOverrideTuple": {
+          "$ref": "#/$defs/ContainerTypeOverrideTuple"
+        },
+        "ContainerTypeOverrideTupleGeneric<i32>": {
+          "$ref": "#/$defs/ContainerTypeOverrideTupleGeneric_i32"
+        },
+        "Cow<'static, i32>": {
+          "type": "integer"
+        },
+        "Cow<'static, str>": {
+          "type": "string"
+        },
+        "DeprecatedEnumVariants": {
+          "$ref": "#/$defs/DeprecatedEnumVariants"
+        },
+        "DeprecatedFields": {
+          "$ref": "#/$defs/DeprecatedFields"
+        },
+        "DeprecatedTupleVariant": {
+          "$ref": "#/$defs/DeprecatedTupleVariant"
+        },
+        "DeprecatedType": {
+          "$ref": "#/$defs/DeprecatedType"
+        },
+        "DeprecatedTypeWithMsg": {
+          "$ref": "#/$defs/DeprecatedTypeWithMsg"
+        },
+        "DeprecatedTypeWithMsg2": {
+          "$ref": "#/$defs/DeprecatedTypeWithMsg2"
+        },
+        "DoubleFlattened": {
+          "$ref": "#/$defs/DoubleFlattened"
+        },
+        "Eight": {
+          "$ref": "#/$defs/Eight"
+        },
+        "EmptyEnum": {
+          "$ref": "#/$defs/EmptyEnum"
+        },
+        "EmptyEnumTagged": {
+          "$ref": "#/$defs/EmptyEnumTagged"
+        },
+        "EmptyEnumTaggedWContent": {
+          "$ref": "#/$defs/EmptyEnumTaggedWContent"
+        },
+        "EmptyEnumUntagged": {
+          "$ref": "#/$defs/EmptyEnumUntagged"
+        },
+        "EmptyStruct": {
+          "$ref": "#/$defs/EmptyStruct"
+        },
+        "EmptyStructWithTag": {
+          "$ref": "#/$defs/EmptyStructWithTag"
+        },
+        "Enum": {
+          "$ref": "#/$defs/Enum"
+        },
+        "Enum2": {
+          "$ref": "#/$defs/Enum2"
+        },
+        "Enum3": {
+          "$ref": "#/$defs/Enum3"
+        },
+        "EnumMacroAttributes": {
+          "$ref": "#/$defs/EnumMacroAttributes"
+        },
+        "EnumReferenceRecordKey": {
+          "$ref": "#/$defs/EnumReferenceRecordKey"
+        },
+        "EnumRenameAllUppercase": {
+          "$ref": "#/$defs/EnumRenameAllUppercase"
+        },
+        "ExternallyTagged": {
+          "$ref": "#/$defs/ExternallyTagged"
+        },
+        "ExtraBracketsInTupleVariant": {
+          "$ref": "#/$defs/ExtraBracketsInTupleVariant"
+        },
+        "ExtraBracketsInUnnamedStruct": {
+          "$ref": "#/$defs/ExtraBracketsInUnnamedStruct"
+        },
+        "First": {
+          "$ref": "#/$defs/First"
+        },
+        "FlattenA": {
+          "$ref": "#/$defs/FlattenA"
+        },
+        "FlattenB": {
+          "$ref": "#/$defs/FlattenB"
+        },
+        "FlattenC": {
+          "$ref": "#/$defs/FlattenC"
+        },
+        "FlattenD": {
+          "$ref": "#/$defs/FlattenD"
+        },
+        "FlattenE": {
+          "$ref": "#/$defs/FlattenE"
+        },
+        "FlattenEnumStruct": {
+          "$ref": "#/$defs/FlattenEnumStruct"
+        },
+        "FlattenF": {
+          "$ref": "#/$defs/FlattenF"
+        },
+        "FlattenG": {
+          "$ref": "#/$defs/FlattenG"
+        },
+        "FlattenOnNestedEnum": {
+          "$ref": "#/$defs/FlattenOnNestedEnum"
+        },
+        "FlattenedInner": {
+          "$ref": "#/$defs/FlattenedInner"
+        },
+        "Fourth": {
+          "$ref": "#/$defs/Fourth"
+        },
+        "FullGeneric<u8, bool>": {
+          "$ref": "#/$defs/Demo_u8_bool"
+        },
+        "Generic1<()>": {
+          "$ref": "#/$defs/Generic1_Tuple_"
+        },
+        "Generic2<(), String, i32>": {
+          "$ref": "#/$defs/Generic2_Tuple__String_i32"
+        },
+        "GenericAutoBound2<()>": {
+          "$ref": "#/$defs/GenericAutoBound2_Tuple_"
+        },
+        "GenericAutoBound<()>": {
+          "$ref": "#/$defs/GenericAutoBound_Tuple_"
+        },
+        "GenericDefault": {
+          "$ref": "#/$defs/GenericDefault_String"
+        },
+        "GenericDefaultSkipped": {
+          "$ref": "#/$defs/GenericDefaultSkipped_String"
+        },
+        "GenericDefaultSkippedNonType": {
+          "$ref": "#/$defs/GenericDefaultSkippedNonType"
+        },
+        "GenericNewType1<()>": {
+          "$ref": "#/$defs/GenericNewType1_Tuple_"
+        },
+        "GenericParameterOrderPreserved": {
+          "$ref": "#/$defs/GenericParameterOrderPreserved"
+        },
+        "GenericStruct2<()>": {
+          "$ref": "#/$defs/GenericStruct2_Tuple_"
+        },
+        "GenericStruct<String>": {
+          "$ref": "#/$defs/GenericStruct_String"
+        },
+        "GenericStruct<i32>": {
+          "$ref": "#/$defs/GenericStruct_i32"
+        },
+        "GenericTuple<()>": {
+          "$ref": "#/$defs/GenericTuple_Tuple_"
+        },
+        "GenericTupleStruct<String>": {
+          "$ref": "#/$defs/GenericTupleStruct_String"
+        },
+        "HalfGenericA<u8>": {
+          "$ref": "#/$defs/Demo_u8_bool"
+        },
+        "HalfGenericB<bool>": {
+          "$ref": "#/$defs/Demo_u8_bool"
+        },
+        "HasGenericAlias": {
+          "$ref": "#/$defs/HasGenericAlias"
+        },
+        "HashMap<BasicEnum, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/BasicEnum"
+          },
+          "type": "object"
+        },
+        "HashMap<BasicEnum, i32>": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/BasicEnum"
+          },
+          "type": "object"
+        },
+        "HashMap<Infallible, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": false,
+          "type": "object"
+        },
+        "HashMap<String, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "HashMap<TransparentStruct, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/TransparentStruct"
+          },
+          "type": "object"
+        },
+        "HashMap<UnitVariants, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/UnitVariants"
+          },
+          "type": "object"
+        },
+        "HashMap<UntaggedVariantsKey, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/UntaggedVariantsKey"
+          },
+          "type": "object"
+        },
+        "Infallible": false,
+        "InlineConstGenericContainer": {
+          "$ref": "#/$defs/InlineConstGenericContainer"
+        },
+        "InlineEnumField": {
+          "$ref": "#/$defs/InlineEnumField"
+        },
+        "InlineFlattenGenerics": {
+          "$ref": "#/$defs/InlineFlattenGenerics"
+        },
+        "InlineFlattenGenericsG<()>": {
+          "$ref": "#/$defs/InlineFlattenGenericsG_Tuple_"
+        },
+        "InlineGenericNested<String>": {
+          "items": false,
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "items": false,
+              "maxItems": 1,
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "oneOf": [
+                {
+                  "const": "Unit"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "Unnamed": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Unnamed"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "Named": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "Named"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          ],
+          "type": "array"
+        },
+        "InlineGenericNewtype<String>": {
+          "items": false,
+          "maxItems": 1,
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "InlineOptionalType": {
+          "$ref": "#/$defs/InlineOptionalType"
+        },
+        "InlineRecursiveConstGenericContainer": {
+          "$ref": "#/$defs/InlineRecursiveConstGenericContainer"
+        },
+        "InlineTuple": {
+          "$ref": "#/$defs/InlineTuple"
+        },
+        "InlineTuple2": {
+          "$ref": "#/$defs/InlineTuple2"
+        },
+        "InlinerStruct": {
+          "$ref": "#/$defs/InlinerStruct"
+        },
+        "InternallyTaggedD": {
+          "$ref": "#/$defs/InternallyTaggedD"
+        },
+        "InternallyTaggedE": {
+          "$ref": "#/$defs/InternallyTaggedE"
+        },
+        "InternallyTaggedF": {
+          "$ref": "#/$defs/InternallyTaggedF"
+        },
+        "InternallyTaggedH": {
+          "$ref": "#/$defs/InternallyTaggedH"
+        },
+        "InternallyTaggedL": {
+          "$ref": "#/$defs/InternallyTaggedL"
+        },
+        "InternallyTaggedM": {
+          "$ref": "#/$defs/InternallyTaggedM"
+        },
+        "InvalidToValidType": {
+          "$ref": "#/$defs/InvalidToValidType"
+        },
+        "IpAddr": {
+          "type": "string"
+        },
+        "Ipv4Addr": {
+          "type": "string"
+        },
+        "Ipv6Addr": {
+          "type": "string"
+        },
+        "Issue221External": {
+          "$ref": "#/$defs/Issue221External"
+        },
+        "Issue221UntaggedMixed": {
+          "$ref": "#/$defs/Issue221UntaggedMixed"
+        },
+        "Issue221UntaggedSafe": {
+          "$ref": "#/$defs/Issue221UntaggedSafe"
+        },
+        "Issue281<'_>": {
+          "$ref": "#/$defs/Issue281"
+        },
+        "KebabCase": {
+          "$ref": "#/$defs/KebabCase"
+        },
+        "LifetimeGenericEnum<'_, i32>": {
+          "$ref": "#/$defs/LifetimeGenericEnum_i32"
+        },
+        "LifetimeGenericStruct<'_, i32>": {
+          "$ref": "#/$defs/LifetimeGenericStruct_i32"
+        },
+        "LoadProjectEvent": {
+          "$ref": "#/$defs/LoadProjectEvent"
+        },
+        "MacroEnum": {
+          "$ref": "#/$defs/MacroEnum"
+        },
+        "MacroStruct": {
+          "$ref": "#/$defs/MacroStruct"
+        },
+        "MacroStruct2": {
+          "$ref": "#/$defs/MacroStruct2"
+        },
+        "MapA<u32>": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MapB<u32>": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MapC<u32>": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AGenericStruct_u32"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MyEmptyInput": {
+          "$ref": "#/$defs/MyEmptyInput"
+        },
+        "MyEnumAdjacent": {
+          "$ref": "#/$defs/MyEnumAdjacent"
+        },
+        "MyEnumExternal": {
+          "$ref": "#/$defs/MyEnumExternal"
+        },
+        "MyEnumTagged": {
+          "$ref": "#/$defs/MyEnumTagged"
+        },
+        "MyEnumUntagged": {
+          "$ref": "#/$defs/MyEnumUntagged"
+        },
+        "NamedConstGenericContainer": {
+          "$ref": "#/$defs/NamedConstGenericContainer"
+        },
+        "Ninth": {
+          "$ref": "#/$defs/Ninth"
+        },
+        "NonGeneric": {
+          "$ref": "#/$defs/Demo_u8_bool"
+        },
+        "NonOptional": {
+          "$ref": "#/$defs/NonOptional"
+        },
+        "Option<()>": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<Option<Option<i32>>>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<Option<String>>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<String>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Vec<Cow<'static, i32>>>": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Vec<i32>>": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<i32>": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "OptionalInEnum": {
+          "$ref": "#/$defs/OptionalInEnum"
+        },
+        "OptionalOnNamedField": {
+          "$ref": "#/$defs/OptionalOnNamedField"
+        },
+        "OptionalOnTransparentNamedField": {
+          "$ref": "#/$defs/OptionalOnTransparentNamedField"
+        },
+        "OverridenStruct": {
+          "$ref": "#/$defs/OverridenStruct"
+        },
+        "PathBuf": {
+          "type": "string"
+        },
+        "PhantomData<()>": {
+          "type": "null"
+        },
+        "PhantomData<String>": {
+          "type": "null"
+        },
+        "Range<i32>": {
+          "$ref": "#/$defs/Range_i32"
+        },
+        "RangeInclusive<i32>": {
+          "$ref": "#/$defs/RangeInclusive_i32"
+        },
+        "Recursive": {
+          "$ref": "#/$defs/Recursive"
+        },
+        "RecursiveInEnum": {
+          "$ref": "#/$defs/RecursiveInEnum"
+        },
+        "RecursiveMapValue": {
+          "$ref": "#/$defs/RecursiveMapValue"
+        },
+        "RecursiveTransparent": {
+          "$ref": "#/$defs/RecursiveTransparent"
+        },
+        "RefStruct": {
+          "$ref": "#/$defs/RefStruct"
+        },
+        "Regular": {
+          "$ref": "#/$defs/Regular"
+        },
+        "Rename": {
+          "$ref": "#/$defs/Rename"
+        },
+        "RenameSerdeSpecialChar": {
+          "$ref": "#/$defs/RenameSerdeSpecialChar"
+        },
+        "RenameWithWeirdCharsField": {
+          "$ref": "#/$defs/RenameWithWeirdCharsField"
+        },
+        "RenameWithWeirdCharsVariant": {
+          "$ref": "#/$defs/RenameWithWeirdCharsVariant"
+        },
+        "RenamedFieldKeys": {
+          "$ref": "#/$defs/RenamedFieldKeys"
+        },
+        "RenamedVariantWithSkippedPayload": {
+          "$ref": "#/$defs/RenamedVariantWithSkippedPayload"
+        },
+        "Result<String, i32>": {
+          "$ref": "#/$defs/Result_i32_String"
+        },
+        "Second": {
+          "$ref": "#/$defs/Second"
+        },
+        "Seventh": {
+          "$ref": "#/$defs/Seventh"
+        },
+        "SimpleStruct": {
+          "$ref": "#/$defs/SimpleStruct"
+        },
+        "SingleLineComment": {
+          "$ref": "#/$defs/SingleLineComment"
+        },
+        "Sixth": {
+          "$ref": "#/$defs/Sixth"
+        },
+        "SkipField": {
+          "$ref": "#/$defs/SkipField"
+        },
+        "SkipNamedFieldInVariant": {
+          "$ref": "#/$defs/SkipNamedFieldInVariant"
+        },
+        "SkipOnlyField": {
+          "$ref": "#/$defs/SkipOnlyField"
+        },
+        "SkipStructFields": {
+          "$ref": "#/$defs/SkipStructFields"
+        },
+        "SkipUnnamedFieldInVariant": {
+          "$ref": "#/$defs/SkipUnnamedFieldInVariant"
+        },
+        "SkipVariant": {
+          "$ref": "#/$defs/SkipVariant"
+        },
+        "SkipVariant2": {
+          "$ref": "#/$defs/SkipVariant2"
+        },
+        "SkipVariant3": {
+          "$ref": "#/$defs/SkipVariant3"
+        },
+        "SkippedFieldWithinVariant": {
+          "$ref": "#/$defs/SkippedFieldWithinVariant"
+        },
+        "SocketAddr": {
+          "type": "string"
+        },
+        "SocketAddrV4": {
+          "type": "string"
+        },
+        "SocketAddrV6": {
+          "type": "string"
+        },
+        "SpectaSkipNonTypeField": {
+          "$ref": "#/$defs/SpectaSkipNonTypeField"
+        },
+        "SpectaTypeOverride": {
+          "$ref": "#/$defs/SpectaTypeOverride"
+        },
+        "String": {
+          "type": "string"
+        },
+        "Struct": {
+          "$ref": "#/$defs/StructNew"
+        },
+        "Struct2": {
+          "$ref": "#/$defs/Struct2"
+        },
+        "StructRenameAllUppercase": {
+          "$ref": "#/$defs/StructRenameAllUppercase"
+        },
+        "TagOnStructWithInline": {
+          "$ref": "#/$defs/TagOnStructWithInline"
+        },
+        "Tenth": {
+          "$ref": "#/$defs/Tenth"
+        },
+        "TestCollectionRegister": {
+          "$ref": "#/$defs/TestCollectionRegister"
+        },
+        "TestEnum": {
+          "$ref": "#/$defs/TestEnum"
+        },
+        "Third": {
+          "$ref": "#/$defs/Third"
+        },
+        "TransparentType": {
+          "$ref": "#/$defs/TransparentType"
+        },
+        "TransparentType2": {
+          "$ref": "#/$defs/TransparentType2"
+        },
+        "TransparentTypeWithOverride": {
+          "$ref": "#/$defs/TransparentTypeWithOverride"
+        },
+        "TransparentWithSkip": {
+          "$ref": "#/$defs/TransparentWithSkip"
+        },
+        "TransparentWithSkip2": {
+          "$ref": "#/$defs/TransparentWithSkip2"
+        },
+        "TransparentWithSkip3": {
+          "$ref": "#/$defs/TransparentWithSkip3"
+        },
+        "TupleNested": {
+          "$ref": "#/$defs/TupleNested"
+        },
+        "TupleStruct": {
+          "$ref": "#/$defs/TupleStruct"
+        },
+        "TupleStruct1": {
+          "$ref": "#/$defs/TupleStruct1"
+        },
+        "TupleStruct3": {
+          "$ref": "#/$defs/TupleStruct3"
+        },
+        "TupleStructWithRep": {
+          "$ref": "#/$defs/TupleStructWithRep"
+        },
+        "Unit1": {
+          "$ref": "#/$defs/Unit1"
+        },
+        "Unit2": {
+          "$ref": "#/$defs/Unit2"
+        },
+        "Unit3": {
+          "$ref": "#/$defs/Unit3"
+        },
+        "Unit4": {
+          "$ref": "#/$defs/Unit4"
+        },
+        "Unit5": {
+          "$ref": "#/$defs/Unit5"
+        },
+        "Unit6": {
+          "$ref": "#/$defs/Unit6"
+        },
+        "Unit7": {
+          "$ref": "#/$defs/Unit7"
+        },
+        "UntaggedVariants": {
+          "$ref": "#/$defs/UntaggedVariants"
+        },
+        "UntaggedVariantsWithDuplicateBranches": {
+          "$ref": "#/$defs/UntaggedVariantsWithDuplicateBranches"
+        },
+        "UntaggedVariantsWithoutValue": {
+          "$ref": "#/$defs/UntaggedVariantsWithoutValue"
+        },
+        "ValidMaybeValidKey": {
+          "$ref": "#/$defs/ValidMaybeValidKey"
+        },
+        "ValidMaybeValidKeyNested": {
+          "$ref": "#/$defs/ValidMaybeValidKeyNested"
+        },
+        "Vec<MyEnum>": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "type": "array"
+        },
+        "Vec<Option<Cow<'static, i32>>>": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "Vec<PlaceholderInnerField>": {
+          "items": {
+            "$ref": "#/$defs/PlaceholderInnerField"
+          },
+          "type": "array"
+        },
+        "Vec<i32>": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "[MyEnum; 2]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "[Option<u8>; 3]": {
+          "items": {
+            "anyOf": [
+              {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "[Vec<String>; 3]": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "[i32; 3]": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "bool": {
+          "type": "boolean"
+        },
+        "char": {
+          "maxLength": 1,
+          "minLength": 1,
+          "type": "string"
+        },
+        "f32": {
+          "type": "number"
+        },
+        "f64": {
+          "type": "number"
+        },
+        "i16": {
+          "maximum": 32767,
+          "minimum": -32768,
+          "type": "integer"
+        },
+        "i32": {
+          "type": "integer"
+        },
+        "i8": {
+          "maximum": 127,
+          "minimum": -128,
+          "type": "integer"
+        },
+        "type_type::Type": {
+          "$ref": "#/$defs/Type"
+        },
+        "u16": {
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "u32": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "u8": {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "i8",
+        "i16",
+        "i32",
+        "u8",
+        "u16",
+        "u32",
+        "f32",
+        "f64",
+        "bool",
+        "char",
+        "Range<i32>",
+        "RangeInclusive<i32>",
+        "()",
+        "(String, i32)",
+        "(String, i32, bool)",
+        "((String, i32), (bool, char, bool), ())",
+        "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)",
+        "(Vec<i32>, Vec<bool>)",
+        "String",
+        "PathBuf",
+        "IpAddr",
+        "Ipv4Addr",
+        "Ipv6Addr",
+        "SocketAddr",
+        "SocketAddrV4",
+        "SocketAddrV6",
+        "Cow<'static, str>",
+        "Cow<'static, i32>",
+        "&'static str",
+        "&'static bool",
+        "&'static i32",
+        "Vec<i32>",
+        "&'static [i32]",
+        "&'static [i32; 3]",
+        "[i32; 3]",
+        "Vec<MyEnum>",
+        "&'static [MyEnum]",
+        "&'static [MyEnum; 6]",
+        "[MyEnum; 2]",
+        "&'static [i32; 1]",
+        "&'static [i32; 0]",
+        "Option<i32>",
+        "Option<()>",
+        "Option<Vec<i32>>",
+        "Result<String, i32>",
+        "Vec<Option<Cow<'static, i32>>>",
+        "Option<Vec<Cow<'static, i32>>>",
+        "[Vec<String>; 3]",
+        "Option<Option<String>>",
+        "Option<Option<Option<String>>>",
+        "PhantomData<()>",
+        "PhantomData<String>",
+        "Infallible",
+        "Unit1",
+        "Unit2",
+        "Unit3",
+        "Unit4",
+        "Unit5",
+        "Unit6",
+        "Unit7",
+        "SimpleStruct",
+        "TupleStruct1",
+        "TupleStruct3",
+        "TestEnum",
+        "RefStruct",
+        "InlinerStruct",
+        "GenericStruct<i32>",
+        "GenericStruct<String>",
+        "FlattenEnumStruct",
+        "OverridenStruct",
+        "HasGenericAlias",
+        "EnumMacroAttributes",
+        "InlineEnumField",
+        "InlineOptionalType",
+        "Rename",
+        "TransparentType",
+        "TransparentType2",
+        "TransparentTypeWithOverride",
+        "[Option<u8>; 3]",
+        "HashMap<BasicEnum, ()>",
+        "HashMap<BasicEnum, i32>",
+        "Option<Option<Option<Option<i32>>>>",
+        "Vec<PlaceholderInnerField>",
+        "EnumReferenceRecordKey",
+        "FlattenOnNestedEnum",
+        "MyEmptyInput",
+        "(String)",
+        "(String,)",
+        "ExtraBracketsInTupleVariant",
+        "ExtraBracketsInUnnamedStruct",
+        "Vec<MyEnum>",
+        "InlineTuple",
+        "InlineTuple2",
+        "Box<str>",
+        "Box<String>",
+        "SkippedFieldWithinVariant",
+        "KebabCase",
+        "&[&str]",
+        "Issue281<'_>",
+        "LifetimeGenericStruct<'_, i32>",
+        "LifetimeGenericEnum<'_, i32>",
+        "RenameWithWeirdCharsField",
+        "RenameWithWeirdCharsVariant",
+        "RenamedFieldKeys",
+        "RenamedVariantWithSkippedPayload",
+        "type_type::Type",
+        "ActualType",
+        "SpectaTypeOverride",
+        "ContainerTypeOverrideStruct",
+        "ContainerTypeOverrideEnum",
+        "ContainerTypeOverrideGeneric<Box<dyn Any>>",
+        "ContainerTypeOverrideToGeneric<i32>",
+        "ContainerTypeOverrideTuple",
+        "ContainerTypeOverrideTupleGeneric<i32>",
+        "InvalidToValidType",
+        "TupleStruct",
+        "TupleStructWithRep",
+        "GenericTupleStruct<String>",
+        "BracedStruct",
+        "Struct",
+        "Struct2",
+        "Enum",
+        "Enum2",
+        "Enum3",
+        "StructRenameAllUppercase",
+        "RenameSerdeSpecialChar",
+        "EnumRenameAllUppercase",
+        "Recursive",
+        "RecursiveMapValue",
+        "RecursiveTransparent",
+        "RecursiveInEnum",
+        "NonOptional",
+        "OptionalOnNamedField",
+        "OptionalOnTransparentNamedField",
+        "OptionalInEnum",
+        "UntaggedVariants",
+        "UntaggedVariantsWithoutValue",
+        "UntaggedVariantsWithDuplicateBranches",
+        "HashMap<String, ()>",
+        "Regular",
+        "HashMap<Infallible, ()>",
+        "HashMap<TransparentStruct, ()>",
+        "HashMap<UnitVariants, ()>",
+        "HashMap<UntaggedVariantsKey, ()>",
+        "ValidMaybeValidKey",
+        "ValidMaybeValidKeyNested",
+        "MacroStruct",
+        "MacroStruct2",
+        "MacroEnum",
+        "DeprecatedType",
+        "DeprecatedTypeWithMsg",
+        "DeprecatedTypeWithMsg2",
+        "DeprecatedFields",
+        "DeprecatedTupleVariant",
+        "DeprecatedEnumVariants",
+        "CommentedStruct",
+        "CommentedEnum",
+        "SingleLineComment",
+        "NonGeneric",
+        "HalfGenericA<u8>",
+        "HalfGenericB<bool>",
+        "FullGeneric<u8, bool>",
+        "Another<bool>",
+        "MapA<u32>",
+        "MapB<u32>",
+        "MapC<u32>",
+        "AGenericStruct<u32>",
+        "A",
+        "DoubleFlattened",
+        "FlattenedInner",
+        "BoxFlattened",
+        "BoxInline",
+        "First",
+        "Second",
+        "Third",
+        "Fourth",
+        "TagOnStructWithInline",
+        "Sixth",
+        "Seventh",
+        "Eight",
+        "Ninth",
+        "Tenth",
+        "MyEnumTagged",
+        "MyEnumExternal",
+        "MyEnumAdjacent",
+        "MyEnumUntagged",
+        "EmptyStruct",
+        "EmptyStructWithTag",
+        "AdjacentlyTagged",
+        "LoadProjectEvent",
+        "ExternallyTagged",
+        "Issue221External",
+        "InternallyTaggedD",
+        "InternallyTaggedE",
+        "InternallyTaggedF",
+        "InternallyTaggedH",
+        "InternallyTaggedL",
+        "InternallyTaggedM",
+        "Issue221UntaggedSafe",
+        "Issue221UntaggedMixed",
+        "EmptyEnum",
+        "EmptyEnumTagged",
+        "EmptyEnumTaggedWContent",
+        "EmptyEnumUntagged",
+        "SkipOnlyField",
+        "SkipField",
+        "SkipVariant",
+        "SkipUnnamedFieldInVariant",
+        "SkipNamedFieldInVariant",
+        "TransparentWithSkip",
+        "TransparentWithSkip2",
+        "TransparentWithSkip3",
+        "SkipVariant2",
+        "SkipVariant3",
+        "SkipStructFields",
+        "SpectaSkipNonTypeField",
+        "FlattenA",
+        "FlattenB",
+        "FlattenC",
+        "FlattenD",
+        "FlattenE",
+        "FlattenF",
+        "FlattenG",
+        "TupleNested",
+        "Generic1<()>",
+        "GenericAutoBound<()>",
+        "GenericAutoBound2<()>",
+        "Container1",
+        "Generic2<(), String, i32>",
+        "GenericNewType1<()>",
+        "GenericTuple<()>",
+        "GenericStruct2<()>",
+        "InlineGenericNewtype<String>",
+        "InlineGenericNested<String>",
+        "InlineFlattenGenericsG<()>",
+        "InlineFlattenGenerics",
+        "GenericDefault",
+        "ChainedGenericDefault",
+        "ChainedGenericDefault<String, String>",
+        "ChainedGenericDefault<i32>",
+        "ChainedGenericDefault<String, i32>",
+        "GenericDefaultSkipped",
+        "GenericDefaultSkippedNonType",
+        "GenericParameterOrderPreserved",
+        "ConstGenericInNonConstContainer",
+        "ConstGenericInConstContainer",
+        "NamedConstGenericContainer",
+        "InlineConstGenericContainer",
+        "InlineRecursiveConstGenericContainer",
+        "TestCollectionRegister",
+        "TestCollectionRegister"
+      ],
+      "title": "Primitives",
+      "type": "object"
+    },
+    "Range": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {},
+        "start": {}
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Range",
+      "type": "object"
+    },
+    "RangeInclusive": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {},
+        "start": {}
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "RangeInclusive",
+      "type": "object"
+    },
+    "RangeInclusive_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "type": "integer"
+        },
+        "start": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "RangeInclusive",
+      "type": "object"
+    },
+    "Range_i32": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "type": "integer"
+        },
+        "start": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Range",
+      "type": "object"
+    },
+    "Recursive": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "$ref": "#/$defs/Recursive"
+        }
+      },
+      "required": [
+        "demo"
+      ],
+      "title": "Recursive",
+      "type": "object"
+    },
+    "RecursiveInEnum": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "additionalProperties": false,
+          "properties": {
+            "demo": {
+              "$ref": "#/$defs/RecursiveInEnum"
+            }
+          },
+          "required": [
+            "demo"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "RecursiveInEnum",
+      "type": "object"
+    },
+    "RecursiveInline": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/RecursiveInline"
+        }
+      ],
+      "title": "RecursiveInline",
+      "unevaluatedProperties": false
+    },
+    "RecursiveMapValue": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RecursiveMapValue"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "demo"
+      ],
+      "title": "RecursiveMapValue",
+      "type": "object"
+    },
+    "RecursiveTransparent": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/RecursiveInline"
+        }
+      ],
+      "title": "RecursiveTransparent",
+      "type": "array"
+    },
+    "RefStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/TestEnum"
+        }
+      ],
+      "title": "RefStruct",
+      "type": "array"
+    },
+    "Regular": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "Regular",
+      "type": "array"
+    },
+    "Rename": {
+      "oneOf": [
+        {
+          "const": "OneWord"
+        },
+        {
+          "const": "Two words"
+        }
+      ],
+      "title": "Rename"
+    },
+    "RenameSerdeSpecialChar": {
+      "additionalProperties": false,
+      "properties": {
+        "a/b": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a/b"
+      ],
+      "title": "RenameSerdeSpecialChar",
+      "type": "object"
+    },
+    "RenameWithWeirdCharsField": {
+      "additionalProperties": false,
+      "properties": {
+        "@odata.context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "@odata.context"
+      ],
+      "title": "RenameWithWeirdCharsField",
+      "type": "object"
+    },
+    "RenameWithWeirdCharsVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "@odata.context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "@odata.context"
+      ],
+      "title": "RenameWithWeirdCharsVariant",
+      "type": "object"
+    },
+    "RenamedFieldKeys": {
+      "additionalProperties": false,
+      "properties": {
+        "": {
+          "type": "string"
+        },
+        "a\"b": {
+          "type": "string"
+        },
+        "a\\b": {
+          "type": "string"
+        },
+        "line\nbreak": {
+          "type": "string"
+        },
+        "line break": {
+          "type": "string"
+        },
+        "line break": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "",
+        "a\"b",
+        "a\\b",
+        "line\nbreak",
+        "line break",
+        "line break"
+      ],
+      "title": "RenamedFieldKeys",
+      "type": "object"
+    },
+    "RenamedVariantWithSkippedPayload": {
+      "const": "a-b",
+      "title": "RenamedVariantWithSkippedPayload"
+    },
+    "Result": {
+      "additionalProperties": false,
+      "properties": {
+        "err": {},
+        "ok": {}
+      },
+      "required": [
+        "ok",
+        "err"
+      ],
+      "title": "Result",
+      "type": "object"
+    },
+    "Result_i32_String": {
+      "additionalProperties": false,
+      "properties": {
+        "err": {
+          "type": "integer"
+        },
+        "ok": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "err"
+      ],
+      "title": "Result",
+      "type": "object"
+    },
+    "Second": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "Second",
+      "type": "object"
+    },
+    "Seventh": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/First"
+        },
+        "b": {
+          "$ref": "#/$defs/Second"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Seventh",
+      "type": "object"
+    },
+    "SimpleStruct": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "type": "string"
+        },
+        "c": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "e": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "title": "SimpleStruct",
+      "type": "object"
+    },
+    "SingleLineComment": {
+      "description": " Some single-line comment",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": " Some single-line comment",
+          "properties": {
+            "A": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": " Some single-line comment",
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "description": " Some single-line comment",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SingleLineComment"
+    },
+    "Sixth": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/First"
+        },
+        "b": {
+          "$ref": "#/$defs/First"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "title": "Sixth",
+      "type": "object"
+    },
+    "SkipField": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "SkipField",
+      "type": "object"
+    },
+    "SkipNamedFieldInVariant": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          },
+          "required": [
+            "A"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "b": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "b"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SkipNamedFieldInVariant"
+    },
+    "SkipOnlyField": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "SkipOnlyField",
+      "type": "object"
+    },
+    "SkipStructFields": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "SkipStructFields",
+      "type": "object"
+    },
+    "SkipUnnamedFieldInVariant": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "items": false,
+              "maxItems": 1,
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SkipUnnamedFieldInVariant"
+    },
+    "SkipVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "SkipVariant",
+      "type": "object"
+    },
+    "SkipVariant2": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "type": "string"
+        },
+        "tag": {
+          "const": "A"
+        }
+      },
+      "required": [
+        "tag",
+        "data"
+      ],
+      "title": "SkipVariant2",
+      "type": "object"
+    },
+    "SkipVariant3": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "SkipVariant3",
+      "type": "object"
+    },
+    "SkippedFieldWithinVariant": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "type": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SkippedFieldWithinVariant"
+    },
+    "SpectaSkipNonTypeField": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "SpectaSkipNonTypeField",
+      "type": "object"
+    },
+    "SpectaTypeOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "string_ident": {
+          "type": "string"
+        },
+        "tuple": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "u32_ident": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "string_ident",
+        "u32_ident",
+        "path",
+        "tuple"
+      ],
+      "title": "SpectaTypeOverride",
+      "type": "object"
+    },
+    "Struct2": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "Struct2",
+      "type": "object"
+    },
+    "StructNew": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        },
+        "t": {
+          "const": "StructNew"
+        }
+      },
+      "required": [
+        "t",
+        "a"
+      ],
+      "title": "StructNew",
+      "type": "object"
+    },
+    "StructPhaseSpecificRename": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StructPhaseSpecificRenameSerialize"
+        },
+        {
+          "$ref": "#/$defs/StructPhaseSpecificRenameDeserialize"
+        }
+      ],
+      "title": "StructPhaseSpecificRename"
+    },
+    "StructPhaseSpecificRenameDeserialize": {
+      "additionalProperties": false,
+      "properties": {
+        "der": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "StructPhaseSpecificRenameDeserialize"
+        }
+      },
+      "required": [
+        "kind",
+        "der"
+      ],
+      "title": "StructPhaseSpecificRenameDeserialize",
+      "type": "object"
+    },
+    "StructPhaseSpecificRenameSerialize": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "StructPhaseSpecificRenameSerialize"
+        },
+        "ser": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ser"
+      ],
+      "title": "StructPhaseSpecificRenameSerialize",
+      "type": "object"
+    },
+    "StructRenameAllUppercase": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "type": "integer"
+        },
+        "B": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "A",
+        "B"
+      ],
+      "title": "StructRenameAllUppercase",
+      "type": "object"
+    },
+    "StructWithAlias": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StructWithAlias_Serialize"
+        },
+        {
+          "$ref": "#/$defs/StructWithAlias_Deserialize"
+        }
+      ],
+      "title": "StructWithAlias"
+    },
+    "StructWithAliasAndRename": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StructWithAliasAndRename_Serialize"
+        },
+        {
+          "$ref": "#/$defs/StructWithAliasAndRename_Deserialize"
+        }
+      ],
+      "title": "StructWithAliasAndRename"
+    },
+    "StructWithAliasAndRename_Deserialize": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "renamed_field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "renamed_field"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "renamed_field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "renamed_field"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      ],
+      "title": "StructWithAliasAndRename_Deserialize",
+      "unevaluatedProperties": false
+    },
+    "StructWithAliasAndRename_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "renamed_field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "renamed_field"
+      ],
+      "title": "StructWithAliasAndRename_Serialize",
+      "type": "object"
+    },
+    "StructWithAlias_Deserialize": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "bruh": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bruh"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      ],
+      "title": "StructWithAlias_Deserialize",
+      "unevaluatedProperties": false
+    },
+    "StructWithAlias_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "StructWithAlias_Serialize",
+      "type": "object"
+    },
+    "StructWithMultipleAliases": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StructWithMultipleAliases_Serialize"
+        },
+        {
+          "$ref": "#/$defs/StructWithMultipleAliases_Deserialize"
+        }
+      ],
+      "title": "StructWithMultipleAliases"
+    },
+    "StructWithMultipleAliases_Deserialize": {
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "field"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "bruh": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bruh"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "alternative": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "alternative"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "another": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "another"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      ],
+      "title": "StructWithMultipleAliases_Deserialize",
+      "unevaluatedProperties": false
+    },
+    "StructWithMultipleAliases_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "StructWithMultipleAliases_Serialize",
+      "type": "object"
+    },
+    "TagOnStructWithInline": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/$defs/First"
+        },
+        "b": {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        "type": {
+          "const": "TagOnStructWithInline"
+        }
+      },
+      "required": [
+        "type",
+        "a",
+        "b"
+      ],
+      "title": "TagOnStructWithInline",
+      "type": "object"
+    },
+    "Tenth": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/First"
+        }
+      ],
+      "title": "Tenth"
+    },
+    "TestCollectionRegister": false,
+    "TestEnum": {
+      "oneOf": [
+        {
+          "const": "Unit"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Single": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Single"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Multiple": {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "Multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Struct": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Struct"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "TestEnum"
+    },
+    "Third": {
+      "allOf": [
+        {
+          "properties": {
+            "b": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "c": {
+              "$ref": "#/$defs/First"
+            }
+          },
+          "required": [
+            "b",
+            "c"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Third",
+      "unevaluatedProperties": false
+    },
+    "ToBeFlattened": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "ToBeFlattened",
+      "type": "object"
+    },
+    "TransparentStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TransparentStruct",
+      "type": "array"
+    },
+    "TransparentType": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/TransparentTypeInner"
+        }
+      ],
+      "title": "TransparentType",
+      "type": "array"
+    },
+    "TransparentType2": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "null"
+        }
+      ],
+      "title": "TransparentType2",
+      "type": "array"
+    },
+    "TransparentTypeInner": {
+      "additionalProperties": false,
+      "properties": {
+        "inner": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "inner"
+      ],
+      "title": "TransparentTypeInner",
+      "type": "object"
+    },
+    "TransparentTypeWithOverride": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TransparentTypeWithOverride",
+      "type": "array"
+    },
+    "TransparentWithSkip": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "null"
+        }
+      ],
+      "title": "TransparentWithSkip",
+      "type": "array"
+    },
+    "TransparentWithSkip2": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TransparentWithSkip2",
+      "type": "array"
+    },
+    "TransparentWithSkip3": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TransparentWithSkip3",
+      "type": "array"
+    },
+    "TupleNested": {
+      "items": false,
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          ],
+          "type": "array"
+        },
+        {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      ],
+      "title": "TupleNested",
+      "type": "array"
+    },
+    "TupleStruct": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TupleStruct",
+      "type": "array"
+    },
+    "TupleStruct1": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "TupleStruct1",
+      "type": "array"
+    },
+    "TupleStruct3": {
+      "items": false,
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TupleStruct3",
+      "type": "array"
+    },
+    "TupleStructWithRep": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "string"
+        }
+      ],
+      "title": "TupleStructWithRep",
+      "type": "array"
+    },
+    "Type": false,
+    "Unit1": {
+      "title": "Unit1",
+      "type": "null"
+    },
+    "Unit2": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "Unit2",
+      "type": "object"
+    },
+    "Unit3": {
+      "items": false,
+      "maxItems": 0,
+      "minItems": 0,
+      "prefixItems": [],
+      "title": "Unit3",
+      "type": "array"
+    },
+    "Unit4": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Unit4",
+      "type": "array"
+    },
+    "Unit5": {
+      "const": "A",
+      "title": "Unit5"
+    },
+    "Unit6": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "Unit6",
+      "type": "object"
+    },
+    "Unit7": {
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "A"
+      ],
+      "title": "Unit7",
+      "type": "object"
+    },
+    "UnitVariants": {
+      "oneOf": [
+        {
+          "const": "A"
+        },
+        {
+          "const": "B"
+        },
+        {
+          "const": "C"
+        }
+      ],
+      "title": "UnitVariants"
+    },
+    "UntaggedVariants": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        }
+      ],
+      "title": "UntaggedVariants"
+    },
+    "UntaggedVariantsKey": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "UntaggedVariantsKey"
+    },
+    "UntaggedVariantsWithDuplicateBranches": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "UntaggedVariantsWithDuplicateBranches"
+    },
+    "UntaggedVariantsWithoutValue": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "UntaggedVariantsWithoutValue"
+    },
+    "UntaggedWithAlias": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/UntaggedWithAlias_Serialize"
+        },
+        {
+          "$ref": "#/$defs/UntaggedWithAlias_Deserialize"
+        }
+      ],
+      "title": "UntaggedWithAlias"
+    },
+    "UntaggedWithAlias_Deserialize": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "field": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "field"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bruh": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "bruh"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "other": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "other"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "UntaggedWithAlias_Deserialize"
+    },
+    "UntaggedWithAlias_Serialize": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "other": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "other"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "UntaggedWithAlias_Serialize"
+    },
+    "ValidMaybeValidKey": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/MaybeValidKey_String"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "ValidMaybeValidKey",
+      "type": "array"
+    },
+    "ValidMaybeValidKeyNested": {
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/MaybeValidKey_MaybeValidKey_String"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "ValidMaybeValidKeyNested",
+      "type": "array"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

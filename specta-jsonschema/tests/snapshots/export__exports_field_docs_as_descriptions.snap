@@ -1,0 +1,24 @@
+---
+source: specta-jsonschema/tests/export.rs
+assertion_line: 149
+expression: schema
+---
+{
+  "$defs": {
+    "DocumentedFields": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": " GitHub issue #491 regression: field docs should become JSON Schema descriptions.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DocumentedFields",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

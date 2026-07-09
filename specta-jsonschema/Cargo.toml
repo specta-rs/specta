@@ -24,7 +24,6 @@ default = []
 
 [dependencies]
 specta = { version = "=2.0.0-rc.25", path = "../specta" }
-schemars = { version = "1.2", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -34,3 +33,4 @@ specta = { version = "=2.0.0-rc.25", path = "../specta", features = ["derive", "
 specta-serde = { path = "../specta-serde" }
 specta-util = { path = "../specta-util", features = ["serde"] }
 insta = { version = "1", features = ["json"] }
+jsonschema = { version = "0.46.4", default-features = false }

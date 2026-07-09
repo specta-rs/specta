@@ -1,0 +1,64 @@
+---
+source: specta-jsonschema/tests/export.rs
+expression: schema
+---
+{
+  "$defs": {
+    "FlattenA": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "a"
+      ],
+      "title": "FlattenA",
+      "type": "object"
+    },
+    "FlattenB": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "FlattenB",
+      "type": "object"
+    },
+    "Flattened": {
+      "allOf": [
+        {
+          "properties": {
+            "a": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "b": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "b"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Flattened",
+      "unevaluatedProperties": false
+    }
+  },
+  "$ref": "#/$defs/Flattened",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
