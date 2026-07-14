@@ -147,9 +147,11 @@ pub enum Phase {
 /// container, variant, and field behavior that affects the exported shape, such
 /// as renames, tagging, defaults, flattening, and compatible conversion attrs.
 ///
-/// If serde metadata produces different serialize and deserialize shapes, this
-/// formatter returns an error instead of guessing. In that case, use
-/// [`PhasesFormat`].
+/// When a single safe type can contain both directions, this formatter widens
+/// the shared shape. For example, conditional serialization makes a field
+/// optional, aliases add accepted names, and `#[serde(other)]` widens its tag.
+/// Use [`PhasesFormat`] when consumers need exact directional shapes or when
+/// the two directions cannot be safely unified.
 pub struct Format;
 
 impl specta::Format for Format {
@@ -1192,7 +1194,7 @@ fn lower_field_aliases_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
 ) -> Result<Option<DataType>, Error> {
-    if mode != PhaseRewrite::Deserialize {
+    if !matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize) {
         return Ok(None);
     }
 
@@ -1387,10 +1389,11 @@ fn rewrite_field_for_phase(
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)?
         && attrs.skip_serializing_if.is_some()
     {
-        if let PhaseRewrite::Serialize = mode {
+        if matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize) {
             field.optional = true;
 
-            if attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
+            if mode == PhaseRewrite::Serialize
+                && attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
                 && let Some(DataType::Nullable(inner)) = field.ty.take()
             {
                 field.ty = Some(*inner);
@@ -1742,13 +1745,13 @@ fn rewrite_enum_repr_for_phase(
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
         let aliases = variant_attrs
             .as_ref()
-            .filter(|_| mode == PhaseRewrite::Deserialize)
+            .filter(|_| matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize))
             .map(|attrs| attrs.aliases.as_slice())
             .unwrap_or(&[]);
         let names = std::iter::once(serialized_name).chain(aliases.iter().cloned());
 
         for serialized_name in names {
-            let widen_tag = mode == PhaseRewrite::Deserialize
+            let widen_tag = matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize)
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {

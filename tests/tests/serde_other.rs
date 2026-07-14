@@ -34,18 +34,18 @@ enum ExternalOther {
 }
 
 #[test]
-fn serde_other_requires_phases_format() {
-    let err = Typescript::default()
+fn serde_other_unified_format_widens_deserialize_tag() {
+    let ts = Typescript::default()
         .export(
-            &Types::default().register::<InternalOther>(),
+            &Types::default()
+                .register::<InternalOther>()
+                .register::<AdjacentOther>()
+                .register::<ExternalOther>(),
             specta_serde::Format,
         )
-        .expect_err("#[serde(other)] should require PhasesFormat");
+        .expect("unified typescript export should succeed");
 
-    assert!(
-        err.to_string()
-            .contains("`#[serde(other)]` requires `PhasesFormat`")
-    );
+    insta::assert_snapshot!("serde-other-unified-internal-tag-typescript", ts);
 }
 
 #[test]
