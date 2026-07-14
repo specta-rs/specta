@@ -6,11 +6,14 @@ expression: rendered
 export type FieldAlias = FieldAlias_Serialize | FieldAlias_Deserialize;
 
 export type FieldAlias_Deserialize = {
+	required: boolean,
+} & ({
 	value: string,
 } | {
 	old_value: string,
-};
+});
 
 export type FieldAlias_Serialize = {
+	required: boolean,
 	value: string,
 };

@@ -1059,7 +1059,16 @@ fn render_datatype(
                 if idx != 0 {
                     s.push_str(" & ");
                 }
+
+                let needs_parentheses = matches!(ty, DataType::Nullable(_))
+                    || matches!(ty, DataType::Enum(enm) if enm.variants.len() > 1);
+                if needs_parentheses {
+                    s.push('(');
+                }
                 render_datatype(s, ctx, ty, location.clone(), mode)?;
+                if needs_parentheses {
+                    s.push(')');
+                }
             }
         }
         (RenderMode::ShallowInline, DataType::Intersection(parts)) => intersection_dt(

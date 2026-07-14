@@ -100,6 +100,7 @@ enum TupleVariantSkipSerializingIfOnly {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FieldAlias {
+    required: bool,
     #[serde(alias = "old_value")]
     value: String,
 }
