@@ -1075,31 +1075,6 @@ fn lower_field_aliases_for_phase(
         return Ok(None);
     }
 
-    if mode == PhaseRewrite::Unified {
-        let mut widened = Vec::new();
-        for (name, mut field) in std::mem::take(&mut named.fields) {
-            let aliases = SerdeFieldAttrs::from_attributes(&field.attributes)?
-                .map(|attrs| attrs.aliases)
-                .unwrap_or_default();
-            field.attributes.remove(parser::FIELD_ALIASES);
-
-            if aliases.is_empty() {
-                widened.push((name, field));
-                continue;
-            }
-
-            field.optional = true;
-            widened.push((name, field.clone()));
-            widened.extend(
-                aliases
-                    .into_iter()
-                    .map(|alias| (Cow::Owned(alias), field.clone())),
-            );
-        }
-        named.fields = widened;
-        return Ok(None);
-    }
-
     let mut base = Struct::named();
     let mut parts = Vec::new();
 

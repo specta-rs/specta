@@ -114,6 +114,19 @@ struct FieldMultipleAliases {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct ManyFieldAliases {
+    #[serde(alias = "old_first")]
+    first: String,
+    #[serde(alias = "old_second")]
+    second: String,
+    #[serde(alias = "old_third")]
+    third: String,
+    #[serde(alias = "old_fourth")]
+    fourth: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum VariantAlias {
     #[serde(alias = "OldValue")]
     Value,
@@ -476,6 +489,22 @@ fn format_unifies_aliases() {
 
     insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
     insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
+}
+
+#[test]
+fn format_unifies_many_field_aliases_without_exponential_intersections() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ManyFieldAliases>(),
+            specta_serde::Format,
+        )
+        .expect("Format should flatten unified field aliases");
+
+    assert!(!rendered.contains(" & "));
+    insta::assert_snapshot!(
+        "serde-conversions-format-unified-many-field-aliases",
+        rendered
+    );
 }
 
 #[test]
