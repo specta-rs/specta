@@ -1041,11 +1041,62 @@ fn lower_field_aliases_for_phase(
         return Ok(None);
     };
 
+    if mode == PhaseRewrite::Unified {
+        let mut aliases = Vec::new();
+
+        for (_, field) in &mut named.fields {
+            let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+                continue;
+            };
+
+            if attrs.aliases.is_empty() {
+                continue;
+            }
+
+            field.attributes.remove(parser::FIELD_ALIASES);
+            field.optional = true;
+
+            for alias in attrs.aliases {
+                let mut alias_field = field.clone();
+                alias_field.optional = true;
+                aliases.push((Cow::Owned(alias), alias_field));
+            }
+        }
+
+        named.fields.extend(aliases);
+        return Ok(None);
+    }
+
     if !named
         .fields
         .iter()
         .any(|(_, field)| field_has_aliases(field))
     {
+        return Ok(None);
+    }
+
+    if mode == PhaseRewrite::Unified {
+        let mut widened = Vec::new();
+        for (name, mut field) in std::mem::take(&mut named.fields) {
+            let aliases = SerdeFieldAttrs::from_attributes(&field.attributes)?
+                .map(|attrs| attrs.aliases)
+                .unwrap_or_default();
+            field.attributes.remove(parser::FIELD_ALIASES);
+
+            if aliases.is_empty() {
+                widened.push((name, field));
+                continue;
+            }
+
+            field.optional = true;
+            widened.push((name, field.clone()));
+            widened.extend(
+                aliases
+                    .into_iter()
+                    .map(|alias| (Cow::Owned(alias), field.clone())),
+            );
+        }
+        named.fields = widened;
         return Ok(None);
     }
 
