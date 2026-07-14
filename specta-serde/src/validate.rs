@@ -205,7 +205,7 @@ fn inner(
                 ));
             }
             validate_identifier_enum(enm, &path, mode)?;
-            validate_enum(enm, types, path.clone(), mode)?;
+            validate_enum(enm, types, path.clone())?;
 
             for (variant_name, variant) in &enm.variants {
                 validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
@@ -473,12 +473,6 @@ fn validate_variant_attributes(
 
     let has_type_override = has_type_override(&variant.attributes);
 
-    if mode == ApplyMode::Unified && !serde_attrs.aliases.is_empty() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(alias = ...)]` requires `PhasesFormat` because aliases widen deserialize-only input shape",
-        ));
-    }
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
@@ -524,13 +518,6 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
 
     let has_type_override = has_type_override(&field.attributes);
 
-    if mode == ApplyMode::Unified && !serde_attrs.aliases.is_empty() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(alias = ...)]` requires `PhasesFormat` because aliases widen deserialize-only input shape",
-        ));
-    }
-
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
@@ -539,13 +526,6 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     }
     if serde_attrs.has_with {
         ensure_codec_override(has_type_override, &path, "with")?;
-    }
-
-    if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`skip_serializing_if` requires `PhasesFormat` because unified mode cannot represent conditional omission",
-        ));
     }
 
     Ok(())
@@ -573,7 +553,7 @@ fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
         .unwrap_or(false)
 }
 
-fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<(), Error> {
+fn validate_enum(enm: &Enum, types: &Types, path: String) -> Result<(), Error> {
     let valid_variants = enm
         .variants
         .iter()
@@ -589,7 +569,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
     let repr = EnumRepr::from_attrs(&enm.attributes)?;
 
     validate_untagged_variants(enm, &path)?;
-    validate_other_variant(enm, &path, &repr, mode)?;
+    validate_other_variant(enm, &path, &repr)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(enm, types, path)?;
@@ -623,12 +603,7 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_other_variant(
-    enm: &Enum,
-    path: &str,
-    repr: &EnumRepr,
-    mode: ApplyMode,
-) -> Result<(), Error> {
+fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr) -> Result<(), Error> {
     let mut other_variants = Vec::new();
     for (name, variant) in &enm.variants {
         if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.other)
@@ -639,13 +614,6 @@ fn validate_other_variant(
 
     if other_variants.is_empty() {
         return Ok(());
-    }
-
-    if mode == ApplyMode::Unified {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(other)]` requires `PhasesFormat` because it widens deserialize-only input shape",
-        ));
     }
 
     if !matches!(

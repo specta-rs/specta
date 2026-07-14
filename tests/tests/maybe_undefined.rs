@@ -97,8 +97,8 @@ fn maybe_undefined_phases() {
 #[test]
 fn maybe_undefined_single_phase() {
     let types = Types::default().register::<UpdateUser>();
-    match Typescript::default().export(&types, specta_serde::Format) {
-        Ok(ts) => insta::assert_snapshot!("maybe-undefined-single-phase", ts),
-        Err(err) => insta::assert_snapshot!("maybe-undefined-single-phase-error", err.to_string()),
-    }
+    let ts = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect("unified typescript export should widen conditional omission");
+    insta::assert_snapshot!("maybe-undefined-single-phase", ts);
 }

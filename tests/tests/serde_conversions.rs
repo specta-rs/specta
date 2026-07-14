@@ -402,21 +402,17 @@ fn phases_format_exports_field_only_phased_override() {
 }
 
 #[test]
-fn skip_serializing_if_requires_phases() {
-    let err = Typescript::default()
+fn format_unifies_skip_serializing_if() {
+    let rendered = Typescript::default()
         .export(
-            &Types::default().register::<SkipSerializingIfOnly>(),
+            &Types::default()
+                .register::<SkipSerializingIfOnly>()
+                .register::<DefaultedSkipSerializingIfOnly>(),
             specta_serde::Format,
         )
-        .expect_err("skip_serializing_if should require PhasesFormat");
-    assert!(err.to_string().contains("skip_serializing_if"));
+        .expect("Format should safely unify conditional omission");
 
-    Typescript::default()
-        .export(
-            &Types::default().register::<SkipSerializingIfOnly>(),
-            specta_serde::PhasesFormat,
-        )
-        .expect("PhasesFormat should accept skip_serializing_if");
+    insta::assert_snapshot!("serde-conversions-format-unified-option-is-none", rendered);
 }
 
 #[test]
@@ -437,14 +433,18 @@ fn option_is_none_omits_null_in_serialize_phase() {
 }
 
 #[test]
-fn tuple_variant_skip_serializing_if_requires_phases_and_splits_owner() {
-    let err = Typescript::default()
+fn tuple_variant_skip_serializing_if_unifies_and_splits_owner() {
+    let unified = Typescript::default()
         .export(
             &Types::default().register::<TupleVariantSkipSerializingIfOnly>(),
             specta_serde::Format,
         )
-        .expect_err("tuple variant field skip_serializing_if should require PhasesFormat");
-    assert!(err.to_string().contains("skip_serializing_if"));
+        .expect("Format should safely unify tuple-field conditional omission");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-unified-tuple-option-is-none",
+        unified
+    );
 
     let rendered = Typescript::default()
         .export(
@@ -458,22 +458,23 @@ fn tuple_variant_skip_serializing_if_requires_phases_and_splits_owner() {
 }
 
 #[test]
-fn aliases_require_phases_format() {
-    let err = Typescript::default()
+fn format_unifies_aliases() {
+    let field = Typescript::default()
         .export(
             &Types::default().register::<FieldAlias>(),
             specta_serde::Format,
         )
-        .expect_err("field aliases should require PhasesFormat");
-    assert!(err.to_string().contains("alias"));
+        .expect("Format should include canonical and aliased field names");
 
-    let err = Typescript::default()
+    let variant = Typescript::default()
         .export(
             &Types::default().register::<VariantAlias>(),
             specta_serde::Format,
         )
-        .expect_err("variant aliases should require PhasesFormat");
-    assert!(err.to_string().contains("alias"));
+        .expect("Format should include canonical and aliased variant names");
+
+    insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
+    insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
 }
 
 #[test]
