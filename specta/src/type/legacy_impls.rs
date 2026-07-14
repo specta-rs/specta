@@ -87,7 +87,7 @@ const _: () = {
 
     impl_ndt!(
         serde_json::Map<K, V> as PrimitiveMap<K, V> = passthrough;
-        serde_json::Value as SerdeValue = inline;
+        serde_json::Value as SerdeValue = named;
         serde_json::Number as SerdeNumber = inline;
     );
 

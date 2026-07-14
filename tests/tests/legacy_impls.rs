@@ -1,7 +1,8 @@
 #![allow(deprecated)]
 
-use specta::{Type, Types};
+use specta::{Type, Types, datatype::Primitive};
 use specta_typescript::Typescript;
+use specta_util::Remapper;
 
 #[derive(Debug)]
 struct ErrorStackRootError;
@@ -117,6 +118,31 @@ fn legacy_impls() {
                 specta_serde::Format
             )
             .unwrap()
+    );
+}
+
+// https://github.com/specta-rs/specta/issues/498
+#[test]
+fn serde_json_value_does_not_recurse_when_exported() {
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type", content = "data")]
+    enum CoapBody {
+        Json(serde_json::Value),
+        Bytes(Vec<u8>),
+        Empty,
+    }
+
+    let types = Remapper::new()
+        .rule(Primitive::i64.into(), Primitive::f64.into())
+        .rule(Primitive::u64.into(), Primitive::f64.into())
+        .remap_types(Types::default().register::<CoapBody>());
+
+    insta::assert_snapshot!(
+        "serde_json_value_does_not_recurse_when_exported",
+        Typescript::default()
+            .export(&types, specta_serde::Format)
+            .expect("serde_json::Value should export without inline recursion")
     );
 }
 
