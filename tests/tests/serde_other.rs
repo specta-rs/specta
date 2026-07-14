@@ -34,7 +34,7 @@ enum ExternalOther {
 }
 
 #[test]
-fn serde_other_unified_format_widens_deserialize_tag() {
+fn serde_other_unified_format_uses_canonical_serialized_tag() {
     let ts = Typescript::default()
         .export(
             &Types::default()
@@ -43,7 +43,7 @@ fn serde_other_unified_format_widens_deserialize_tag() {
                 .register::<ExternalOther>(),
             specta_serde::Format,
         )
-        .expect("unified typescript export should succeed");
+        .expect("unified export should use the canonical serialized tag");
 
     insta::assert_snapshot!("serde-other-unified-internal-tag-typescript", ts);
 }

@@ -147,11 +147,11 @@ pub enum Phase {
 /// container, variant, and field behavior that affects the exported shape, such
 /// as renames, tagging, defaults, flattening, and compatible conversion attrs.
 ///
-/// When a single safe type can contain both directions, this formatter widens
-/// the shared shape. For example, conditional serialization makes a field
-/// optional, aliases add accepted names, and `#[serde(other)]` widens its tag.
-/// Use [`PhasesFormat`] when consumers need exact directional shapes or when
-/// the two directions cannot be safely unified.
+/// This formatter emits the canonical serialized shape while accepting
+/// deserialize-only compatibility metadata such as aliases and
+/// `#[serde(other)]`. Conditional serialization makes fields optional, and
+/// `Option::is_none` fields remain non-null because serialization omits `None`.
+/// Use [`PhasesFormat`] when consumers need exact directional input shapes.
 pub struct Format;
 
 impl specta::Format for Format {
@@ -1033,39 +1033,13 @@ fn lower_field_aliases_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
 ) -> Result<Option<DataType>, Error> {
-    if !matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize) {
+    if mode != PhaseRewrite::Deserialize {
         return Ok(None);
     }
 
     let Fields::Named(named) = fields else {
         return Ok(None);
     };
-
-    if mode == PhaseRewrite::Unified {
-        let mut aliases = Vec::new();
-
-        for (_, field) in &mut named.fields {
-            let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
-                continue;
-            };
-
-            if attrs.aliases.is_empty() {
-                continue;
-            }
-
-            field.attributes.remove(parser::FIELD_ALIASES);
-            field.optional = true;
-
-            for alias in attrs.aliases {
-                let mut alias_field = field.clone();
-                alias_field.optional = true;
-                aliases.push((Cow::Owned(alias), alias_field));
-            }
-        }
-
-        named.fields.extend(aliases);
-        return Ok(None);
-    }
 
     if !named
         .fields
@@ -1228,8 +1202,7 @@ fn rewrite_field_for_phase(
         if matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize) {
             field.optional = true;
 
-            if mode == PhaseRewrite::Serialize
-                && attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
+            if attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
                 && let Some(DataType::Nullable(inner)) = field.ty.take()
             {
                 field.ty = Some(*inner);
@@ -1401,13 +1374,13 @@ fn rewrite_enum_repr_for_phase(
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
         let aliases = variant_attrs
             .as_ref()
-            .filter(|_| matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize))
+            .filter(|_| mode == PhaseRewrite::Deserialize)
             .map(|attrs| attrs.aliases.as_slice())
             .unwrap_or(&[]);
         let names = std::iter::once(serialized_name).chain(aliases.iter().cloned());
 
         for serialized_name in names {
-            let widen_tag = matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize)
+            let widen_tag = mode == PhaseRewrite::Deserialize
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {
