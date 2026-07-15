@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenTree};
 use quote::ToTokens;
 use syn::{
     Expr, Ident, Lit, Meta, Path, Result, Token, Type, TypePath,
@@ -228,8 +228,13 @@ impl Parse for NestedAttributeList {
                 let fork = input.fork();
                 let _ = fork.call(Ident::parse_any)?;
 
-                if fork.peek(Token![::]) {
-                    let _ignored: syn::Expr = input.parse()?;
+                if fork.peek(Token![::])
+                    || !(fork.is_empty()
+                        || fork.peek(Paren)
+                        || fork.peek(Token![=])
+                        || fork.peek(Token![,]))
+                {
+                    skip_unstructured_argument(input)?;
                 } else {
                     let key = input.call(Ident::parse_any)?;
                     let key_span = key.span();
@@ -255,7 +260,7 @@ impl Parse for NestedAttributeList {
                     });
                 }
             } else {
-                let _ignored: syn::Expr = input.parse()?;
+                skip_unstructured_argument(input)?;
             }
 
             if input.peek(Token![,]) {
@@ -264,6 +269,13 @@ impl Parse for NestedAttributeList {
         }
         Ok(NestedAttributeList { attrs })
     }
+}
+
+fn skip_unstructured_argument(input: ParseStream) -> Result<()> {
+    while !input.is_empty() && !input.peek(Token![,]) {
+        let _ = input.parse::<TokenTree>()?;
+    }
+    Ok(())
 }
 
 /// pass all of the attributes into a single structure.
@@ -345,4 +357,50 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
 #[cfg(feature = "DO_NOT_USE_function")]
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
     quote::format_ident!("__specta__fn__{}", function)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignores_method_calls_in_unrelated_attributes() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[error("Circular dependency detected: {}", chain.join(" -> "))]
+                enum InheritanceError { CircularDependency { chain: Vec<String> } }
+            "#,
+        )
+        .expect("test input should parse");
+
+        let attrs = parse_attrs(&input.attrs).expect("unrelated attribute should remain parseable");
+        let argument_count = match attrs[0].value.as_ref() {
+            Some(AttributeValue::Attribute { attr, .. }) => attr.len(),
+            _ => usize::MAX,
+        };
+        assert_eq!(argument_count, 0);
+    }
+
+    #[test]
+    fn parses_structured_metadata_alongside_unstructured_arguments() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[error("Circular dependency detected: {}", chain.join(" -> "))]
+                #[serde(rename_all = "camelCase", untagged)]
+                enum InheritanceError { CircularDependency { chain: Vec<String> } }
+            "#,
+        )
+        .expect("test input should parse");
+
+        let mut attrs = parse_attrs(&input.attrs).expect("attributes should parse");
+        assert!(attrs.extract("serde", "untagged").is_some());
+        assert_eq!(
+            attrs
+                .extract("serde", "rename_all")
+                .expect("rename_all should be captured")
+                .parse_string()
+                .expect("rename_all should be a string"),
+            "camelCase"
+        );
+    }
 }
