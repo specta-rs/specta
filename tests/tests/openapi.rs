@@ -108,6 +108,12 @@ struct WideIntegers {
     unsigned: u64,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct StrictOptionalReference {
+    value: Option<StrictUnit>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenA {
@@ -399,6 +405,42 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert_eq!(flattened["additionalProperties"], false);
     assert!(flattened["properties"].get("a").is_some());
     assert!(flattened["properties"].get("b").is_some());
+
+    // `Option<T>` over a named type is the most common shape strict mode rejects: OpenAPI 3.0
+    // cannot mark a `$ref` nullable.
+    let reference_error = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictOptionalReference>(),
+            specta_serde::Format,
+        )
+        .expect_err("OpenAPI 3.0 cannot represent a nullable reference exactly");
+    assert!(
+        reference_error
+            .to_string()
+            .contains("nullable references or composed schemas")
+    );
+    let compatible_reference = OpenApi::default()
+        .schema_mode(SchemaMode::Compatible)
+        .export_document(
+            &Types::default().register::<StrictOptionalReference>(),
+            specta_serde::Format,
+        )
+        .expect("compatible mode should approximate a nullable reference");
+    let compatible_reference = serde_json::to_value(compatible_reference).unwrap();
+    assert!(
+        compatible_reference["components"]["schemas"]["StrictOptionalReference"]["properties"]
+            ["value"]
+            .get("x-specta-nullable")
+            .is_some()
+    );
+
+    // Strict is the default, so every rejection names the way out.
+    for error in [&error, &map_error, &null_error, &reference_error] {
+        assert!(
+            error.to_string().contains("SchemaMode::Compatible"),
+            "strict-mode error should point at the escape hatch: {error}"
+        );
+    }
 }
 
 #[test]
