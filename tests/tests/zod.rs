@@ -247,7 +247,12 @@ fn zod_define_map_key_uses_a_valid_typescript_property_key() {
     #[specta(collect = false)]
     struct DefinedMapKey {
         values: HashMap<i64, String>,
+        named: HashMap<DefinedKey, String>,
     }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DefinedKey(i64);
 
     let types = Remapper::new()
         .rule(Primitive::i64.into(), define("z.string()").into())
@@ -259,6 +264,8 @@ fn zod_define_map_key_uses_a_valid_typescript_property_key() {
         "unexpected export: {out}"
     );
     assert!(out.contains("values: z.record(z.string(), z.string())"));
+    assert!(out.contains("named: Partial<{ [key in string]: string }>"));
+    assert!(out.contains("named: z.record(z.string(), z.string())"));
     assert!(!out.contains("[key in unknown]"));
 }
 

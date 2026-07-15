@@ -109,11 +109,11 @@ fn export_single_internal(
         let mut alias_ndt = ndt.clone();
         alias_ndt.generics.to_mut().iter_mut().for_each(|generic| {
             if let Some(default) = &mut generic.default {
-                typescript_alias_datatype(default, false);
+                typescript_alias_datatype(default, false, types);
             }
         });
         if let Some(ty) = &mut alias_ndt.ty {
-            typescript_alias_datatype(ty, false);
+            typescript_alias_datatype(ty, false, types);
         }
         let mut type_alias = specta_typescript::primitives::export(
             &typescript,
@@ -305,32 +305,36 @@ fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
     }
 }
 
-fn typescript_alias_datatype(dt: &mut DataType, map_key: bool) {
+fn typescript_alias_datatype(dt: &mut DataType, map_key: bool, types: &Types) {
     match dt {
         DataType::Primitive(_) | DataType::Generic(_) => {}
-        DataType::List(list) => typescript_alias_datatype(&mut list.ty, map_key),
+        DataType::List(list) => typescript_alias_datatype(&mut list.ty, map_key, types),
         DataType::Map(map) => {
-            typescript_alias_datatype(map.key_ty_mut(), true);
-            typescript_alias_datatype(map.value_ty_mut(), false);
+            if contains_zod_define(map.key_ty(), types, &[], &mut Vec::new()) {
+                *map.key_ty_mut() = DataType::Reference(specta_typescript::define("string"));
+            } else {
+                typescript_alias_datatype(map.key_ty_mut(), true, types);
+            }
+            typescript_alias_datatype(map.value_ty_mut(), false, types);
         }
-        DataType::Nullable(inner) => typescript_alias_datatype(inner, map_key),
-        DataType::Struct(strct) => typescript_alias_fields(&mut strct.fields),
+        DataType::Nullable(inner) => typescript_alias_datatype(inner, map_key, types),
+        DataType::Struct(strct) => typescript_alias_fields(&mut strct.fields, types),
         DataType::Enum(enm) => enm
             .variants
             .iter_mut()
-            .for_each(|(_, variant)| typescript_alias_fields(&mut variant.fields)),
+            .for_each(|(_, variant)| typescript_alias_fields(&mut variant.fields, types)),
         DataType::Tuple(tuple) => tuple
             .elements
             .iter_mut()
-            .for_each(|dt| typescript_alias_datatype(dt, map_key)),
-        DataType::Intersection(types) => types
+            .for_each(|dt| typescript_alias_datatype(dt, map_key, types)),
+        DataType::Intersection(types_) => types_
             .iter_mut()
-            .for_each(|dt| typescript_alias_datatype(dt, map_key)),
+            .for_each(|dt| typescript_alias_datatype(dt, map_key, types)),
         DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt, map_key),
+            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt, map_key, types),
             NamedReferenceType::Reference { generics, .. } => generics
                 .iter_mut()
-                .for_each(|(_, dt)| typescript_alias_datatype(dt, map_key)),
+                .for_each(|(_, dt)| typescript_alias_datatype(dt, map_key, types)),
             NamedReferenceType::Recursive(_) => {}
         },
         DataType::Reference(Reference::Opaque(reference)) => {
@@ -355,19 +359,103 @@ fn typescript_alias_datatype(dt: &mut DataType, map_key: bool) {
     }
 }
 
-fn typescript_alias_fields(fields: &mut Fields) {
+fn typescript_alias_fields(fields: &mut Fields, types: &Types) {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(fields) => fields
             .fields
             .iter_mut()
             .filter_map(|field| field.ty.as_mut())
-            .for_each(|dt| typescript_alias_datatype(dt, false)),
+            .for_each(|dt| typescript_alias_datatype(dt, false, types)),
         Fields::Named(fields) => fields
             .fields
             .iter_mut()
             .filter_map(|(_, field)| field.ty.as_mut())
-            .for_each(|dt| typescript_alias_datatype(dt, false)),
+            .for_each(|dt| typescript_alias_datatype(dt, false, types)),
+    }
+}
+
+fn contains_zod_define(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    stack: &mut Vec<NamedReference>,
+) -> bool {
+    match dt {
+        DataType::Primitive(_) => false,
+        DataType::Generic(generic) => generics
+            .iter()
+            .find(|(candidate, _)| candidate == generic)
+            .is_some_and(|(_, dt)| {
+                !matches!(dt, DataType::Generic(candidate) if candidate == generic)
+                    && contains_zod_define(dt, types, generics, stack)
+            }),
+        DataType::List(list) => contains_zod_define(&list.ty, types, generics, stack),
+        DataType::Map(map) => {
+            contains_zod_define(map.key_ty(), types, generics, stack)
+                || contains_zod_define(map.value_ty(), types, generics, stack)
+        }
+        DataType::Nullable(inner) => contains_zod_define(inner, types, generics, stack),
+        DataType::Struct(strct) => fields_contain_zod_define(&strct.fields, types, generics, stack),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain_zod_define(&variant.fields, types, generics, stack)),
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter()
+            .any(|dt| contains_zod_define(dt, types, generics, stack)),
+        DataType::Intersection(types_) => types_
+            .iter()
+            .any(|dt| contains_zod_define(dt, types, generics, stack)),
+        DataType::Reference(Reference::Opaque(reference)) => {
+            reference.downcast_ref::<opaque::Define>().is_some()
+        }
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => {
+                contains_zod_define(dt, types, generics, stack)
+            }
+            NamedReferenceType::Reference { .. } => {
+                if stack.contains(reference) {
+                    return false;
+                }
+                let Some(ty) = types.get(reference).and_then(|ndt| ndt.ty.as_ref()) else {
+                    return false;
+                };
+                let Ok(reference_generics) = resolved_reference_generics(reference, generics)
+                else {
+                    return false;
+                };
+                stack.push(reference.clone());
+                let contains = contains_zod_define(ty, types, &reference_generics, stack);
+                stack.pop();
+                contains
+            }
+            NamedReferenceType::Recursive(_) => false,
+        },
+    }
+}
+
+fn fields_contain_zod_define(
+    fields: &Fields,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    stack: &mut Vec<NamedReference>,
+) -> bool {
+    match fields {
+        Fields::Unit => false,
+        Fields::Unnamed(fields) => fields.fields.iter().any(|field| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|dt| contains_zod_define(dt, types, generics, stack))
+        }),
+        Fields::Named(fields) => fields.fields.iter().any(|(_, field)| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|dt| contains_zod_define(dt, types, generics, stack))
+        }),
     }
 }
 

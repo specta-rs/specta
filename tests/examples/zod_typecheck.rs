@@ -49,7 +49,11 @@ struct WireTypes {
 #[derive(Type, Serialize, Deserialize)]
 struct DefinedMapKey {
     value: HashMap<i64, String>,
+    named: HashMap<DefinedKey, String>,
 }
+
+#[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+struct DefinedKey(i64);
 
 #[derive(Type)]
 #[allow(dead_code)]
