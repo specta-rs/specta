@@ -1579,22 +1579,23 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
     })
 }
 
-/// Marker recording that a skipped field's *declared Rust type* was
-/// `Option<T>`. serde's `missing_field` helper special-cases `Option` on
-/// deserialize (a missing key yields `None`), which changes what an
-/// adjacently tagged collapsed newtype variant requires for its `content`
-/// key.
+/// Marker recording that a field's *declared Rust type* was `Option<T>`.
+/// serde's `missing_field` helper special-cases `Option` on deserialize (a
+/// missing key yields `None`), which changes what an adjacently tagged
+/// newtype variant requires for its `content` key -- both when the sole
+/// field is skipped (collapse handling) and when it is live (a missing
+/// `content` deserializes as `None` even without any skip attrs).
 ///
-/// Written exclusively by the `Type` derive from the real field syntax, for
-/// every skip spelling. It is deliberately NOT inferred from the exported
-/// datatype here: a `#[specta(type = Option<...>)]` override produces a
+/// Written exclusively by the `Type` derive from the real field syntax. It
+/// is deliberately NOT inferred from the exported datatype here: a
+/// `#[specta(type = Option<...>)]` override produces a
 /// [`DataType::Nullable`] that serde knows nothing about (and vice versa),
 /// so the exported shape is not evidence of serde's `Option` behavior.
 /// Hand-built datatypes without the marker conservatively keep `content`
 /// required, which is exact for non-`Option` fields and merely conservative
 /// for writers of actual `Option` fields (serde accepts an explicit
 /// `content: null` for those too).
-const SKIPPED_NULLABLE_FIELD: &str = "specta:skipped_nullable";
+const NULLABLE_FIELD: &str = "specta:nullable";
 
 fn skipped_field_marker(field: &Field) -> Field {
     let mut skipped = Field::default();
@@ -2190,8 +2191,21 @@ fn transform_adjacent_variant(
     // both phases; newtype variants collapsed to unit by a skipped sole field
     // omit it on serialize only (see below).
     if !variant_collapses_to_unit(variant) {
-        let payload = variant_payload_field(variant)
+        let mut payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
+        // serde's adjacent deserializer routes a missing `content` key
+        // through `missing_field`, which yields `None` for a *newtype*
+        // `Option` payload even without any skip attrs -- `{"t":"V"}`
+        // deserializes to `V(None)` while the serializer always emits
+        // `content`. Deserialize-facing shapes therefore keep `content`
+        // optional, mirroring `field_is_optional_for_mode`'s treatment of
+        // missing-input-allowed (`#[serde(default)]`) fields: optional in
+        // the deserialize and unified phases, required in serialize.
+        if matches!(mode, PhaseRewrite::Deserialize | PhaseRewrite::Unified)
+            && sole_live_field_is_nullable(variant)
+        {
+            payload.optional = true;
+        }
         fields.push((Cow::Owned(content.to_string()), payload));
     } else if !matches!(variant.fields, Fields::Unit) && sole_field_is_serde_skipped(variant, mode)?
     {
@@ -2428,14 +2442,29 @@ fn sole_field_is_serde_skipped(variant: &Variant, mode: PhaseRewrite) -> Result<
     }
 }
 
+/// Whether a newtype variant's *live* sole payload was declared as
+/// `Option<T>` (see [`NULLABLE_FIELD`]). Declared arity must be 1: a
+/// multi-field tuple variant deserializes as a sequence, so serde's
+/// `missing_field` `Option` special case never applies to it.
+fn sole_live_field_is_nullable(variant: &Variant) -> bool {
+    match &variant.fields {
+        Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
+            [field] => field.ty.is_some() && field.attributes.contains_key(NULLABLE_FIELD),
+            _ => false,
+        },
+        Fields::Unit | Fields::Named(_) => false,
+    }
+}
+
 /// Whether a collapsed newtype variant's skipped sole field was declared as
-/// `Option<T>`, recorded on the `ty: None` marker by [`skipped_field_marker`].
+/// `Option<T>` (see [`NULLABLE_FIELD`]; the attribute survives on the
+/// `ty: None` placeholder produced by [`skipped_field_marker`]).
 fn skipped_sole_field_is_nullable(variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unnamed(unnamed) => unnamed
             .fields
             .first()
-            .is_some_and(|field| field.attributes.contains_key(SKIPPED_NULLABLE_FIELD)),
+            .is_some_and(|field| field.attributes.contains_key(NULLABLE_FIELD)),
         Fields::Unit | Fields::Named(_) => false,
     }
 }
@@ -2790,8 +2819,8 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
     // `missing_field` helper deserializes a missing `content` key as `None`,
     // so the unified `content?: null` shape is exact for both phases and no
     // split is needed. `Option`-ness is read only from the marker the derive
-    // records from the real field syntax; see [`SKIPPED_NULLABLE_FIELD`].
-    if field.attributes.contains_key(SKIPPED_NULLABLE_FIELD) {
+    // records from the real field syntax; see [`NULLABLE_FIELD`].
+    if field.attributes.contains_key(NULLABLE_FIELD) {
         return Ok(false);
     }
 

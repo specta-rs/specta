@@ -230,6 +230,114 @@ fn adjacent_tagged_option_skip_phases() {
     );
 }
 
+// serde's `missing_field` `Option` special case applies to LIVE newtype
+// `Option` payloads too, without any skip attrs: the serializer always emits
+// `c` (`c: 1` / `c: null`), but the deserializer accepts a missing `c` as
+// `None`. Deserialize-facing shapes must keep `c` optional (mirroring the
+// `#[serde(default)]` convention: optional in deserialize/unified, required
+// in serialize). Non-`Option` payloads keep `c` required.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjLiveOption {
+    V(Option<u8>),
+    NonOpt(u8),
+}
+
+#[test]
+fn adjacent_tagged_live_option_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjLiveOption::V(Some(1))).unwrap(),
+        r#"{"t":"V","c":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&AdjLiveOption::V(None)).unwrap(),
+        r#"{"t":"V","c":null}"#
+    );
+
+    assert!(matches!(
+        serde_json::from_str::<AdjLiveOption>(r#"{"t":"V"}"#),
+        Ok(AdjLiveOption::V(None))
+    ));
+    assert!(serde_json::from_str::<AdjLiveOption>(r#"{"t":"V","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjLiveOption>(r#"{"t":"V","c":1}"#).is_ok());
+    // The non-Option control still hard-requires `c`.
+    assert!(serde_json::from_str::<AdjLiveOption>(r#"{"t":"NonOpt"}"#).is_err());
+}
+
+#[test]
+fn adjacent_tagged_live_option_unified() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjLiveOption>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains(r#"{ t: "V"; c?: number | null }"#),
+        "a live newtype `Option` payload accepts a missing `c` on deserialize; \
+         unified must keep it optional:\n{ts}"
+    );
+    assert!(
+        ts.contains(r#"{ t: "NonOpt"; c: number }"#),
+        "a non-`Option` payload keeps `c` required:\n{ts}"
+    );
+}
+
+// Codex's reported case: `skip_serializing` on a live-on-deserialize
+// `Option` payload. The enum splits (one-sided skip); the deserialize shape
+// must keep `c` optional, since `{"t":"V"}` deserializes to `V(None)`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjOptionSkipSer {
+    V(#[serde(skip_serializing)] Option<u8>),
+}
+
+#[test]
+fn adjacent_tagged_option_skip_serializing_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjOptionSkipSer::V(Some(1))).unwrap(),
+        r#"{"t":"V"}"#
+    );
+
+    assert!(matches!(
+        serde_json::from_str::<AdjOptionSkipSer>(r#"{"t":"V"}"#),
+        Ok(AdjOptionSkipSer::V(None))
+    ));
+    assert!(serde_json::from_str::<AdjOptionSkipSer>(r#"{"t":"V","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjOptionSkipSer>(r#"{"t":"V","c":1}"#).is_ok());
+}
+
+#[test]
+fn adjacent_tagged_option_skip_serializing_phases() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjOptionSkipSer>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    let serialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjOptionSkipSer_Serialize ="))
+        .expect("serialize type must be exported");
+    assert!(
+        serialize_ty.contains(r#"{ t: "V" }"#),
+        "serialize omits `c` for the ser-skipped payload:\n{ts}"
+    );
+
+    let deserialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjOptionSkipSer_Deserialize ="))
+        .expect("deserialize type must be exported");
+    assert!(
+        deserialize_ty.contains(r#"{ t: "V"; c?: number | null }"#),
+        "deserialize must keep `c` optional for a live `Option` payload:\n{ts}"
+    );
+}
+
 // One-sided `skip_deserializing` on an `Option` sole field: the serializer
 // still emits the live payload, while the deserializer accepts a missing or
 // `null` `c` (serde's `missing_field` `Option` special case again).

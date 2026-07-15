@@ -876,7 +876,7 @@ fn validate_adjacent_collapsed_newtype_variants(
             continue;
         }
 
-        if field.attributes.contains_key(crate::SKIPPED_NULLABLE_FIELD) {
+        if field.attributes.contains_key(crate::NULLABLE_FIELD) {
             continue;
         }
 

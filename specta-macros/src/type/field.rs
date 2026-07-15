@@ -68,18 +68,16 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
-    // Whether a skipped field was declared as `Option<T>` matters to
-    // consumers: e.g. serde deserializes a missing value into a skipped
-    // `Option` field as `None` while other skipped types have stricter
-    // requirements. Record it syntactically here for every skip spelling --
-    // for symmetric `#[serde(skip)]` the type never even enters the datatype
-    // graph, and for one-sided skips the exported datatype may be overridden
-    // (`#[specta(type = ...)]`), so the real syntax is the only reliable
-    // source.
-    let field_has_skip =
-        attrs.skip || variant_skip || super::serde::field_has_phase_skip(raw_attrs)?;
-    let skipped_nullable_attribute = (field_has_skip && declared_ty_is_option)
-        .then(|| quote!(field.attributes.insert("specta:skipped_nullable", true);));
+    // Whether a field was declared as `Option<T>` matters to consumers
+    // beyond the exported datatype: e.g. serde deserializes a missing value
+    // into an `Option` as `None` (both for skipped fields and for newtype
+    // enum payloads) while other types have stricter requirements. Record it
+    // syntactically -- for symmetric `#[serde(skip)]` the type never even
+    // enters the datatype graph, and elsewhere the exported datatype may be
+    // overridden (`#[specta(type = ...)]`), so the real syntax is the only
+    // reliable source.
+    let nullable_attribute =
+        declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
 
     let field_ty = if attrs.skip || variant_skip {
         quote!()
@@ -96,7 +94,7 @@ pub fn construct_field_with_variant_skip(
         #field_docs
         #runtime_attrs
         #type_overridden_attribute
-        #skipped_nullable_attribute
+        #nullable_attribute
         #field_ty
         field
     }))
