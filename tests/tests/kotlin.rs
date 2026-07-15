@@ -139,6 +139,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         )
         .expect("plain records have compatible Kotlinx declarations");
     assert!(supported.contains("@Serializable"));
+    assert!(supported.contains("val maybe: String? = null"));
 
     let error = Kotlin::default()
         .serialization(Serialization::Kotlinx)
@@ -160,6 +161,13 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
     assert!(mutable_newtype.contains("data class NewType"));
     assert!(mutable_newtype.contains("public var field0: String"));
     assert!(!mutable_newtype.contains("@JvmInline"));
+
+    let error = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .mutable_properties(true)
+        .export(&Types::default().register::<NewType>(), IdentityFormat)
+        .expect_err("mutable Kotlinx newtypes cannot preserve scalar encoding");
+    assert!(error.to_string().contains("mutable Kotlinx newtypes"));
 }
 
 #[test]

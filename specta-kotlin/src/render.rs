@@ -171,6 +171,12 @@ fn render_struct(
                     reason: "Kotlinx data classes do not preserve tuple-struct array encoding",
                 });
             }
+            Fields::Unnamed(_) if kotlin.mutable_properties => {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "mutable Kotlinx newtypes cannot preserve scalar encoding",
+                });
+            }
             Fields::Unnamed(_) | Fields::Named(_) => {}
         }
     }
@@ -551,15 +557,10 @@ fn render_property(
     out.push(' ');
     out.push_str(&identifier(&converted, path)?);
     out.push_str(": ");
-    out.push_str(&field_datatype(
-        kotlin,
-        format,
-        types,
-        generic_scope,
-        field,
-        path,
-    )?);
-    if field.optional {
+    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path)?;
+    out.push_str(&rendered);
+    if field.optional || (kotlin.serialization == Serialization::Kotlinx && rendered.ends_with('?'))
+    {
         out.push_str(" = null");
     }
     Ok(())
