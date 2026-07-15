@@ -10,7 +10,7 @@ import { z } from "zod";
  *  `z.tuple([..., z.number().optional()])`.
  */
 export type ZodTupleDefault = ZodTupleDefault_Serialize | ZodTupleDefault_Deserialize;
-export const ZodTupleDefaultSchema: z.ZodType<ZodTupleDefault> = z.union([z.lazy(() => ZodTupleDefault_DeserializeSchema), z.lazy(() => ZodTupleDefault_SerializeSchema)]);
+export const ZodTupleDefaultSchema: z.ZodType<ZodTupleDefault> = z.union([z.lazy(() => ZodTupleDefault_SerializeSchema), z.lazy(() => ZodTupleDefault_DeserializeSchema)]);
 
 /**
  *  A trailing `#[serde(default)]` tuple element is optional on deserialize

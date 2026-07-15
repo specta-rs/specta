@@ -55,6 +55,18 @@ struct DefinedMapKey {
 #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
 struct DefinedKey(i64);
 
+#[derive(Type, Serialize, Deserialize)]
+struct OptionalFlattenInner {
+    inner: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct OptionalFlatten {
+    id: String,
+    #[serde(flatten)]
+    inner: Option<OptionalFlattenInner>,
+}
+
 #[derive(Type)]
 #[allow(dead_code)]
 struct OpaqueTypes {
@@ -119,6 +131,7 @@ fn main() {
                 .register::<Generic>()
                 .register::<WireTypes>()
                 .register::<DefinedMapKey>()
+                .register::<OptionalFlatten>()
                 .register::<OpaqueTypes>()
                 .register::<ExternalEnum>()
                 .register::<UntaggedMatchingField>()
@@ -142,6 +155,16 @@ fn main() {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             root_type.reference(vec![]),
+        ));
+    });
+    let parent_type = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+        ndt.module_path = "parent".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+        ndt.module_path = "parent::child".into();
+        ndt.ty = Some(specta::datatype::DataType::Reference(
+            parent_type.reference(vec![]),
         ));
     });
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("zod-typecheck/generated");

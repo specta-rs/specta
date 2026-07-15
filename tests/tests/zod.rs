@@ -475,6 +475,45 @@ fn zod_layout_files_qualifies_root_types_from_modules() {
 }
 
 #[test]
+fn zod_layout_files_imports_parent_module_files() {
+    let temp = temp_dir();
+    let path = temp.path().join("zod-parent-reference");
+    let mut types = Types::default();
+    let parent = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+        ndt.module_path = "parent".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+        ndt.module_path = "parent::child".into();
+        ndt.ty = Some(DataType::Reference(parent.reference(vec![])));
+    });
+
+    Zod::default()
+        .layout(Layout::Files)
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+
+    let child = std::fs::read_to_string(path.join("parent/child.ts")).unwrap();
+    assert!(child.contains("import * as parent from \"../parent\";"));
+    assert!(!child.contains(" from \".\";"));
+    assert!(child.contains("parent.ParentReferenceSchema"));
+}
+
+#[test]
+fn zod_layout_files_empty_export_allows_a_missing_directory() {
+    let temp = temp_dir();
+    let path = temp.path().join("missing-empty-export");
+    assert!(!path.exists());
+
+    Zod::default()
+        .layout(Layout::Files)
+        .export_to(&path, &Types::default(), specta_serde::Format)
+        .unwrap();
+
+    assert!(!path.exists());
+}
+
+#[test]
 fn zod_layout_namespaces_rejects_module_type_collisions() {
     let mut types = Types::default().register::<Testing>();
     NamedDataType::new("test", &mut types, |_, ndt| {

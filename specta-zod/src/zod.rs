@@ -887,7 +887,9 @@ fn cleanup_stale_files(
         })?;
     }
 
-    remove_empty_dirs(root, root)?;
+    if root.exists() {
+        remove_empty_dirs(root, root)?;
+    }
 
     Ok(())
 }
@@ -964,9 +966,10 @@ fn module_import_path(from_module_path: &str, to_module_path: &str) -> String {
     let from_dir_segments = &from_file_segments[..from_file_segments.len() - 1];
     let to_file_segments = module_file_segments(to_module_path);
 
+    let to_dir_segments = &to_file_segments[..to_file_segments.len() - 1];
     let shared = from_dir_segments
         .iter()
-        .zip(to_file_segments.iter())
+        .zip(to_dir_segments.iter())
         .take_while(|(a, b)| a == b)
         .count();
 

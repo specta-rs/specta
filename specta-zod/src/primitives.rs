@@ -1300,15 +1300,20 @@ fn enum_dt(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut variants = variants.into_iter().flatten().collect::<Vec<_>>();
+    let variants = variants.into_iter().flatten().collect::<Vec<_>>();
 
     if variants.is_empty() {
         s.push_str("z.never()");
         return Ok(());
     }
 
-    variants.sort();
-    variants.dedup();
+    let mut unique_variants = Vec::with_capacity(variants.len());
+    for variant in variants {
+        if !unique_variants.contains(&variant) {
+            unique_variants.push(variant);
+        }
+    }
+    let variants = unique_variants;
 
     if variants.len() == 1 {
         s.push_str(&variants[0]);

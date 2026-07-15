@@ -54,13 +54,13 @@ export type ZodEnumCoverage =
 	value: string,
 } }) & { Newtype?: never; Tuple?: never };
 export const ZodEnumCoverageSchema: z.ZodType<ZodEnumCoverage> = z.union([z.literal("Unit"), z.strictObject({
-	Named: z.object({
-	value: z.string(),
-}),
-}), z.strictObject({
 	Newtype: z.string(),
 }), z.strictObject({
 	Tuple: z.tuple([z.int().min(-2147483648).max(2147483647), z.boolean()]),
+}), z.strictObject({
+	Named: z.object({
+	value: z.string(),
+}),
 })]);
 
 export type ZodFiniteKey = "First" | "Second";
@@ -104,9 +104,9 @@ export type ZodOptionalFlatten = {
 };
 export const ZodOptionalFlattenSchema: z.ZodType<ZodOptionalFlatten> = z.union([z.object({
 	id: z.string(),
-}), z.object({
+}).and(z.lazy(() => ZodFlattenInnerSchema)), z.object({
 	id: z.string(),
-}).and(z.lazy(() => ZodFlattenInnerSchema))]);
+})]);
 
 export type ZodWireTypes = {
 	character: string,
