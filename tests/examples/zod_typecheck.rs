@@ -104,6 +104,15 @@ mod r#type {
     pub struct SameKeywordModule {
         value: KeywordModule,
     }
+
+    pub mod r#type {
+        use super::*;
+
+        #[derive(Type, Serialize, Deserialize)]
+        pub struct NestedKeywordModule {
+            value: String,
+        }
+    }
 }
 
 mod keys {
@@ -117,6 +126,7 @@ mod keys {
 struct UsesKeywordModule {
     value: r#type::KeywordModule,
     same_module: r#type::SameKeywordModule,
+    nested: r#type::r#type::NestedKeywordModule,
 }
 
 fn main() {

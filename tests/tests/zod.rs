@@ -126,11 +126,21 @@ mod r#type {
     pub struct KeywordModule {
         value: String,
     }
+
+    pub mod r#type {
+        use super::*;
+
+        #[derive(Type)]
+        pub struct NestedKeywordModule {
+            value: String,
+        }
+    }
 }
 
 #[derive(Type)]
 struct UsesKeywordModule {
     value: r#type::KeywordModule,
+    nested: r#type::r#type::NestedKeywordModule,
 }
 
 fn inline_for<T: Type>(zod: &Zod) -> Result<String, specta_zod::Error> {
@@ -426,6 +436,8 @@ fn zod_layout_sanitises_reserved_module_identifiers() {
 
     assert!(rendered.contains("export namespace $type"));
     assert!(rendered.contains(".$type.KeywordModule"));
+    assert!(rendered.contains(".$type.$type.NestedKeywordModule"));
+    assert!(!rendered.contains(".$type.type.NestedKeywordModule"));
     assert!(!rendered.contains("namespace type"));
 }
 

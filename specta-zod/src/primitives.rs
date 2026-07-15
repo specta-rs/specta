@@ -165,11 +165,14 @@ fn export_single_internal(
                 }
             }
         } else if exporter.layout == Layout::Namespaces {
-            let module_paths = types
+            let mut module_paths = types
                 .into_unsorted_iter()
                 .map(|ndt| ndt.module_path.as_ref())
                 .filter(|path| !path.is_empty())
-                .collect::<std::collections::BTreeSet<_>>();
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            module_paths.sort_by_key(|path| std::cmp::Reverse(path.split("::").count()));
             for module_path in module_paths {
                 let raw = module_path.split("::").collect::<Vec<_>>().join(".");
                 let sanitized = crate::zod::namespace_module_path(module_path);
