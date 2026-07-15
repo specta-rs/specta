@@ -96,6 +96,37 @@ struct InlineFields {
     tuple: (u8, String),
     #[specta(inline)]
     status: Status,
+    #[specta(inline)]
+    optional: Option<InlineInner>,
+    #[specta(inline)]
+    children: Vec<InlineInner>,
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct AlwaysInlineA {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct AlwaysInlineB {
+    value: u32,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlinePair<A, B> {
+    first: A,
+    second: B,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct MultiInlineFields {
+    tuple: (AlwaysInlineA, AlwaysInlineB),
+    map: std::collections::HashMap<AlwaysInlineA, AlwaysInlineB>,
+    pair: InlinePair<AlwaysInlineA, AlwaysInlineB>,
 }
 
 #[derive(Type)]
@@ -117,6 +148,21 @@ enum VariantCollisions {
 struct InlineNode {
     #[specta(inline)]
     next: Option<Box<InlineNode>>,
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct UnsupportedOpaque;
+
+impl Type for UnsupportedOpaque {
+    fn definition(_types: &mut Types) -> specta::datatype::DataType {
+        specta::datatype::Reference::opaque(UnsupportedOpaque).into()
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UnsupportedExport {
+    value: UnsupportedOpaque,
 }
 
 #[derive(Type)]
@@ -188,15 +234,23 @@ fn declaration_collisions_are_disambiguated() {
 
 #[test]
 fn inline_fields_preserve_their_wrapper_properties() {
-    let output = CSharp::new()
-        .export(&Types::default().register::<InlineFields>(), IdentityFormat)
-        .unwrap();
+    let types = Types::default()
+        .register::<InlineFields>()
+        .register::<MultiInlineFields>();
+    let output = CSharp::new().export(&types, IdentityFormat).unwrap();
 
     assert!(output.contains("record InnerValue"));
     assert!(output.contains("InnerValue Inner"));
     assert!(output.contains("(byte, string) Tuple"));
     assert!(output.contains("enum StatusValue"));
     assert!(output.contains("StatusValue Status"));
+    assert!(output.contains("record OptionalValue"));
+    assert!(output.contains("OptionalValue? Optional"));
+    assert!(output.contains("record ChildrenValue"));
+    assert!(output.contains("IReadOnlyList<ChildrenValue> Children"));
+    assert!(output.contains("(TupleValue, TupleValue2) Tuple"));
+    assert!(output.contains("IReadOnlyDictionary<MapValue, MapValue2> Map"));
+    assert!(output.contains("InlinePair<PairValue, PairValue2> Pair"));
 }
 
 #[test]
@@ -268,31 +322,26 @@ fn datatype_format_errors_include_the_named_type_path() {
 
 #[test]
 fn files_are_rendered_before_the_output_directory_is_created() {
-    let (types, _) = crate::types();
+    let types = Types::default().register::<UnsupportedExport>();
     let root = workspace_scratch("atomic-render-error");
     let _ = std::fs::remove_dir_all(&root);
     assert!(matches!(
         CSharp::new()
             .layout(Layout::Files)
             .export_to(&root, &types, IdentityFormat),
-        Err(Error::UnsupportedType { .. })
+        Err(Error::UnsupportedOpaque { .. })
     ));
     assert!(!root.exists());
 }
 
 #[test]
-fn recursive_inline_structures_are_rejected() {
-    let error = CSharp::new()
+fn recursive_inline_structures_fall_back_to_named_references() {
+    let output = CSharp::new()
         .export(&Types::default().register::<InlineNode>(), IdentityFormat)
-        .unwrap_err();
+        .unwrap();
 
-    assert!(
-        matches!(
-            error,
-            Error::RecursiveInline { .. } | Error::UnsupportedType { .. }
-        ),
-        "unexpected error: {error:?}"
-    );
+    assert!(output.contains("record NextValue"));
+    assert!(output.contains("InlineNode? Next"));
 }
 
 #[test]
@@ -307,14 +356,16 @@ fn module_prefixed_names_are_flat() {
 }
 
 #[test]
-fn unsupported_anonymous_types_return_an_error() {
+fn anonymous_structural_types_are_supported() {
     let (types, _) = crate::types();
-    let error = CSharp::new()
+    let output = CSharp::new()
         .layout(Layout::ModulePrefixedName)
         .export(&types, IdentityFormat)
-        .unwrap_err();
+        .unwrap();
 
-    assert!(matches!(error, Error::UnsupportedType { .. }));
+    assert!(output.contains("record Test_Types_BoxInline"));
+    assert!(output.contains("record CValue"));
+    assert!(output.contains("CValue C"));
 }
 
 #[test]
@@ -438,6 +489,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
     std::fs::create_dir_all(&root).unwrap();
     let types = Types::default()
         .register::<InlineFields>()
+        .register::<MultiInlineFields>()
         .register::<ContainingNameCollision>()
         .register::<VariantCollisions>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();

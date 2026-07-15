@@ -336,6 +336,7 @@ fn render_fields(
                     field,
                     ty,
                     path,
+                    &mut used,
                 )?;
             }
         }
@@ -358,6 +359,7 @@ fn render_fields(
                     field,
                     ty,
                     path,
+                    &mut used,
                 )?;
             }
         }
@@ -377,50 +379,71 @@ fn render_field_property(
     field: &Field,
     ty: &DataType,
     path: &str,
+    used: &mut HashSet<String>,
 ) -> Result<(), Error> {
-    let structural_ty = match ty {
-        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-            NamedReferenceType::Inline { dt, .. } => dt.as_ref(),
-            _ => ty,
-        },
-        _ => ty,
-    };
-    let type_override = match structural_ty {
-        DataType::Struct(strct) => {
-            render_record(
+    if contains_recursive_inline(ty) {
+        return Err(Error::RecursiveInline {
+            path: format!("{path}.{wire_name}"),
+        });
+    }
+    let mut structural_types = Vec::new();
+    for structural_ty in collect_inline_structural_types(ty) {
+        if structural_types
+            .iter()
+            .all(|(existing, _)| *existing != structural_ty)
+        {
+            let name = if structural_types.is_empty() {
+                nested_name.to_string()
+            } else {
+                unique_identifier(format!("{nested_name}{}", structural_types.len() + 1), used)
+            };
+            structural_types.push((structural_ty, name));
+        }
+    }
+    for (structural_ty, name) in &structural_types {
+        match structural_ty {
+            DataType::Struct(strct) => render_record(
                 out,
                 exporter,
                 types,
                 indent,
                 "public",
-                nested_name,
+                name,
                 "",
                 &strct.fields,
                 &format!("{path}.{wire_name}"),
-            )?;
-            Some(nested_name)
+            )?,
+            DataType::Enum(enm)
+                if enm
+                    .variants
+                    .iter()
+                    .all(|(_, variant)| matches!(variant.fields, Fields::Unit)) =>
+            {
+                render_simple_enum(out, exporter, indent, name, "", enm, path)?;
+            }
+            DataType::Enum(enm) => {
+                render_union(out, exporter, types, indent, name, "", enm, path)?;
+            }
+            DataType::Intersection(_) => {
+                return Err(Error::UnsupportedType {
+                    path: format!("{path}.{wire_name}"),
+                    kind: "intersection",
+                });
+            }
+            _ => unreachable!("only structural datatypes are collected"),
         }
-        DataType::Enum(enm)
-            if enm
-                .variants
-                .iter()
-                .all(|(_, variant)| matches!(variant.fields, Fields::Unit)) =>
-        {
-            render_simple_enum(out, exporter, indent, nested_name, "", enm, path)?;
-            Some(nested_name)
-        }
-        DataType::Enum(enm) => {
-            render_union(out, exporter, types, indent, nested_name, "", enm, path)?;
-            Some(nested_name)
-        }
-        DataType::Intersection(_) => {
-            return Err(Error::UnsupportedType {
-                path: format!("{path}.{wire_name}"),
-                kind: "intersection",
-            });
-        }
-        _ => None,
-    };
+    }
+    let type_override = (!structural_types.is_empty())
+        .then(|| {
+            render_datatype_with_inline_overrides(
+                exporter,
+                types,
+                ty,
+                &structural_types,
+                &format!("{path}.{wire_name}"),
+            )
+        })
+        .transpose()?;
 
     render_property(
         out,
@@ -431,9 +454,139 @@ fn render_field_property(
         wire_name,
         field,
         ty,
-        type_override,
+        type_override.as_deref(),
         path,
     )
+}
+
+fn collect_inline_structural_types(ty: &DataType) -> Vec<&DataType> {
+    fn collect<'a>(ty: &'a DataType, found: &mut Vec<&'a DataType>) {
+        match ty {
+            DataType::Struct(_) | DataType::Enum(_) | DataType::Intersection(_) => {
+                found.push(ty);
+            }
+            DataType::List(list) => collect(&list.ty, found),
+            DataType::Map(map) => {
+                collect(map.key_ty(), found);
+                collect(map.value_ty(), found);
+            }
+            DataType::Nullable(inner) => collect(inner, found),
+            DataType::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    collect(element, found);
+                }
+            }
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => collect(dt, found),
+                NamedReferenceType::Reference { generics, .. } => {
+                    for (_, generic) in generics {
+                        collect(generic, found);
+                    }
+                }
+                NamedReferenceType::Recursive(_) => {}
+            },
+            DataType::Primitive(_)
+            | DataType::Generic(_)
+            | DataType::Reference(Reference::Opaque(_)) => {}
+        }
+    }
+
+    let mut found = Vec::new();
+    collect(ty, &mut found);
+    found
+}
+
+fn render_datatype_with_inline_overrides(
+    exporter: &CSharp,
+    types: &Types,
+    ty: &DataType,
+    structural_types: &[(&DataType, String)],
+    path: &str,
+) -> Result<String, Error> {
+    fn render(
+        out: &mut String,
+        exporter: &CSharp,
+        types: &Types,
+        ty: &DataType,
+        structural_types: &[(&DataType, String)],
+        path: &str,
+    ) -> Result<(), Error> {
+        match ty {
+            DataType::Struct(_) | DataType::Enum(_) | DataType::Intersection(_) => {
+                let (_, name) = structural_types
+                    .iter()
+                    .find(|(structural_ty, _)| *structural_ty == ty)
+                    .expect("all structural datatypes must have a nested name");
+                out.push_str(name);
+            }
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    render(out, exporter, types, dt, structural_types, path)?;
+                }
+                NamedReferenceType::Recursive(_) => {
+                    return Err(Error::RecursiveInline { path: path.into() });
+                }
+                NamedReferenceType::Reference { generics, .. } => {
+                    let ndt = types
+                        .get(reference)
+                        .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                    reference_name(out, exporter, ndt);
+                    if !generics.is_empty() {
+                        out.push('<');
+                        for (index, (_, generic)) in generics.iter().enumerate() {
+                            if index != 0 {
+                                out.push_str(", ");
+                            }
+                            render(out, exporter, types, generic, structural_types, path)?;
+                        }
+                        out.push('>');
+                    }
+                }
+            },
+            DataType::Nullable(inner) => {
+                render(out, exporter, types, inner, structural_types, path)?;
+                if !is_nullable(inner) {
+                    out.push('?');
+                }
+            }
+            DataType::List(list) => {
+                out.push_str("global::System.Collections.Generic.IReadOnlyList<");
+                render(out, exporter, types, &list.ty, structural_types, path)?;
+                out.push('>');
+            }
+            DataType::Map(map) => {
+                out.push_str("global::System.Collections.Generic.IReadOnlyDictionary<");
+                render(out, exporter, types, map.key_ty(), structural_types, path)?;
+                out.push_str(", ");
+                render(out, exporter, types, map.value_ty(), structural_types, path)?;
+                out.push('>');
+            }
+            DataType::Tuple(tuple) => match tuple.elements.as_slice() {
+                [] => out.push_str("global::System.ValueTuple"),
+                [element] => {
+                    out.push_str("global::System.ValueTuple<");
+                    render(out, exporter, types, element, structural_types, path)?;
+                    out.push('>');
+                }
+                elements => {
+                    out.push('(');
+                    for (index, element) in elements.iter().enumerate() {
+                        if index != 0 {
+                            out.push_str(", ");
+                        }
+                        render(out, exporter, types, element, structural_types, path)?;
+                    }
+                    out.push(')');
+                }
+            },
+            _ => datatype(out, exporter, types, ty, path)?,
+        }
+        Ok(())
+    }
+
+    let mut out = String::new();
+    render(&mut out, exporter, types, ty, structural_types, path)?;
+    Ok(out)
 }
 
 #[allow(clippy::too_many_arguments)]
