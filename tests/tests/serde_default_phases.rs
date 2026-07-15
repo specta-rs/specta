@@ -759,3 +759,83 @@ fn default_on_flattened_field_does_not_split() {
          directional: {rendered}"
     );
 }
+
+/// A variant removed in BOTH phases (`filter_enum_variants_for_phase` drops
+/// it from each half) must not contribute phase differences from its payload
+/// attrs — `#[serde(default)]`, asymmetric renames, or anything else.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum DeadVariantDefault {
+    #[serde(skip_serializing, skip_deserializing)]
+    Dead {
+        #[serde(default)]
+        x: i32,
+    },
+    Live {
+        y: i32,
+    },
+}
+
+/// A dependent of [`DeadVariantDefault`] must not be dragged into a split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DeadVariantDefaultParent {
+    inner: DeadVariantDefault,
+}
+
+/// Field counterpart of the same disease: a field removed in BOTH phases
+/// carrying some other directional attr (asymmetric rename here) must not
+/// split its container either.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+struct DeadFieldRename {
+    #[serde(
+        skip_serializing,
+        skip_deserializing,
+        rename(serialize = "s", deserialize = "d")
+    )]
+    cache: i32,
+    a: i32,
+}
+
+/// Control: a ONE-sided skip keeps the field in one phase and is genuinely
+/// directional, so it must still split.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+struct OneSidedSkip {
+    #[serde(skip_serializing)]
+    cache: i32,
+    a: i32,
+}
+
+/// Dead-in-both-phases variants and fields render nowhere, so none of their
+/// attrs can constitute a phase difference. Live-variant `default` splitting
+/// is pinned by [`variant_field_default_splits_enum`] as the control.
+#[test]
+fn dead_in_both_phases_positions_do_not_split() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<DeadVariantDefaultParent>()
+                .register::<DeadFieldRename>()
+                .register::<OneSidedSkip>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept dead-in-both-phases positions");
+
+    for split_name in [
+        "DeadVariantDefault_Serialize",
+        "DeadVariantDefaultParent_Serialize",
+        "DeadFieldRename_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "attrs on a position removed from both phases cannot be a phase \
+             difference (found `{split_name}`): {rendered}"
+        );
+    }
+    assert!(
+        rendered.contains("OneSidedSkip_Serialize"),
+        "a one-sided skip is genuinely directional and must still split: {rendered}"
+    );
+}

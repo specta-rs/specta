@@ -2402,6 +2402,13 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
+                    // A variant removed from both phases renders in neither
+                    // half, so none of its own or its payload's attrs can
+                    // constitute a phase difference.
+                    if variant_is_dead_in_both_phases(variant)? {
+                        return Ok(false);
+                    }
+
                     Ok(variant_has_local_difference(variant)?
                         || fields_have_local_difference(&variant.fields)?)
                 })?),
@@ -2484,11 +2491,7 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
-                    Ok(field_has_local_difference(field)?
-                        || field
-                            .ty
-                            .as_ref()
-                            .map_or(Ok(false), has_local_phase_difference)?)
+                    single_field_has_local_difference(field)
                 })
         }
         Fields::Named(named) => {
@@ -2500,14 +2503,49 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
-                    Ok(field_has_local_difference(field)?
-                        || field
-                            .ty
-                            .as_ref()
-                            .map_or(Ok(false), has_local_phase_difference)?)
+                    single_field_has_local_difference(field)
                 })
         }
     }
+}
+
+fn single_field_has_local_difference(field: &Field) -> Result<bool, Error> {
+    // A field removed from both phases renders in neither half, so no attr
+    // on it — nor anything inside its (inline) datatype — can constitute a
+    // phase difference.
+    if field_is_dead_in_both_phases(field)? {
+        return Ok(false);
+    }
+
+    Ok(field_has_local_difference(field)?
+        || field
+            .ty
+            .as_ref()
+            .map_or(Ok(false), has_local_phase_difference)?)
+}
+
+/// A field absent from BOTH exported phases: `#[specta(skip)]` (and bare
+/// `#[serde(skip)]`, which the specta macro special-cases the same way)
+/// erase `ty`, and the explicit `skip_serializing, skip_deserializing` pair
+/// is removed from each rewrite. Such a field renders nowhere, so it can
+/// neither contribute a phase difference nor tie its container to a
+/// dependency's split. A one-sided skip keeps the field in one phase and
+/// stays direction-relevant.
+fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
+    if field.ty.is_none() {
+        return Ok(true);
+    }
+
+    Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
+}
+
+/// The variant counterpart of [`field_is_dead_in_both_phases`]:
+/// [`filter_enum_variants_for_phase`] drops such a variant from both
+/// generated halves.
+fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
+    Ok(SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
 }
 
 fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
@@ -2569,11 +2607,9 @@ fn collect_dependencies(
         DataType::Enum(e) => {
             collect_conversion_dependencies(&e.attributes, types, deps)?;
             for (_, variant) in &e.variants {
-                // A variant skipped in both phases never appears in either
+                // A variant removed from both phases never appears in either
                 // half, so its payload cannot tie the enum to a phase split.
-                if SerdeVariantAttrs::from_attributes(&variant.attributes)?
-                    .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
-                {
+                if variant_is_dead_in_both_phases(variant)? {
                     continue;
                 }
 
@@ -2673,18 +2709,11 @@ fn collect_field_dependencies(
     types: &Types,
     deps: &mut HashSet<TypeIdentity>,
 ) -> Result<(), Error> {
-    // A field removed from BOTH phases renders identically — that is, not
-    // at all — in both halves, so it cannot tie its container to a
-    // referenced type's phase split. The flag pair catches an explicit
-    // `#[serde(skip_serializing, skip_deserializing)]`; hidden fields
-    // (`#[specta(skip)]`, and bare `#[serde(skip)]` which the specta macro
-    // special-cases the same way) have `ty: None` and are covered by the
-    // `ty` check below. A one-sided skip keeps the field in one phase, so
-    // it must still propagate (and its skip asymmetry splits the container
-    // regardless).
-    if SerdeFieldAttrs::from_attributes(&field.attributes)?
-        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
-    {
+    // See `field_is_dead_in_both_phases`: such a field renders in neither
+    // half, so it cannot tie its container to a referenced type's phase
+    // split. A one-sided skip keeps the field in one phase, so it must
+    // still propagate (its skip asymmetry splits the container regardless).
+    if field_is_dead_in_both_phases(field)? {
         return Ok(());
     }
 
