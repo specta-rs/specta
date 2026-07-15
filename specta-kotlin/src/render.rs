@@ -837,9 +837,17 @@ fn field_datatype(
         });
     }
     if field.optional && !nullable {
-        rendered.push('?');
+        rendered = nullable_type(rendered);
     }
     Ok(rendered)
+}
+
+fn nullable_type(rendered: String) -> String {
+    if rendered.ends_with('?') {
+        rendered
+    } else {
+        format!("{rendered}?")
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -951,11 +959,7 @@ fn datatype(
         ),
         DataType::Nullable(inner) => {
             let inner = datatype(kotlin, format, types, inner, generic_scope, path)?;
-            if inner.ends_with('?') {
-                inner
-            } else {
-                format!("{inner}?")
-            }
+            nullable_type(inner)
         }
         DataType::Tuple(_) if kotlin.serialization == Serialization::Kotlinx => {
             return Err(Error::UnsupportedType {

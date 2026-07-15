@@ -2,7 +2,9 @@ use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
 use specta::{Format, Type, Types, datatype::DataType};
-use specta_kotlin::{Error, IndentStyle, Kotlin, Layout, NamingConvention, Serialization};
+use specta_kotlin::{
+    Error, IndentStyle, Kotlin, Layout, NamingConvention, Serialization, UnknownType,
+};
 use tempfile::TempDir;
 
 struct IdentityFormat;
@@ -498,6 +500,28 @@ fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
         .expect("generic value wrappers are nominal even with nullable type arguments");
     assert!(output.contains("val value: Identity<kotlin.String?>"));
     assert!(!output.contains("val value: Identity<kotlin.String?> = null"));
+}
+
+#[test]
+fn optional_nullable_fallbacks_do_not_get_duplicate_markers() {
+    use specta::datatype::{Field, NamedDataType, Reference, Struct};
+
+    #[derive(Hash, PartialEq, Eq)]
+    struct UnsupportedOpaque;
+
+    let mut types = Types::default();
+    NamedDataType::new("OpaqueContainer", &mut types, |_, datatype| {
+        let mut field = Field::new(Reference::opaque(UnsupportedOpaque).into());
+        field.optional = true;
+        datatype.ty = Some(Struct::named().field("value", field).build());
+    });
+
+    let output = Kotlin::default()
+        .unknown_types(UnknownType::Any)
+        .export(&types, IdentityFormat)
+        .expect("optional opaque fallbacks should remain valid nullable Kotlin types");
+    assert!(output.contains("val value: kotlin.Any? = null"));
+    assert!(!output.contains("kotlin.Any??"));
 }
 
 #[test]
