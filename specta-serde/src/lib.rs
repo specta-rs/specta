@@ -2357,12 +2357,14 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
         // them, so it forces a phase split just like a field-level default.
         // serde only supports this attribute on structs (not enums), so it
         // is checked here rather than inside `container_has_local_difference`,
-        // which is shared with `DataType::Enum` below. A struct with no named
-        // fields has nothing for `default` to make optional, so splitting it
-        // would only add a redundant identical type pair (and force every
-        // dependent to split too) for no representational benefit.
+        // which is shared with `DataType::Enum` below. Like a field-level
+        // default, it only matters for fields that appear on the deserialize
+        // wire: with no such field (an empty struct, or one whose fields are
+        // all `#[serde(skip)]`-ped cache/state) both phases render the same
+        // shape, and splitting would only add a redundant identical type pair
+        // (and force every dependent to split too).
         DataType::Struct(s) => Ok(container_has_local_difference(&s.attributes)?
-            || (struct_has_named_fields(&s.fields)
+            || (struct_has_deserialize_wire_field(&s.fields)?
                 && SerdeContainerAttrs::from_attributes(&s.attributes)?
                     .is_some_and(|attrs| attrs.default))
             || fields_have_local_difference(&s.fields)?),
@@ -2404,8 +2406,23 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     }
 }
 
-fn struct_has_named_fields(fields: &Fields) -> bool {
-    matches!(fields, Fields::Named(named) if !named.fields.is_empty())
+/// Whether at least one named field survives the deserialize phase — the only
+/// fields a container `#[serde(default)]` can widen (a `skip_deserializing`
+/// field's default is applied invisibly, off the wire).
+fn struct_has_deserialize_wire_field(fields: &Fields) -> Result<bool, Error> {
+    let Fields::Named(named) = fields else {
+        return Ok(false);
+    };
+
+    for (_, field) in &named.fields {
+        if !SerdeFieldAttrs::from_attributes(&field.attributes)?
+            .is_some_and(|attrs| attrs.skip_deserializing)
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> Result<bool, Error> {

@@ -154,6 +154,37 @@ enum SkippedDefaultVariant {
     },
 }
 
+/// Container `#[serde(default)]` on a non-wire cache/state struct whose
+/// fields are ALL `#[serde(skip)]`-ped: both phases render `{}`, so the
+/// container default is wire-irrelevant and must not force a phase split.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct AllSkipped {
+    #[serde(skip)]
+    a: u8,
+    #[serde(skip)]
+    b: String,
+}
+
+/// A dependent of [`AllSkipped`] must not be dragged into a split either.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AllSkippedParent {
+    inner: AllSkipped,
+}
+
+/// Control for [`AllSkipped`]: one field surviving deserialize is enough for
+/// the container default to matter, so this must still split.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct MixedSkipped {
+    #[serde(skip)]
+    cache: u8,
+    live: i32,
+}
+
 fn named_field_optional(dt: &DataType, types: &Types, field_name: &str) -> bool {
     let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
         panic!("expected named reference, got {dt:?}");
@@ -464,4 +495,42 @@ fn default_on_both_phase_skipped_field_does_not_split() {
     assert_eq!(serde_json::to_string(&value).unwrap(), r#"{"a":1}"#);
     let parsed: SkippedDefault = serde_json::from_str(r#"{"a":1,"cache":9}"#).unwrap();
     assert_eq!((parsed.cache, parsed.a), (0, 1));
+}
+
+/// Container `#[serde(default)]` where every field is skipped in both phases
+/// renders `{}` for both directions, so it must not split — and must not
+/// cascade a split into dependents. A single field surviving deserialize
+/// (the [`MixedSkipped`] control) still splits.
+#[test]
+fn container_default_with_all_fields_skipped_does_not_split() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<AllSkippedParent>()
+                .register::<MixedSkipped>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept container `default` with all fields skipped");
+
+    for split_name in ["AllSkipped_Serialize", "AllSkippedParent_Serialize"] {
+        assert!(
+            !rendered.contains(split_name),
+            "container `default` over fields skipped in both phases never \
+             reaches the wire and must not cause a phase split (found \
+             `{split_name}`): {rendered}"
+        );
+    }
+    assert!(
+        rendered.contains("MixedSkipped_Serialize"),
+        "container `default` with a live field must still split: {rendered}"
+    );
+
+    // serde_json ground truth: nothing on the wire in either direction.
+    let value = AllSkipped {
+        a: 1,
+        b: "x".into(),
+    };
+    assert_eq!(serde_json::to_string(&value).unwrap(), "{}");
+    let parsed: AllSkipped = serde_json::from_str("{}").unwrap();
+    assert_eq!((parsed.a, parsed.b.as_str()), (0, ""));
 }
