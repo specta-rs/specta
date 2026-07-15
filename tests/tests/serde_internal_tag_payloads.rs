@@ -94,6 +94,16 @@ enum ExternalWithoutUnit {
     Struct { value: i32 },
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum DirectionalExternalUnit {
+    #[serde(skip_serializing)]
+    Unit,
+    Live {
+        value: i32,
+    },
+}
+
 #[derive(Debug, PartialEq, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
@@ -253,6 +263,13 @@ enum ExternalWithUntaggedUnit {
 enum ExternalWithUntaggedEmptyStruct {
     #[serde(untagged)]
     Empty {},
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum UntaggedDirectionalMap {
+    #[serde(untagged)]
+    Value(#[serde(skip_serializing)] Inner),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -425,6 +442,22 @@ fn format_accepts_newtype_unit_and_generic_payloads() {
     let err = specta_serde::Format
         .map_types(&Types::default().register::<GenericPayload<ExternalWithUntaggedUnit>>())
         .expect_err("an untagged unit contributes no payload under TaggedSerializer");
+    assert!(
+        err.to_string().contains("context-sensitive enum encoding"),
+        "unexpected error: {err}"
+    );
+
+    let err = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<GenericPayload<DirectionalExternalUnit>>())
+        .expect_err("deserialize-only unit variants still need contextual generic encoding");
+    assert!(
+        err.to_string().contains("context-sensitive enum encoding"),
+        "unexpected error: {err}"
+    );
+
+    let err = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<GenericPayload<UntaggedDirectionalMap>>())
+        .expect_err("a phase-skipped untagged newtype becomes a contextual unit contribution");
     assert!(
         err.to_string().contains("context-sensitive enum encoding"),
         "unexpected error: {err}"

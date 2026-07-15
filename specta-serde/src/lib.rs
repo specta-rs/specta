@@ -3048,7 +3048,10 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         Contextual,
     }
 
-    fn transparent_payload(strct: &Struct) -> Result<TransparentPayload<'_>, Error> {
+    fn transparent_payload(
+        strct: &Struct,
+        mode: PhaseRewrite,
+    ) -> Result<TransparentPayload<'_>, Error> {
         if !SerdeContainerAttrs::from_attributes(&strct.attributes)?
             .is_some_and(|attrs| attrs.transparent)
         {
@@ -3066,7 +3069,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         };
         let mut live = Vec::new();
         for field in fields {
-            if should_skip_field_for_mode(field, PhaseRewrite::Unified)? {
+            if should_skip_field_for_mode(field, mode)? {
                 continue;
             }
             let Some(ty) = &field.ty else {
@@ -3085,11 +3088,12 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         ty: &DataType,
         types: &Types,
         seen: &mut HashSet<Reference>,
+        mode: PhaseRewrite,
     ) -> Result<bool, Error> {
         match ty {
-            DataType::Struct(strct) => match transparent_payload(strct)? {
+            DataType::Struct(strct) => match transparent_payload(strct, mode)? {
                 TransparentPayload::Payload(ty) => {
-                    empty_payload_uses_unit_encoding(ty, types, seen)
+                    empty_payload_uses_unit_encoding(ty, types, seen, mode)
                 }
                 TransparentPayload::Contextual => Ok(true),
                 TransparentPayload::NotTransparent => match &strct.fields {
@@ -3097,7 +3101,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                     Fields::Named(_) => Ok(false),
                     Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
                         unnamed.fields[0].ty.as_ref().map_or(Ok(true), |ty| {
-                            empty_payload_uses_unit_encoding(ty, types, seen)
+                            empty_payload_uses_unit_encoding(ty, types, seen, mode)
                         })
                     }
                     Fields::Unnamed(_) => Ok(true),
@@ -3121,7 +3125,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                 let result = match referenced_ty {
                     Some(mut ty) => {
                         substitute_generics(&mut ty, named_reference_generics(reference));
-                        empty_payload_uses_unit_encoding(&ty, types, seen)
+                        empty_payload_uses_unit_encoding(&ty, types, seen, mode)
                     }
                     None => Ok(true),
                 };
@@ -3141,7 +3145,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                             else {
                                 return Ok(true);
                             };
-                            if empty_payload_uses_unit_encoding(&payload, types, seen)? {
+                            if empty_payload_uses_unit_encoding(&payload, types, seen, mode)? {
                                 return Ok(true);
                             }
                         }
@@ -3151,7 +3155,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
             }
             DataType::Intersection(parts) => {
                 for part in parts {
-                    if empty_payload_uses_unit_encoding(part, types, seen)? {
+                    if empty_payload_uses_unit_encoding(part, types, seen, mode)? {
                         return Ok(true);
                     }
                 }
@@ -3167,23 +3171,28 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         }
     }
 
-    fn inner(ty: &DataType, types: &Types, seen: &mut HashSet<Reference>) -> Result<bool, Error> {
-        if let Some(converted) = conversion_datatype_for_mode(ty, PhaseRewrite::Unified)?
+    fn inner(
+        ty: &DataType,
+        types: &Types,
+        seen: &mut HashSet<Reference>,
+        mode: PhaseRewrite,
+    ) -> Result<bool, Error> {
+        if let Some(converted) = conversion_datatype_for_mode(ty, mode)?
             && converted != *ty
         {
-            return inner(&converted, types, seen);
+            return inner(&converted, types, seen, mode);
         }
 
         match ty {
-            DataType::Struct(strct) => match transparent_payload(strct)? {
-                TransparentPayload::Payload(ty) => inner(ty, types, seen),
+            DataType::Struct(strct) => match transparent_payload(strct, mode)? {
+                TransparentPayload::Payload(ty) => inner(ty, types, seen, mode),
                 TransparentPayload::Contextual => Ok(true),
                 TransparentPayload::NotTransparent => match &strct.fields {
                     Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
                         let field = &unnamed.fields[0];
                         match &field.ty {
-                            Some(ty) => inner(ty, types, seen),
-                            None => Ok(!should_skip_field_for_mode(field, PhaseRewrite::Unified)?),
+                            Some(ty) => inner(ty, types, seen, mode),
+                            None => Ok(!should_skip_field_for_mode(field, mode)?),
                         }
                     }
                     Fields::Unit => Ok(true),
@@ -3208,12 +3217,69 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                 let result = match referenced_ty {
                     Some(mut ty) => {
                         substitute_generics(&mut ty, named_reference_generics(reference));
-                        inner(&ty, types, seen)
+                        inner(&ty, types, seen, mode)
                     }
                     None => Ok(false),
                 };
                 seen.remove(&key);
                 result
+            }
+            DataType::Enum(enm)
+                if matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged) =>
+            {
+                for (_, variant) in &enm.variants {
+                    if variant.skip {
+                        continue;
+                    }
+                    let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+                    if attrs
+                        .as_ref()
+                        .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
+                    {
+                        continue;
+                    }
+
+                    let Some(payload) = internal_tag_variant_payload_compatibility(
+                        variant,
+                        types,
+                        &mut HashSet::new(),
+                        mode,
+                    )?
+                    else {
+                        return Ok(true);
+                    };
+                    if payload.replacement.is_some() {
+                        return Ok(true);
+                    }
+                    if !payload.is_effectively_empty {
+                        continue;
+                    }
+
+                    match &variant.fields {
+                        Fields::Unit => return Ok(true),
+                        Fields::Named(_) => {}
+                        Fields::Unnamed(unnamed) => {
+                            let [field] = unnamed.fields.as_slice() else {
+                                return Ok(true);
+                            };
+                            if should_skip_field_for_mode(field, mode)? {
+                                return Ok(true);
+                            }
+                            let Some(ty) = &field.ty else {
+                                return Ok(true);
+                            };
+                            if empty_payload_uses_unit_encoding(
+                                ty,
+                                types,
+                                &mut HashSet::new(),
+                                mode,
+                            )? {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+                Ok(false)
             }
             DataType::Enum(enm)
                 if matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::External) =>
@@ -3223,9 +3289,10 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                         continue;
                     }
                     let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
-                    if attrs.as_ref().is_some_and(|attrs| {
-                        variant_is_skipped_for_mode(attrs, PhaseRewrite::Unified)
-                    }) {
+                    if attrs
+                        .as_ref()
+                        .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
+                    {
                         continue;
                     }
                     if attrs.as_ref().is_some_and(|attrs| attrs.other) {
@@ -3236,7 +3303,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                             variant,
                             types,
                             &mut HashSet::new(),
-                            PhaseRewrite::Unified,
+                            mode,
                         )?;
                         let requires_rewrite = match compatibility {
                             None => true,
@@ -3245,16 +3312,21 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                                 match &variant.fields {
                                     Fields::Unit => true,
                                     Fields::Named(_) => false,
-                                    Fields::Unnamed(_) => {
-                                        let Some(ty) = variant_payload_field(variant)
-                                            .and_then(|field| field.ty)
-                                        else {
+                                    Fields::Unnamed(unnamed) => {
+                                        let [field] = unnamed.fields.as_slice() else {
+                                            return Ok(true);
+                                        };
+                                        if should_skip_field_for_mode(field, mode)? {
+                                            return Ok(true);
+                                        }
+                                        let Some(ty) = &field.ty else {
                                             return Ok(true);
                                         };
                                         empty_payload_uses_unit_encoding(
-                                            &ty,
+                                            ty,
                                             types,
                                             &mut HashSet::new(),
+                                            mode,
                                         )?
                                     }
                                 }
@@ -3271,8 +3343,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
                         Fields::Unit => return Ok(true),
                         Fields::Unnamed(unnamed) => {
                             if let [field] = unnamed.fields.as_slice()
-                                && (field.ty.is_none()
-                                    || should_skip_field_for_mode(field, PhaseRewrite::Unified)?)
+                                && (field.ty.is_none() || should_skip_field_for_mode(field, mode)?)
                             {
                                 return Ok(true);
                             }
@@ -3284,7 +3355,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
             }
             DataType::Intersection(parts) => {
                 for part in parts {
-                    if inner(part, types, seen)? {
+                    if inner(part, types, seen, mode)? {
                         return Ok(true);
                     }
                 }
@@ -3301,7 +3372,10 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         }
     }
 
-    inner(ty, types, &mut HashSet::new())
+    if inner(ty, types, &mut HashSet::new(), PhaseRewrite::Serialize)? {
+        return Ok(true);
+    }
+    inner(ty, types, &mut HashSet::new(), PhaseRewrite::Deserialize)
 }
 
 fn contextualize_rewritten_external_units(
@@ -3632,13 +3706,13 @@ fn internal_tag_variant_payload_compatibility(
                 return Ok(None);
             }
 
-            unnamed
-                .fields
-                .iter()
-                .find_map(|field| field.ty.as_ref())
-                .map_or(Ok(None), |ty| {
-                    internal_tag_payload_compatibility(ty, original_types, seen, mode)
-                })
+            let field = &unnamed.fields[0];
+            if should_skip_field_for_mode(field, mode)? {
+                return Ok(Some(InternalTagPayloadCompatibility::empty()));
+            }
+            field.ty.as_ref().map_or(Ok(None), |ty| {
+                internal_tag_payload_compatibility(ty, original_types, seen, mode)
+            })
         }
     }
 }
