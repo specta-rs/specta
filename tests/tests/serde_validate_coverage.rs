@@ -1526,7 +1526,8 @@ fn serde_json_confirms_generic_flatten_instantiations() {
     })
     .expect_err("flattening the Vec instantiation fails at runtime");
     assert!(
-        err.to_string().contains("can only flatten structs and maps"),
+        err.to_string()
+            .contains("can only flatten structs and maps"),
         "unexpected serde_json error: {err}"
     );
 
@@ -1595,6 +1596,76 @@ fn flatten_of_nested_generic_instantiation_over_vec_is_rejected() {
         err.to_string().contains("flatten"),
         "unexpected error: {err}"
     );
+}
+
+// The reference memo must be keyed per *substitution*, not per syntactic
+// reference: `Outer<T>`'s body names `FlattenGeneric<T>` once, but reaching
+// it under two different outer instantiations in one walk must validate the
+// flattened `T` against each of them - whichever order the walk sees them in.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct Outer<T> {
+    inner: FlattenGeneric<T>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct BothGoodFirst {
+    good: Outer<Inner>,
+    bad: Outer<Vec<u8>>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct BothBadFirst {
+    bad: Outer<Vec<u8>>,
+    good: Outer<Inner>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct OnlyGood {
+    good: Outer<Inner>,
+}
+
+#[test]
+fn flatten_of_generic_reached_under_two_substitutions_rejects_the_bad_one() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<BothGoodFirst>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "the struct-shaped instantiation being walked first must not mask the Vec \
+             instantiation of the same syntactic reference",
+        );
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+
+    // Order-sensitivity check: the bad instantiation first must not pass by
+    // accident of walk order either.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<BothBadFirst>(),
+            specta_serde::Format,
+        )
+        .expect_err("the Vec instantiation must be rejected regardless of walk order");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_generic_reached_under_one_good_substitution_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<OnlyGood>(),
+            specta_serde::Format,
+        )
+        .expect("the struct-shaped instantiation alone is valid");
 }
 
 #[derive(Type, Serialize)]

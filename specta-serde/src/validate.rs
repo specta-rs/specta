@@ -367,10 +367,20 @@ fn inner(
                     }
                 }
 
-                if follow_named_references
-                    && !checked_references.contains(&Reference::Named(reference.clone()))
-                {
-                    let reference_key = Reference::Named(reference.clone());
+                // The memo is keyed on the reference with its generic
+                // arguments *resolved through the current substitution*, so
+                // the same syntactic reference reached under two different
+                // outer instantiations (say `Outer<Inner>` and
+                // `Outer<Vec<u8>>` both naming `FlattenGeneric<T>` in their
+                // body) is re-validated for each. Identical
+                // (reference, resolved arguments) pairs still dedupe, which
+                // keeps cyclic graphs terminating; if resolving a key would
+                // grow past `RESOLVED_KEY_NODE_BUDGET` (only possible for
+                // hand-built non-regular generics - derived ones don't
+                // compile), it falls back to the syntactic key, trading that
+                // pathological corner's strictness for termination.
+                let reference_key = resolved_reference_key(reference, env);
+                if follow_named_references && !checked_references.contains(&reference_key) {
                     checked_references.insert(reference_key);
                     if let Some(ty) = named_reference_ty(reference, types) {
                         let name = types
@@ -382,11 +392,7 @@ fn inner(
                         // which were written in the current scope - hence a
                         // new frame with `parent: env`. Inline datatypes were
                         // written at the use site, so they keep the current
-                        // scope. (Note the `checked_references` guard above
-                        // is keyed on the syntactic reference: the same
-                        // reference reached under a different substitution is
-                        // skipped, trading a sliver of strictness for
-                        // guaranteed termination.)
+                        // scope.
                         let reference_frame = match &reference.inner {
                             NamedReferenceType::Reference { generics, .. } => Some(GenericEnv {
                                 map: generics,
@@ -747,6 +753,130 @@ impl FlattenDirections {
 struct GenericEnv<'a> {
     map: &'a [(Generic, DataType)],
     parent: Option<&'a GenericEnv<'a>>,
+}
+
+/// Upper bound on the number of datatype nodes materialized while resolving a
+/// reference's generic arguments for a memo key. Regular type graphs resolve
+/// in a handful of nodes; only a hand-built non-regular generic (e.g.
+/// `N<T>` whose body names `N<Option<T>>` - the derive can't produce one,
+/// rustc fails to monomorphize `Type` for it) grows without bound, and the
+/// budget converts that into a fallback to the syntactic key so the walk
+/// still terminates.
+const RESOLVED_KEY_NODE_BUDGET: usize = 256;
+
+/// Builds the `checked_references` memo key for a named reference: the
+/// reference with its generic arguments resolved through `env`, so the same
+/// syntactic reference reached under different substitutions gets distinct
+/// keys (and identical substitutions still dedupe). Falls back to the
+/// syntactic reference when there is nothing to resolve or the node budget is
+/// exhausted.
+///
+/// Termination: every key is either a syntactic reference occurring in the
+/// finite type graph, or a reference whose resolved arguments are trees of at
+/// most [`RESOLVED_KEY_NODE_BUDGET`] nodes built from clones of graph nodes -
+/// a finite set either way, so a walk deduped on these keys terminates.
+fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_>>) -> Reference {
+    let mut resolved = reference.clone();
+
+    if env.is_some()
+        && let NamedReferenceType::Reference { generics, .. } = &mut resolved.inner
+        && !generics.is_empty()
+    {
+        let mut budget = RESOLVED_KEY_NODE_BUDGET;
+        if !generics
+            .iter_mut()
+            .all(|(_, dt)| resolve_generics_for_key(dt, env, &mut budget))
+        {
+            return Reference::Named(reference.clone());
+        }
+    }
+
+    Reference::Named(resolved)
+}
+
+/// Resolves [`DataType::Generic`] placeholders in `dt` (in place) through the
+/// substitution environment, for memo-key purposes. Returns `false` when the
+/// node budget runs out, in which case the caller discards the partial result
+/// and falls back to the syntactic key. Datatypes stored inside attributes
+/// (resolved conversion targets) are not rewritten; a key collision there
+/// would only re-skip a validation, never mis-validate.
+fn resolve_generics_for_key(
+    dt: &mut DataType,
+    env: Option<&GenericEnv<'_>>,
+    budget: &mut usize,
+) -> bool {
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
+
+    match dt {
+        DataType::Generic(generic) => {
+            let Some((arg, parent)) = env.and_then(|env| {
+                env.map
+                    .iter()
+                    .find(|(param, _)| param == generic)
+                    .map(|(_, arg)| (arg, env.parent))
+            }) else {
+                return true;
+            };
+
+            // The argument was written one scope up, so it resolves against
+            // the parent environment.
+            let mut resolved = arg.clone();
+            if !resolve_generics_for_key(&mut resolved, parent, budget) {
+                return false;
+            }
+            *dt = resolved;
+            true
+        }
+        DataType::Nullable(inner) => resolve_generics_for_key(inner, env, budget),
+        DataType::List(list) => resolve_generics_for_key(&mut list.ty, env, budget),
+        DataType::Map(map) => {
+            resolve_generics_for_key(map.key_ty_mut(), env, budget)
+                && resolve_generics_for_key(map.value_ty_mut(), env, budget)
+        }
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter_mut()
+            .all(|element| resolve_generics_for_key(element, env, budget)),
+        DataType::Intersection(parts) => parts
+            .iter_mut()
+            .all(|part| resolve_generics_for_key(part, env, budget)),
+        DataType::Struct(strct) => resolve_fields_generics_for_key(&mut strct.fields, env, budget),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter_mut()
+            .all(|(_, variant)| resolve_fields_generics_for_key(&mut variant.fields, env, budget)),
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Reference { generics, .. } => generics
+                .iter_mut()
+                .all(|(_, dt)| resolve_generics_for_key(dt, env, budget)),
+            NamedReferenceType::Inline { dt, .. } => resolve_generics_for_key(dt, env, budget),
+            NamedReferenceType::Recursive(_) => true,
+        },
+        DataType::Reference(Reference::Opaque(_)) | DataType::Primitive(_) => true,
+    }
+}
+
+fn resolve_fields_generics_for_key(
+    fields: &mut Fields,
+    env: Option<&GenericEnv<'_>>,
+    budget: &mut usize,
+) -> bool {
+    match fields {
+        Fields::Unit => true,
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .iter_mut()
+            .filter_map(|field| field.ty.as_mut())
+            .all(|ty| resolve_generics_for_key(ty, env, budget)),
+        Fields::Named(named) => named
+            .fields
+            .iter_mut()
+            .filter_map(|(_, field)| field.ty.as_mut())
+            .all(|ty| resolve_generics_for_key(ty, env, budget)),
+    }
 }
 
 /// `seen` tracks named references currently being resolved on this flatten
