@@ -170,7 +170,8 @@ fn serde_json_number_uses_untagged_wire_shape() {
     let lossless_output = Typescript::default()
         .export(&lossless_types, specta_serde::Format)
         .unwrap();
-    assert!(lossless_output.contains("bigint"));
+    assert!(lossless_output.contains("value: number"));
+    assert!(!lossless_output.contains("bigint"));
 
     let types = Remapper::new()
         .dangerous_bigints_as_number()

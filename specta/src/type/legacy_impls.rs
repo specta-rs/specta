@@ -136,8 +136,8 @@ const _: () = {
     struct SerdeNumber;
     impl Type for SerdeNumber {
         /// `serde_json::Number` is finite and serializes as an untagged JSON number. Its
-        /// `i64`/`u64` variants remain visible for precision guards; the finite-number
-        /// marker lets exporters collapse explicitly remapped variants without inheriting
+        /// `i64`/`u64` variants remain visible so exporters can enforce precision guards
+        /// before the finite-number marker collapses the rendered shape without inheriting
         /// the nullability of arbitrary `f64` values.
         fn definition(_: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
