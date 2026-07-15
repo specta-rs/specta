@@ -588,6 +588,60 @@ fn flatten_of_into_only_conversion_with_skipped_deserialize_is_accepted() {
         );
 }
 
+// The mirror case: a *deserialize-only* conversion to a non-flattenable wire
+// on a field whose deserialization is skipped. Serialization flattens the raw
+// named-field struct (fine); deserialization would use the Vec wire, but that
+// direction is dead, so the export must succeed.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(from = "Vec<String>")]
+struct FromOnlyVecWire {
+    x: String,
+}
+
+impl From<Vec<String>> for FromOnlyVecWire {
+    fn from(value: Vec<String>) -> Self {
+        Self {
+            x: value.into_iter().next().unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenFromOnlySkipDeserializeValid {
+    a: i32,
+    #[serde(flatten, skip_deserializing, default)]
+    v: FromOnlyVecWire,
+}
+
+#[test]
+fn serde_json_confirms_from_only_with_skipped_deserialize_flattens_fine() {
+    assert_eq!(
+        serde_json::to_string(&FlattenFromOnlySkipDeserializeValid {
+            a: 1,
+            v: FromOnlyVecWire { x: "hi".into() },
+        })
+        .unwrap(),
+        r#"{"a":1,"x":"hi"}"#
+    );
+    let back: FlattenFromOnlySkipDeserializeValid = serde_json::from_str(r#"{"a":1}"#).unwrap();
+    assert_eq!(back.v.x, "");
+}
+
+#[test]
+fn flatten_of_from_only_conversion_with_skipped_deserialize_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenFromOnlySkipDeserializeValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "serialization flattens the raw named-field struct; the Vec wire only exists on the \
+             skipped deserialize side",
+        );
+}
+
 // `#[serde(transparent)]` selects the single non-skipped field as the wire
 // shape, ignoring `#[serde(skip)]`-ed siblings (ground-truthed: the wrapper
 // below serializes as `[1,2]`, and flattening it fails at runtime with "can
