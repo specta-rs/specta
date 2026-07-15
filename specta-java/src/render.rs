@@ -797,7 +797,7 @@ fn validate_nested_declarations(
     let mut seen = BTreeMap::<String, ()>::new();
     seen.insert(enclosing_name.to_string(), ());
     for source in fields.iter().filter_map(|field| field.nested.as_deref()) {
-        for line in source.lines().map(str::trim) {
+        for line in source.lines() {
             let name = ["public record ", "public enum ", "public sealed interface "]
                 .into_iter()
                 .find_map(|prefix| line.strip_prefix(prefix))
@@ -824,6 +824,12 @@ fn string_literal_raw_value(datatype: &DataType) -> Option<&str> {
     let DataType::Enum(value) = datatype else {
         return None;
     };
+    if !value
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
+    {
+        return None;
+    }
     let [(raw_value, variant)] = value.variants.as_slice() else {
         return None;
     };

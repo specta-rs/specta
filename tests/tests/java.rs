@@ -460,6 +460,78 @@ fn files_layout_rejects_default_package_references_from_named_packages() {
 }
 
 #[test]
+fn genuine_inline_single_variant_enums_remain_enums() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum SingleVariant {
+        Only,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineSingleVariant {
+        #[specta(inline)]
+        status: SingleVariant,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<InlineSingleVariant>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("public enum Status"));
+    assert!(source.contains("Status status"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn equal_nested_names_are_allowed_in_separate_scopes() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Inner {
+        value: u8,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct A {
+        #[specta(inline)]
+        inner: Inner,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct B {
+        #[specta(inline)]
+        inner: Inner,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Outer {
+        #[specta(inline)]
+        a: A,
+        #[specta(inline)]
+        b: B,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(&path, &Types::default().register::<Outer>(), IdentityFormat)
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("public record A"));
+    assert!(source.contains("public record B"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
 fn rejects_wrapper_and_nested_declaration_collisions() {
     #[derive(Type)]
     #[specta(collect = false)]
