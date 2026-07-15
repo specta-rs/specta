@@ -2499,6 +2499,13 @@ fn transform_internal_variant(
             fields.extend(named.fields.iter().cloned());
         }
         Fields::Unnamed(unnamed) => {
+            if variant_payload_is_hidden(variant, mode)? {
+                return Err(Error::invalid_internally_tagged_variant(
+                    serialized_name,
+                    "a payload hidden only from Specta cannot be represented inside an internal tag",
+                ));
+            }
+
             let live_field_count = unnamed_live_field_count(unnamed);
 
             if live_field_count == 0 {
@@ -2520,10 +2527,11 @@ fn transform_internal_variant(
                 .expect("checked above")
                 .clone();
             let payload_ty = payload_field.ty.clone().expect("checked above");
-            let Some(payload_is_effectively_empty) = internal_tag_payload_compatibility(
+            let Some(payload) = internal_tag_payload_compatibility(
                 &payload_ty,
                 original_types,
                 &mut HashSet::new(),
+                mode,
             )?
             else {
                 return Err(Error::invalid_internally_tagged_variant(
@@ -2532,12 +2540,12 @@ fn transform_internal_variant(
                 ));
             };
 
-            if !payload_is_effectively_empty {
+            if !payload.is_effectively_empty {
                 return Ok(clone_variant_with_unnamed_fields(
                     variant,
                     vec![Field::new(DataType::Intersection(vec![
                         named_fields_datatype(fields),
-                        payload_ty,
+                        payload.replacement.unwrap_or(payload_ty),
                     ]))],
                 ));
             }
@@ -2770,19 +2778,81 @@ fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> 
     transformed
 }
 
+struct InternalTagPayloadCompatibility {
+    is_effectively_empty: bool,
+    replacement: Option<DataType>,
+}
+
+impl InternalTagPayloadCompatibility {
+    fn empty() -> Self {
+        Self {
+            is_effectively_empty: true,
+            replacement: None,
+        }
+    }
+
+    fn merge_as_is() -> Self {
+        Self {
+            is_effectively_empty: false,
+            replacement: None,
+        }
+    }
+}
+
 fn internal_tag_payload_compatibility(
     ty: &DataType,
     original_types: &Types,
-    seen: &mut HashSet<TypeIdentity>,
-) -> Result<Option<bool>, Error> {
+    seen: &mut HashSet<Reference>,
+    mode: PhaseRewrite,
+) -> Result<Option<InternalTagPayloadCompatibility>, Error> {
+    if let Some(converted) = conversion_datatype_for_mode(ty, mode)?
+        && converted != *ty
+    {
+        let Some(mut compatibility) =
+            internal_tag_payload_compatibility(&converted, original_types, seen, mode)?
+        else {
+            return Ok(None);
+        };
+        if !compatibility.is_effectively_empty && compatibility.replacement.is_none() {
+            compatibility.replacement = Some(converted);
+        }
+        return Ok(Some(compatibility));
+    }
+
     match ty {
-        DataType::Map(_) => Ok(Some(false)),
+        DataType::Map(_) | DataType::Generic(_) => {
+            Ok(Some(InternalTagPayloadCompatibility::merge_as_is()))
+        }
         DataType::Struct(strct) => {
             if SerdeContainerAttrs::from_attributes(&strct.attributes)?
                 .is_some_and(|attrs| attrs.transparent)
             {
+                let has_hidden_wire_data =
+                    match &strct.fields {
+                        Fields::Unit => Ok(false),
+                        Fields::Unnamed(unnamed) => unnamed.fields.iter().try_fold(
+                            false,
+                            |hidden, field| -> Result<_, Error> {
+                                Ok(hidden
+                                    || (field.ty.is_none()
+                                        && !should_skip_field_for_mode(field, mode)?))
+                            },
+                        ),
+                        Fields::Named(named) => named.fields.iter().try_fold(
+                            false,
+                            |hidden, (_, field)| -> Result<_, Error> {
+                                Ok(hidden
+                                    || (field.ty.is_none()
+                                        && !should_skip_field_for_mode(field, mode)?))
+                            },
+                        ),
+                    }?;
+                if has_hidden_wire_data {
+                    return Ok(None);
+                }
+
                 let payload_fields = match &strct.fields {
-                    Fields::Unit => return Ok(Some(true)),
+                    Fields::Unit => return Ok(Some(InternalTagPayloadCompatibility::empty())),
                     Fields::Unnamed(unnamed) => unnamed
                         .fields
                         .iter()
@@ -2797,104 +2867,766 @@ fn internal_tag_payload_compatibility(
 
                 let [inner_ty] = payload_fields.as_slice() else {
                     if payload_fields.is_empty() {
-                        return Ok(Some(true));
+                        return Ok(Some(InternalTagPayloadCompatibility::empty()));
                     }
 
                     return Ok(None);
                 };
 
-                return internal_tag_payload_compatibility(inner_ty, original_types, seen);
+                return internal_tag_payload_compatibility(inner_ty, original_types, seen, mode);
             }
 
-            Ok(match &strct.fields {
-                Fields::Named(named) => Some(
-                    named
-                        .fields
-                        .iter()
-                        .all(|(_, field)| field.ty.as_ref().is_none()),
-                ),
-                Fields::Unit | Fields::Unnamed(_) => None,
-            })
+            match &strct.fields {
+                Fields::Unit => Ok(Some(InternalTagPayloadCompatibility::empty())),
+                Fields::Named(named) => {
+                    let mut is_effectively_empty = true;
+                    for (_, field) in &named.fields {
+                        if field.ty.is_some() {
+                            is_effectively_empty = false;
+                        } else if !should_skip_field_for_mode(field, mode)? {
+                            return Ok(None);
+                        }
+                    }
+                    Ok(Some(InternalTagPayloadCompatibility {
+                        is_effectively_empty,
+                        replacement: None,
+                    }))
+                }
+                // Serde's newtype structs delegate their payload back into
+                // `TaggedSerializer`. Empty and multi-field tuple structs use
+                // the unsupported tuple-struct path instead.
+                Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
+                    let Some(inner_ty) = unnamed.fields[0].ty.as_ref() else {
+                        return if should_skip_field_for_mode(&unnamed.fields[0], mode)? {
+                            Ok(Some(InternalTagPayloadCompatibility::empty()))
+                        } else {
+                            Ok(None)
+                        };
+                    };
+                    internal_tag_payload_compatibility(inner_ty, original_types, seen, mode)
+                }
+                Fields::Unnamed(_) => Ok(None),
+            }
         }
-        DataType::Tuple(tuple) => Ok(tuple.elements.is_empty().then_some(true)),
+        DataType::Tuple(tuple) => Ok(tuple
+            .elements
+            .is_empty()
+            .then(InternalTagPayloadCompatibility::empty)),
         DataType::Intersection(types) => {
             let mut is_effectively_empty = true;
+            let mut replacements = Vec::with_capacity(types.len());
+            let mut was_rewritten = false;
 
             for ty in types {
-                let Some(part_empty) =
-                    internal_tag_payload_compatibility(ty, original_types, seen)?
+                let Some(part) =
+                    internal_tag_payload_compatibility(ty, original_types, seen, mode)?
                 else {
                     return Ok(None);
                 };
 
-                is_effectively_empty &= part_empty;
+                is_effectively_empty &= part.is_effectively_empty;
+                was_rewritten |= part.replacement.is_some();
+                replacements.push(part.replacement.unwrap_or_else(|| ty.clone()));
             }
 
-            Ok(Some(is_effectively_empty))
+            Ok(Some(InternalTagPayloadCompatibility {
+                is_effectively_empty,
+                replacement: was_rewritten.then_some(DataType::Intersection(replacements)),
+            }))
         }
         DataType::Reference(Reference::Named(reference)) => {
-            if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
-                return internal_tag_payload_compatibility(dt, original_types, seen);
-            }
-
-            let Some(referenced) = original_types.get(reference) else {
-                return Ok(None);
+            let referenced_ty = match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => (**dt).clone(),
+                NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive(_) => {
+                    let Some(ty) = original_types
+                        .get(reference)
+                        .and_then(|referenced| referenced.ty.as_ref())
+                    else {
+                        return Ok(None);
+                    };
+                    ty.clone()
+                }
             };
-            let Some(referenced_ty) = referenced.ty.as_ref() else {
-                return Ok(None);
-            };
+            let mut referenced_ty = referenced_ty;
+            substitute_generics(&mut referenced_ty, named_reference_generics(reference));
 
-            let key = TypeIdentity::from_ndt(referenced);
+            let key = Reference::Named(reference.clone());
             if !seen.insert(key.clone()) {
-                return Ok(Some(false));
+                return Ok(Some(InternalTagPayloadCompatibility::merge_as_is()));
             }
 
-            let compatible =
-                internal_tag_payload_compatibility(referenced_ty, original_types, seen);
+            let mut compatible =
+                internal_tag_payload_compatibility(&referenced_ty, original_types, seen, mode)?;
             seen.remove(&key);
-            compatible
+            if let Some(replacement) = compatible
+                .as_mut()
+                .and_then(|payload| payload.replacement.as_mut())
+            {
+                substitute_generics(replacement, named_reference_generics(reference));
+            }
+            Ok(compatible)
+        }
+        DataType::Enum(enm)
+            if enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+                && !matches!(
+                    EnumRepr::from_attrs(&enm.attributes),
+                    Ok(EnumRepr::Untagged)
+                ) =>
+        {
+            Ok(Some(contextualize_rewritten_external_units(enm)?))
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes) {
             Ok(EnumRepr::Untagged) => {
                 let mut is_effectively_empty = true;
-                for (_, variant) in &enm.variants {
-                    let Some(variant_empty) =
-                        internal_tag_variant_payload_compatibility(variant, original_types, seen)?
+                let mut rewritten = enm.clone();
+                let mut changed = false;
+                for ((_, variant), (_, rewritten_variant)) in
+                    enm.variants.iter().zip(&mut rewritten.variants)
+                {
+                    let Some(variant_payload) = internal_tag_variant_payload_compatibility(
+                        variant,
+                        original_types,
+                        seen,
+                        mode,
+                    )?
                     else {
                         return Ok(None);
                     };
 
-                    is_effectively_empty &= variant_empty;
+                    is_effectively_empty &= variant_payload.is_effectively_empty;
+                    let replacement = variant_payload.replacement.or_else(|| {
+                        variant_payload
+                            .is_effectively_empty
+                            .then(|| named_fields_datatype(Vec::new()))
+                    });
+                    if let Some(replacement) = replacement {
+                        *rewritten_variant = clone_variant_with_unnamed_fields(
+                            rewritten_variant,
+                            vec![Field::new(replacement)],
+                        );
+                        changed = true;
+                    }
                 }
 
-                Ok(Some(is_effectively_empty))
+                Ok(Some(InternalTagPayloadCompatibility {
+                    is_effectively_empty,
+                    replacement: changed.then_some(DataType::Enum(rewritten)),
+                }))
             }
-            Ok(EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }) => {
-                Ok(Some(false))
+            Ok(EnumRepr::External) => {
+                if !external_enum_requires_contextual_rewrite(enm, mode)? {
+                    return Ok(Some(InternalTagPayloadCompatibility::merge_as_is()));
+                }
+                Ok(Some(InternalTagPayloadCompatibility {
+                    is_effectively_empty: false,
+                    replacement: Some(external_enum_tagged_payload_datatype(
+                        enm,
+                        original_types,
+                        mode,
+                    )?),
+                }))
+            }
+            Ok(EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }) => {
+                Ok(Some(InternalTagPayloadCompatibility::merge_as_is()))
             }
             Err(_) => Ok(None),
         },
         DataType::Primitive(_)
         | DataType::List(_)
         | DataType::Nullable(_)
-        | DataType::Reference(Reference::Opaque(_))
-        | DataType::Generic(_) => Ok(None),
+        | DataType::Reference(Reference::Opaque(_)) => Ok(None),
+    }
+}
+
+pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
+    ty: &DataType,
+    types: &Types,
+) -> Result<bool, Error> {
+    enum TransparentPayload<'a> {
+        NotTransparent,
+        Payload(&'a DataType),
+        Contextual,
+    }
+
+    fn transparent_payload(strct: &Struct) -> Result<TransparentPayload<'_>, Error> {
+        if !SerdeContainerAttrs::from_attributes(&strct.attributes)?
+            .is_some_and(|attrs| attrs.transparent)
+        {
+            return Ok(TransparentPayload::NotTransparent);
+        }
+
+        let fields = match &strct.fields {
+            Fields::Unit => Vec::new(),
+            Fields::Unnamed(unnamed) => unnamed.fields.iter().collect::<Vec<_>>(),
+            Fields::Named(named) => named
+                .fields
+                .iter()
+                .map(|(_, field)| field)
+                .collect::<Vec<_>>(),
+        };
+        let mut live = Vec::new();
+        for field in fields {
+            if should_skip_field_for_mode(field, PhaseRewrite::Unified)? {
+                continue;
+            }
+            let Some(ty) = &field.ty else {
+                return Ok(TransparentPayload::Contextual);
+            };
+            live.push(ty);
+        }
+
+        Ok(match live.as_slice() {
+            [ty] => TransparentPayload::Payload(ty),
+            _ => TransparentPayload::Contextual,
+        })
+    }
+
+    fn empty_payload_uses_unit_encoding(
+        ty: &DataType,
+        types: &Types,
+        seen: &mut HashSet<Reference>,
+    ) -> Result<bool, Error> {
+        match ty {
+            DataType::Struct(strct) => match transparent_payload(strct)? {
+                TransparentPayload::Payload(ty) => {
+                    empty_payload_uses_unit_encoding(ty, types, seen)
+                }
+                TransparentPayload::Contextual => Ok(true),
+                TransparentPayload::NotTransparent => match &strct.fields {
+                    Fields::Unit => Ok(true),
+                    Fields::Named(_) => Ok(false),
+                    Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
+                        unnamed.fields[0].ty.as_ref().map_or(Ok(true), |ty| {
+                            empty_payload_uses_unit_encoding(ty, types, seen)
+                        })
+                    }
+                    Fields::Unnamed(_) => Ok(true),
+                },
+            },
+            DataType::Tuple(tuple) => Ok(tuple.elements.is_empty()),
+            DataType::Reference(Reference::Named(reference)) => {
+                let key = Reference::Named(reference.clone());
+                if !seen.insert(key.clone()) {
+                    return Ok(false);
+                }
+                let referenced_ty = match &reference.inner {
+                    NamedReferenceType::Inline { dt, .. } => Some((**dt).clone()),
+                    NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive(_) => {
+                        types
+                            .get(reference)
+                            .and_then(|ndt| ndt.ty.as_ref())
+                            .cloned()
+                    }
+                };
+                let result = match referenced_ty {
+                    Some(mut ty) => {
+                        substitute_generics(&mut ty, named_reference_generics(reference));
+                        empty_payload_uses_unit_encoding(&ty, types, seen)
+                    }
+                    None => Ok(true),
+                };
+                seen.remove(&key);
+                result
+            }
+            DataType::Enum(enm)
+                if matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged) =>
+            {
+                for (_, variant) in &enm.variants {
+                    match &variant.fields {
+                        Fields::Unit => return Ok(true),
+                        Fields::Named(_) => {}
+                        Fields::Unnamed(_) => {
+                            let Some(payload) =
+                                variant_payload_field(variant).and_then(|field| field.ty)
+                            else {
+                                return Ok(true);
+                            };
+                            if empty_payload_uses_unit_encoding(&payload, types, seen)? {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+                Ok(false)
+            }
+            DataType::Intersection(parts) => {
+                for part in parts {
+                    if empty_payload_uses_unit_encoding(part, types, seen)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            DataType::Map(_) => Ok(false),
+            DataType::Enum(_)
+            | DataType::Primitive(_)
+            | DataType::List(_)
+            | DataType::Nullable(_)
+            | DataType::Generic(_)
+            | DataType::Reference(Reference::Opaque(_)) => Ok(true),
+        }
+    }
+
+    fn inner(ty: &DataType, types: &Types, seen: &mut HashSet<Reference>) -> Result<bool, Error> {
+        if let Some(converted) = conversion_datatype_for_mode(ty, PhaseRewrite::Unified)?
+            && converted != *ty
+        {
+            return inner(&converted, types, seen);
+        }
+
+        match ty {
+            DataType::Struct(strct) => match transparent_payload(strct)? {
+                TransparentPayload::Payload(ty) => inner(ty, types, seen),
+                TransparentPayload::Contextual => Ok(true),
+                TransparentPayload::NotTransparent => match &strct.fields {
+                    Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
+                        let field = &unnamed.fields[0];
+                        match &field.ty {
+                            Some(ty) => inner(ty, types, seen),
+                            None => Ok(!should_skip_field_for_mode(field, PhaseRewrite::Unified)?),
+                        }
+                    }
+                    Fields::Unit => Ok(true),
+                    Fields::Named(_) | Fields::Unnamed(_) => Ok(false),
+                },
+            },
+            DataType::Reference(Reference::Named(reference)) => {
+                let key = Reference::Named(reference.clone());
+                if !seen.insert(key.clone()) {
+                    return Ok(false);
+                }
+
+                let referenced_ty = match &reference.inner {
+                    NamedReferenceType::Inline { dt, .. } => Some((**dt).clone()),
+                    NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive(_) => {
+                        types
+                            .get(reference)
+                            .and_then(|ndt| ndt.ty.as_ref())
+                            .cloned()
+                    }
+                };
+                let result = match referenced_ty {
+                    Some(mut ty) => {
+                        substitute_generics(&mut ty, named_reference_generics(reference));
+                        inner(&ty, types, seen)
+                    }
+                    None => Ok(false),
+                };
+                seen.remove(&key);
+                result
+            }
+            DataType::Enum(enm)
+                if matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::External) =>
+            {
+                for (_, variant) in &enm.variants {
+                    if variant.skip {
+                        continue;
+                    }
+                    let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+                    if attrs.as_ref().is_some_and(|attrs| {
+                        variant_is_skipped_for_mode(attrs, PhaseRewrite::Unified)
+                    }) {
+                        continue;
+                    }
+                    if attrs.as_ref().is_some_and(|attrs| attrs.other) {
+                        return Ok(true);
+                    }
+                    if attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
+                        let compatibility = internal_tag_variant_payload_compatibility(
+                            variant,
+                            types,
+                            &mut HashSet::new(),
+                            PhaseRewrite::Unified,
+                        )?;
+                        let requires_rewrite = match compatibility {
+                            None => true,
+                            Some(payload) if payload.replacement.is_some() => true,
+                            Some(payload) if payload.is_effectively_empty => {
+                                match &variant.fields {
+                                    Fields::Unit => true,
+                                    Fields::Named(_) => false,
+                                    Fields::Unnamed(_) => {
+                                        let Some(ty) = variant_payload_field(variant)
+                                            .and_then(|field| field.ty)
+                                        else {
+                                            return Ok(true);
+                                        };
+                                        empty_payload_uses_unit_encoding(
+                                            &ty,
+                                            types,
+                                            &mut HashSet::new(),
+                                        )?
+                                    }
+                                }
+                            }
+                            Some(_) => false,
+                        };
+                        if requires_rewrite {
+                            return Ok(true);
+                        }
+                        continue;
+                    }
+
+                    match &variant.fields {
+                        Fields::Unit => return Ok(true),
+                        Fields::Unnamed(unnamed) => {
+                            if let [field] = unnamed.fields.as_slice()
+                                && (field.ty.is_none()
+                                    || should_skip_field_for_mode(field, PhaseRewrite::Unified)?)
+                            {
+                                return Ok(true);
+                            }
+                        }
+                        Fields::Named(_) => {}
+                    }
+                }
+                Ok(false)
+            }
+            DataType::Intersection(parts) => {
+                for part in parts {
+                    if inner(part, types, seen)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            DataType::Tuple(tuple) => Ok(tuple.elements.is_empty()),
+            DataType::Enum(_)
+            | DataType::Map(_)
+            | DataType::List(_)
+            | DataType::Nullable(_)
+            | DataType::Primitive(_)
+            | DataType::Generic(_)
+            | DataType::Reference(Reference::Opaque(_)) => Ok(false),
+        }
+    }
+
+    inner(ty, types, &mut HashSet::new())
+}
+
+fn contextualize_rewritten_external_units(
+    enm: &Enum,
+) -> Result<InternalTagPayloadCompatibility, Error> {
+    let mut rewritten = enm.clone();
+    let mut changed = false;
+
+    for (name, variant) in &mut rewritten.variants {
+        let Fields::Unnamed(fields) = &variant.fields else {
+            continue;
+        };
+        let [field] = fields.fields.as_slice() else {
+            continue;
+        };
+        let Some(ty) = field.ty.as_ref() else {
+            continue;
+        };
+        if matches!(ty, DataType::Primitive(Primitive::str)) {
+            return Err(Error::invalid_internally_tagged_variant(
+                name.clone(),
+                "an external enum payload with `#[serde(other)]` cannot be represented generically inside an internal tag",
+            ));
+        }
+        if matches!(ty, DataType::Tuple(tuple) if tuple.elements.is_empty()) {
+            *variant = clone_variant_with_unnamed_fields(
+                variant,
+                vec![Field::new(named_fields_datatype(Vec::new()))],
+            );
+            variant.attributes = Default::default();
+            changed = true;
+            continue;
+        }
+        if !is_generated_string_literal_datatype(ty) {
+            continue;
+        }
+
+        *variant = clone_variant_with_named_fields(
+            variant,
+            vec![(
+                name.clone(),
+                Field::new(DataType::Tuple(Tuple::new(vec![]))),
+            )],
+        );
+        variant.attributes = Default::default();
+        changed = true;
+    }
+
+    if changed {
+        Ok(InternalTagPayloadCompatibility {
+            is_effectively_empty: false,
+            replacement: Some(DataType::Enum(rewritten)),
+        })
+    } else {
+        Ok(InternalTagPayloadCompatibility::merge_as_is())
+    }
+}
+
+fn external_enum_requires_contextual_rewrite(
+    enm: &Enum,
+    mode: PhaseRewrite,
+) -> Result<bool, Error> {
+    for (_, variant) in &enm.variants {
+        if variant.skip {
+            continue;
+        }
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if attrs
+            .as_ref()
+            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
+        {
+            continue;
+        }
+        if attrs
+            .as_ref()
+            .is_some_and(|attrs| attrs.other || attrs.untagged)
+        {
+            return Ok(true);
+        }
+
+        match &variant.fields {
+            Fields::Unit => return Ok(true),
+            Fields::Unnamed(unnamed) => {
+                if let [field] = unnamed.fields.as_slice()
+                    && (field.ty.is_none() || should_skip_field_for_mode(field, mode)?)
+                {
+                    return Ok(true);
+                }
+            }
+            Fields::Named(_) => {}
+        }
+    }
+
+    Ok(false)
+}
+
+// An externally tagged enum normally renders a unit variant as a string, but
+// serde's `TaggedSerializer` always writes the inner discriminant as a map
+// entry. Build the contextual representation used only inside the outer
+// internally tagged newtype variant.
+fn external_enum_tagged_payload_datatype(
+    enm: &Enum,
+    original_types: &Types,
+    mode: PhaseRewrite,
+) -> Result<DataType, Error> {
+    let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
+    let mut transformed = Enum::default();
+
+    for (variant_name, original_variant) in &enm.variants {
+        let mut variant = original_variant.clone();
+        if variant.skip {
+            continue;
+        }
+
+        let variant_attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if variant_attrs
+            .as_ref()
+            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
+        {
+            continue;
+        }
+
+        let rename_rule =
+            enum_variant_field_rename_rule(&container_attrs, &variant, mode, variant_name)?;
+        rewrite_fields_for_phase(
+            &mut variant.fields,
+            mode,
+            original_types,
+            &HashMap::new(),
+            &HashSet::new(),
+            rename_rule,
+            false,
+            true,
+        )?;
+
+        if let Fields::Named(fields) = &variant.fields {
+            if fields
+                .fields
+                .iter()
+                .any(|(_, field)| field_is_flattened(field))
+            {
+                return Err(Error::invalid_internally_tagged_variant(
+                    variant_name.clone(),
+                    "flattened fields in a contextual external enum payload are not supported",
+                ));
+            }
+            if mode == PhaseRewrite::Deserialize
+                && fields
+                    .fields
+                    .iter()
+                    .any(|(_, field)| field_has_aliases(field))
+            {
+                return Err(Error::invalid_internally_tagged_variant(
+                    variant_name.clone(),
+                    "field aliases in a contextual external enum payload are not supported",
+                ));
+            }
+        }
+
+        if variant_payload_is_hidden(&variant, mode)? {
+            return Err(Error::invalid_internally_tagged_variant(
+                variant_name.clone(),
+                "a payload hidden only from Specta cannot be represented inside an internal tag",
+            ));
+        }
+
+        if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
+            let payload = match &variant.fields {
+                Fields::Unit => named_fields_datatype(Vec::new()),
+                _ => {
+                    let payload = variant_payload_field(&variant)
+                        .ok_or_else(|| {
+                            Error::invalid_external_tagged_variant(variant_name.clone())
+                        })?
+                        .ty
+                        .expect("variant payload fields always have a datatype");
+                    let Some(compatibility) = internal_tag_payload_compatibility(
+                        &payload,
+                        original_types,
+                        &mut HashSet::new(),
+                        mode,
+                    )?
+                    else {
+                        return Err(Error::invalid_internally_tagged_variant(
+                            variant_name.clone(),
+                            "untagged payload cannot be merged with a tag",
+                        ));
+                    };
+
+                    if compatibility.is_effectively_empty {
+                        named_fields_datatype(Vec::new())
+                    } else {
+                        compatibility.replacement.unwrap_or(payload)
+                    }
+                }
+            };
+            let mut transformed_variant =
+                clone_variant_with_unnamed_fields(&variant, vec![Field::new(payload)]);
+            transformed_variant.attributes = Default::default();
+            transformed
+                .variants
+                .push((variant_name.clone(), transformed_variant));
+            continue;
+        }
+
+        let serialized_name =
+            serialized_variant_name(variant_name, &variant, &container_attrs, mode)?;
+        let aliases = variant_attrs
+            .as_ref()
+            .filter(|_| mode == PhaseRewrite::Deserialize)
+            .map(|attrs| attrs.aliases.as_slice())
+            .unwrap_or(&[]);
+
+        for name in std::iter::once(serialized_name).chain(aliases.iter().cloned()) {
+            let widen_tag = mode == PhaseRewrite::Deserialize
+                && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
+            if widen_tag {
+                return Err(Error::invalid_internally_tagged_variant(
+                    name,
+                    "an external enum payload with `#[serde(other)]` cannot be represented generically inside an internal tag",
+                ));
+            }
+
+            let payload = match &variant.fields {
+                Fields::Unit => Field::new(DataType::Tuple(Tuple::new(vec![]))),
+                _ => variant_payload_field(&variant)
+                    .ok_or_else(|| Error::invalid_external_tagged_variant(name.clone()))?,
+            };
+            let mut transformed_variant = clone_variant_with_named_fields(
+                &variant,
+                vec![(Cow::Owned(name.clone()), payload)],
+            );
+            transformed_variant.attributes = Default::default();
+            transformed
+                .variants
+                .push((Cow::Owned(name), transformed_variant));
+        }
+    }
+
+    transformed
+        .attributes
+        .insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    Ok(DataType::Enum(transformed))
+}
+
+fn substitute_generics(ty: &mut DataType, generics: &[(specta::datatype::Generic, DataType)]) {
+    match ty {
+        DataType::Generic(generic) => {
+            if let Some((_, concrete)) = generics.iter().find(|(candidate, _)| candidate == generic)
+            {
+                *ty = concrete.clone();
+            }
+        }
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                substitute_field_generics(&mut variant.fields, generics);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                substitute_generics(element, generics);
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Intersection(parts) => {
+            for part in parts {
+                substitute_generics(part, generics);
+            }
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Reference(Reference::Named(reference)) => {
+            for (_, argument) in named_reference_generics_mut(reference) {
+                substitute_generics(argument, generics);
+            }
+            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                substitute_generics(dt, generics);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(
+    fields: &mut Fields,
+    generics: &[(specta::datatype::Generic, DataType)],
+) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => {
+            for field in &mut fields.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        Fields::Named(fields) => {
+            for (_, field) in &mut fields.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
     }
 }
 
 fn internal_tag_variant_payload_compatibility(
     variant: &Variant,
     original_types: &Types,
-    seen: &mut HashSet<TypeIdentity>,
-) -> Result<Option<bool>, Error> {
+    seen: &mut HashSet<Reference>,
+    mode: PhaseRewrite,
+) -> Result<Option<InternalTagPayloadCompatibility>, Error> {
     match &variant.fields {
-        Fields::Unit => Ok(Some(true)),
-        Fields::Named(named) => Ok(Some(
-            named
+        Fields::Unit => Ok(Some(InternalTagPayloadCompatibility::empty())),
+        Fields::Named(named) => Ok(Some(InternalTagPayloadCompatibility {
+            is_effectively_empty: named
                 .fields
                 .iter()
                 .all(|(_, field)| field.ty.as_ref().is_none()),
-        )),
+            replacement: None,
+        })),
         Fields::Unnamed(unnamed) => {
             if unnamed.fields.len() != 1 {
                 return Ok(None);
@@ -2905,7 +3637,7 @@ fn internal_tag_variant_payload_compatibility(
                 .iter()
                 .find_map(|field| field.ty.as_ref())
                 .map_or(Ok(None), |ty| {
-                    internal_tag_payload_compatibility(ty, original_types, seen)
+                    internal_tag_payload_compatibility(ty, original_types, seen, mode)
                 })
         }
     }

@@ -36,6 +36,7 @@ mod serde_empty_payloads;
 mod serde_enum_rewrite;
 mod serde_flatten_option;
 mod serde_identifiers;
+mod serde_internal_tag_payloads;
 mod serde_other;
 mod serde_unified_asymmetry;
 mod serde_unknown_attrs;

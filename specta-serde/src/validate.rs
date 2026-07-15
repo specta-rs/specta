@@ -42,6 +42,23 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
         )?;
     }
 
+    // Generic definitions are necessarily conditional: an internally tagged
+    // `E<T> { V(T) }` is valid for map-like `T` and invalid for scalar `T`.
+    // Walk registered roots as use sites so their concrete generic arguments
+    // are available through `GenericEnv` when following the named reference.
+    for root in types.roots() {
+        inner(
+            root,
+            types,
+            &mut HashSet::new(),
+            "<root>".to_string(),
+            mode,
+            true,
+            None,
+            FlattenDirections::LIVE,
+        )?;
+    }
+
     Ok(())
 }
 
@@ -316,6 +333,7 @@ fn inner(
                 path.clone(),
                 mode,
                 declared_directions.deserialize,
+                env,
             )?;
             if variant_names_emitted {
                 validate_variant_aliases(
@@ -1734,6 +1752,7 @@ fn validate_enum(
     path: String,
     mode: ApplyMode,
     declared_deserializes: bool,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     let valid_variants = enm
         .variants
@@ -1754,7 +1773,7 @@ fn validate_enum(
     validate_adjacent_collapsed_newtype_variants(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
-        validate_internally_tag_enum(enm, types, path, &mut HashSet::new())?;
+        validate_internally_tag_enum(enm, types, path, &mut HashSet::new(), env)?;
     }
 
     Ok(())
@@ -1936,9 +1955,10 @@ fn validate_internally_tag_enum(
     types: &Types,
     path: String,
     seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     for (variant_name, variant) in &enm.variants {
-        validate_internally_tag_variant(enm, variant_name, variant, types, &path, seen)?;
+        validate_internally_tag_variant(enm, variant_name, variant, types, &path, seen, env)?;
     }
 
     Ok(())
@@ -1951,6 +1971,7 @@ fn validate_internally_tag_variant(
     types: &Types,
     path: &str,
     seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     let _ = enm;
     if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
@@ -1977,7 +1998,15 @@ fn validate_internally_tag_variant(
                 ));
             }
 
-            validate_internally_tag_enum_datatype(first_field, types, path, variant_name, seen)
+            validate_internally_tag_enum_datatype(
+                first_field,
+                types,
+                path,
+                variant_name,
+                seen,
+                env,
+                true,
+            )
         }
     }
 }
@@ -1992,31 +2021,171 @@ fn validate_internally_tag_enum_datatype(
     path: &str,
     variant_name: &str,
     seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
+    reject_contextual_generic_argument: bool,
 ) -> Result<(), Error> {
     match ty {
         DataType::Map(_) => Ok(()),
-        DataType::Struct(_) => Ok(()),
+        DataType::Struct(strct)
+            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
+                .is_some_and(|attrs| attrs.transparent) =>
+        {
+            let mut live_fields = Vec::new();
+            match &strct.fields {
+                Fields::Unit => {}
+                Fields::Unnamed(unnamed) => {
+                    for field in &unnamed.fields {
+                        let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+                        if attrs
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
+                        {
+                            continue;
+                        }
+                        if let Some(ty) = &field.ty {
+                            live_fields.push(ty);
+                        }
+                    }
+                }
+                Fields::Named(named) => {
+                    for (_, field) in &named.fields {
+                        let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+                        if attrs
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
+                        {
+                            continue;
+                        }
+                        if let Some(ty) = &field.ty {
+                            live_fields.push(ty);
+                        }
+                    }
+                }
+            }
+
+            match live_fields.as_slice() {
+                [ty] => validate_internally_tag_enum_datatype(
+                    ty,
+                    types,
+                    path,
+                    variant_name,
+                    seen,
+                    env,
+                    reject_contextual_generic_argument,
+                ),
+                [] => Ok(()),
+                _ => Err(Error::invalid_internally_tagged_enum(
+                    path,
+                    variant_name,
+                    "payload cannot be merged with an internal tag",
+                )),
+            }
+        }
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unit | Fields::Named(_) => Ok(()),
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
+                unnamed.fields[0].ty.as_ref().map_or(Ok(()), |ty| {
+                    validate_internally_tag_enum_datatype(
+                        ty,
+                        types,
+                        path,
+                        variant_name,
+                        seen,
+                        env,
+                        reject_contextual_generic_argument,
+                    )
+                })
+            }
+            Fields::Unnamed(_) => Err(Error::invalid_internally_tagged_enum(
+                path,
+                variant_name,
+                "payload cannot be merged with an internal tag",
+            )),
+        },
         DataType::Reference(Reference::Named(reference)) => {
-            let key = Reference::Named(reference.clone());
+            let key = resolved_reference_key(reference, env);
             if !seen.insert(key.clone()) {
                 return Ok(());
             }
 
-            let result = named_reference_ty(reference, types).map_or(Ok(()), |ty| {
-                let path = inner_reference_path(path, reference, types);
-                validate_internally_tag_enum_datatype(ty, types, &path, variant_name, seen)
-            });
+            let path = inner_reference_path(path, reference, types);
+            let result = match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    let reject_contextual_generic_argument =
+                        reject_contextual_generic_argument && datatype_changes_under_env(dt, env);
+                    validate_internally_tag_enum_datatype(
+                        dt,
+                        types,
+                        &path,
+                        variant_name,
+                        seen,
+                        env,
+                        reject_contextual_generic_argument,
+                    )
+                }
+                NamedReferenceType::Reference { generics, .. } => {
+                    let reject_contextual_generic_argument = reject_contextual_generic_argument
+                        && generics
+                            .iter()
+                            .any(|(_, argument)| datatype_changes_under_env(argument, env));
+                    types
+                        .get(reference)
+                        .and_then(|ndt| ndt.ty.as_ref())
+                        .map_or(Ok(()), |ty| {
+                            validate_internally_tag_enum_datatype(
+                                ty,
+                                types,
+                                &path,
+                                variant_name,
+                                seen,
+                                Some(&GenericEnv {
+                                    map: generics,
+                                    parent: env,
+                                }),
+                                reject_contextual_generic_argument,
+                            )
+                        })
+                }
+                NamedReferenceType::Recursive(_) => Ok(()),
+            };
             seen.remove(&key);
 
             result
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
-            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string(), seen),
+            EnumRepr::Untagged => {
+                validate_internally_tag_enum(enm, types, path.to_string(), seen, env)
+            }
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
+        DataType::Generic(generic) => {
+            match env.and_then(|env| env.map.iter().find(|(param, _)| param == generic)) {
+                Some((_, argument)) => {
+                    if reject_contextual_generic_argument
+                        && crate::internal_tag_payload_requires_contextual_rewrite(argument, types)?
+                    {
+                        return Err(Error::invalid_internally_tagged_enum(
+                            path,
+                            variant_name,
+                            "a concrete generic payload requires context-sensitive enum encoding; use a non-generic wrapper variant",
+                        ));
+                    }
+
+                    validate_internally_tag_enum_datatype(
+                        argument,
+                        types,
+                        path,
+                        variant_name,
+                        seen,
+                        env.and_then(|env| env.parent),
+                        reject_contextual_generic_argument,
+                    )
+                }
+                None => Ok(()),
+            }
+        }
         DataType::Reference(Reference::Opaque(_))
-        | DataType::Generic(_)
         | DataType::Intersection(_)
         | DataType::Tuple(_)
         | DataType::Primitive(_)
@@ -2027,6 +2196,12 @@ fn validate_internally_tag_enum_datatype(
             "payload cannot be merged with an internal tag",
         )),
     }
+}
+
+fn datatype_changes_under_env(ty: &DataType, env: Option<&GenericEnv<'_>>) -> bool {
+    let mut resolved = ty.clone();
+    let mut budget = RESOLVED_KEY_NODE_BUDGET;
+    resolve_generics_for_key(&mut resolved, env, &mut budget) && resolved != *ty
 }
 
 /// Extends `path` with the name of the type behind a named reference, so an
