@@ -58,7 +58,9 @@ impl Remapper {
 
     /// Registers a rule that replaces exact matches of `from` with `to`.
     ///
-    /// Rules are checked in the order they are registered.
+    /// Rules are checked in the order they are registered. Replacements are
+    /// recursively crawled, but a rule is not reapplied within the replacement
+    /// subtree it created. This allows rules such as `T -> Vec<T>` to terminate.
     pub fn rule(mut self, from: DataType, to: DataType) -> Self {
         self.rules.push((from, to));
         self
@@ -116,7 +118,8 @@ impl Remapper {
 
     /// Applies the remap operation to a datatype, returning the remapped datatype.
     pub fn remap_dt(&self, mut dt: DataType) -> DataType {
-        self.remap_internal(&mut dt);
+        let active_rules = vec![false; self.rules.len()];
+        self.remap_internal(&mut dt, &active_rules);
         dt
     }
 
@@ -125,86 +128,90 @@ impl Remapper {
         types.map(|mut ndt| {
             ndt.generics.to_mut().iter_mut().for_each(|generic| {
                 if let Some(dt) = &mut generic.default {
-                    self.remap_internal(dt);
+                    let active_rules = vec![false; self.rules.len()];
+                    self.remap_internal(dt, &active_rules);
                 }
             });
             if let Some(dt) = &mut ndt.ty {
-                self.remap_internal(dt);
+                let active_rules = vec![false; self.rules.len()];
+                self.remap_internal(dt, &active_rules);
             }
             ndt
         })
     }
 
-    fn remap_internal(&self, dt: &mut DataType) {
-        self.remap_rules(dt);
+    fn remap_internal(&self, dt: &mut DataType, active_rules: &[bool]) {
+        let mut active_rules = active_rules.to_vec();
+        self.remap_rules(dt, &mut active_rules);
 
         match dt {
             DataType::Primitive(_) | DataType::Generic(_) => {}
-            DataType::List(list) => self.remap_internal(&mut list.ty),
+            DataType::List(list) => self.remap_internal(&mut list.ty, &active_rules),
             DataType::Map(map) => {
-                self.remap_internal(map.key_ty_mut());
-                self.remap_internal(map.value_ty_mut());
+                self.remap_internal(map.key_ty_mut(), &active_rules);
+                self.remap_internal(map.value_ty_mut(), &active_rules);
             }
-            DataType::Struct(s) => self.remap_fields(&mut s.fields),
+            DataType::Struct(s) => self.remap_fields(&mut s.fields, &active_rules),
             DataType::Enum(e) => {
                 for (_, variant) in &mut e.variants {
-                    self.remap_fields(&mut variant.fields);
+                    self.remap_fields(&mut variant.fields, &active_rules);
                 }
             }
             DataType::Tuple(tuple) => {
                 for dt in &mut tuple.elements {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, &active_rules);
                 }
             }
-            DataType::Nullable(dt) => self.remap_internal(dt),
+            DataType::Nullable(dt) => self.remap_internal(dt, &active_rules),
             DataType::Intersection(dts) => {
                 for dt in dts {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, &active_rules);
                 }
             }
-            DataType::Reference(r) => self.remap_reference(r),
+            DataType::Reference(r) => self.remap_reference(r, &active_rules),
         }
     }
 
-    fn remap_rules(&self, dt: &mut DataType) {
-        for (from, to) in &self.rules {
-            if *dt == *from {
+    fn remap_rules(&self, dt: &mut DataType, active_rules: &mut [bool]) {
+        for (index, (from, to)) in self.rules.iter().enumerate() {
+            if !active_rules[index] && *dt == *from {
                 *dt = to.clone();
+                active_rules[index] = true;
             }
         }
     }
 
-    fn remap_fields(&self, fields: &mut Fields) {
+    fn remap_fields(&self, fields: &mut Fields, active_rules: &[bool]) {
         match fields {
             Fields::Unit => {}
             Fields::Unnamed(fields) => {
                 for field in &mut fields.fields {
                     if let Some(dt) = &mut field.ty {
-                        self.remap_internal(dt);
+                        self.remap_internal(dt, active_rules);
                     }
                 }
             }
             Fields::Named(fields) => {
                 for (_, field) in &mut fields.fields {
                     if let Some(dt) = &mut field.ty {
-                        self.remap_internal(dt);
+                        self.remap_internal(dt, active_rules);
                     }
                 }
             }
         }
     }
 
-    fn remap_reference(&self, reference: &mut Reference) {
+    fn remap_reference(&self, reference: &mut Reference, active_rules: &[bool]) {
         let Reference::Named(reference) = reference else {
             return;
         };
 
         match &mut reference.inner {
             NamedReferenceType::Recursive(_) => {}
-            NamedReferenceType::Inline { dt, .. } => self.remap_internal(dt),
+            NamedReferenceType::Inline { dt, .. } => self.remap_internal(dt, active_rules),
             NamedReferenceType::Reference { generics, .. } => {
                 for (_, dt) in generics {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, active_rules);
                 }
             }
         }
@@ -262,6 +269,18 @@ mod tests {
             .remap_dt(Primitive::u32.into());
 
         assert_eq!(remapped, DataType::List(List::new(Primitive::bool.into())));
+    }
+
+    #[test]
+    fn replacement_does_not_recrawl_the_rule_that_created_it() {
+        let remapped = Remapper::new()
+            .rule(
+                Primitive::u32.into(),
+                DataType::List(List::new(Primitive::u32.into())),
+            )
+            .remap_dt(Primitive::u32.into());
+
+        assert_eq!(remapped, DataType::List(List::new(Primitive::u32.into())));
     }
 
     #[test]
