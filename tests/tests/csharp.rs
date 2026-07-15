@@ -701,8 +701,8 @@ fn serde_defaults_do_not_make_non_nullable_fields_nullable() {
         )
         .unwrap();
 
-    assert!(output.contains("public uint Count { get; init; }"));
-    assert!(output.contains("public string Label { get; init; }"));
+    assert!(output.contains("public uint Count { get; init; } = default!;"));
+    assert!(output.contains("public string Label { get; init; } = default!;"));
     assert!(!output.contains("uint? Count"));
     assert!(!output.contains("string? Label"));
 }
@@ -915,7 +915,8 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<MultiInlineFields>()
         .register::<ContainingNameCollision>()
         .register::<VariantCollisions>()
-        .register::<RecordVariantCollisions>();
+        .register::<RecordVariantCollisions>()
+        .register::<DefaultedNonNullableFields>();
     let types = types.register::<NonObjectWireShapes>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();
     std::fs::write(root.join("Bindings.cs"), bindings).unwrap();
@@ -926,6 +927,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>
 "#,

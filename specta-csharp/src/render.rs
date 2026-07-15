@@ -959,7 +959,11 @@ fn render_property(
     out.push_str(&rendered_type);
     out.push(' ');
     out.push_str(property);
-    out.push_str(" { get; init; }\n");
+    out.push_str(" { get; init; }");
+    if field.optional && !rendered_type.ends_with('?') {
+        out.push_str(" = default!;");
+    }
+    out.push('\n');
     Ok(())
 }
 
