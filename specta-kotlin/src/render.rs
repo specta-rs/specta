@@ -474,6 +474,7 @@ fn render_enum(
     let serde_untagged = enm.attributes.contains_key("serde:container:untagged");
     let mut used_names = std::iter::once(name.to_owned())
         .chain(generics.iter().cloned())
+        .map(|name| semantic_identifier(&name).to_owned())
         .collect::<BTreeSet<_>>();
     let mut base_names = BTreeSet::new();
     let variant_names = variants
@@ -481,6 +482,7 @@ fn render_enum(
         .map(|(original, _)| {
             let base = safe_member_name(&convert_variant_name(kotlin.naming, original), "Variant");
             let base_identifier = identifier(&base, &format!("{path}.{original}"))?;
+            let base_identifier = semantic_identifier(&base_identifier).to_owned();
             if !base_names.insert(base_identifier) {
                 return Err(Error::DuplicateIdentifier {
                     path: path.into(),
@@ -490,6 +492,7 @@ fn render_enum(
             let mut resolved = base;
             loop {
                 let identifier = identifier(&resolved, &format!("{path}.{original}"))?;
+                let identifier = semantic_identifier(&identifier).to_owned();
                 if !used_names.contains(&identifier)
                     && !ROOT_NAMESPACES.contains(&resolved.as_str())
                 {
@@ -1474,7 +1477,7 @@ fn ensure_unique(
 ) -> Result<(), Error> {
     let mut seen = std::collections::BTreeSet::new();
     for name in names {
-        let name = name.as_ref();
+        let name = semantic_identifier(name.as_ref());
         if !seen.insert(name.to_owned()) {
             return Err(Error::DuplicateIdentifier {
                 path: path.into(),
@@ -1483,6 +1486,12 @@ fn ensure_unique(
         }
     }
     Ok(())
+}
+
+fn semantic_identifier(name: &str) -> &str {
+    name.strip_prefix('`')
+        .and_then(|name| name.strip_suffix('`'))
+        .unwrap_or(name)
 }
 
 fn package_name(package: &str) -> Result<String, Error> {

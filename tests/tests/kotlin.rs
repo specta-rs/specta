@@ -404,6 +404,46 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
         .export(&keyword_types, IdentityFormat)
         .expect("escaped names should participate in variant collision allocation");
     assert!(output.contains("class whenVariant<`when`>"));
+
+    let mut modifier_types = Types::default();
+    NamedDataType::new("ModifierVariants", &mut modifier_types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("out"), None)]);
+        let mut enm = Enum::default();
+        enm.variants.push((Cow::Borrowed("Out"), Variant::unit()));
+        datatype.ty = Some(DataType::Enum(enm));
+    });
+    let output = Kotlin::default()
+        .naming(NamingConvention::SnakeCase)
+        .export(&modifier_types, IdentityFormat)
+        .expect("generic modifiers should participate in semantic collision allocation");
+    assert!(output.contains("class outVariant<`out`>"));
+}
+
+#[test]
+fn kotlin_rejects_declarations_that_shadow_generic_modifiers() {
+    use specta::datatype::{GenericDefinition, NamedDataType, Struct};
+
+    for modifier in ["out", "reified"] {
+        let mut types = Types::default();
+        let declaration = if modifier == "out" { "Out" } else { modifier };
+        NamedDataType::new(declaration, &mut types, |_, datatype| {
+            datatype.generics = Cow::Owned(vec![GenericDefinition::new(
+                Cow::Owned(modifier.to_owned()),
+                None,
+            )]);
+            datatype.ty = Some(DataType::Struct(Struct::unit()));
+        });
+
+        let exporter = Kotlin::default().naming(if modifier == "out" {
+            NamingConvention::SnakeCase
+        } else {
+            NamingConvention::Preserve
+        });
+        assert!(matches!(
+            exporter.export(&types, IdentityFormat),
+            Err(Error::DuplicateIdentifier { name, .. }) if name == modifier
+        ));
+    }
 }
 
 #[test]
