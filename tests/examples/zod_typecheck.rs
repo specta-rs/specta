@@ -23,6 +23,9 @@ struct Generic<T = String, U = T> {
 struct IntegerKey(i32);
 
 #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+struct BooleanKey(bool);
+
+#[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
 struct GenericKey<T>(T);
 
 #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
@@ -40,6 +43,7 @@ struct WireTypes {
     integer_keys: HashMap<i32, String>,
     boolean_keys: HashMap<bool, String>,
     newtype_keys: HashMap<IntegerKey, String>,
+    boolean_newtype_keys: HashMap<BooleanKey, String>,
     enum_keys: HashMap<FiniteKey, String>,
     generic_finite_keys: HashMap<GenericKey<FiniteKey>, String>,
     nested_generic_finite_keys: HashMap<OuterKey<FiniteKey>, String>,

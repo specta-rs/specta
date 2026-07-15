@@ -25,6 +25,7 @@ test("generated schemas validate representative wire values", () => {
     integer_keys: { "-2": "value" },
     boolean_keys: { true: "value" },
     newtype_keys: { "42": "value" },
+    boolean_newtype_keys: { false: "value" },
     enum_keys: { First: "value" },
     generic_finite_keys: { First: "value" },
     nested_generic_finite_keys: { First: "value" },
@@ -40,6 +41,8 @@ test("generated schemas validate representative wire values", () => {
   expect(UntaggedMatchingFieldSchema.safeParse({ Variant: "value", extra: true }).success).toBe(true);
   expect(UntaggedMatchingFieldSchema.safeParse({ extra: true }).success).toBe(true);
   expect(OptionalFlattenSchema.parse({ id: "id", inner: "kept" })).toEqual({ id: "id", inner: "kept" });
+  expect(OptionalFlattenSchema.safeParse({ id: "id", inner: 1 }).success).toBe(false);
+  expect(OptionalFlattenSchema.safeParse({ id: "id", unrelated: 1 }).success).toBe(true);
   expect(ProtoFieldSchema.safeParse(JSON.parse('{"__proto__":"value"}')).success).toBe(true);
   expect(ProtoFieldSchema.safeParse({}).success).toBe(false);
   expect(GenericMapHolderSchema.safeParse({
@@ -62,6 +65,7 @@ test("generated schemas reject invalid primitive wire values", () => {
     integer_keys: { invalid: "value" },
     boolean_keys: {},
     newtype_keys: {},
+    boolean_newtype_keys: {},
     enum_keys: {},
     generic_finite_keys: {},
     nested_generic_finite_keys: {},
@@ -73,6 +77,7 @@ test("generated schemas reject invalid primitive wire values", () => {
     integer_keys: { "2147483648": "out of range" },
     boolean_keys: {},
     newtype_keys: {},
+    boolean_newtype_keys: {},
     enum_keys: {},
     generic_finite_keys: {},
     nested_generic_finite_keys: {},

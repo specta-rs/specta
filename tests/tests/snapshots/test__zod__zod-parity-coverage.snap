@@ -106,14 +106,16 @@ export const ZodOptionalFlattenSchema: z.ZodType<ZodOptionalFlatten> = z.union([
 	id: z.string(),
 }).and(z.lazy(() => ZodFlattenInnerSchema)), z.object({
 	id: z.string(),
-})]);
+}).and(z.object({
+	inner: z.never().optional(),
+}))]);
 
 export type ZodWireTypes = {
 	character: string,
 	integer_keys: { [key in number]: string },
 	boolean_keys: Partial<{ [key in "true" | "false"]: string }>,
-	newtype_keys: { [key in ZodIntegerKey]: string },
-	enum_keys: Partial<{ [key in ZodFiniteKey]: string }>,
+	newtype_keys: { [key in number]: string },
+	enum_keys: Partial<{ [key in "First" | "Second"]: string }>,
 };
 export const ZodWireTypesSchema: z.ZodType<ZodWireTypes> = z.object({
 	character: z.string().refine((value) => [...value].length === 1),

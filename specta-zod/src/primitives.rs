@@ -16,6 +16,7 @@ use crate::{Error, Layout, Zod, map_keys, opaque, reserved_names::RESERVED_TYPE_
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
 const STRICT_OBJECT_MARKER: &str = "specta:strict_object";
+const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
 
 fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
     match &r.inner {
@@ -383,6 +384,49 @@ fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
     }
 }
 
+fn resolved_typescript_map_key_alias(
+    reference: &NamedReference,
+    types: &Types,
+    visiting: &mut HashSet<NamedReference>,
+) -> Option<DataType> {
+    if matches!(reference.inner, NamedReferenceType::Recursive(_))
+        || !visiting.insert(reference.clone())
+    {
+        return None;
+    }
+
+    let result = (|| {
+        let mut resolved = named_reference_ty(types, reference).ok()?.clone();
+        substitute_generics(&mut resolved, named_reference_generics(reference).ok()?);
+
+        loop {
+            match &resolved {
+                DataType::Struct(strct) => {
+                    let Fields::Unnamed(fields) = &strct.fields else {
+                        break;
+                    };
+                    let mut live = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                    let Some(inner) = live.next() else {
+                        break;
+                    };
+                    if live.next().is_some() {
+                        break;
+                    }
+                    resolved = inner.clone();
+                }
+                DataType::Reference(Reference::Named(inner)) => {
+                    resolved = resolved_typescript_map_key_alias(inner, types, visiting)?;
+                }
+                _ => break,
+            }
+        }
+
+        Some(resolved)
+    })();
+    visiting.remove(reference);
+    result
+}
+
 fn typescript_alias_datatype(dt: &mut DataType, map_key: bool, types: &Types) {
     match dt {
         DataType::Primitive(_) => {}
@@ -412,13 +456,26 @@ fn typescript_alias_datatype(dt: &mut DataType, map_key: bool, types: &Types) {
         DataType::Intersection(types_) => types_
             .iter_mut()
             .for_each(|dt| typescript_alias_datatype(dt, map_key, types)),
-        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt, map_key, types),
-            NamedReferenceType::Reference { generics, .. } => generics
-                .iter_mut()
-                .for_each(|(_, dt)| typescript_alias_datatype(dt, map_key, types)),
-            NamedReferenceType::Recursive(_) => {}
-        },
+        DataType::Reference(Reference::Named(reference)) => {
+            if map_key
+                && let Some(mut resolved) =
+                    resolved_typescript_map_key_alias(reference, types, &mut HashSet::new())
+            {
+                typescript_alias_datatype(&mut resolved, true, types);
+                *dt = resolved;
+                return;
+            }
+
+            match &mut reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    typescript_alias_datatype(dt, map_key, types)
+                }
+                NamedReferenceType::Reference { generics, .. } => generics
+                    .iter_mut()
+                    .for_each(|(_, dt)| typescript_alias_datatype(dt, map_key, types)),
+                NamedReferenceType::Recursive(_) => {}
+            }
+        }
         DataType::Reference(Reference::Opaque(reference)) => {
             let ty = if reference.downcast_ref::<opaque::Any>().is_some() {
                 Some("any")
@@ -1573,6 +1630,104 @@ fn struct_dt(
     Ok(())
 }
 
+fn object_field_keys(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    visiting: &mut HashSet<NamedReference>,
+) -> Option<HashSet<String>> {
+    match dt {
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Named(named) => Some(
+                named
+                    .fields
+                    .iter()
+                    .filter(|(_, field)| field.ty.is_some())
+                    .map(|(name, _)| name.to_string())
+                    .collect(),
+            ),
+            Fields::Unnamed(fields) => {
+                let mut live = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                let inner = live.next()?;
+                if live.next().is_some() {
+                    return None;
+                }
+                object_field_keys(inner, types, generics, visiting)
+            }
+            Fields::Unit => Some(HashSet::new()),
+        },
+        DataType::Intersection(parts) => {
+            let mut keys = HashSet::new();
+            for part in parts {
+                keys.extend(object_field_keys(part, types, generics, visiting)?);
+            }
+            Some(keys)
+        }
+        DataType::Enum(enm) => {
+            let mut keys = HashSet::new();
+            for (_, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
+                keys.extend(object_field_keys_for_fields(
+                    &variant.fields,
+                    types,
+                    generics,
+                    visiting,
+                )?);
+            }
+            Some(keys)
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            if matches!(reference.inner, NamedReferenceType::Recursive(_))
+                || !visiting.insert(reference.clone())
+            {
+                return None;
+            }
+            let result = (|| {
+                let ty = named_reference_ty(types, reference).ok()?;
+                let reference_generics = resolved_reference_generics(reference, generics).ok()?;
+                object_field_keys(ty, types, &reference_generics, visiting)
+            })();
+            visiting.remove(reference);
+            result
+        }
+        DataType::Generic(generic) => generics
+            .iter()
+            .find(|(candidate, _)| candidate == generic)
+            .and_then(|(_, ty)| {
+                (!matches!(ty, DataType::Generic(candidate) if candidate == generic))
+                    .then(|| object_field_keys(ty, types, generics, visiting))
+                    .flatten()
+            }),
+        _ => None,
+    }
+}
+
+fn object_field_keys_for_fields(
+    fields: &Fields,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    visiting: &mut HashSet<NamedReference>,
+) -> Option<HashSet<String>> {
+    match fields {
+        Fields::Named(named) => Some(
+            named
+                .fields
+                .iter()
+                .filter(|(_, field)| field.ty.is_some())
+                .map(|(name, _)| name.to_string())
+                .collect(),
+        ),
+        Fields::Unnamed(unnamed) => {
+            let mut live = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+            let inner = live.next()?;
+            if live.next().is_some() {
+                return None;
+            }
+            object_field_keys(inner, types, generics, visiting)
+        }
+        Fields::Unit => Some(HashSet::new()),
+    }
+}
+
 fn enum_dt(
     s: &mut String,
     exporter: &Zod,
@@ -1583,13 +1738,29 @@ fn enum_dt(
     type_render_stack: &mut TypeRenderStack,
     allowed_object_keys: &[&str],
 ) -> Result<(), Error> {
-    let variants = e
+    let optional_flatten_union = e.attributes.contains_key(OPTIONAL_FLATTEN_UNION_MARKER);
+    let entries = e
         .variants
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| {
+            let keys = optional_flatten_union.then(|| {
+                object_field_keys_for_fields(&variant.fields, types, generics, &mut HashSet::new())
+            });
+            (name, variant, keys.flatten())
+        })
+        .collect::<Vec<_>>();
+    let all_optional_flatten_keys = entries
+        .iter()
+        .filter_map(|(_, _, keys)| keys.as_ref())
+        .flat_map(|keys| keys.iter().cloned())
+        .collect::<HashSet<_>>();
+
+    let variants = entries
+        .into_iter()
+        .map(|(name, variant, keys)| -> Result<Option<String>, Error> {
             let strict_object = variant.attributes.contains_key(STRICT_OBJECT_MARKER);
-            enum_variant_dt(
+            let rendered = enum_variant_dt(
                 exporter,
                 types,
                 name.as_ref(),
@@ -1599,7 +1770,27 @@ fn enum_dt(
                 generics,
                 type_render_stack,
                 allowed_object_keys,
-            )
+            )?;
+            let Some(mut rendered) = rendered else {
+                return Ok(None);
+            };
+
+            if let Some(keys) = keys {
+                let mut missing = all_optional_flatten_keys
+                    .difference(&keys)
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                missing.sort_unstable();
+                if !missing.is_empty() {
+                    rendered.push_str(".and(z.object({");
+                    for key in missing {
+                        write!(rendered, "\n\t{}: z.never().optional(),", sanitise_key(key))?;
+                    }
+                    rendered.push_str("\n}))");
+                }
+            }
+
+            Ok(Some(rendered))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
