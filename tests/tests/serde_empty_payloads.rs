@@ -919,6 +919,72 @@ fn tuple_struct_skipped_field_container_rename() {
     );
 }
 
+// serde_derive silently IGNORES every `skip` spelling on a newtype struct's
+// only field: the wire stays the bare inner value in both directions (`null`
+// and `[]` are rejected). The derive erases the field type for symmetric
+// skips, so the real wire shape cannot be represented -- the export rejects
+// the construct instead of fabricating a payload.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NewtypeStructSkip(#[serde(skip)] u8);
+
+// Control: a declared-multi-field tuple struct with all fields serde-skipped
+// really is `[]` on the wire and stays exportable.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct TupleAllSkipped(#[serde(skip)] u8, #[serde(skip)] u8);
+
+#[test]
+fn newtype_struct_skip_serde_ground_truth() {
+    // The skip is ignored: the wire is the bare inner value...
+    assert_eq!(serde_json::to_string(&NewtypeStructSkip(7)).unwrap(), "7");
+    assert!(serde_json::from_str::<NewtypeStructSkip>("7").is_ok());
+    // ...NOT a unit/`null` payload, and NOT an empty array.
+    assert!(serde_json::from_str::<NewtypeStructSkip>("null").is_err());
+    assert!(serde_json::from_str::<NewtypeStructSkip>("[]").is_err());
+
+    // The multi-field control honors the skips: wire is `[]`.
+    assert_eq!(serde_json::to_string(&TupleAllSkipped(1, 2)).unwrap(), "[]");
+    assert!(serde_json::from_str::<TupleAllSkipped>("[]").is_ok());
+}
+
+#[test]
+fn newtype_struct_skip_errors() {
+    let result = Typescript::default().export(
+        &Types::default().register::<NewtypeStructSkip>(),
+        specta_serde::Format,
+    );
+    let err = result.expect_err("the unrepresentable construct must be rejected");
+    assert!(
+        err.to_string().contains("newtype struct"),
+        "error must explain that serde ignores the skip:\n{err}"
+    );
+
+    let phases = Typescript::default().export(
+        &Types::default().register::<NewtypeStructSkip>(),
+        specta_serde::PhasesFormat,
+    );
+    assert!(
+        phases.is_err(),
+        "wrong in every mode; phases must reject too"
+    );
+}
+
+#[test]
+fn tuple_struct_all_skipped_exports_empty_array() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<TupleAllSkipped>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains("export type TupleAllSkipped = [];"),
+        "all-serde-skipped multi-field tuple struct really is `[]`:\n{ts}"
+    );
+}
+
 // A serde-transparent tuple struct is the exception to the arity rule above:
 // serde serializes it as the bare inner value, so it must NOT be rewritten to
 // an array even though its declared arity is > 1. `#[specta(transparent =

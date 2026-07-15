@@ -155,6 +155,27 @@ fn inner(
                 }
             }
 
+            // serde_derive silently IGNORES every `skip` spelling on a
+            // newtype struct's only field: the wire stays the bare inner
+            // value in both directions (`S(#[serde(skip)] u8)` serializes as
+            // `7` and only deserializes from `7`; `null` and `[]` are
+            // rejected). The derive erases the field's type for symmetric
+            // skips (skipped fields don't need `Type` impls), so the real
+            // wire shape cannot be represented -- reject instead of
+            // exporting a fabricated payload.
+            if let Fields::Unnamed(unnamed) = &strct.fields
+                && let [field] = unnamed.fields.as_slice()
+                && SerdeFieldAttrs::from_attributes(&field.attributes)?
+                    .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
+            {
+                return Err(Error::invalid_usage_of_skip(
+                    path,
+                    "serde ignores `skip` on a newtype struct's only field (the wire format \
+                     stays the bare inner value), so the export cannot represent it; remove \
+                     the attribute -- it has no effect on the serde wire format",
+                ));
+            }
+
             match &strct.fields {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
