@@ -25,7 +25,7 @@ pub struct ContainerAttr {
 }
 
 impl ContainerAttr {
-    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>, is_struct: bool) -> Result<Self> {
         let mut result = Self {
             common: RustCAttr::from_attrs(attrs)?,
             ..Default::default()
@@ -63,7 +63,7 @@ impl ContainerAttr {
 
         if let Some(attr) = attrs.extract("specta", "transparent") {
             result.transparent = attr.parse_bool_or_true()?;
-        } else if let Some(attr) = attrs.extract("repr", "transparent") {
+        } else if is_struct && let Some(attr) = attrs.extract("repr", "transparent") {
             result.transparent = attr.parse_bool_or_true()?;
         } else if let Some(attr) = attrs.extract("serde", "transparent") {
             // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,

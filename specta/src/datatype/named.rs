@@ -110,8 +110,9 @@ impl NamedDataType {
     ///   `instantiation_generics` as the concrete generic arguments for this use site.
     /// - When inlining, this calls `build_ty` and returns [`NamedReferenceType::Inline`] containing
     ///   the resulting datatype.
-    /// - If inline expansion recursively reaches the same sentinel and generic arguments, this
-    ///   returns [`NamedReferenceType::Recursive`] so exporters can avoid infinite expansion.
+    /// - If inline expansion recursively reaches the same sentinel, generic arguments, and
+    ///   supplemental generic identities, this returns [`NamedReferenceType::Recursive`] so
+    ///   exporters can avoid infinite expansion.
     ///
     /// `has_const_param` only affects the temporary resolution context used while `build_ndt`
     /// builds the canonical named type. That context controls implementations such as fixed-size
@@ -131,6 +132,7 @@ impl NamedDataType {
     pub fn init_with_sentinel(
         sentinel: &'static str,
         instantiation_generics: &[(Generic, DataType)],
+        instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
         passthrough: bool,
         types: &mut Types,
@@ -205,6 +207,7 @@ impl NamedDataType {
                     generic_r.hash(&mut h);
                     generic.hash(&mut h);
                 }
+                instantiation_generic_identities.hash(&mut h);
                 h.finish()
             };
 

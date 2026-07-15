@@ -1,6 +1,5 @@
 ---
 source: tests/tests/typescript.rs
-assertion_line: 1039
 expression: output
 ---
 Range<i32>: export type Range<T> = {
@@ -25,10 +24,7 @@ Cow<'static, str>:
 Cow<'static, i32>: 
 Vec<i32>: 
 Vec<MyEnum>: 
-Result<String, i32>: export type Result<T, E> = {
-	ok: T,
-	err: E,
-};
+Result<String, i32>: export type Result<T, E> = ({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never };
 
 Vec<Option<Cow<'static, i32>>>: 
 PhantomData<()>: 

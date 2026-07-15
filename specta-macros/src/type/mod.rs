@@ -103,7 +103,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let raw_attrs = attrs; // Preserve raw attrs before parse_attrs shadows the variable
     let mut attrs = parse_attrs(attrs)?;
 
-    let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
+    let container_attrs = ContainerAttr::from_attrs(&mut attrs, matches!(data, Data::Struct(_)))?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
     if container_attrs.r#type.is_some() && container_attrs.transparent {
@@ -321,6 +321,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             ndt.docs = Cow::Borrowed(#docs);
         }
     });
+    let instantiation_generic_identities = used_generic_types
+        .iter()
+        .map(|generic| quote!(std::any::type_name::<#generic>()));
     let deprecated = container_attrs.common.deprecated.map(|deprecated| {
         let tokens = deprecated_as_tokens(deprecated);
         quote!(ndt.deprecated = #tokens;)
@@ -339,6 +342,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             datatype::NamedDataType::init_with_sentinel(
                 SENTINEL,
                 &[#(#instantiation_generics),*],
+                &[#(#instantiation_generic_identities),*],
                 #has_const_param,
                 false,
                 types,

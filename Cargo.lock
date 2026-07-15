@@ -2246,6 +2246,7 @@ dependencies = [
  "thiserror",
  "toml",
  "trybuild",
+ "uhlc",
  "ulid",
  "wasm-bindgen",
 ]

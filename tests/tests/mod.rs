@@ -13,6 +13,7 @@ macro_rules! register {
 }
 
 mod bound;
+mod core_type_impls;
 mod errors;
 mod functions;
 mod go;
@@ -22,6 +23,10 @@ mod jsonschema;
 mod kotlin;
 mod layouts;
 mod legacy_impls;
+mod macro_doc_attrs;
+mod macro_generic_variant_override;
+mod macro_repr_transparent_enum;
+mod macro_structured_deprecated;
 mod maybe_undefined;
 mod openapi;
 mod python;
@@ -35,6 +40,7 @@ mod serde_empty_payloads;
 mod serde_enum_rewrite;
 mod serde_flatten_option;
 mod serde_identifiers;
+mod serde_internal_tag_payloads;
 mod serde_other;
 mod serde_unified_asymmetry;
 mod serde_unknown_attrs;

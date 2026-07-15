@@ -33,12 +33,9 @@ Cow<'static, i32>:
 Vec<i32>: 
 Vec<MyEnum>: 
 Result<String, i32>: /**
-	* @typedef {{
-	*		ok: T,
-	*		err: E,
-	*	}} Result<T, E>
-	* @property {T} ok
-	* @property {E} err
+	* @typedef {T | E} Result<T, E>
+	* @property {T} Ok
+	* @property {E} Err
 	*/
 
 Vec<Option<Cow<'static, i32>>>: 

@@ -1,6 +1,5 @@
 ---
 source: tests/tests/typescript.rs
-assertion_line: 1068
 expression: output
 ---
 /**  https://github.com/specta-rs/specta/issues/374 */
@@ -38,10 +37,7 @@ export type RangeInclusive<T> = {
 	end: T,
 };
 
-export type Result<T, E> = {
-	ok: T,
-	err: E,
-};
+export type Result<T, E> = ({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never };
 
 export type Unit1 = null;
 
