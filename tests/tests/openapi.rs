@@ -101,6 +101,13 @@ struct StrictOptionalPrimitive {
     nested: Option<Option<String>>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct WideIntegers {
+    signed: i64,
+    unsigned: u64,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenA {
@@ -392,6 +399,30 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert_eq!(flattened["additionalProperties"], false);
     assert!(flattened["properties"].get("a").is_some());
     assert!(flattened["properties"].get("b").is_some());
+}
+
+#[test]
+fn openapi_preserves_exact_wide_integer_bounds_in_extensions() {
+    let types = Types::default().register::<WideIntegers>();
+    let error = OpenApi::default()
+        .schema_mode(SchemaMode::Strict)
+        .export_document(&types, specta_serde::Format)
+        .expect_err("OpenAPI 3.0 cannot represent every 64-bit integer bound exactly");
+    assert!(error.to_string().contains("exact 64-bit integer bounds"));
+
+    let document = OpenApi::default()
+        .schema_mode(SchemaMode::Compatible)
+        .export_document(&types, specta_serde::Format)
+        .expect("compatible mode should retain exact bounds in extensions");
+    let document = serde_json::to_value(document).unwrap();
+    let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
+
+    assert_eq!(properties["signed"]["maximum"], i64::MAX);
+    assert_eq!(properties["signed"]["minimum"], i64::MIN);
+    assert!(properties["signed"].get("x-specta-maximum").is_none());
+    assert!(properties["unsigned"].get("maximum").is_none());
+    assert_eq!(properties["unsigned"]["x-specta-maximum"], u64::MAX);
+    assert_eq!(properties["unsigned"]["minimum"], 0.0);
 }
 
 #[test]
