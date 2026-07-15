@@ -103,6 +103,13 @@ enum UntaggedValue {
 }
 
 #[derive(Serialize, Deserialize, Type)]
+#[serde(untagged)]
+enum OverlappingUntagged {
+    First(u32),
+    Second(u32),
+}
+
+#[derive(Serialize, Deserialize, Type)]
 struct FlattenA {
     a: String,
 }
@@ -220,6 +227,24 @@ fn exports_untagged_enums() {
     assert!(validator.is_valid(&serde_json::json!("hello")));
     assert!(validator.is_valid(&serde_json::json!({ "id": 1 })));
     assert!(!validator.is_valid(&serde_json::json!({ "Object": { "id": 1 } })));
+}
+
+#[test]
+fn overlapping_untagged_enums_use_any_of() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<OverlappingUntagged>(),
+            specta_serde::Format,
+            "OverlappingUntagged",
+        )
+        .unwrap();
+
+    assert!(schema["$defs"]["OverlappingUntagged"]["anyOf"].is_array());
+    assert!(
+        jsonschema::validator_for(&schema)
+            .unwrap()
+            .is_valid(&serde_json::json!(42))
+    );
 }
 
 #[test]

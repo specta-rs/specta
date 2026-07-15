@@ -724,7 +724,7 @@ fn field_has_live_key(field: &Field) -> Result<bool, Error> {
         return Ok(true);
     };
 
-    Ok(!attrs.flatten && !(attrs.skip_serializing && attrs.skip_deserializing))
+    Ok(!(attrs.flatten || attrs.skip_serializing && attrs.skip_deserializing))
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
