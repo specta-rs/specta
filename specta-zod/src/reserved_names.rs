@@ -1,4 +1,6 @@
 pub(crate) const RESERVED_TYPE_NAMES: &[&str] = &[
+    // Bound by every generated file's `import { z } from "zod"` prelude.
+    "z",
     "break",
     "case",
     "catch",

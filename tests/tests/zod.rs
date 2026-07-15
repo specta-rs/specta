@@ -403,6 +403,42 @@ fn zod_layout_sanitises_reserved_module_identifiers() {
 }
 
 #[test]
+fn zod_layout_files_sanitises_the_zod_prelude_binding() {
+    fn read_typescript_files(path: &Path, output: &mut String) {
+        for entry in std::fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                read_typescript_files(&path, output);
+            } else if path.extension().is_some_and(|extension| extension == "ts") {
+                output.push_str(&std::fs::read_to_string(path).unwrap());
+            }
+        }
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("zod-prelude-binding");
+    let mut types = Types::default();
+    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+        ndt.module_path = "z".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesZ", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(DataType::Reference(z_type.reference(vec![])));
+    });
+    Zod::default()
+        .layout(Layout::Files)
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+
+    let mut rendered = String::new();
+    read_typescript_files(&path, &mut rendered);
+    assert!(rendered.contains("import * as $z from"));
+    assert!(!rendered.contains("import * as z from"));
+    assert!(rendered.contains("$z.PreludeCollisionSchema"));
+}
+
+#[test]
 fn zod_layout_namespaces_rejects_module_type_collisions() {
     let mut types = Types::default().register::<Testing>();
     NamedDataType::new("test", &mut types, |_, ndt| {
@@ -515,6 +551,18 @@ fn zod_reserved_type_name_errors() {
     let err = Zod::default()
         .export(&types, specta_serde::Format)
         .unwrap_err();
+    assert!(err.to_string().contains("reserved keyword"));
+
+    let mut types = Types::default();
+    NamedDataType::new("GenericZ", &mut types, |_, ndt| {
+        let generic = specta::datatype::GenericDefinition::new("z".into(), None);
+        ndt.generics = Cow::Owned(vec![generic.clone()]);
+        ndt.ty = Some(DataType::Generic(generic.reference()));
+    });
+    let err = Zod::default()
+        .export(&types, specta_serde::Format)
+        .unwrap_err();
+    assert!(err.to_string().contains("<generic z>"));
     assert!(err.to_string().contains("reserved keyword"));
 }
 

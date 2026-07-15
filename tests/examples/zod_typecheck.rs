@@ -98,7 +98,7 @@ struct UsesKeywordModule {
 }
 
 fn main() {
-    let types = Remapper::new()
+    let mut types = Remapper::new()
         .rule(
             Primitive::i64.into(),
             specta_zod::define("z.string()").into(),
@@ -113,6 +113,16 @@ fn main() {
                 .register::<ExternalEnum>()
                 .register::<UsesKeywordModule>(),
         );
+    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+        ndt.module_path = "z".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesZ", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(specta::datatype::DataType::Reference(
+            z_type.reference(vec![]),
+        ));
+    });
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("zod-typecheck/generated");
     std::fs::create_dir_all(&out).unwrap();
 
