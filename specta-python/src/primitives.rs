@@ -531,8 +531,8 @@ fn intersection_to_python(
                 .iter()
                 .filter(|part| object_variants(ctx, part, &location, &mut HashSet::new()).is_err())
                 .collect::<Vec<_>>();
-            if let [part] = non_objects.as_slice() {
-                return datatype_to_python(ctx, part, location, generics);
+            if non_objects.len() == 1 && is_map_like(ctx, non_objects[0], &mut HashSet::new()) {
+                return datatype_to_python(ctx, non_objects[0], location, generics);
             }
             return Err(Error::unrepresentable_intersection(
                 crate::error::display_path(&location),
@@ -564,6 +564,30 @@ fn intersection_to_python(
         })
         .collect::<Result<BTreeSet<_>, _>>()
         .map(join_union)
+}
+
+fn is_map_like(
+    ctx: RenderContext<'_>,
+    datatype: &DataType,
+    visiting: &mut HashSet<NamedReference>,
+) -> bool {
+    match datatype {
+        DataType::Map(_) => true,
+        DataType::Reference(Reference::Named(reference)) if visiting.insert(reference.clone()) => {
+            let result = match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => is_map_like(ctx, dt, visiting),
+                NamedReferenceType::Reference { .. } => ctx
+                    .types
+                    .get(reference)
+                    .and_then(|datatype| datatype.ty.as_ref())
+                    .is_some_and(|datatype| is_map_like(ctx, datatype, visiting)),
+                NamedReferenceType::Recursive(_) => false,
+            };
+            visiting.remove(reference);
+            result
+        }
+        _ => false,
+    }
 }
 
 fn join_union(types: impl IntoIterator<Item = String>) -> String {
@@ -676,26 +700,45 @@ fn object_variants(
                 })
                 .collect(),
         ]),
-        DataType::Enum(enm) => enm
-            .variants
-            .iter()
-            .filter(|(_, variant)| !variant.skip)
-            .map(|(_, variant)| match &variant.fields {
-                Fields::Named(fields) => Ok(fields
-                    .fields
-                    .iter()
-                    .filter_map(|(name, field)| {
-                        field
-                            .ty
-                            .as_ref()
-                            .map(|ty| (name.to_string(), (field.clone(), ty.clone())))
-                    })
-                    .collect()),
-                _ => Err(Error::unrepresentable_intersection(
-                    crate::error::display_path(location),
-                )),
-            })
-            .collect(),
+        DataType::Enum(enm) => {
+            let mut alternatives = Vec::new();
+            for (_, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
+                match &variant.fields {
+                    Fields::Named(fields) => alternatives.push(
+                        fields
+                            .fields
+                            .iter()
+                            .filter_map(|(name, field)| {
+                                field
+                                    .ty
+                                    .as_ref()
+                                    .map(|ty| (name.to_string(), (field.clone(), ty.clone())))
+                            })
+                            .collect(),
+                    ),
+                    Fields::Unnamed(fields) => {
+                        let mut live = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                        let Some(datatype) = live.next() else {
+                            return Err(Error::unrepresentable_intersection(
+                                crate::error::display_path(location),
+                            ));
+                        };
+                        if live.next().is_some() {
+                            return Err(Error::unrepresentable_intersection(
+                                crate::error::display_path(location),
+                            ));
+                        }
+                        alternatives.extend(object_variants(ctx, datatype, location, visiting)?);
+                    }
+                    Fields::Unit => {
+                        return Err(Error::unrepresentable_intersection(
+                            crate::error::display_path(location),
+                        ));
+                    }
+                }
+            }
+            Ok(alternatives)
+        }
         DataType::Intersection(parts) => intersection_variants(ctx, parts, location, visiting),
         DataType::Reference(Reference::Named(reference)) => {
             if !visiting.insert(reference.clone()) {

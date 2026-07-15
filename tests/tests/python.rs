@@ -311,6 +311,38 @@ fn python_inline_and_opaque_types() {
 }
 
 #[test]
+fn python_rejects_unrepresentable_mixed_intersections() {
+    use specta::datatype::{Field, Map, Primitive, Struct};
+
+    let record = Struct::named()
+        .field("value", Field::new(Primitive::str.into()))
+        .build();
+    for non_object in [
+        DataType::Primitive(Primitive::str),
+        <Vec<String> as Type>::definition(&mut Types::default()),
+    ] {
+        let error = primitives::inline(
+            &Python::default(),
+            &Types::default(),
+            &DataType::Intersection(vec![record.clone(), non_object]),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("cannot be represented"));
+    }
+
+    let map = Map::new(Primitive::str.into(), Primitive::str.into()).into();
+    assert_eq!(
+        primitives::inline(
+            &Python::default(),
+            &Types::default(),
+            &DataType::Intersection(vec![record, map]),
+        )
+        .unwrap(),
+        "_specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]"
+    );
+}
+
+#[test]
 fn python_flatten_uses_omitted_generic_defaults() {
     #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]

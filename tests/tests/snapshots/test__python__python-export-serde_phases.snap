@@ -341,7 +341,7 @@ type InternallyTaggedMInner = None
 
 type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Deserialize | InternallyTaggedWithAlias_Serialize
 
-type InternallyTaggedWithAlias_Deserialize = _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeA", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeA", {"field": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeB", {"type": _specta_typing.Literal["B"], "other": _specta_builtins.int})
+type InternallyTaggedWithAlias_Deserialize = _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeAintersection0", {"field": _specta_builtins.str, "type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeAintersection1", {"bruh": _specta_builtins.str, "type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeB", {"type": _specta_typing.Literal["B"], "other": _specta_builtins.int})
 
 type InternallyTaggedWithAlias_Serialize = _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_SerializeA", {"type": _specta_typing.Literal["A"], "field": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_SerializeB", {"type": _specta_typing.Literal["B"], "other": _specta_builtins.int})
 
