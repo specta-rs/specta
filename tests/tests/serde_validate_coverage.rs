@@ -1920,3 +1920,165 @@ fn nested_untagged_enum_error_names_the_inner_type() {
         "error should name the inner enum's variant, not a variant of the outer enum, got: {msg}"
     );
 }
+
+// A field skipped for a phase is removed before the rewrite ever visits its
+// type in that phase, so flatten checks *inside* the field's type must
+// inherit the field's skips. In this construct the containing field kills
+// serialization and the flattened Vec's own skip kills deserialization - the
+// Vec never flattens in either phase (ground-truthed below), so a per-phase
+// rendering must accept it. The nested struct is built by hand because a
+// *registered* equivalent is validated standalone too - and rejected
+// correctly, since serializing it directly does flatten the Vec (also pinned
+// below).
+fn nested_dead_flatten_datatype(
+    types: &mut Types,
+    container_field_attr: Option<&'static str>,
+) -> specta::datatype::DataType {
+    use specta::datatype::{Field, Struct};
+
+    let mut v = Field::new(<Vec<u8> as Type>::definition(types));
+    v.attributes.insert("serde:field:flatten", true);
+    v.attributes.insert("serde:field:skip_deserializing", true);
+    let inner_struct = Struct::named().field("v", v).build();
+
+    let mut inner_field = Field::new(inner_struct);
+    if let Some(attr) = container_field_attr {
+        inner_field.attributes.insert(attr, true);
+    }
+
+    Struct::named()
+        .field("a", Field::new(<i32 as Type>::definition(types)))
+        .field("inner", inner_field)
+        .build()
+}
+
+#[test]
+fn phases_map_type_nested_flatten_dead_in_both_phases_is_accepted() {
+    use specta::Format as _;
+
+    let mut types = Types::default();
+    let dt = nested_dead_flatten_datatype(&mut types, Some("serde:field:skip_serializing"));
+
+    specta_serde::PhasesFormat.map_type(&types, &dt).expect(
+        "the containing field kills serialize and the flatten's own skip kills deserialize",
+    );
+}
+
+#[test]
+fn phases_map_type_nested_flatten_through_live_field_is_rejected() {
+    use specta::Format as _;
+
+    let mut types = Types::default();
+    let dt = nested_dead_flatten_datatype(&mut types, None);
+
+    let err = specta_serde::PhasesFormat
+        .map_type(&types, &dt)
+        .expect_err("through a live field the flattened Vec is live on the serialize side");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn phases_map_type_same_inner_through_dead_and_live_fields_is_rejected() {
+    use specta::Format as _;
+    use specta::datatype::{Field, Struct};
+
+    // The same inner shape reached through a skipped field AND a live field:
+    // the live occurrence must still be validated (and rejected), in both
+    // declaration orders, so a dead-direction visit can't mask a live one.
+    for dead_first in [true, false] {
+        let mut types = Types::default();
+
+        let make_inner = |types: &mut Types| {
+            let mut v = Field::new(<Vec<u8> as Type>::definition(types));
+            v.attributes.insert("serde:field:flatten", true);
+            v.attributes.insert("serde:field:skip_deserializing", true);
+            Struct::named().field("v", v).build()
+        };
+
+        let mut dead_field = Field::new(make_inner(&mut types));
+        dead_field
+            .attributes
+            .insert("serde:field:skip_serializing", true);
+        let live_field = Field::new(make_inner(&mut types));
+
+        let builder = Struct::named();
+        let dt = if dead_first {
+            builder
+                .field("dead", dead_field)
+                .field("live", live_field)
+                .build()
+        } else {
+            builder
+                .field("live", live_field)
+                .field("dead", dead_field)
+                .build()
+        };
+
+        let err = specta_serde::PhasesFormat.map_type(&types, &dt).expect_err(
+            "the live field's flattened Vec is live on the serialize side regardless of order",
+        );
+        assert!(
+            err.to_string().contains("flatten"),
+            "unexpected error (dead_first={dead_first}): {err}"
+        );
+    }
+}
+
+// The registered (derive) equivalent stays rejected by the whole-graph
+// export: the inner type is a standalone export there, and serializing it
+// directly *does* flatten the Vec at runtime.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NestedDeadFlattenInner {
+    #[serde(flatten, skip_deserializing, default)]
+    v: Vec<u8>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NestedDeadFlattenContainer {
+    a: i32,
+    #[serde(skip_serializing)]
+    inner: NestedDeadFlattenInner,
+}
+
+#[test]
+fn serde_json_confirms_nested_dead_flatten_runtime_behavior() {
+    // The container never flattens the Vec in either direction...
+    assert_eq!(
+        serde_json::to_string(&NestedDeadFlattenContainer {
+            a: 1,
+            inner: NestedDeadFlattenInner { v: vec![1] },
+        })
+        .unwrap(),
+        r#"{"a":1}"#
+    );
+    let _: NestedDeadFlattenContainer = serde_json::from_str(r#"{"a":1,"inner":{}}"#).unwrap();
+
+    // ...but the inner type alone still fails when serialized directly,
+    // which is why its *registered* form is correctly rejected.
+    let err = serde_json::to_string(&NestedDeadFlattenInner { v: vec![1] })
+        .expect_err("serializing the inner type directly flattens the Vec");
+    assert!(
+        err.to_string()
+            .contains("can only flatten structs and maps"),
+        "unexpected serde_json error: {err}"
+    );
+}
+
+#[test]
+fn registered_nested_dead_flatten_graph_stays_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<NestedDeadFlattenContainer>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the inner type is registered standalone and is invalid on its own");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}

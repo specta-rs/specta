@@ -83,7 +83,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
 fn inner(
     dt: &DataType,
     types: &Types,
-    checked_references: &mut HashSet<Reference>,
+    checked_references: &mut HashSet<(Reference, FlattenDirections)>,
     path: String,
     mode: ApplyMode,
     follow_named_references: bool,
@@ -186,7 +186,7 @@ fn inner(
                     {
                         validate_field_attributes(field, format!("{path}[{idx}]"), mode)?;
                     }
-                    for (idx, (_, ty)) in unnamed
+                    for (idx, (field, ty)) in unnamed
                         .fields
                         .iter()
                         .enumerate()
@@ -200,7 +200,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             env,
-                            root_directions,
+                            root_directions.and(FlattenDirections::for_field(field)?),
                         )?;
                     }
                 }
@@ -227,7 +227,7 @@ fn inner(
                             env,
                         )?;
                     }
-                    for (name, (_, ty)) in named
+                    for (name, (field, ty)) in named
                         .fields
                         .iter()
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
@@ -240,7 +240,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             env,
-                            root_directions,
+                            root_directions.and(FlattenDirections::for_field(field)?),
                         )?;
                     }
                 }
@@ -306,9 +306,11 @@ fn inner(
                                 env,
                             )?;
                         }
-                        for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
-                            field.ty.as_ref().map(|ty| (name, (field, ty)))
-                        }) {
+                        for (name, (field, ty)) in
+                            named.fields.iter().filter_map(|(name, field)| {
+                                field.ty.as_ref().map(|ty| (name, (field, ty)))
+                            })
+                        {
                             inner(
                                 ty,
                                 types,
@@ -317,7 +319,7 @@ fn inner(
                                 mode,
                                 follow_named_references,
                                 env,
-                                root_directions,
+                                variant_directions.and(FlattenDirections::for_field(field)?),
                             )?;
                         }
                     }
@@ -337,7 +339,7 @@ fn inner(
                                 mode,
                             )?;
                         }
-                        for (idx, (_, ty)) in
+                        for (idx, (field, ty)) in
                             unnamed
                                 .fields
                                 .iter()
@@ -354,7 +356,7 @@ fn inner(
                                 mode,
                                 follow_named_references,
                                 env,
-                                root_directions,
+                                variant_directions.and(FlattenDirections::for_field(field)?),
                             )?;
                         }
                     }
@@ -421,8 +423,12 @@ fn inner(
                 // grow past `RESOLVED_KEY_NODE_BUDGET` (only possible for
                 // hand-built non-regular generics - derived ones don't
                 // compile), it falls back to the syntactic key, trading that
-                // pathological corner's strictness for termination.
-                let reference_key = resolved_reference_key(reference, env);
+                // pathological corner's strictness for termination. The key
+                // also carries the walk's flatten liveness, so a visit through
+                // a phase-dead field can't mask a later live visit; liveness
+                // only shrinks along a path and has four values, so the key
+                // space stays finite.
+                let reference_key = (resolved_reference_key(reference, env), root_directions);
                 if follow_named_references && !checked_references.contains(&reference_key) {
                     checked_references.insert(reference_key);
                     if let Some(ty) = named_reference_ty(reference, types) {
@@ -466,6 +472,8 @@ fn inner(
                         ));
                     }
 
+                    // Each phased side is only ever rendered for its own
+                    // phase, so flatten liveness narrows accordingly.
                     inner(
                         &phased.serialize,
                         types,
@@ -474,7 +482,7 @@ fn inner(
                         mode,
                         follow_named_references,
                         env,
-                        root_directions,
+                        root_directions.and(FlattenDirections::SERIALIZE_ONLY),
                     )?;
                     inner(
                         &phased.deserialize,
@@ -484,7 +492,7 @@ fn inner(
                         mode,
                         follow_named_references,
                         env,
-                        root_directions,
+                        root_directions.and(FlattenDirections::DESERIALIZE_ONLY),
                     )?;
                 }
             }
@@ -557,7 +565,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    checked_references: &mut HashSet<Reference>,
+    checked_references: &mut HashSet<(Reference, FlattenDirections)>,
     path: &str,
     mode: ApplyMode,
     env: Option<&GenericEnv<'_>>,
@@ -942,7 +950,7 @@ fn validate_flatten_field(
 /// killed by a one-sided serde skip doesn't need a flattenable shape, which
 /// matters wherever the two directions' shapes can diverge: explicit
 /// [`PhasedTy`] overrides and container conversion targets.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct FlattenDirections {
     serialize: bool,
     deserialize: bool,
@@ -987,6 +995,19 @@ impl FlattenDirections {
         serialize: false,
         deserialize: true,
     };
+
+    /// The directions in which a field exists on the wire: a one-sided serde
+    /// skip removes it from that phase before the rewrite ever visits its
+    /// type (`should_skip_field_for_mode` in `lib.rs`), so nothing reached
+    /// *through* the field can flatten there. (Fully skipped fields carry no
+    /// type and are never walked at all.)
+    fn for_field(field: &Field) -> Result<Self, Error> {
+        let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+        Ok(Self {
+            serialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_serializing),
+            deserialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_deserializing),
+        })
+    }
 
     /// The directions in which an enum variant exists on the wire: a fully
     /// skipped variant exists in neither, and a one-sided variant skip drops
