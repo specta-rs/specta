@@ -1586,7 +1586,7 @@ fn reference_named_dt(
     Ok(())
 }
 
-fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
+pub(crate) fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
         Layout::Namespaces | Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {

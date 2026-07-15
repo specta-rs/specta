@@ -773,7 +773,7 @@ fn render_flat_types<'a>(
     let ndts = ndts
         .filter(|ndt| ndt.ty.is_some())
         .map(|ndt| {
-            let export_name = exported_type_name(exporter, ndt);
+            let export_name = primitives::exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
                 return Err(Error::duplicate_type_name(export_name, ndt.location, other));
             }
@@ -890,20 +890,6 @@ fn cleanup_stale_files(
     remove_empty_dirs(root, root)?;
 
     Ok(())
-}
-
-fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
-    match exporter.layout {
-        Layout::Namespaces | Layout::FlatFile | Layout::Files => ndt.name.clone(),
-        Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            if !s.is_empty() {
-                s.push('_');
-            }
-            s.push_str(&ndt.name);
-            Cow::Owned(s)
-        }
-    }
 }
 
 pub(crate) fn module_alias(module_path: &str) -> String {

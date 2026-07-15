@@ -313,6 +313,35 @@ fn zod_layout_duplicate_typenames() {
 }
 
 #[test]
+fn zod_module_prefixed_duplicate_checks_use_rendered_names() {
+    fn add_type(types: &mut Types, name: &'static str, module_path: &'static str) {
+        NamedDataType::new(name, types, |_, ndt| {
+            ndt.module_path = module_path.into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+
+    let mut distinct = Types::default();
+    add_type(&mut distinct, "foo_Bar", "");
+    add_type(&mut distinct, "Bar", "foo");
+    let out = Zod::default()
+        .layout(Layout::ModulePrefixedName)
+        .export(&distinct, specta_serde::Format)
+        .unwrap();
+    assert!(out.contains("export type _foo_Bar = string"));
+    assert!(out.contains("export type foo_Bar = string"));
+
+    let mut colliding = Types::default();
+    add_type(&mut colliding, "_foo_Bar", "");
+    add_type(&mut colliding, "foo_Bar", "_");
+    let err = Zod::default()
+        .layout(Layout::ModulePrefixedName)
+        .export(&colliding, specta_serde::Format)
+        .unwrap_err();
+    assert!(err.to_string().contains("Detected multiple types"));
+}
+
+#[test]
 fn zod_layout_files_export_to() {
     let types = Types::default().register::<Testing>().register::<Another>();
     let temp = temp_dir();
