@@ -123,6 +123,16 @@ fn main() {
             z_type.reference(vec![]),
         ));
     });
+    let root_type = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(specta::datatype::DataType::Reference(
+            root_type.reference(vec![]),
+        ));
+    });
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("zod-typecheck/generated");
     std::fs::create_dir_all(&out).unwrap();
 

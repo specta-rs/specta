@@ -439,6 +439,31 @@ fn zod_layout_files_sanitises_the_zod_prelude_binding() {
 }
 
 #[test]
+fn zod_layout_files_qualifies_root_types_from_modules() {
+    let temp = temp_dir();
+    let path = temp.path().join("zod-root-reference");
+    let mut types = Types::default();
+    let root = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(DataType::Reference(root.reference(vec![])));
+    });
+
+    Zod::default()
+        .layout(Layout::Files)
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+
+    let module = std::fs::read_to_string(path.join("other.ts")).unwrap();
+    assert!(module.contains("import * as $root from \"./index\";"));
+    assert!(module.contains("export type UsesRoot = $root.RootReference;"));
+    assert!(module.contains("$root.RootReferenceSchema"));
+}
+
+#[test]
 fn zod_layout_namespaces_rejects_module_type_collisions() {
     let mut types = Types::default().register::<Testing>();
     NamedDataType::new("test", &mut types, |_, ndt| {

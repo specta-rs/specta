@@ -115,12 +115,19 @@ fn export_single_internal(
         if let Some(ty) = &mut alias_ndt.ty {
             typescript_alias_datatype(ty, false, types);
         }
-        let mut type_alias = specta_typescript::primitives::export(
-            &typescript,
-            types,
-            std::iter::once(&alias_ndt),
-            indent,
-        )
+        let render_type_alias = || {
+            specta_typescript::primitives::export(
+                &typescript,
+                types,
+                std::iter::once(&alias_ndt),
+                indent,
+            )
+        };
+        let mut type_alias = if exporter.layout == Layout::Files {
+            specta_typescript::with_module_path(&ndt.module_path, render_type_alias)
+        } else {
+            render_type_alias()
+        }
         .map_err(|source| {
             Error::framework("failed to render the inferred TypeScript type", source)
         })?;
