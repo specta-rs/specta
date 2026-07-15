@@ -297,6 +297,45 @@ struct RenameAllPartialNoop {
     field_one: String,
 }
 
+// --- Dead variants: never rendered in any phase, so their keys don't count ---
+//
+// `#[specta(skip)]` variants and serde variants skipped in both directions are
+// dropped by `filter_enum_variants_for_phase` before either phase's output is
+// produced, so directional attrs that only affect those variants (or their
+// field keys) cannot produce a phase difference. The live control is
+// `MixedNamedOneSidedRenameAllFields` above.
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all_fields(serialize = "camelCase"))]
+enum SerdeSkippedVariantRenameAllFields {
+    A(String),
+    #[serde(skip)]
+    B {
+        field_one: String,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpectaSkippedVariantRenameAll {
+    A(String),
+    #[specta(skip)]
+    #[serde(rename_all(serialize = "camelCase"))]
+    B {
+        field_one: String,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpectaSkippedVariantSkipAsymmetry {
+    A(String),
+    #[specta(skip)]
+    #[serde(skip_deserializing)]
+    B(u32),
+}
+
 // --- Controls: these must keep working unchanged under `Format` ---
 
 #[derive(Type, Serialize, Deserialize)]
@@ -843,6 +882,23 @@ fn genuinely_differing_effective_keys_still_require_phases_format() {
         msg.contains("field_one") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
+}
+
+#[test]
+fn directional_attrs_on_dead_variants_export_fine_under_format() {
+    fn assert_exports<T: Type>(name: &str) {
+        let rendered = Typescript::default()
+            .export(&Types::default().register::<T>(), specta_serde::Format)
+            .unwrap_or_else(|err| {
+                panic!("{name}: directional attrs on dead variants should export under Format: {err}")
+            });
+        // The dead variant must not appear in the unified output either.
+        assert!(!rendered.contains('B'), "got: {rendered}");
+    }
+
+    assert_exports::<SerdeSkippedVariantRenameAllFields>("SerdeSkippedVariantRenameAllFields");
+    assert_exports::<SpectaSkippedVariantRenameAll>("SpectaSkippedVariantRenameAll");
+    assert_exports::<SpectaSkippedVariantSkipAsymmetry>("SpectaSkippedVariantSkipAsymmetry");
 }
 
 #[test]

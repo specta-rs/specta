@@ -222,19 +222,22 @@ fn inner(
             validate_enum(enm, types, path.clone(), mode)?;
 
             for (variant_name, variant) in &enm.variants {
+                let variant_is_rendered = variant_is_rendered(variant)?;
                 validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
-                if variant_names_emitted {
+                if variant_names_emitted && variant_is_rendered {
                     validate_variant_key(variant_name, variant, &container_attrs, &path, mode)?;
                 }
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
-                        validate_named_field_keys(
-                            named,
-                            variant_field_key_rules(&container_attrs, variant, variant_name)?,
-                            &format!("{path}::{variant_name}"),
-                            mode,
-                        )?;
+                        if variant_is_rendered {
+                            validate_named_field_keys(
+                                named,
+                                variant_field_key_rules(&container_attrs, variant, variant_name)?,
+                                &format!("{path}::{variant_name}"),
+                                mode,
+                            )?;
+                        }
                         for (name, (field, _)) in named.fields.iter().filter_map(|(name, field)| {
                             field.ty.as_ref().map(|ty| (name, (field, ty)))
                         }) {
@@ -540,12 +543,16 @@ fn validate_variant_attributes(
     // *effective* per-direction names/keys in `validate_variant_key` and
     // `validate_named_field_keys` (see `inner`'s enum arm), not the raw attrs.
 
-    if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+    if mode == ApplyMode::Unified
+        && !variant.skip
+        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
     {
         // Applies regardless of `untagged`: a mismatched skip means serde
         // constructs/emits this variant on one side but not the other
         // (`variant_is_skipped_for_mode` would otherwise drop it from the
         // unified type entirely, even for the side that still uses it).
+        // `#[specta(skip)]` variants are exempt: they are dropped from both
+        // phases before the serde skip flags matter.
         return Err(Error::incompatible_skip(
             "variant skip",
             path,
@@ -655,12 +662,12 @@ fn validate_variant_key(
     path: &str,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    if mode != ApplyMode::Unified || variant.skip {
+    // Dead variants (see `variant_is_rendered`) are gated by the caller.
+    if mode != ApplyMode::Unified {
         return Ok(());
     }
 
-    if let Some(attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)?
-        && (attrs.untagged || (attrs.skip_serializing && attrs.skip_deserializing))
+    if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
     {
         return Ok(());
     }
@@ -688,6 +695,21 @@ fn validate_variant_key(
     }
 
     Ok(())
+}
+
+/// Whether the variant is rendered in at least one phase. `#[specta(skip)]`
+/// variants (also set by `#[serde(skip)]` at derive time) and variants
+/// serde-skipped in both directions are dropped by
+/// `filter_enum_variants_for_phase` before either phase's output is produced,
+/// so nothing about them — names, field keys, skip asymmetry — can create a
+/// phase difference.
+fn variant_is_rendered(variant: &Variant) -> Result<bool, Error> {
+    if variant.skip {
+        return Ok(false);
+    }
+
+    Ok(!SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
 }
 
 /// Whether a named field's *key* is part of the local wire shape: excludes
