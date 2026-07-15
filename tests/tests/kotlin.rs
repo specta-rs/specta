@@ -93,6 +93,16 @@ struct OptIn {
 struct JvmInline(String);
 
 #[derive(Type)]
+#[specta(type = Option<String>, collect = false)]
+struct NullableAlias;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UsesNullableAlias {
+    alias: NullableAlias,
+}
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -320,6 +330,22 @@ fn kotlin_materializes_generic_defaults_and_keeps_empty_variants_generic() {
 }
 
 #[test]
+fn kotlin_rejects_generics_that_shadow_their_declaration() {
+    use specta::datatype::{GenericDefinition, NamedDataType, Struct};
+
+    let mut types = Types::default();
+    NamedDataType::new("Node", &mut types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("Node"), None)]);
+        datatype.ty = Some(DataType::Struct(Struct::unit()));
+    });
+
+    assert!(matches!(
+        Kotlin::default().export(&types, IdentityFormat),
+        Err(Error::DuplicateIdentifier { name, .. }) if name == "Node"
+    ));
+}
+
+#[test]
 fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
     use specta::datatype::{Field, Generic, GenericDefinition, NamedDataType, Primitive, Struct};
 
@@ -452,6 +478,17 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .export(&Types::default().register::<KotlinxChar>(), IdentityFormat)
         .expect("Rust char should use the wire-compatible Kotlinx string representation");
     assert!(supported.contains("val value: kotlin.String"));
+
+    let supported = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<UsesNullableAlias>(),
+            IdentityFormat,
+        )
+        .expect("nullable aliases should retain Kotlinx missing-field defaults");
+    assert!(supported.contains("typealias NullableAlias = kotlin.String?"));
+    assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
+    assert!(supported.contains("val alias: NullableAlias = null"));
 
     let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)

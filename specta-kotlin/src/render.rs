@@ -96,7 +96,10 @@ fn render_named(
         .iter()
         .map(|generic| generic_identifier(&generic.name, &ndt.name))
         .collect::<Result<Vec<_>, _>>()?;
-    ensure_unique(ndt.name.as_ref(), generics.iter().map(String::as_str))?;
+    ensure_unique(
+        ndt.name.as_ref(),
+        std::iter::once(name.as_str()).chain(generics.iter().map(String::as_str)),
+    )?;
     let generic_scope = ndt
         .generics
         .iter()
@@ -716,6 +719,12 @@ fn render_property(
 ) -> Result<(), Error> {
     let indent = kotlin.indentation(depth);
     let rendered = field_datatype(kotlin, format, types, generic_scope, field, path)?;
+    let nullable = field
+        .ty
+        .as_ref()
+        .map(|ty| datatype_is_nullable(format, types, ty, path, &mut Vec::new()))
+        .transpose()?
+        .unwrap_or(false);
     render_kdoc(out, &indent, &field.docs);
     render_deprecated(out, &indent, field.deprecated.as_ref());
     let converted = safe_member_name(
@@ -725,8 +734,7 @@ fn render_property(
     if converted != original_name {
         annotation(out, &indent, kotlin, "SerialName", Some(original_name));
     }
-    if kotlin.serialization == Serialization::Kotlinx && rendered.ends_with('?') && !field.optional
-    {
+    if kotlin.serialization == Serialization::Kotlinx && nullable && !field.optional {
         annotation(out, &indent, kotlin, "EncodeDefault", None);
     }
     out.push_str(&indent);
@@ -736,8 +744,7 @@ fn render_property(
     out.push_str(&identifier(&converted, path)?);
     out.push_str(": ");
     out.push_str(&rendered);
-    if field.optional || (kotlin.serialization == Serialization::Kotlinx && rendered.ends_with('?'))
-    {
+    if field.optional || (kotlin.serialization == Serialization::Kotlinx && nullable) {
         out.push_str(" = null");
     }
     Ok(())
@@ -756,17 +763,79 @@ fn field_datatype(
         reason: "skipped field cannot be rendered",
     })?;
     let mut rendered = datatype(kotlin, format, types, ty, generic_scope, path)?;
-    if kotlin.serialization == Serialization::Kotlinx && field.optional && !rendered.ends_with('?')
-    {
+    let nullable = datatype_is_nullable(format, types, ty, path, &mut Vec::new())?;
+    if kotlin.serialization == Serialization::Kotlinx && field.optional && !nullable {
         return Err(Error::UnsupportedType {
             path: path.into(),
             reason: "optional non-null fields require a wire-specific Kotlin default",
         });
     }
-    if field.optional && !rendered.ends_with('?') {
+    if field.optional && !nullable {
         rendered.push('?');
     }
     Ok(rendered)
+}
+
+fn datatype_is_nullable(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    path: &str,
+    visited: &mut Vec<*const NamedDataType>,
+) -> Result<bool, Error> {
+    let mapped = map_datatype(format, types, dt)?;
+    datatype_is_nullable_mapped(format, types, &mapped, path, visited)
+}
+
+fn datatype_is_nullable_mapped(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    path: &str,
+    visited: &mut Vec<*const NamedDataType>,
+) -> Result<bool, Error> {
+    let DataType::Reference(Reference::Named(reference)) = dt else {
+        return Ok(matches!(dt, DataType::Nullable(_)));
+    };
+
+    match &reference.inner {
+        NamedReferenceType::Inline { dt, .. } => {
+            return datatype_is_nullable(format, types, dt, path, visited);
+        }
+        NamedReferenceType::Recursive(_) => return Ok(false),
+        NamedReferenceType::Reference { .. } => {}
+    }
+
+    let ndt = types
+        .get(reference)
+        .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+    let pointer = ndt as *const NamedDataType;
+    if visited.contains(&pointer) {
+        return Ok(false);
+    }
+    let Some(original) = &ndt.ty else {
+        return Ok(false);
+    };
+    let mut aliased = map_datatype(format, types, original)?;
+    if matches!(aliased, DataType::Struct(_) | DataType::Enum(_)) {
+        return Ok(false);
+    }
+
+    if let NamedReferenceType::Reference { generics, .. } = &reference.inner {
+        let resolved = resolved_reference_generics(ndt, generics, path)?;
+        let substitutions = ndt
+            .generics
+            .iter()
+            .map(|definition| definition.reference())
+            .zip(resolved)
+            .collect::<Vec<_>>();
+        substitute_generics(&mut aliased, &substitutions);
+    }
+
+    visited.push(pointer);
+    let nullable = datatype_is_nullable_mapped(format, types, &aliased, path, visited);
+    visited.pop();
+    nullable
 }
 
 fn datatype(
