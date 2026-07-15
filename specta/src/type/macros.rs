@@ -406,7 +406,7 @@ macro_rules! _impl_ndt {
         <$generic as Type>::definition($types)
     };
     (@generic_dt false $generic:ident $types:ident) => {
-        datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
+        <$generic as Type>::definition($types)
     };
 
     // Helpers for determining NDT name
@@ -434,3 +434,41 @@ macro_rules! _impl_ndt {
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;
+
+#[cfg(test)]
+mod tests {
+    use super::impl_ndt;
+    use crate::{
+        Type, Types,
+        datatype::{DataType, NamedReferenceType, Primitive, Reference},
+    };
+
+    struct NamedWrapper<T>(T);
+
+    impl_ndt!(
+        "specta::type::macros::tests" NamedWrapper<T> where { T: Type } as T = named;
+    );
+
+    #[test]
+    fn named_where_clause_impl_uses_concrete_reference_generics() {
+        let mut types = Types::default();
+        let data_type = NamedWrapper::<u32>::definition(&mut types);
+        assert!(matches!(
+            data_type,
+            DataType::Reference(Reference::Named(_))
+        ));
+        let DataType::Reference(Reference::Named(reference)) = data_type else {
+            return;
+        };
+        assert!(matches!(
+            reference.inner,
+            NamedReferenceType::Reference { .. }
+        ));
+        let NamedReferenceType::Reference { generics, .. } = reference.inner else {
+            return;
+        };
+
+        assert_eq!(generics.len(), 1);
+        assert_eq!(generics[0].1, DataType::Primitive(Primitive::u32));
+    }
+}
