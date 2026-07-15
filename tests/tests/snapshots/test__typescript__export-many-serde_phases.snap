@@ -506,7 +506,7 @@ export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 	a: string,
 } } | { t: "D"; c: First };
 
-export type Tenth = string | "B" | {
+export type Tenth = string | null | {
 	a: string,
 } | First;
 

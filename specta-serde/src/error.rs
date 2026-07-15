@@ -36,6 +36,12 @@ enum ErrorKind {
         serialize: Option<String>,
         deserialize: Option<String>,
     },
+    IncompatibleSkip {
+        context: Cow<'static, str>,
+        name: String,
+        skip_serializing: bool,
+        skip_deserializing: bool,
+    },
     IncompatibleConversion {
         context: Cow<'static, str>,
         name: String,
@@ -135,6 +141,22 @@ impl Error {
                 name: name.into(),
                 serialize,
                 deserialize,
+            },
+        }
+    }
+
+    pub(crate) fn incompatible_skip(
+        context: impl Into<Cow<'static, str>>,
+        name: impl Into<String>,
+        skip_serializing: bool,
+        skip_deserializing: bool,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::IncompatibleSkip {
+                context: context.into(),
+                name: name.into(),
+                skip_serializing,
+                skip_deserializing,
             },
         }
     }
@@ -240,7 +262,16 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use PhasesFormat for one-sided or asymmetric serde renames"
+            ),
+            ErrorKind::IncompatibleSkip {
+                context,
+                name,
+                skip_serializing,
+                skip_deserializing,
+            } => write!(
+                f,
+                "Incompatible {context} for '{name}' in unified mode: skip_serializing={skip_serializing}, skip_deserializing={skip_deserializing}. Use PhasesFormat for one-sided serde skips"
             ),
             ErrorKind::IncompatibleConversion {
                 context,

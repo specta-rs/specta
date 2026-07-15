@@ -6588,12 +6588,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
-                "renamed_field": {
+                "bruh": {
                   "type": "string"
                 }
               },
               "required": [
-                "renamed_field"
+                "bruh"
               ],
               "type": "object"
             }

@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 191
 expression: output
 ---
 Issue374: {
@@ -28,7 +29,7 @@ StructWithAliasAndRename: {
 EnumWithVariantAlias: "Variant" | "Other"
 EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
-InternallyTaggedWithAlias: ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }
+InternallyTaggedWithAlias: { type: "A"; field: string } | { type: "B"; other: number }
 AdjacentlyTaggedWithAlias: { type: "A"; data: {
 	field: string,
 } } | { type: "B"; data: {
@@ -455,7 +456,7 @@ Eight: { A: string } | "B"
 Ninth: { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 	a: string,
 } } | { t: "D"; c: First }
-Tenth: string | "B" | {
+Tenth: string | null | {
 	a: string,
 } | First
 MyEnumTagged: {
