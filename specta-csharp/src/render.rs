@@ -2276,8 +2276,11 @@ fn record_reserved_names(containing_name: &str) -> HashSet<String> {
         "EqualityContract",
         "PrintMembers",
         "Equals",
+        "Finalize",
         "GetType",
         "GetHashCode",
+        "MemberwiseClone",
+        "ReferenceEquals",
         "ToString",
     ]
     .into_iter()

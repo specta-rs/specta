@@ -102,7 +102,10 @@ struct ContainingNameCollision {
     clone: bool,
     equality_contract: bool,
     print_members: bool,
+    finalize: bool,
     get_type: bool,
+    memberwise_clone: bool,
+    reference_equals: bool,
 }
 
 #[derive(Type, Serialize)]
@@ -415,7 +418,10 @@ fn declaration_collisions_are_disambiguated() {
     let output = CSharp::new().export(&types, IdentityFormat).unwrap();
 
     assert!(output.contains("bool ContainingNameCollision2"));
+    assert!(output.contains("bool Finalize2"));
     assert!(output.contains("bool GetType2"));
+    assert!(output.contains("bool MemberwiseClone2"));
+    assert!(output.contains("bool ReferenceEquals2"));
     assert!(output.contains("JsonPropertyName(\"get_type\")"));
     assert!(output.contains("bool Clone2"));
     assert!(output.contains("bool EqualityContract2"));
