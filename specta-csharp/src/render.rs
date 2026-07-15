@@ -198,7 +198,13 @@ pub(crate) fn render_named_types(
     types: &Types,
     ndts: Vec<&NamedDataType>,
 ) -> Result<String, Error> {
-    render_file(exporter, types, &ndts, exporter.namespace.as_ref(), true)
+    match exporter.layout {
+        Layout::Namespaces => render_namespaces(exporter, types, &ndts),
+        Layout::FlatFile | Layout::ModulePrefixedName => {
+            render_file(exporter, types, &ndts, exporter.namespace.as_ref(), true)
+        }
+        Layout::Files => Err(Error::ExportRequiresExportTo(Layout::Files)),
+    }
 }
 
 fn render_namespaces(

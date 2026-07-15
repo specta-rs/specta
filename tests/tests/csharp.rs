@@ -1105,6 +1105,28 @@ fn low_level_datatype_api_covers_composites() {
 }
 
 #[test]
+fn low_level_named_export_respects_layout() {
+    let types = Types::default().register::<InlineNameShadowing>();
+    let output = specta_csharp::primitives::export(
+        &CSharp::new().layout(Layout::Namespaces),
+        &types,
+        types.into_unsorted_iter(),
+    )
+    .unwrap();
+
+    assert!(output.contains("namespace Specta.Generated.Test.Csharp"));
+    assert!(output.contains("global::Specta.Generated.Test.Csharp.FooValue TopLevel"));
+    assert!(matches!(
+        specta_csharp::primitives::export(
+            &CSharp::new().layout(Layout::Files),
+            &types,
+            types.into_unsorted_iter(),
+        ),
+        Err(Error::ExportRequiresExportTo(Layout::Files))
+    ));
+}
+
+#[test]
 fn opaque_types_require_an_explicit_or_builtin_mapping() {
     #[derive(Hash, PartialEq, Eq)]
     struct CustomOpaque;
