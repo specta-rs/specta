@@ -848,3 +848,133 @@ fn divergent_instantiation_set_still_fails_honestly() {
         "error should explain the divergence: {message}"
     );
 }
+
+/// Builds the two-node cycle `DefP<T> -> DefQ<U> -> DefP<T>` where `DefQ`'s
+/// terminal branch is `define(<raw>)` - raw TypeScript text the exporter
+/// cannot rewrite. `DefQ` is reached with the non-identity substitution
+/// `U -> T`, so merging its terminal into `DefP`'s body is only sound if
+/// the raw text doesn't mention `U`.
+fn define_cycle(raw: &'static str) -> Types {
+    use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
+
+    let mut types = Types::default();
+    NamedDataType::new("DefP", &mut types, |types, p| {
+        let t = GenericDefinition::new("T".into(), None);
+        p.generics = std::borrow::Cow::Owned(vec![t.clone()]);
+
+        let u = GenericDefinition::new("U".into(), None);
+        let q = NamedDataType::new("DefQ", types, |_, q| {
+            q.generics = std::borrow::Cow::Owned(vec![u.clone()]);
+            let mut e = Enum::default();
+            e.variants.push((
+                "X".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Reference(p.reference(vec![(
+                        t.reference(),
+                        DataType::Generic(u.reference()),
+                    )]))))
+                    .build(),
+            ));
+            e.variants.push((
+                "Z".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Reference(specta_typescript::define(
+                        raw,
+                    ))))
+                    .build(),
+            ));
+            q.ty = Some(DataType::Enum(e));
+        });
+
+        let mut e = Enum::default();
+        e.variants.push((
+            "X".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Reference(q.reference(vec![(
+                    u.reference(),
+                    DataType::Generic(t.reference()),
+                )]))))
+                .build(),
+        ));
+        e.variants.push((
+            "Y".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Generic(t.reference())))
+                .build(),
+        ));
+        p.ty = Some(DataType::Enum(e));
+    });
+    types
+}
+
+/// A cycle member's terminal branch is raw TypeScript that *names the
+/// member's generic parameter*
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584719985):
+/// `define("ReadonlyArray<U>")` merged into `DefP<T>`'s body under the
+/// substitution `U -> T` would leave the raw `U` untouched - a dangling
+/// parameter. Raw text can't be rewritten, so the export must fail with
+/// the honest unrepresentable-cycle error instead.
+#[test]
+fn define_mentioning_a_renamed_parameter_fails_honestly() {
+    let err = Typescript::default()
+        .export(&define_cycle("ReadonlyArray<U>"), RawFormat)
+        .expect_err("raw TypeScript naming a rewritten parameter cannot be merged");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("recursive type-alias cycle") && message.contains('U'),
+        "error should explain which parameter the raw text mentions: {message}"
+    );
+}
+
+/// The narrow allowance: raw text that does not mention any rewritten
+/// parameter as a standalone identifier is unaffected by the substitution
+/// and may be merged. `"Unit"` contains the letter `U` but not the
+/// *identifier* `U`, so the word-boundary scan must let it through.
+#[test]
+fn define_not_mentioning_any_renamed_parameter_still_collapses() {
+    let ts = Typescript::default()
+        .export(&define_cycle("Unit"), RawFormat)
+        .expect("raw TypeScript that mentions no rewritten parameter is safe to merge");
+
+    assert!(
+        ts.contains("export type DefP<T> = T | Unit;"),
+        "DefP must merge DefQ's raw terminal branch verbatim: {ts}"
+    );
+}
+
+/// Control: `define(...)` under an *identity* substitution (a non-generic
+/// cycle) keeps working exactly as before, whatever the raw text says -
+/// nothing is being rewritten, so the raw text can't be invalidated.
+#[test]
+fn define_in_a_non_generic_cycle_is_untouched() {
+    use specta::datatype::{DataType, Enum, Field, NamedDataType, Variant};
+
+    let mut types = Types::default();
+    NamedDataType::new("DefSelf", &mut types, |_, ndt| {
+        let mut e = Enum::default();
+        e.variants.push((
+            "X".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Reference(ndt.reference(vec![]))))
+                .build(),
+        ));
+        e.variants.push((
+            "Z".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Reference(specta_typescript::define(
+                    "`${string}-id`",
+                ))))
+                .build(),
+        ));
+        ndt.ty = Some(DataType::Enum(e));
+    });
+
+    let ts = Typescript::default()
+        .export(&types, RawFormat)
+        .expect("identity substitutions never invalidate raw TypeScript");
+    assert!(
+        ts.contains("export type DefSelf = `${string}-id`;"),
+        "the raw terminal must survive the collapse verbatim: {ts}"
+    );
+}

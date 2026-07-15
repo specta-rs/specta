@@ -2346,16 +2346,34 @@ fn substitute_generics(dt: &mut DataType, subst: &GenericSubst) -> Result<(), Co
                 substitute_generics(&mut ty, subst)?;
                 *dt = DataType::Reference(Reference::opaque(Branded::new(brand, ty)));
                 Ok(())
-            } else if subst_is_identity(subst)
-                || opaque_ref.downcast_ref::<opaque::Define>().is_some()
-                || opaque_ref.downcast_ref::<opaque::Any>().is_some()
+            } else if subst_is_identity(subst) {
+                // Identity substitutions are no-ops: nothing is being
+                // rewritten, so no payload can be invalidated.
+                Ok(())
+            } else if let Some(def) = opaque_ref.downcast_ref::<opaque::Define>() {
+                // `define(...)` is raw TypeScript text: it can *name* the
+                // member's generic parameters but cannot be structurally
+                // rewritten (and textually rewriting raw TS would be
+                // fragile). Allow it only when a conservative
+                // word-boundary scan shows it mentions no parameter this
+                // substitution actually rewrites.
+                match subst.iter().find(|(name, replacement)| {
+                    !matches!(replacement, DataType::Generic(g) if g.name() == *name)
+                        && raw_ts_mentions_identifier(&def.0, name)
+                }) {
+                    Some((name, _)) => Err(Cow::Owned(format!(
+                        "the cycle contains raw TypeScript (`define(...)`) that mentions generic parameter `{name}`, which cannot be rewritten"
+                    ))),
+                    None => Ok(()),
+                }
+            } else if opaque_ref.downcast_ref::<opaque::Any>().is_some()
                 || opaque_ref.downcast_ref::<opaque::Unknown>().is_some()
                 || opaque_ref.downcast_ref::<opaque::Never>().is_some()
                 || opaque_ref.downcast_ref::<opaque::Number>().is_some()
                 || opaque_ref.downcast_ref::<opaque::BigInt>().is_some()
             {
-                // Identity substitutions are no-ops, and this crate's other
-                // opaque payloads can't embed a datatype at all.
+                // This crate's remaining opaque payloads can't embed a
+                // datatype or mention a parameter at all.
                 Ok(())
             } else {
                 // An opaque reference from elsewhere might embed generic
@@ -2367,6 +2385,41 @@ fn substitute_generics(dt: &mut DataType, subst: &GenericSubst) -> Result<(), Co
             }
         }
     }
+}
+
+/// Conservative check for whether raw TypeScript text (a `define(...)`
+/// payload) mentions `name` as a standalone identifier - a word-boundary
+/// match, so the parameter `U` is found in `ReadonlyArray<U>` but not in
+/// `Unit`. Any hit means the raw text may depend on a generic parameter a
+/// cycle merge would rewrite, which is impossible for raw text, so the
+/// caller must reject the merge. Non-ASCII bytes are treated as identifier
+/// characters, erring toward a match (and therefore rejection) around
+/// exotic identifiers.
+fn raw_ts_mentions_identifier(raw: &str, name: &str) -> bool {
+    fn is_ident_byte(b: u8) -> bool {
+        b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || !b.is_ascii()
+    }
+
+    if name.is_empty() {
+        return false;
+    }
+    let bytes = raw.as_bytes();
+    let mut search_start = 0;
+    while let Some(pos) = raw[search_start..].find(name) {
+        let start = search_start + pos;
+        let end = start + name.len();
+        if (start == 0 || !is_ident_byte(bytes[start - 1]))
+            && (end == raw.len() || !is_ident_byte(bytes[end]))
+        {
+            return true;
+        }
+        // A later occurrence overlapping this one starts inside `name`, so
+        // its preceding character is part of `name` - an identifier - and
+        // would fail the boundary check anyway; skipping past `end` is safe
+        // and keeps the cursor on a UTF-8 character boundary.
+        search_start = end;
+    }
+    false
 }
 
 /// Structural size of a datatype, used as a divergence guard for cycle
