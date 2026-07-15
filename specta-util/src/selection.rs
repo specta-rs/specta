@@ -1,5 +1,3 @@
-// TODO: Should `specta-util` rexport `specta` for these macros???
-
 /// Specta compatible selection of struct fields.
 ///
 /// ```ignore
@@ -37,37 +35,94 @@
 // TODO: better docs w/ example
 #[macro_export]
 macro_rules! selection {
-    ( $s:expr, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+    ( @define { $($n:ident),+ } as $name:ident ) => {
         #[allow(non_camel_case_types)]
         mod selection {
-            #[derive(serde::Serialize, specta::Type)]
-            #[specta(inline)]
-            pub struct $name<$($n,)*> {
-                $(pub $n: $n),*
+            mod deps {
+                pub use $crate::__private::{serde, specta};
+            }
+
+            pub mod definition {
+                #[derive(super::deps::serde::Serialize, super::deps::specta::Type)]
+                #[serde(crate = "super::deps::serde")]
+                #[specta(crate = super::deps::specta, inline)]
+                pub struct $name<$($n,)*> {
+                    $(pub $n: $n),*
+                }
             }
         }
-        use selection::$name;
+        use selection::definition::$name;
+    };
+    ( $s:ident, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+        $crate::selection!(@define { $($n),+ } as $name);
         #[allow(non_camel_case_types)]
         $name { $($n: $s.$n,)* }
+    }};
+    ( $s:expr, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+        $crate::selection!(@define { $($n),+ } as $name);
+        #[allow(non_camel_case_types)]
+        let value = $s;
+        $name { $($n: value.$n,)* }
+    }};
+    ( $s:ident, { $($n:ident),+ $(,)? } ) => {{
+        $crate::selection!($s, { $($n),+ } as Selection)
     }};
     ( $s:expr, { $($n:ident),+ $(,)? } ) => {{
         $crate::selection!($s, { $($n),+ } as Selection)
     }};
 
     ( $s:expr, [{ $($n:ident),+ $(,)? }] as $name:ident ) => {{
-        #[allow(non_camel_case_types)]
-        mod selection {
-            #[derive(serde::Serialize, specta::Type)]
-            #[specta(inline)]
-            pub struct $name<$($n,)*> {
-                $(pub $n: $n),*
-            }
-        }
-        use selection::$name;
+        $crate::selection!(@define { $($n),+ } as $name);
         #[allow(non_camel_case_types)]
         $s.into_iter().map(|v| $name { $($n: v.$n,)* }).collect::<Vec<_>>()
     }};
     ( $s:expr, [{ $($n:ident),+ $(,)? }] ) => {{
         $crate::selection!($s, [{ $($n),+ }] as Selection)
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    struct User {
+        name: &'static str,
+        age: u32,
+    }
+
+    struct Account {
+        name: String,
+        password: String,
+    }
+
+    #[test]
+    fn struct_input_is_evaluated_once() {
+        let evaluations = Cell::new(0);
+        let selection = crate::selection!(
+            {
+                evaluations.set(evaluations.get() + 1);
+                User {
+                    name: "Ada",
+                    age: 37,
+                }
+            },
+            { name, age }
+        );
+
+        assert_eq!(evaluations.get(), 1);
+        assert_eq!(selection.name, "Ada");
+        assert_eq!(selection.age, 37);
+    }
+
+    #[test]
+    fn struct_identifier_preserves_unselected_fields() {
+        let account = Account {
+            name: "Ada".to_owned(),
+            password: "correct horse".to_owned(),
+        };
+        let selection = crate::selection!(account, { name });
+
+        assert_eq!(selection.name, "Ada");
+        assert_eq!(account.password, "correct horse");
+    }
 }
