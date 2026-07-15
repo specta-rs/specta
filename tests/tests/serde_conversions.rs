@@ -563,7 +563,7 @@ fn field_phase_specific_rename_requires_phases() {
             specta_serde::Format,
         )
         .expect_err("field-level phase-specific renames should require PhasesFormat");
-    assert!(err.to_string().contains("Incompatible field rename"));
+    assert!(err.to_string().contains("Incompatible field key"));
 
     Typescript::default()
         .export(

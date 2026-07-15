@@ -1082,6 +1082,8 @@ export type StructWithAliasAndRename = StructWithAliasAndRename_Serialize | Stru
 
 export type StructWithAliasAndRename_Deserialize = {
 	renamed_field: string,
+} | {
+	bruh: string,
 };
 
 export type StructWithAliasAndRename_Serialize = {

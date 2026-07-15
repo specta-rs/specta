@@ -27,6 +27,7 @@ mod serde_enum_rewrite;
 mod serde_flatten_option;
 mod serde_identifiers;
 mod serde_other;
+mod serde_unified_asymmetry;
 mod serde_unknown_attrs;
 mod serde_untagged_unit;
 mod serde_validate_recursion;

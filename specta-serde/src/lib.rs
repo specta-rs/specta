@@ -597,7 +597,7 @@ pub fn select_phase_datatype(dt: &DataType, types: &Types, phase: Phase) -> Data
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PhaseRewrite {
+pub(crate) enum PhaseRewrite {
     Unified,
     Serialize,
     Deserialize,
@@ -867,6 +867,7 @@ fn rewrite_datatype_for_phase(
                 false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
+            normalize_container_attrs_for_phase(&mut s.attributes, mode)?;
             if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
                 *ty = intersection;
                 return Ok(());
@@ -904,6 +905,7 @@ fn rewrite_datatype_for_phase(
             }
 
             rewrite_enum_repr_for_phase(e, mode, original_types)?;
+            normalize_enum_attrs_for_phase(e, mode)?;
         }
         DataType::Tuple(tuple) => {
             for ty in &mut tuple.elements {
@@ -1261,22 +1263,11 @@ fn rewrite_fields_for_phase(
             for (name, field) in &mut named.fields {
                 apply_field_attrs(field, mode, container_default)?;
 
-                if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
-                    let rename = select_phase_string(
-                        mode,
-                        serde_attrs.rename_serialize.as_deref(),
-                        serde_attrs.rename_deserialize.as_deref(),
-                        "field rename",
-                        name.as_ref(),
-                    )?;
-
-                    if let Some(rename) = rename {
-                        *name = Cow::Owned(rename.to_string());
-                    } else if let Some(rule) = rename_all_rule {
-                        *name = Cow::Owned(rule.apply_to_field(name.as_ref()));
-                    }
-                } else if let Some(rule) = rename_all_rule {
-                    *name = Cow::Owned(rule.apply_to_field(name.as_ref()));
+                let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+                let key =
+                    phase_field_key(name.as_ref(), serde_attrs.as_ref(), rename_all_rule, mode)?;
+                if key != name.as_ref() {
+                    *name = Cow::Owned(key);
                 }
 
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
@@ -1285,6 +1276,36 @@ fn rewrite_fields_for_phase(
     }
 
     Ok(())
+}
+
+/// The effective wire key of a named field for `mode`: the explicit
+/// directional `rename` if set, else the phase's `rename_all` /
+/// `rename_all_fields` rule applied to the default name, else the default
+/// name. This is the single source of truth for field keys — unified-mode
+/// validation compares the `Serialize` and `Deserialize` results of this
+/// same function, so validation and rewriting cannot drift.
+pub(crate) fn phase_field_key(
+    field_name: &str,
+    serde_attrs: Option<&SerdeFieldAttrs>,
+    rename_all_rule: Option<RenameRule>,
+    mode: PhaseRewrite,
+) -> Result<String, Error> {
+    if let Some(attrs) = serde_attrs
+        && let Some(rename) = select_phase_string(
+            mode,
+            attrs.rename_serialize.as_deref(),
+            attrs.rename_deserialize.as_deref(),
+            "field rename",
+            field_name,
+        )?
+    {
+        return Ok(rename.to_string());
+    }
+
+    Ok(match rename_all_rule {
+        Some(rule) => rule.apply_to_field(field_name),
+        None => field_name.to_string(),
+    })
 }
 
 fn rewrite_field_for_phase(
@@ -1316,6 +1337,23 @@ fn rewrite_field_for_phase(
         field.attributes.remove(parser::FIELD_SKIP_SERIALIZING_IF);
     }
 
+    if mode != PhaseRewrite::Unified {
+        // Directional attributes were consumed while producing this
+        // phase-specific shape: renames are already applied to the field name
+        // by the caller, and fields skipped in this phase were already
+        // dropped. Strip them for the same reason as `skip_serializing_if`
+        // above: unified-mode validation now rejects one-sided renames/skips,
+        // and it must keep accepting the already-split shapes.
+        for key in [
+            parser::FIELD_RENAME_SERIALIZE,
+            parser::FIELD_RENAME_DESERIALIZE,
+            parser::FIELD_SKIP_SERIALIZING,
+            parser::FIELD_SKIP_DESERIALIZING,
+        ] {
+            field.attributes.remove(key);
+        }
+    }
+
     if let Some(ty) = field.ty.clone()
         && let Some(resolved) = resolve_phased_type(&ty, mode, "field")?
     {
@@ -1324,6 +1362,86 @@ fn rewrite_field_for_phase(
 
     if let Some(ty) = field.ty.as_mut() {
         rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
+    }
+
+    Ok(())
+}
+
+/// Strips or normalizes directional container serde attrs that were consumed
+/// while producing a phase-specific shape, so that unified-mode validation
+/// (which rejects one-sided renames) keeps accepting the already-split shapes
+/// for downstream callers that validate the post-`apply_phases` graph.
+fn normalize_container_attrs_for_phase(
+    attrs: &mut specta::datatype::Attributes,
+    mode: PhaseRewrite,
+) -> Result<(), Error> {
+    if mode == PhaseRewrite::Unified {
+        return Ok(());
+    }
+
+    let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)? else {
+        return Ok(());
+    };
+
+    // `rename_all` / `rename_all_fields` have already been applied to the
+    // field names by `rewrite_fields_for_phase`.
+    for key in [
+        parser::CONTAINER_RENAME_ALL_SERIALIZE,
+        parser::CONTAINER_RENAME_ALL_DESERIALIZE,
+        parser::CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
+        parser::CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+    ] {
+        attrs.remove(key);
+    }
+
+    // The container rename is still needed by `rewrite_named_type_for_phase`
+    // (which runs after this rewrite) to name the exported type, so normalize
+    // it to the phase-selected value instead of dropping it.
+    let rename = match mode {
+        PhaseRewrite::Serialize => parsed.rename_serialize,
+        PhaseRewrite::Deserialize => parsed.rename_deserialize,
+        PhaseRewrite::Unified => unreachable!("handled above"),
+    };
+    attrs.remove(parser::CONTAINER_RENAME_SERIALIZE);
+    attrs.remove(parser::CONTAINER_RENAME_DESERIALIZE);
+    if let Some(rename) = rename {
+        attrs.insert(parser::CONTAINER_RENAME_SERIALIZE, rename.clone());
+        attrs.insert(parser::CONTAINER_RENAME_DESERIALIZE, rename);
+    }
+
+    Ok(())
+}
+
+/// Enum counterpart of [`normalize_container_attrs_for_phase`]: tagged enum
+/// reprs are rebuilt without the original variant attrs by
+/// [`rewrite_enum_repr_for_phase`], but untagged enums keep their
+/// `DataType::Enum` shape (the repr rewrite returns early for them) and
+/// variant-level `#[serde(untagged)]` variants keep their attrs via
+/// [`clone_variant_with_unnamed_fields`], so the consumed directional attrs
+/// must be stripped here as well.
+fn normalize_enum_attrs_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<(), Error> {
+    if mode == PhaseRewrite::Unified {
+        return Ok(());
+    }
+
+    normalize_container_attrs_for_phase(&mut e.attributes, mode)?;
+
+    for (_, variant) in &mut e.variants {
+        // Variant renames were already consumed by `serialized_variant_name`
+        // (and are wire-irrelevant for untagged variants), `rename_all` was
+        // applied to the variant's field names by `rewrite_fields_for_phase`,
+        // and variants skipped in this phase were already dropped by
+        // `filter_enum_variants_for_phase`.
+        for key in [
+            parser::VARIANT_RENAME_SERIALIZE,
+            parser::VARIANT_RENAME_DESERIALIZE,
+            parser::VARIANT_RENAME_ALL_SERIALIZE,
+            parser::VARIANT_RENAME_ALL_DESERIALIZE,
+            parser::VARIANT_SKIP_SERIALIZING,
+            parser::VARIANT_SKIP_DESERIALIZING,
+        ] {
+            variant.attributes.remove(key);
+        }
     }
 
     Ok(())
@@ -1634,7 +1752,7 @@ fn rewrite_identifier_enum_for_phase(
     Ok(true)
 }
 
-fn container_rename_all_rule(
+pub(crate) fn container_rename_all_rule(
     attrs: &specta::datatype::Attributes,
     mode: PhaseRewrite,
     context: &str,
@@ -1653,7 +1771,7 @@ fn container_rename_all_rule(
     )
 }
 
-fn enum_variant_field_rename_rule(
+pub(crate) fn enum_variant_field_rename_rule(
     container_attrs: &Option<SerdeContainerAttrs>,
     variant: &Variant,
     mode: PhaseRewrite,
@@ -1767,7 +1885,7 @@ fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) ->
     }
 }
 
-fn serialized_variant_name(
+pub(crate) fn serialized_variant_name(
     variant_name: &str,
     variant: &Variant,
     container_attrs: &Option<SerdeContainerAttrs>,
@@ -2753,6 +2871,39 @@ mod tests {
         nickname: Option<String>,
     }
 
+    #[derive(Type, Serialize, Deserialize)]
+    struct WithDirectionalFieldAttrs {
+        #[serde(rename(serialize = "serName"))]
+        field_a: String,
+        #[serde(skip_serializing)]
+        field_b: String,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(
+        rename(serialize = "DirectionalContainerSer"),
+        rename_all(serialize = "camelCase")
+    )]
+    struct WithDirectionalContainerAttrs {
+        field_one: String,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(untagged)]
+    enum UntaggedWithDirectionalVariantAttrs {
+        A(String),
+        #[serde(skip_deserializing)]
+        B(u32),
+        #[serde(rename(serialize = "CSer"))]
+        C(bool),
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(untagged, rename_all(serialize = "camelCase"))]
+    enum UntaggedWithDirectionalContainerAttrs {
+        A { field_one: String },
+    }
+
     #[test]
     fn selects_split_named_reference_for_each_phase() {
         let mut types = specta::Types::default();
@@ -2867,6 +3018,63 @@ mod tests {
             .expect("Unified validation should accept phase-split _Serialize variant");
         validate_datatype_for_mode(&deserialize, &resolved, ApplyMode::Unified)
             .expect("Unified validation should accept phase-split _Deserialize variant");
+    }
+
+    #[test]
+    fn phase_split_directional_attrs_pass_unified_mode_validation() {
+        // Same downstream contract as above, but for the one-sided directional
+        // renames/skips that unified-mode validation rejects: once
+        // `PhasesFormat` has split a type, the phase-specific shapes must not
+        // keep carrying the consumed directional serde attrs, otherwise
+        // unified-mode validation on the post-`apply_phases` graph rejects the
+        // already-split types.
+        let mut types = specta::Types::default();
+        let field_dt = WithDirectionalFieldAttrs::definition(&mut types);
+        let container_dt = WithDirectionalContainerAttrs::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        for (name, dt) in [
+            ("field attrs", &field_dt),
+            ("container attrs", &container_dt),
+        ] {
+            for phase in [Phase::Serialize, Phase::Deserialize] {
+                let phased = select_phase_datatype(dt, &resolved, phase);
+                validate_datatype_for_mode(&phased, &resolved, ApplyMode::Unified)
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "Unified validation should accept phase-split {name} {phase:?} shape: {err}"
+                        )
+                    });
+            }
+        }
+    }
+
+    #[test]
+    fn phase_split_untagged_enum_directional_attrs_pass_unified_mode_validation() {
+        // Untagged enums keep their `DataType::Enum` shape through a phase
+        // split (`rewrite_enum_repr_for_phase` returns early for them), so the
+        // consumed directional variant/container attrs must be stripped from
+        // the kept variants too, or unified-mode validation of the
+        // post-`apply_phases` graph rejects the already-split enums.
+        let mut types = specta::Types::default();
+        let variant_dt = UntaggedWithDirectionalVariantAttrs::definition(&mut types);
+        let container_dt = UntaggedWithDirectionalContainerAttrs::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        for (name, dt) in [
+            ("variant attrs", &variant_dt),
+            ("container attrs", &container_dt),
+        ] {
+            for phase in [Phase::Serialize, Phase::Deserialize] {
+                let phased = select_phase_datatype(dt, &resolved, phase);
+                validate_datatype_for_mode(&phased, &resolved, ApplyMode::Unified)
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "Unified validation should accept phase-split untagged enum {name} {phase:?} shape: {err}"
+                        )
+                    });
+            }
+        }
     }
 
     #[test]
