@@ -552,12 +552,12 @@ class Issue281(_specta_typing.TypedDict):
 #  https://github.com/specta-rs/specta/issues/374
 type Issue374 = Issue374_Deserialize | Issue374_Serialize
 
-_specta_typed_dict_test__types__Issue374_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Deserialize", {"foo": "_specta_typing.NotRequired[_specta_builtins.bool]", "bar": "_specta_typing.NotRequired[_specta_builtins.bool]"})
+_specta_typed_dict_test__types__Issue374_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Deserialize", {"foo": _specta_typing.NotRequired["_specta_builtins.bool"], "bar": _specta_typing.NotRequired["_specta_builtins.bool"]})
 
 #  https://github.com/specta-rs/specta/issues/374
 type Issue374_Deserialize = _specta_typed_dict_test__types__Issue374_Deserialize
 
-_specta_typed_dict_test__types__Issue374_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Serialize", {"foo": "_specta_typing.NotRequired[_specta_builtins.bool]", "bar": "_specta_typing.NotRequired[_specta_builtins.bool]"})
+_specta_typed_dict_test__types__Issue374_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Serialize", {"foo": _specta_typing.NotRequired["_specta_builtins.bool"], "bar": _specta_typing.NotRequired["_specta_builtins.bool"]})
 
 #  https://github.com/specta-rs/specta/issues/374
 type Issue374_Serialize = _specta_typed_dict_test__types__Issue374_Serialize
@@ -664,7 +664,7 @@ type NonOptional = None | _specta_builtins.str
 
 type Optional = Optional_Deserialize | Optional_Serialize
 
-_specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumA", {"A": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+_specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumA", {"A": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 _specta_typed_dict_test__types__OptionalInEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumB", {"B": "_specta_typed_dict_test__types__OptionalInEnumBB"})
 
@@ -672,7 +672,7 @@ _specta_typed_dict_test__types__OptionalInEnumBB = _specta_typing.TypedDict("_sp
 
 _specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"C": "_specta_typed_dict_test__types__OptionalInEnumCC"})
 
-_specta_typed_dict_test__types__OptionalInEnumCC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumCC", {"a": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+_specta_typed_dict_test__types__OptionalInEnumCC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumCC", {"a": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 type OptionalInEnum = _specta_typed_dict_test__types__OptionalInEnumA | _specta_typed_dict_test__types__OptionalInEnumB | _specta_typed_dict_test__types__OptionalInEnumC
 
@@ -681,11 +681,11 @@ type OptionalOnNamedField = None | _specta_builtins.str
 class OptionalOnTransparentNamedField(_specta_typing.TypedDict):
     b: None | _specta_builtins.str
 
-_specta_typed_dict_test__types__Optional_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Deserialize", {"a": "None | _specta_builtins.int", "b": "_specta_typing.NotRequired[None | _specta_builtins.int]", "c": "None | _specta_builtins.str", "d": "_specta_typing.NotRequired[_specta_builtins.bool]"})
+_specta_typed_dict_test__types__Optional_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Deserialize", {"a": "None | _specta_builtins.int", "b": _specta_typing.NotRequired["None | _specta_builtins.int"], "c": "None | _specta_builtins.str", "d": _specta_typing.NotRequired["_specta_builtins.bool"]})
 
 type Optional_Deserialize = _specta_typed_dict_test__types__Optional_Deserialize
 
-_specta_typed_dict_test__types__Optional_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Serialize", {"a": "None | _specta_builtins.int", "b": "_specta_typing.NotRequired[None | _specta_builtins.int]", "c": "_specta_typing.NotRequired[_specta_builtins.str]", "d": "_specta_builtins.bool"})
+_specta_typed_dict_test__types__Optional_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Serialize", {"a": "None | _specta_builtins.int", "b": _specta_typing.NotRequired["None | _specta_builtins.int"], "c": _specta_typing.NotRequired["_specta_builtins.str"], "d": "_specta_builtins.bool"})
 
 type Optional_Serialize = _specta_typed_dict_test__types__Optional_Serialize
 
@@ -825,7 +825,7 @@ _specta_typed_dict_test__types__SkipVariant3AA = _specta_typing.TypedDict("_spec
 
 type SkipVariant3 = _specta_typed_dict_test__types__SkipVariant3A
 
-_specta_typed_dict_test__types__SkippedFieldWithinVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typing.NotRequired[None]"})
+_specta_typed_dict_test__types__SkippedFieldWithinVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantA", {"type": "_specta_typing.Literal[\"A\"]", "data": _specta_typing.NotRequired["None"]})
 
 _specta_typed_dict_test__types__SkippedFieldWithinVariantB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_builtins.str"})
 

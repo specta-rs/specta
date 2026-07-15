@@ -36,7 +36,7 @@ struct RenderState {
 struct TypedDictHelper {
     name: String,
     generics: Vec<Generic>,
-    fields: Vec<(String, String)>,
+    fields: Vec<(String, String, bool)>,
 }
 
 impl<'a> RenderContext<'a, 'static> {
@@ -595,14 +595,7 @@ fn typed_dict_expression<'a>(
             let mut field_location = location.clone();
             field_location.push(Cow::Owned(name.to_string()));
             let ty = datatype_to_python(helper_ctx, ty, field_location, generics)?;
-            Ok((
-                name.to_string(),
-                if field.optional {
-                    format!("_specta_typing.NotRequired[{ty}]")
-                } else {
-                    ty
-                },
-            ))
+            Ok((name.to_string(), ty, field.optional))
         })
         .collect::<Result<Vec<_>, Error>>()?;
     let fields = deduplicate_typed_dict_fields(fields);
@@ -615,7 +608,7 @@ fn typed_dict_expression<'a>(
                 let type_var = helper_type_var(&helper_name, generic);
                 fields
                     .iter()
-                    .any(|(_, ty)| contains_python_identifier(ty, &type_var))
+                    .any(|(_, ty, _)| contains_python_identifier(ty, &type_var))
             })
             .cloned()
             .collect::<Vec<_>>();
@@ -652,10 +645,13 @@ fn contains_python_identifier(value: &str, identifier: &str) -> bool {
     })
 }
 
-fn deduplicate_typed_dict_fields(fields: Vec<(String, String)>) -> Vec<(String, String)> {
+fn deduplicate_typed_dict_fields(
+    fields: Vec<(String, String, bool)>,
+) -> Vec<(String, String, bool)> {
     fields.into_iter().fold(Vec::new(), |mut fields, field| {
         if let Some(existing) = fields.iter_mut().find(|existing| existing.0 == field.0) {
             existing.1 = field.1;
+            existing.2 = field.2;
         } else {
             fields.push(field);
         }
@@ -702,7 +698,17 @@ fn render_typed_dict_helpers(state: &RenderState, indent: &str) -> String {
             &helper
                 .fields
                 .iter()
-                .map(|(name, ty)| format!("{}: {}", python_string(name), python_string(ty)))
+                .map(|(name, ty, optional)| {
+                    format!(
+                        "{}: {}",
+                        python_string(name),
+                        if *optional {
+                            format!("_specta_typing.NotRequired[{}]", python_string(ty))
+                        } else {
+                            python_string(ty)
+                        }
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", "),
         );
@@ -1292,7 +1298,7 @@ fn anonymous_type_name(location: &Location) -> String {
         .iter()
         .flat_map(|part| part.chars())
         .map(|character| {
-            if character.is_alphanumeric() {
+            if character == '_' || unicode_ident::is_xid_continue(character) {
                 character
             } else {
                 '_'

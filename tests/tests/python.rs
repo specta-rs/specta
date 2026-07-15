@@ -483,6 +483,12 @@ fn python_disambiguates_normalized_anonymous_helper_names() {
 
     #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
+    struct Third {
+        third: u32,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
     struct Outer {
         #[serde(rename = "K")]
         #[specta(inline)]
@@ -490,6 +496,9 @@ fn python_disambiguates_normalized_anonymous_helper_names() {
         #[serde(rename = "K")]
         #[specta(inline)]
         second: Second,
+        #[serde(rename = "²")]
+        #[specta(inline)]
+        third: Third,
     }
 
     let output = Python::default()
@@ -504,8 +513,12 @@ fn python_disambiguates_normalized_anonymous_helper_names() {
         "{output}"
     );
     assert!(
+        output.contains("_specta_typed_dict_test__python__Outer_ = "),
+        "{output}"
+    );
+    assert!(
         output.contains(
-            "{\"K\": \"_specta_typed_dict_test__python__OuterK\", \"K\": \"_specta_typed_dict_test__python__OuterK_2\"}"
+            "{\"K\": \"_specta_typed_dict_test__python__OuterK\", \"K\": \"_specta_typed_dict_test__python__OuterK_2\", \"²\": \"_specta_typed_dict_test__python__Outer_\"}"
         ),
         "{output}"
     );
@@ -527,7 +540,7 @@ fn python_functional_typed_dict_preserves_optional_keys() {
         )
         .unwrap();
     assert!(output.contains(
-        "_specta_typed_dict_test__python__OptionalKey = _specta_typing.TypedDict(\"_specta_typed_dict_test__python__OptionalKey\", {\"value\": \"_specta_typing.NotRequired[_specta_builtins.str]\"})"
+        "_specta_typed_dict_test__python__OptionalKey = _specta_typing.TypedDict(\"_specta_typed_dict_test__python__OptionalKey\", {\"value\": _specta_typing.NotRequired[\"_specta_builtins.str\"]})"
     ));
     assert!(output.contains("type OptionalKey = _specta_typed_dict_test__python__OptionalKey"));
     assert!(!output.contains(": _specta_typing.TypedDict("));

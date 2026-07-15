@@ -591,7 +591,7 @@ type Ninth = _specta_typed_dict_test__types__NinthA | _specta_typed_dict_test__t
 
 type NonOptional = None | _specta_builtins.str
 
-_specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumA", {"A": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+_specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumA", {"A": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 _specta_typed_dict_test__types__OptionalInEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumB", {"B": "_specta_typed_dict_test__types__OptionalInEnumBB"})
 
@@ -599,7 +599,7 @@ _specta_typed_dict_test__types__OptionalInEnumBB = _specta_typing.TypedDict("_sp
 
 _specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"C": "_specta_typed_dict_test__types__OptionalInEnumCC"})
 
-_specta_typed_dict_test__types__OptionalInEnumCC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumCC", {"a": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+_specta_typed_dict_test__types__OptionalInEnumCC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumCC", {"a": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 type OptionalInEnum = _specta_typed_dict_test__types__OptionalInEnumA | _specta_typed_dict_test__types__OptionalInEnumB | _specta_typed_dict_test__types__OptionalInEnumC
 
@@ -744,7 +744,7 @@ _specta_typed_dict_test__types__SkipVariant3AA = _specta_typing.TypedDict("_spec
 
 type SkipVariant3 = _specta_typed_dict_test__types__SkipVariant3A
 
-_specta_typed_dict_test__types__SkippedFieldWithinVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typing.NotRequired[None]"})
+_specta_typed_dict_test__types__SkippedFieldWithinVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantA", {"type": "_specta_typing.Literal[\"A\"]", "data": _specta_typing.NotRequired["None"]})
 
 _specta_typed_dict_test__types__SkippedFieldWithinVariantB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_builtins.str"})
 

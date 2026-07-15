@@ -476,7 +476,7 @@ type NonOptional = None | _specta_builtins.str
 
 _specta_typed_dict_test__types__OptionalInEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumB", {"a": "None | _specta_builtins.str"})
 
-_specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"a": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+_specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"a": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 type OptionalInEnum = None | _specta_builtins.str | _specta_typed_dict_test__types__OptionalInEnumB | _specta_typed_dict_test__types__OptionalInEnumC
 
