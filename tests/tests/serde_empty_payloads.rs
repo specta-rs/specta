@@ -254,3 +254,45 @@ fn tuple_struct_skipped_field_typescript() {
         "must not collapse to a bare newtype:\n{ts}"
     );
 }
+
+// A serde-transparent tuple struct is the exception to the arity rule above:
+// serde serializes it as the bare inner value, so it must NOT be rewritten to
+// an array even though its declared arity is > 1. `#[specta(transparent =
+// false)]` keeps Specta from resolving the container to its inner type at
+// derive time, so specta-serde sees the struct with its
+// `serde:container:transparent` attribute intact.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+#[specta(transparent = false)]
+struct TransparentTupleSkip(String, #[serde(skip)] u8);
+
+#[test]
+fn transparent_tuple_struct_skipped_field_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&TransparentTupleSkip("a".into(), 1)).unwrap(),
+        r#""a""#
+    );
+
+    assert!(serde_json::from_str::<TransparentTupleSkip>(r#""a""#).is_ok());
+    assert!(serde_json::from_str::<TransparentTupleSkip>(r#"["a"]"#).is_err());
+}
+
+#[test]
+fn transparent_tuple_struct_skipped_field_typescript() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<TransparentTupleSkip>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains("type TransparentTupleSkip = string;"),
+        "serde-transparent tuple struct must stay a bare `string`, not `[string]`:\n{ts}"
+    );
+    assert!(
+        !ts.contains("[string]"),
+        "must not rewrite a transparent struct to an array shape:\n{ts}"
+    );
+}

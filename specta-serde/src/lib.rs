@@ -847,8 +847,9 @@ fn rewrite_datatype_for_phase(
 
     match ty {
         DataType::Struct(s) => {
-            let container_default = SerdeContainerAttrs::from_attributes(&s.attributes)?
-                .is_some_and(|attrs| attrs.default);
+            let container_attrs = SerdeContainerAttrs::from_attributes(&s.attributes)?;
+            let container_default = container_attrs.as_ref().is_some_and(|attrs| attrs.default);
+            let container_transparent = container_attrs.is_some_and(|attrs| attrs.transparent);
             let container_rename_all = container_rename_all_rule(
                 &s.attributes,
                 mode,
@@ -856,9 +857,12 @@ fn rewrite_datatype_for_phase(
                 container_name.unwrap_or("<anonymous struct>"),
             )?;
 
+            // A `#[serde(transparent)]` struct serializes as its sole live
+            // field's bare value regardless of declared arity, so it is
+            // exempt from the declared-arity tuple rewrite below.
             let original_unnamed_arity = match &s.fields {
-                Fields::Unnamed(unnamed) => Some(unnamed.fields.len()),
-                Fields::Unit | Fields::Named(_) => None,
+                Fields::Unnamed(unnamed) if !container_transparent => Some(unnamed.fields.len()),
+                Fields::Unit | Fields::Named(_) | Fields::Unnamed(_) => None,
             };
 
             rewrite_fields_for_phase(
