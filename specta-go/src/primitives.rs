@@ -612,18 +612,16 @@ fn render_reference(
                     })?;
                 let mut out = exported_name(&ndt.name, &rust_type_path(ndt))?;
                 let mut rendered_arguments = Vec::new();
+                let resolved_arguments = resolve_reference_arguments(ndt, arguments);
                 for definition in ndt.generics.iter() {
-                    let argument = arguments
-                        .iter()
-                        .find(|(generic, _)| generic == &definition.reference())
-                        .map(|(_, ty)| ty)
-                        .or(definition.default.as_ref());
-                    rendered_arguments.push(match argument {
-                        Some(argument) => {
-                            render_datatype(exporter, types, argument, generics, path, false, ctx)?
-                        }
-                        None => "any".into(),
-                    });
+                    rendered_arguments.push(
+                        match resolved_arguments.get(&definition.reference()) {
+                            Some(argument) => render_datatype(
+                                exporter, types, argument, generics, path, false, ctx,
+                            )?,
+                            None => "any".into(),
+                        },
+                    );
                 }
                 if !rendered_arguments.is_empty() {
                     out.push('[');
@@ -651,6 +649,30 @@ fn render_reference(
             )
         }
     }
+}
+
+fn resolve_reference_arguments(
+    ndt: &NamedDataType,
+    arguments: &[(Generic, DataType)],
+) -> HashMap<Generic, DataType> {
+    let mut resolved = HashMap::new();
+    for definition in ndt.generics.iter() {
+        let reference = definition.reference();
+        let argument = arguments
+            .iter()
+            .find(|(generic, _)| generic == &reference)
+            .map(|(_, ty)| ty.clone())
+            .or_else(|| {
+                definition.default.clone().map(|mut ty| {
+                    substitute_generics(&mut ty, &resolved);
+                    ty
+                })
+            });
+        if let Some(argument) = argument {
+            resolved.insert(reference, argument);
+        }
+    }
+    resolved
 }
 
 fn render_map_key(
@@ -775,22 +797,7 @@ fn reference_requires_pointer(
     if target == *root {
         return true;
     }
-    let substitutions = ndt
-        .generics
-        .iter()
-        .filter_map(|definition| {
-            arguments
-                .iter()
-                .find(|(generic, _)| generic == &definition.reference())
-                .map(|(_, ty)| (definition.reference(), ty.clone()))
-                .or_else(|| {
-                    definition
-                        .default
-                        .clone()
-                        .map(|ty| (definition.reference(), ty))
-                })
-        })
-        .collect::<HashMap<_, _>>();
+    let substitutions = resolve_reference_arguments(ndt, arguments);
     let Some(mut target_ty) = ndt.ty.clone() else {
         return false;
     };

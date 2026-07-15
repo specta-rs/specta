@@ -624,6 +624,19 @@ fn go_only_pointers_recursive_required_references() {
     #[specta(collect = false)]
     struct ErasedTupleStruct(i128, String);
 
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct ChainedGenericDefault<T = String, U = T> {
+        first: T,
+        second: U,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UsesChainedGenericDefault {
+        value: ChainedGenericDefault<i32>,
+    }
+
     let non_recursive = Go::default().export(&types(), IdentityFormat).unwrap();
     assert!(
         non_recursive.contains("ID ID `json:\"id\"`"),
@@ -643,7 +656,9 @@ fn go_only_pointers_recursive_required_references() {
         .register::<AliasA>()
         .register::<AliasB>()
         .register::<ErasedTuple>()
-        .register::<ErasedTupleStruct>();
+        .register::<ErasedTupleStruct>()
+        .register::<ChainedGenericDefault<i32>>()
+        .register::<UsesChainedGenericDefault>();
     let generic = Go::default()
         .export(&generic_types, IdentityFormat)
         .unwrap();
@@ -656,6 +671,10 @@ fn go_only_pointers_recursive_required_references() {
     assert!(generic.contains("type AliasA *AliasB"), "{generic}");
     assert!(generic.contains("type AliasB *AliasA"), "{generic}");
     assert!(!generic.contains("math/big"), "{generic}");
+    assert!(
+        generic.contains("Value ChainedGenericDefault[int32, int32]"),
+        "{generic}"
+    );
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&root).unwrap();
