@@ -751,6 +751,29 @@ fn render_types(
                     || module.children.values().any(has_renderable_content)
             }
 
+            fn validate_namespace_scopes(module: &Module<'_>) -> Result<(), Error> {
+                let mut exports = HashSet::new();
+                for ndt in module.types.iter().filter(|ndt| ndt.ty.is_some()) {
+                    for name in [ndt.name.to_string(), format!("{}Schema", ndt.name)] {
+                        if !exports.insert(name.clone()) {
+                            return Err(Error::duplicate_export_name(name));
+                        }
+                    }
+                }
+                for (name, child) in module
+                    .children
+                    .iter()
+                    .filter(|(_, child)| has_renderable_content(child))
+                {
+                    let name = namespace_segment(name).into_owned();
+                    if !exports.insert(name.clone()) {
+                        return Err(Error::duplicate_export_name(name));
+                    }
+                    validate_namespace_scopes(child)?;
+                }
+                Ok(())
+            }
+
             fn export<'a>(
                 exporter: &Zod,
                 types: &Types,
@@ -797,6 +820,7 @@ fn render_types(
             }
 
             let mut module = build_module_graph(types);
+            validate_namespace_scopes(&module)?;
             let mut reexports = String::new();
             let mut reexport_names = HashSet::new();
             for name in module

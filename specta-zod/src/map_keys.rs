@@ -7,6 +7,10 @@ use specta::{
 
 use crate::{Error, opaque};
 
+const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
+const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
+const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
+
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
     types: &Types,
@@ -53,12 +57,35 @@ fn validate_map_key_inner(
             invalid_primitive_reason(primitive.clone()),
         )),
         DataType::Enum(enm) => {
+            let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+            let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
             for (variant_name, variant) in &enm.variants {
                 let fields = unwrap_synthetic_variant_fields(variant_name, &variant.fields)
                     .unwrap_or(&variant.fields);
                 match fields {
-                    Fields::Unit => {}
+                    Fields::Unit
+                        if !untagged
+                            && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) => {}
+                    Fields::Unit => {
+                        return Err(Error::invalid_map_key(
+                            &path,
+                            format!(
+                                "untagged enum key variant '{variant_name}' does not serialize as a string"
+                            ),
+                        ));
+                    }
                     Fields::Unnamed(fields) => {
+                        if !untagged
+                            && !rewritten
+                            && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                        {
+                            return Err(Error::invalid_map_key(
+                                &path,
+                                format!(
+                                    "enum key variant '{variant_name}' uses tagged newtype or tuple serialization, which serde_json rejects"
+                                ),
+                            ));
+                        }
                         let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
                         let Some(inner) = fields.next() else {
                             return Err(Error::invalid_map_key(

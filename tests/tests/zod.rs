@@ -424,6 +424,73 @@ fn zod_rejects_non_json_map_keys() {
 }
 
 #[test]
+fn zod_rejects_tagged_enum_payload_map_keys_like_serde_json() {
+    #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+    #[specta(collect = false)]
+    enum TaggedPayloadKey {
+        Unit,
+        Newtype(u8),
+        Tuple(u8, u8),
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct TaggedPayloadMap {
+        values: HashMap<TaggedPayloadKey, String>,
+    }
+
+    for key in [TaggedPayloadKey::Newtype(1), TaggedPayloadKey::Tuple(1, 2)] {
+        let runtime = serde_json::to_string(&HashMap::from([(key, "value")])).unwrap_err();
+        assert!(runtime.to_string().contains("key must be a string"));
+    }
+
+    let high_level_err = export_for::<TaggedPayloadMap>().unwrap_err().to_string();
+    assert!(
+        high_level_err.contains("Invalid map key"),
+        "{high_level_err}"
+    );
+
+    let mut types = Types::default();
+    let dt = HashMap::<TaggedPayloadKey, String>::definition(&mut types);
+    let err = primitives::inline(&Zod::default(), &types, &dt)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("tagged newtype or tuple serialization"),
+        "{err}"
+    );
+}
+
+#[test]
+fn zod_accepts_variant_untagged_scalar_map_keys() {
+    #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+    #[specta(collect = false)]
+    enum MixedKey {
+        Unit,
+        #[serde(untagged)]
+        Number(u8),
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MixedMap {
+        values: HashMap<MixedKey, String>,
+    }
+
+    let runtime = serde_json::to_string(&HashMap::from([
+        (MixedKey::Unit, "unit"),
+        (MixedKey::Number(42), "number"),
+    ]))
+    .unwrap();
+    assert!(runtime.contains("\"Unit\""));
+    assert!(runtime.contains("\"42\""));
+
+    let rendered = export_for::<MixedMap>().unwrap();
+    assert!(rendered.contains("z.literal(\"Unit\")"), "{rendered}");
+    assert!(rendered.contains("Number(value) <= 255"), "{rendered}");
+}
+
+#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     #[derive(Type)]
     #[specta(collect = false)]
@@ -721,6 +788,25 @@ fn zod_layout_namespaces_rejects_module_type_collisions() {
         .export(&types, specta_serde::Format)
         .unwrap_err();
     assert!(err.to_string().contains("namespace exports"));
+}
+
+#[test]
+fn zod_layout_namespaces_rejects_nested_schema_module_collisions() {
+    let mut types = Types::default();
+    NamedDataType::new("Foo", &mut types, |_, ndt| {
+        ndt.module_path = "outer".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Nested", &mut types, |_, ndt| {
+        ndt.module_path = "outer::FooSchema".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let err = Zod::default()
+        .layout(Layout::Namespaces)
+        .export(&types, specta_serde::Format)
+        .unwrap_err();
+    assert!(err.to_string().contains("namespace exports"), "{err}");
 }
 
 #[test]
