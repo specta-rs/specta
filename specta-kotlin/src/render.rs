@@ -31,7 +31,9 @@ pub(crate) fn render_file(
         out.push_str("\n\n");
     }
     if kotlin.serialization == Serialization::Kotlinx {
-        out.push_str("@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\n");
+        out.push_str(
+            "@file:kotlin.OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\n",
+        );
     }
     if let Some(package) = &kotlin.package {
         out.push_str("package ");
@@ -390,7 +392,7 @@ fn render_struct(
                 .filter(|(_, field)| field.ty.is_some())
                 .collect::<Vec<_>>();
             if fields.len() == 1 && !kotlin.mutable_properties {
-                out.push_str("@JvmInline\npublic value class ");
+                out.push_str("@kotlin.jvm.JvmInline\npublic value class ");
                 out.push_str(name);
                 out.push_str(&generic_declaration(generics));
                 out.push_str("(public ");
@@ -786,15 +788,15 @@ fn datatype(
             });
         }
         DataType::Primitive(Primitive::char) if kotlin.serialization == Serialization::Kotlinx => {
-            "String".to_owned()
+            "kotlin.String".to_owned()
         }
         DataType::Primitive(primitive) => primitive_name(primitive).to_owned(),
         DataType::List(list) => format!(
-            "List<{}>",
+            "kotlin.collections.List<{}>",
             datatype(kotlin, format, types, &list.ty, generic_scope, path)?
         ),
         DataType::Map(map) => format!(
-            "Map<{}, {}>",
+            "kotlin.collections.Map<{}, {}>",
             datatype(kotlin, format, types, map.key_ty(), generic_scope, path)?,
             datatype(kotlin, format, types, map.value_ty(), generic_scope, path)?
         ),
@@ -813,20 +815,20 @@ fn datatype(
             });
         }
         DataType::Tuple(tuple) => match tuple.elements.as_slice() {
-            [] => "Unit".to_owned(),
+            [] => "kotlin.Unit".to_owned(),
             [single] => datatype(kotlin, format, types, single, generic_scope, path)?,
             [first, second] => format!(
-                "Pair<{}, {}>",
+                "kotlin.Pair<{}, {}>",
                 datatype(kotlin, format, types, first, generic_scope, path)?,
                 datatype(kotlin, format, types, second, generic_scope, path)?
             ),
             [first, second, third] => format!(
-                "Triple<{}, {}, {}>",
+                "kotlin.Triple<{}, {}, {}>",
                 datatype(kotlin, format, types, first, generic_scope, path)?,
                 datatype(kotlin, format, types, second, generic_scope, path)?,
                 datatype(kotlin, format, types, third, generic_scope, path)?
             ),
-            _ => "List<Any?>".to_owned(),
+            _ => "kotlin.collections.List<kotlin.Any?>".to_owned(),
         },
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Reference { generics, .. } => {
@@ -854,7 +856,9 @@ fn datatype(
             }
         },
         DataType::Reference(Reference::Opaque(reference)) => match kotlin.unknown_types {
-            UnknownType::Any if kotlin.serialization == Serialization::None => "Any?".to_owned(),
+            UnknownType::Any if kotlin.serialization == Serialization::None => {
+                "kotlin.Any?".to_owned()
+            }
             UnknownType::Any | UnknownType::Error => {
                 return Err(Error::UnsupportedType {
                     path: path.into(),
@@ -880,7 +884,7 @@ fn datatype(
                     reason: "Kotlinx object serialization does not preserve unit-struct null encoding",
                 });
             }
-            Fields::Unit => "Unit".to_owned(),
+            Fields::Unit => "kotlin.Unit".to_owned(),
             Fields::Unnamed(fields)
                 if kotlin.serialization == Serialization::Kotlinx
                     && (fields.fields.len() != 1 || fields.fields[0].ty.is_none()) =>
@@ -903,21 +907,21 @@ fn datatype(
                 .as_ref()
                 .map(|ty| datatype(kotlin, format, types, ty, generic_scope, path))
                 .transpose()?
-                .unwrap_or_else(|| "Unit".to_owned()),
+                .unwrap_or_else(|| "kotlin.Unit".to_owned()),
             Fields::Unnamed(_) if kotlin.serialization == Serialization::Kotlinx => {
                 return Err(Error::UnsupportedType {
                     path: path.into(),
                     reason: "heterogeneous inline tuple has no inferred Kotlinx serializer",
                 });
             }
-            Fields::Unnamed(_) => "List<Any?>".to_owned(),
+            Fields::Unnamed(_) => "kotlin.collections.List<kotlin.Any?>".to_owned(),
             Fields::Named(_) if kotlin.serialization == Serialization::Kotlinx => {
                 return Err(Error::UnsupportedType {
                     path: path.into(),
                     reason: "anonymous structural type has no inferred Kotlinx serializer",
                 });
             }
-            Fields::Named(_) => "Map<String, Any?>".to_owned(),
+            Fields::Named(_) => "kotlin.collections.Map<kotlin.String, kotlin.Any?>".to_owned(),
         },
         DataType::Enum(_) if kotlin.serialization == Serialization::Kotlinx => {
             return Err(Error::UnsupportedType {
@@ -931,7 +935,7 @@ fn datatype(
                 .iter()
                 .all(|(_, variant)| is_unit_fields(&variant.fields)) =>
         {
-            "String".to_owned()
+            "kotlin.String".to_owned()
         }
         DataType::Intersection(_) if kotlin.serialization == Serialization::Kotlinx => {
             return Err(Error::UnsupportedType {
@@ -939,7 +943,7 @@ fn datatype(
                 reason: "structural union has no inferred Kotlinx serializer",
             });
         }
-        DataType::Enum(_) | DataType::Intersection(_) => "Any?".to_owned(),
+        DataType::Enum(_) | DataType::Intersection(_) => "kotlin.Any?".to_owned(),
     })
 }
 
@@ -1066,22 +1070,22 @@ fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType
 
 fn primitive_name(primitive: &Primitive) -> &'static str {
     match primitive {
-        Primitive::i8 => "Byte",
-        Primitive::i16 => "Short",
-        Primitive::i32 => "Int",
-        Primitive::i64 | Primitive::isize => "Long",
+        Primitive::i8 => "kotlin.Byte",
+        Primitive::i16 => "kotlin.Short",
+        Primitive::i32 => "kotlin.Int",
+        Primitive::i64 | Primitive::isize => "kotlin.Long",
         Primitive::i128 => "java.math.BigInteger",
-        Primitive::u8 => "UByte",
-        Primitive::u16 => "UShort",
-        Primitive::u32 => "UInt",
-        Primitive::u64 | Primitive::usize => "ULong",
+        Primitive::u8 => "kotlin.UByte",
+        Primitive::u16 => "kotlin.UShort",
+        Primitive::u32 => "kotlin.UInt",
+        Primitive::u64 | Primitive::usize => "kotlin.ULong",
         Primitive::u128 => "java.math.BigInteger",
-        Primitive::f16 | Primitive::f32 => "Float",
-        Primitive::f64 => "Double",
+        Primitive::f16 | Primitive::f32 => "kotlin.Float",
+        Primitive::f64 => "kotlin.Double",
         Primitive::f128 => "java.math.BigDecimal",
-        Primitive::bool => "Boolean",
-        Primitive::char => "Char",
-        Primitive::str => "String",
+        Primitive::bool => "kotlin.Boolean",
+        Primitive::char => "kotlin.Char",
+        Primitive::str => "kotlin.String",
     }
 }
 
@@ -1230,7 +1234,7 @@ fn render_deprecated(
         .as_deref()
         .unwrap_or("This declaration is deprecated");
     out.push_str(indent);
-    out.push_str("@Deprecated(\"");
+    out.push_str("@kotlin.Deprecated(\"");
     out.push_str(&escape_string(note));
     out.push_str("\")\n");
 }

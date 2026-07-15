@@ -11,20 +11,20 @@ public data class Account<T>(
     /**
      * Stable account identifier.
      */
-    public val id: ULong,
-    public val display_name: String,
-    public val metadata: Map<String, T?>,
-    public val nickname: String? = null
+    public val id: kotlin.ULong,
+    public val display_name: kotlin.String,
+    public val metadata: kotlin.collections.Map<kotlin.String, T?>,
+    public val nickname: kotlin.String? = null
 )
 
 public sealed interface Event<T> {
     public class Started<T> : Event<T>
     public data class Message<T>(
-        public val value: String
+        public val value: kotlin.String
     ) : Event<T>
     public data class Progress<T>(
-        public val current: UInt,
-        public val total: UInt
+        public val current: kotlin.UInt,
+        public val total: kotlin.UInt
     ) : Event<T>
     public data class Generic<T>(
         public val value: T
@@ -35,19 +35,19 @@ public enum class KeywordEnum {
     When
 }
 
-@JvmInline
-public value class NewType(public val value: String)
+@kotlin.jvm.JvmInline
+public value class NewType(public val value: kotlin.String)
 
 public data class TupleRecord(
-    public val field0: UByte,
-    public val field1: String,
-    public val field2: Boolean
+    public val field0: kotlin.UByte,
+    public val field1: kotlin.String,
+    public val field2: kotlin.Boolean
 )
 
 public data class UsesEverything(
-    public val account: Account<String>,
-    public val event: Event<UByte>,
-    public val tuple: Pair<String, Int>,
-    public val nested: List<Account<Boolean>?>,
+    public val account: Account<kotlin.String>,
+    public val event: Event<kotlin.UByte>,
+    public val tuple: kotlin.Pair<kotlin.String, kotlin.Int>,
+    public val nested: kotlin.collections.List<Account<kotlin.Boolean>?>,
     public val keyword: KeywordEnum
 )

@@ -83,6 +83,16 @@ struct EncodeDefault {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct OptIn {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct JvmInline(String);
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -297,8 +307,8 @@ fn kotlin_materializes_generic_defaults_and_keeps_empty_variants_generic() {
         )
         .expect("defaulted references and skipped generic variants should export");
 
-    assert!(output.contains("val default: KotlinGenericDefault<String>"));
-    assert!(output.contains("val chained: KotlinChainedGenericDefault<Int, Int>"));
+    assert!(output.contains("val default: KotlinGenericDefault<kotlin.String>"));
+    assert!(output.contains("val chained: KotlinChainedGenericDefault<kotlin.Int, kotlin.Int>"));
     assert!(
         output.contains("public class Tuple<T> : GenericSkippedVariant<T>"),
         "{output}"
@@ -435,13 +445,13 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .expect("plain records have compatible Kotlinx declarations");
     assert!(supported.contains("@kotlinx.serialization.Serializable"));
     assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
-    assert!(supported.contains("val maybe: String? = null"));
+    assert!(supported.contains("val maybe: kotlin.String? = null"));
 
     let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)
         .export(&Types::default().register::<KotlinxChar>(), IdentityFormat)
         .expect("Rust char should use the wire-compatible Kotlinx string representation");
-    assert!(supported.contains("val value: String"));
+    assert!(supported.contains("val value: kotlin.String"));
 
     let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)
@@ -449,13 +459,26 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
             &Types::default()
                 .register::<Serializable>()
                 .register::<SerialName>()
-                .register::<EncodeDefault>(),
+                .register::<EncodeDefault>()
+                .register::<OptIn>()
+                .register::<JvmInline>(),
             IdentityFormat,
         )
         .expect("generated names must not shadow fully qualified Kotlinx annotations");
     assert!(!supported.contains("import kotlinx.serialization"));
+    assert!(supported.contains("@file:kotlin.OptIn"));
     assert!(supported.contains("@kotlinx.serialization.Serializable"));
     assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
+    assert!(supported.contains("@kotlin.jvm.JvmInline"));
+
+    let mut deprecated_types = Types::default().register::<OptIn>();
+    deprecated_types.iter_mut(|datatype| {
+        datatype.deprecated = Some(specta::datatype::Deprecated::new());
+    });
+    let supported = Kotlin::default()
+        .export(&deprecated_types, IdentityFormat)
+        .expect("deprecation annotations should be namespace-safe");
+    assert!(supported.contains("@kotlin.Deprecated"));
 
     let error = Kotlin::default()
         .serialization(Serialization::Kotlinx)
@@ -475,7 +498,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .export(&Types::default().register::<NewType>(), IdentityFormat)
         .expect("mutable newtype should export as a regular data class");
     assert!(mutable_newtype.contains("data class NewType"));
-    assert!(mutable_newtype.contains("public var field0: String"));
+    assert!(mutable_newtype.contains("public var field0: kotlin.String"));
     assert!(!mutable_newtype.contains("@JvmInline"));
 
     let error = Kotlin::default()
@@ -502,6 +525,29 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         )
         .expect_err("inline unit enums must not bypass Kotlinx wire-shape validation");
     assert!(error.to_string().contains("structural union"));
+}
+
+#[test]
+fn kotlin_qualifies_builtins_that_generated_types_can_shadow() {
+    let mut types = Types::default();
+    specta::datatype::NamedDataType::new("String", &mut types, |_, datatype| {
+        datatype.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "value",
+                    specta::datatype::Field::new(DataType::Primitive(
+                        specta::datatype::Primitive::str,
+                    )),
+                )
+                .build(),
+        );
+    });
+
+    let output = Kotlin::default()
+        .export(&types, IdentityFormat)
+        .expect("generated built-in names should not shadow Kotlin types");
+    assert!(output.contains("data class String"));
+    assert!(output.contains("val value: kotlin.String"));
 }
 
 #[test]
@@ -555,7 +601,7 @@ fn kotlin_module_prefixed_layout_updates_declarations_and_references() {
         .expect("module-prefixed layout should export");
 
     assert!(output.contains("data class TestKotlinAccount<T>"));
-    assert!(output.contains("val account: TestKotlinAccount<String>"));
+    assert!(output.contains("val account: TestKotlinAccount<kotlin.String>"));
 }
 
 #[test]
