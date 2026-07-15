@@ -106,11 +106,24 @@ fn export_single_internal(
             Layout::ModulePrefixedName => TypescriptLayout::ModulePrefixedName,
             Layout::Files => TypescriptLayout::Files,
         });
-        let mut type_alias =
-            specta_typescript::primitives::export(&typescript, types, std::iter::once(ndt), indent)
-                .map_err(|source| {
-                    Error::framework("failed to render the inferred TypeScript type", source)
-                })?;
+        let mut alias_ndt = ndt.clone();
+        alias_ndt.generics.to_mut().iter_mut().for_each(|generic| {
+            if let Some(default) = &mut generic.default {
+                typescript_alias_datatype(default);
+            }
+        });
+        if let Some(ty) = &mut alias_ndt.ty {
+            typescript_alias_datatype(ty);
+        }
+        let mut type_alias = specta_typescript::primitives::export(
+            &typescript,
+            types,
+            std::iter::once(&alias_ndt),
+            indent,
+        )
+        .map_err(|source| {
+            Error::framework("failed to render the inferred TypeScript type", source)
+        })?;
         if exporter.layout == Layout::Files {
             let current_alias = if ndt.module_path.is_empty() {
                 "$root".to_string()
@@ -289,6 +302,68 @@ fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
         Cow::Borrowed(value)
     } else {
         Cow::Owned(value.replace('\n', &format!("\n{indent}")))
+    }
+}
+
+fn typescript_alias_datatype(dt: &mut DataType) {
+    match dt {
+        DataType::Primitive(_) | DataType::Generic(_) => {}
+        DataType::List(list) => typescript_alias_datatype(&mut list.ty),
+        DataType::Map(map) => {
+            typescript_alias_datatype(map.key_ty_mut());
+            typescript_alias_datatype(map.value_ty_mut());
+        }
+        DataType::Nullable(inner) => typescript_alias_datatype(inner),
+        DataType::Struct(strct) => typescript_alias_fields(&mut strct.fields),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter_mut()
+            .for_each(|(_, variant)| typescript_alias_fields(&mut variant.fields)),
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter_mut()
+            .for_each(typescript_alias_datatype),
+        DataType::Intersection(types) => types.iter_mut().for_each(typescript_alias_datatype),
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt),
+            NamedReferenceType::Reference { generics, .. } => generics
+                .iter_mut()
+                .for_each(|(_, dt)| typescript_alias_datatype(dt)),
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Reference(Reference::Opaque(reference)) => {
+            let ty = if reference.downcast_ref::<opaque::Any>().is_some() {
+                Some("any")
+            } else if reference.downcast_ref::<opaque::Never>().is_some() {
+                Some("never")
+            } else if reference.downcast_ref::<opaque::Unknown>().is_some()
+                || reference.downcast_ref::<opaque::Define>().is_some()
+            {
+                // A raw Zod expression carries no corresponding TypeScript type metadata.
+                Some("unknown")
+            } else {
+                None
+            };
+            if let Some(ty) = ty {
+                *dt = DataType::Reference(specta_typescript::define(ty));
+            }
+        }
+    }
+}
+
+fn typescript_alias_fields(fields: &mut Fields) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter_mut()
+            .filter_map(|field| field.ty.as_mut())
+            .for_each(typescript_alias_datatype),
+        Fields::Named(fields) => fields
+            .fields
+            .iter_mut()
+            .filter_map(|(_, field)| field.ty.as_mut())
+            .for_each(typescript_alias_datatype),
     }
 }
 
@@ -672,8 +747,8 @@ fn map_key_is_finite(
             .get(reference)
             .and_then(|ndt| ndt.ty.as_ref())
             .is_some_and(|dt| {
-                named_reference_generics(reference)
-                    .is_ok_and(|generics| map_key_is_finite(dt, types, generics))
+                resolved_reference_generics(reference, generics)
+                    .is_ok_and(|generics| map_key_is_finite(dt, types, &generics))
             }),
         DataType::Generic(generic) => generics
             .iter()
@@ -832,14 +907,14 @@ fn map_key_datatype(
         DataType::Reference(Reference::Named(reference)) => {
             crate::references::track_nr(reference);
             let ty = named_reference_ty(types, reference)?;
-            let reference_generics = named_reference_generics(reference)?;
+            let reference_generics = resolved_reference_generics(reference, generics)?;
             map_key_datatype(
                 s,
                 exporter,
                 types,
                 ty,
                 location,
-                reference_generics,
+                &reference_generics,
                 type_render_stack,
             )?;
         }
@@ -872,6 +947,80 @@ fn map_key_datatype(
         )?,
     }
     Ok(())
+}
+
+fn resolved_reference_generics(
+    reference: &NamedReference,
+    outer_generics: &[(GenericReference, DataType)],
+) -> Result<Vec<(GenericReference, DataType)>, Error> {
+    named_reference_generics(reference).map(|generics| {
+        generics
+            .iter()
+            .map(|(generic, dt)| {
+                let mut dt = dt.clone();
+                substitute_generics(&mut dt, outer_generics);
+                (generic.clone(), dt)
+            })
+            .collect()
+    })
+}
+
+fn substitute_generics(dt: &mut DataType, generics: &[(GenericReference, DataType)]) {
+    match dt {
+        DataType::Generic(generic) => {
+            if let Some((_, replacement)) =
+                generics.iter().find(|(candidate, _)| candidate == generic)
+                && !matches!(replacement, DataType::Generic(candidate) if candidate == generic)
+            {
+                *dt = replacement.clone();
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter_mut()
+            .for_each(|(_, variant)| substitute_field_generics(&mut variant.fields, generics)),
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter_mut()
+            .for_each(|dt| substitute_generics(dt, generics)),
+        DataType::Intersection(types) => types
+            .iter_mut()
+            .for_each(|dt| substitute_generics(dt, generics)),
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Inline { dt, .. } => substitute_generics(dt, generics),
+            NamedReferenceType::Reference {
+                generics: reference_generics,
+                ..
+            } => reference_generics
+                .iter_mut()
+                .for_each(|(_, dt)| substitute_generics(dt, generics)),
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(fields: &mut Fields, generics: &[(GenericReference, DataType)]) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter_mut()
+            .filter_map(|field| field.ty.as_mut())
+            .for_each(|dt| substitute_generics(dt, generics)),
+        Fields::Named(fields) => fields
+            .fields
+            .iter_mut()
+            .filter_map(|(_, field)| field.ty.as_mut())
+            .for_each(|dt| substitute_generics(dt, generics)),
+    }
 }
 
 fn tuple_dt(

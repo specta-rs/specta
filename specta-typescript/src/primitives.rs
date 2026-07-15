@@ -1178,8 +1178,21 @@ fn is_exhaustive_map_key(
         DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
         DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r, &[])
             .and_then(|ty| {
-                named_reference_generics(r)
-                    .map(|generics| is_exhaustive_map_key(ty, types, generics))
+                named_reference_generics(r).map(|reference_generics| {
+                    let substitution = generics
+                        .iter()
+                        .map(|(generic, dt)| (generic.name().clone(), dt.clone()))
+                        .collect::<GenericSubst>();
+                    let reference_generics = reference_generics
+                        .iter()
+                        .map(|(generic, dt)| {
+                            let mut dt = dt.clone();
+                            let _ = substitute_generics(&mut dt, &substitution);
+                            (generic.clone(), dt)
+                        })
+                        .collect::<Vec<_>>();
+                    is_exhaustive_map_key(ty, types, &reference_generics)
+                })
             })
             .unwrap_or(false),
         DataType::Struct(strct) => match &strct.fields {

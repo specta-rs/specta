@@ -216,6 +216,32 @@ fn zod_bigint_override_via_define() {
 }
 
 #[test]
+fn zod_high_level_export_supports_zod_opaque_types() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct OpaqueTypes {
+        any: Any<String>,
+        unknown: Unknown<String>,
+        never: Never<String>,
+    }
+
+    let wrappers = export_for::<OpaqueTypes>().unwrap();
+    assert!(wrappers.contains("any: any"));
+    assert!(wrappers.contains("unknown: unknown"));
+    assert!(wrappers.contains("never: never"));
+    assert!(wrappers.contains("any: z.any()"));
+    assert!(wrappers.contains("unknown: z.unknown()"));
+    assert!(wrappers.contains("never: z.never()"));
+
+    let types = Remapper::new()
+        .rule(Primitive::i128.into(), define("z.bigint()").into())
+        .remap_types(Types::default().register::<StructWithBigInt>());
+    let defined = Zod::default().export(&types, specta_serde::Format).unwrap();
+    assert!(defined.contains("a: unknown"));
+    assert!(defined.contains("a: z.bigint()"));
+}
+
+#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     #[derive(Type)]
     #[specta(collect = false)]

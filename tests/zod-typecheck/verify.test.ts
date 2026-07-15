@@ -21,6 +21,7 @@ test("generated schemas validate representative wire values", () => {
     newtype_keys: { "42": "value" },
     enum_keys: { First: "value" },
     generic_finite_keys: { First: "value" },
+    nested_generic_finite_keys: { First: "value" },
     remote_keys: { "42": "value" },
   }).success).toBe(true);
   expect(ExternalEnumSchema.safeParse({ Newtype: "value", Tuple: [1, true] }).success).toBe(false);
@@ -34,6 +35,7 @@ test("generated schemas reject invalid primitive wire values", () => {
     newtype_keys: {},
     enum_keys: {},
     generic_finite_keys: {},
+    nested_generic_finite_keys: {},
     remote_keys: {},
   }).success).toBe(false);
 
@@ -44,6 +46,7 @@ test("generated schemas reject invalid primitive wire values", () => {
     newtype_keys: {},
     enum_keys: {},
     generic_finite_keys: {},
+    nested_generic_finite_keys: {},
     remote_keys: {},
   }).success).toBe(false);
 });
