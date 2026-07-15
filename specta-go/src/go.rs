@@ -400,6 +400,7 @@ fn validate_package_name(name: &str) -> Result<(), Error> {
         .next()
         .is_some_and(|ch| ch == '_' || ch.is_alphabetic())
         && chars.all(|ch| ch == '_' || ch.is_alphanumeric())
+        && name != "_"
         && !crate::reserved_names::GO_KEYWORDS.contains(&name);
     valid
         .then_some(())

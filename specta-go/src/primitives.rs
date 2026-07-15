@@ -1072,7 +1072,7 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
 }
 
 fn field_name(name: &str, index: usize, path: &str) -> Result<String, Error> {
-    if name.is_empty() || name == "-" {
+    if name.is_empty() {
         return Err(Error::InvalidName {
             path: path.into(),
             name: name.into(),
@@ -1127,6 +1127,10 @@ fn struct_tag(name: &str, optional: bool) -> String {
     tag.push_str(&escape_go_string(name));
     if optional {
         tag.push_str(",omitempty");
+    } else if name == "-" {
+        // A bare `json:"-"` means "ignore this field". The empty option
+        // segment disambiguates the literal JSON key `-`.
+        tag.push(',');
     }
     tag.push('"');
     format!("`{tag}`")
@@ -1134,7 +1138,6 @@ fn struct_tag(name: &str, optional: bool) -> String {
 
 fn valid_json_tag_name(name: &str) -> bool {
     !name.is_empty()
-        && name != "-"
         && name.chars().all(|ch| {
             ch.is_alphabetic() || ch.is_ascii_digit() || "!#$%&()*+-./:;<=>?@[]^_{|}~ ".contains(ch)
         })

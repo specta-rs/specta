@@ -222,6 +222,8 @@ fn go_output_is_accepted_by_go_toolchain() {
     struct LocalizedWireName {
         #[serde(rename = "名字")]
         value: String,
+        #[serde(rename = "-")]
+        hyphen: String,
     }
 
     let newtypes = temp.path().join("newtypes.go");
@@ -258,6 +260,10 @@ fn go_output_is_accepted_by_go_toolchain() {
     let localized_before = std::fs::read_to_string(&localized).unwrap();
     assert!(
         localized_before.contains("Field1 string `json:\"名字\"`"),
+        "{localized_before}"
+    );
+    assert!(
+        localized_before.contains("Field2 string `json:\"-,\"`"),
         "{localized_before}"
     );
     assert!(
@@ -347,20 +353,23 @@ func TestOptionalCollectionsPreserveEmptyValues(t *testing.T) {
 }
 
 func TestLocalizedWireName(t *testing.T) {
-	encoded, err := json.Marshal(LocalizedWireName{Field1: "value"})
+	encoded, err := json.Marshal(LocalizedWireName{Field1: "value", Field2: "hyphen"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(encoded), `{"名字":"value"}`; got != want {
+	if got, want := string(encoded), `{"名字":"value","-":"hyphen"}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
 	var decoded LocalizedWireName
-	if err := json.Unmarshal([]byte(`{"名字":"decoded"}`), &decoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"名字":"decoded","-":"dash"}`), &decoded); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Field1 != "decoded" {
 		t.Fatalf("decoded: %s", decoded.Field1)
+	}
+	if decoded.Field2 != "dash" {
+		t.Fatalf("decoded hyphen: %s", decoded.Field2)
 	}
 }
 "#,
@@ -445,6 +454,14 @@ fn go_reports_invalid_configuration_and_map_keys() {
     assert!(
         Go::default()
             .package_name("not-valid")
+            .export(&Types::default(), IdentityFormat)
+            .unwrap_err()
+            .to_string()
+            .contains("package name")
+    );
+    assert!(
+        Go::default()
+            .package_name("_")
             .export(&Types::default(), IdentityFormat)
             .unwrap_err()
             .to_string()
