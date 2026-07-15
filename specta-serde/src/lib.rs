@@ -1003,12 +1003,22 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
 
     let fields = std::mem::take(&mut named.fields);
     let mut base = Struct::named();
-    let mut parts = Vec::new();
+    let mut mandatory = Vec::new();
+    let mut optional = Vec::new();
 
     for (name, field) in fields {
         if field_is_flattened(&field) {
             if let Some(ty) = field.ty {
-                parts.push(ty);
+                // `#[serde(flatten)]` on an `Option<T>` (or `Option<Option<T>>`,
+                // which serde flattens identically) contributes nothing when
+                // `None` and `T`'s fields when `Some`. Track it separately so
+                // it can become a union branch instead of being merged
+                // unconditionally into the intersection - see
+                // `flatten_intersection_with_optionals` for why.
+                match strip_nullable(ty) {
+                    (inner, true) => optional.push(inner),
+                    (ty, false) => mandatory.push(ty),
+                }
             }
         } else {
             base.field_mut(name, field);
@@ -1021,10 +1031,88 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
     };
     if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
         base.attributes = strct.attributes.clone();
-        parts.insert(0, DataType::Struct(base));
+        mandatory.insert(0, DataType::Struct(base));
     }
 
-    Ok(Some(DataType::Intersection(parts)))
+    Ok(Some(flatten_intersection_with_optionals(
+        mandatory, optional,
+    )))
+}
+
+/// Strips zero or more layers of `Nullable` (i.e. `Option`) off a `DataType`,
+/// reporting whether at least one layer was present. `Option<Option<T>>`
+/// flattens the same way `Option<T>` does, so nested `Nullable`s all collapse
+/// to a single "this part is optional" flag.
+fn strip_nullable(mut ty: DataType) -> (DataType, bool) {
+    let mut was_nullable = false;
+    while let DataType::Nullable(inner) = ty {
+        was_nullable = true;
+        ty = *inner;
+    }
+    (ty, was_nullable)
+}
+
+/// Builds the `DataType` for a flattened intersection where some parts came
+/// from `#[serde(flatten)]`-ed `Option<T>` fields.
+///
+/// Serde contributes nothing for a flattened `Option<T>` field when it's
+/// `None`, and merges `T`'s fields when it's `Some`. Naively intersecting the
+/// field's `Nullable(T)` type (i.e. `Base & T | null`) is wrong in both
+/// directions: the wire value is never bare `null`, and legitimate `None`
+/// output (base fields only) wouldn't satisfy `T`'s required fields.
+///
+/// Instead, every optional part becomes a branch in a union: for each subset
+/// of the optional parts we emit `mandatory & <subset>` (an empty subset with
+/// no mandatory parts becomes an empty struct), so the result is exactly the
+/// set of shapes serde can actually produce. With no optional parts this
+/// degrades to the plain intersection that existed before this function was
+/// introduced.
+///
+/// We deliberately build the union as the *outermost* type (`(Base & Inner) |
+/// Base` rather than `Base & (Inner | {})`): TypeScript's `&` binds tighter
+/// than `|`, so an intersection nested inside a union never needs parens,
+/// whereas `specta-typescript`'s `RenderMode::Normal` intersection renderer
+/// joins parts with `" & "` without wrapping union members in parens.
+///
+/// The branch without an optional part leans on TypeScript's structural
+/// typing when *deserializing*: a value carrying only a strict subset of a
+/// part's required fields still satisfies the part-less branch, even though
+/// serde would reject it. Guarding against that would need `field?: never`
+/// markers for each of the part's fields (like the untagged-enum lowering
+/// emits), but the part is usually an unresolved [`Reference`] whose fields
+/// aren't known here.
+fn flatten_intersection_with_optionals(
+    mandatory: Vec<DataType>,
+    optional: Vec<DataType>,
+) -> DataType {
+    if optional.is_empty() {
+        return DataType::Intersection(mandatory);
+    }
+
+    let branch_count = 1usize << optional.len();
+    let mut variants = Vec::with_capacity(branch_count);
+    for mask in (0..branch_count).rev() {
+        let mut parts = mandatory.clone();
+        for (idx, part) in optional.iter().enumerate() {
+            if mask & (1 << idx) != 0 {
+                parts.push(part.clone());
+            }
+        }
+
+        let branch_ty = match parts.len() {
+            0 => Struct::named().build(),
+            1 => parts.remove(0),
+            _ => DataType::Intersection(parts),
+        };
+        variants.push((
+            Cow::Borrowed(""),
+            Variant::unnamed().field(Field::new(branch_ty)).build(),
+        ));
+    }
+
+    let mut union = Enum::default();
+    union.variants = variants;
+    DataType::Enum(union)
 }
 
 fn lower_field_aliases_for_phase(
@@ -1957,26 +2045,37 @@ fn transform_internal_variant(
                 .iter()
                 .any(|(_, field)| field_is_flattened(field));
             if has_flattened {
-                let mut payload_parts: Vec<DataType> = Vec::new();
+                let mut mandatory_parts: Vec<DataType> = Vec::new();
+                let mut optional_parts: Vec<DataType> = Vec::new();
                 let mut leftover: Vec<(Cow<'static, str>, Field)> = Vec::new();
                 for (name, field) in named.fields.iter().cloned() {
                     if field_is_flattened(&field) {
                         if let Some(ty) = field.ty {
-                            payload_parts.push(ty);
+                            // See `flatten_intersection_with_optionals` on why
+                            // a flattened `Option<T>` field needs to become a
+                            // union branch rather than an unconditional
+                            // intersection part.
+                            match strip_nullable(ty) {
+                                (inner, true) => optional_parts.push(inner),
+                                (ty, false) => mandatory_parts.push(ty),
+                            }
                         }
                     } else {
                         leftover.push((name, field));
                     }
                 }
-                let mut intersection = Vec::with_capacity(payload_parts.len() + 2);
-                intersection.push(named_fields_datatype(fields));
+                let mut mandatory = Vec::with_capacity(mandatory_parts.len() + 2);
+                mandatory.push(named_fields_datatype(fields));
                 if !leftover.is_empty() {
-                    intersection.push(named_fields_datatype(leftover));
+                    mandatory.push(named_fields_datatype(leftover));
                 }
-                intersection.extend(payload_parts);
+                mandatory.extend(mandatory_parts);
                 return Ok(clone_variant_with_unnamed_fields(
                     variant,
-                    vec![Field::new(DataType::Intersection(intersection))],
+                    vec![Field::new(flatten_intersection_with_optionals(
+                        mandatory,
+                        optional_parts,
+                    ))],
                 ));
             }
             fields.extend(named.fields.iter().cloned());
