@@ -58,6 +58,18 @@ struct KotlinxRecord {
     maybe: Option<String>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct InnerPayload {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum SelfNamedRawVariant {
+    Foo { foo: InnerPayload },
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum KeywordEnum {
@@ -93,6 +105,17 @@ fn kotlin_export_raw() {
             .export(&raw_types(), IdentityFormat)
             .expect("Kotlin export should succeed")
     );
+}
+
+#[test]
+fn kotlin_raw_enum_keeps_self_named_field() {
+    let output = Kotlin::default()
+        .export(
+            &Types::default().register::<SelfNamedRawVariant>(),
+            IdentityFormat,
+        )
+        .expect("raw enum should export");
+    assert!(output.contains("val foo: InnerPayload"));
 }
 
 #[test]

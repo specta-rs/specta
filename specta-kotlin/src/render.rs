@@ -321,6 +321,9 @@ fn render_enum(
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .collect::<Vec<_>>();
+    let serde_rewritten = enm
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten");
     ensure_unique(
         path,
         variants.iter().map(|(name, _)| {
@@ -329,7 +332,11 @@ fn render_enum(
     )?;
     let unit_only = generics.is_empty()
         && variants.iter().all(|(name, variant)| {
-            is_unit_fields(&normalized_variant_fields(name, &variant.fields))
+            is_unit_fields(&normalized_variant_fields(
+                name,
+                &variant.fields,
+                serde_rewritten,
+            ))
         });
 
     if kotlin.serialization == Serialization::Kotlinx {
@@ -382,6 +389,7 @@ fn render_enum(
             variant_name,
             variant,
             path,
+            serde_rewritten,
         )?;
         out.push('\n');
     }
@@ -401,8 +409,9 @@ fn render_variant(
     original_name: &str,
     variant: &Variant,
     path: &str,
+    serde_rewritten: bool,
 ) -> Result<(), Error> {
-    let fields = normalized_variant_fields(original_name, &variant.fields);
+    let fields = normalized_variant_fields(original_name, &variant.fields, serde_rewritten);
     let indent = kotlin.indentation(1);
     render_kdoc(out, &indent, &variant.docs);
     render_deprecated(out, &indent, variant.deprecated.as_ref());
@@ -785,7 +794,10 @@ fn is_unit_fields(fields: &Fields) -> bool {
     }
 }
 
-fn normalized_variant_fields(variant_name: &str, fields: &Fields) -> Fields {
+fn normalized_variant_fields(variant_name: &str, fields: &Fields, serde_rewritten: bool) -> Fields {
+    if !serde_rewritten {
+        return fields.clone();
+    }
     let payload = match fields {
         Fields::Unnamed(fields) if fields.fields.len() == 1 => fields.fields[0]
             .ty
