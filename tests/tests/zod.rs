@@ -333,18 +333,18 @@ fn zod_module_prefixed_duplicate_checks_use_rendered_names() {
     }
 
     let mut distinct = Types::default();
-    add_type(&mut distinct, "foo_Bar", "");
+    add_type(&mut distinct, "Bar", "");
     add_type(&mut distinct, "Bar", "foo");
     let out = Zod::default()
         .layout(Layout::ModulePrefixedName)
         .export(&distinct, specta_serde::Format)
         .unwrap();
-    assert!(out.contains("export type _foo_Bar = string"));
+    assert!(out.contains("export type Bar = string"));
     assert!(out.contains("export type foo_Bar = string"));
 
     let mut colliding = Types::default();
-    add_type(&mut colliding, "_foo_Bar", "");
-    add_type(&mut colliding, "foo_Bar", "_");
+    add_type(&mut colliding, "foo_Bar", "");
+    add_type(&mut colliding, "Bar", "foo");
     let err = Zod::default()
         .layout(Layout::ModulePrefixedName)
         .export(&colliding, specta_serde::Format)

@@ -1609,7 +1609,9 @@ pub(crate) fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'st
         Layout::Namespaces | Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            s.push('_');
+            if !s.is_empty() {
+                s.push('_');
+            }
             s.push_str(&ndt.name);
             Cow::Owned(s)
         }

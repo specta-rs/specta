@@ -8,7 +8,7 @@ use std::{
 
 use specta::{
     Format, Type, Types,
-    datatype::{DataType, Reference},
+    datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::{ErrorTraceFrame, Exporter, Layout, Typescript, primitives};
 use tempfile::TempDir;
@@ -1130,6 +1130,22 @@ fn typescript_export_to() {
 
     // TODO: Assert layouts error out with `export` method
     // TODO: Assert it errors if given the path to a file
+}
+
+#[test]
+fn typescript_module_prefixed_root_has_no_empty_prefix() {
+    let mut types = Types::default();
+    NamedDataType::new("RootType", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let rendered = Typescript::default()
+        .layout(Layout::ModulePrefixedName)
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(rendered.contains("export type RootType = string"));
+    assert!(!rendered.contains("export type _RootType"));
 }
 
 #[test]

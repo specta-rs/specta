@@ -40,7 +40,9 @@ fn rust_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
 
 fn module_prefixed_type_name(ndt: &NamedDataType) -> String {
     let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-    name.push('_');
+    if !name.is_empty() {
+        name.push('_');
+    }
     name.push_str(&ndt.name);
     name
 }
