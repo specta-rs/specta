@@ -1264,7 +1264,9 @@ fn rewrite_fields_for_phase(
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
 
-            if !preserve_skipped_unnamed_fields {
+            if !preserve_skipped_unnamed_fields
+                && !unnamed_skip_slots_need_preserving(unnamed, container_default)?
+            {
                 unnamed.fields.retain(|field| field.ty.as_ref().is_some());
             }
         }
@@ -1546,6 +1548,37 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
         PhaseRewrite::Deserialize => attrs.skip_deserializing,
         PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
     })
+}
+
+/// Whether a tuple struct's skipped `ty: None` slots must survive the
+/// rewrite so the declared arity reaches the renderer. serde keeps the
+/// sequence representation for skip-reduced tuple structs
+/// (`S(#[serde(skip)] u8, #[serde(default)] u8)` serializes to `[2]` and
+/// accepts `[]`), so when a default — field-level on a surviving element or
+/// container-level — makes elements omittable, collapsing to a bare newtype
+/// would lose both the array shape and the deserialize `?`. The condition is
+/// deliberately phase-symmetric (attrs, not the phase-computed `optional`
+/// flag) so both split halves keep the same arity. Without a default in
+/// play the historical collapsed rendering is kept.
+fn unnamed_skip_slots_need_preserving(
+    unnamed: &UnnamedFields,
+    container_default: bool,
+) -> Result<bool, Error> {
+    if unnamed.fields.len() <= 1 || unnamed.fields.iter().all(|field| field.ty.is_some()) {
+        return Ok(false);
+    }
+
+    if container_default {
+        return Ok(true);
+    }
+
+    for field in unnamed_live_fields(unnamed) {
+        if SerdeFieldAttrs::from_attributes(&field.attributes)?.is_some_and(|attrs| attrs.default) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn skipped_field_marker(field: &Field) -> Field {

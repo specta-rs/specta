@@ -1269,3 +1269,58 @@ fn pair_skipped_unnamed_field_is_dropped_from_export() {
     // The child itself is still exported and split.
     assert!(rendered.contains("WithFieldDefault_Serialize"));
 }
+
+/// A skip-reduced tuple struct with a defaulted surviving element keeps its
+/// sequence representation in serde (`[2]` on serialize; `[]`/`[2]` accepted
+/// on deserialize), so the declared arity must survive the rewrite: the
+/// halves render `[number]` / `[number?]`, not a bare newtype `number` that
+/// also loses the deserialize `?`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipSlotTupleStruct(#[serde(skip)] u8, #[serde(default)] u8);
+
+/// Container-default counterpart: every surviving element is omittable.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct SkipSlotContainerDefault(#[serde(skip)] u8, u8);
+
+#[test]
+fn skip_reduced_tuple_struct_keeps_arity_with_defaulted_element() {
+    // serde_json ground truth.
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct S(#[serde(skip)] u8, #[serde(default)] u8);
+    assert_eq!(serde_json::to_string(&S(9, 2)).unwrap(), "[2]");
+    let v: S = serde_json::from_str("[]").unwrap();
+    assert!(v.0 == 0 && v.1 == 0);
+    let v: S = serde_json::from_str("[2]").unwrap();
+    assert!(v.0 == 0 && v.1 == 2);
+    assert!(serde_json::from_str::<S>("2").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SkipSlotTupleStruct>()
+                .register::<SkipSlotContainerDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support skip-reduced defaulted tuple structs");
+
+    assert!(
+        rendered.contains("SkipSlotTupleStruct_Serialize = [number]"),
+        "serialize keeps the one-live-element sequence: {rendered}"
+    );
+    assert!(
+        rendered.contains("SkipSlotTupleStruct_Deserialize = [number?]"),
+        "deserialize marks the defaulted element optional without collapsing \
+         to a bare newtype: {rendered}"
+    );
+    assert!(
+        rendered.contains("SkipSlotContainerDefault_Serialize = [number]"),
+        "container-default serialize half keeps the sequence: {rendered}"
+    );
+    assert!(
+        rendered.contains("SkipSlotContainerDefault_Deserialize = [number?]"),
+        "container-default deserialize half marks the element optional: {rendered}"
+    );
+}
