@@ -358,9 +358,9 @@ fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Err
         let imports = module_imports(types, &module, &ndts);
         if !imports.is_empty() {
             out.push_str("\nif _specta_typing.TYPE_CHECKING:\n");
-            for import in imports {
+            for import in &imports {
                 out.push_str("    ");
-                out.push_str(&import);
+                out.push_str(import);
                 out.push('\n');
             }
         }
@@ -375,6 +375,12 @@ fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Err
                 "",
             )?;
             append_section(&mut out, &declaration);
+        }
+        if !imports.is_empty() {
+            append_section(
+                &mut out,
+                &imports.into_iter().collect::<Vec<_>>().join("\n"),
+            );
         }
         if module.is_empty() {
             append_raw(&mut out, &exporter.raw);

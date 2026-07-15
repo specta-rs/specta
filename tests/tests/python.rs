@@ -364,6 +364,10 @@ fn python_export_to_file_and_files_layout() {
         root_module
             .contains("child: _specta_import_4_test_6_python_12_files_layout_6_nested_Child")
     );
+    assert!(
+        root_module.rfind("from .nested import Child as ").unwrap()
+            > root_module.find("class Root(").unwrap()
+    );
     let child_module =
         std::fs::read_to_string(package.join("test/python/files_layout/nested/__init__.py"))
             .unwrap();
@@ -373,6 +377,10 @@ fn python_export_to_file_and_files_layout() {
     );
     assert!(
         child_module.contains("parent: None | _specta_import_4_test_6_python_12_files_layout_Root")
+    );
+    assert!(
+        child_module.rfind("from .. import Root as ").unwrap()
+            > child_module.find("class Child(").unwrap()
     );
 
     let error = Python::default()
@@ -403,7 +411,7 @@ fn python_files_layout_uses_unambiguous_import_aliases() {
         .map(str::trim_start)
         .filter(|line| line.starts_with("from ") && line.ends_with("_X"))
         .collect::<Vec<_>>();
-    assert_eq!(aliases.len(), 2);
+    assert_eq!(aliases.len(), 4);
     assert_ne!(
         aliases[0].split(" as ").nth(1),
         aliases[1].split(" as ").nth(1)
@@ -428,6 +436,10 @@ fn python_files_layout_imports_generic_defaults() {
     .unwrap();
     assert!(consumer.contains("from ..target import Other as "));
     assert!(consumer.contains("class Box[T = _specta_import_"));
+    assert!(
+        consumer.rfind("from ..target import Other as ").unwrap()
+            > consumer.find("class Box[").unwrap()
+    );
 }
 
 #[test]
