@@ -39,8 +39,10 @@
 //! [`SchemaMode::Strict`] returns an error for structural schema features which
 //! the specification cannot express. Opt into [`SchemaMode::Compatible`] to emit a useful
 //! approximation and retain the original constraints in `x-specta-*`
-//! extensions. This affects null-only types, heterogeneous tuples, constrained
-//! map keys, and closed flattened intersections.
+//! extensions. This affects nullable references — an `Option<T>` over a named
+//! type, which OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with
+//! exact 64-bit integer bounds, null-only types, heterogeneous tuples,
+//! constrained map keys, and closed flattened intersections.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(

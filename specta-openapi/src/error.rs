@@ -18,7 +18,11 @@ pub enum Error {
     },
 
     /// A Specta shape cannot be represented exactly by OpenAPI 3.0.
-    #[error("OpenAPI 3.0 cannot represent {feature} exactly in component {component:?}")]
+    #[error(
+        "OpenAPI 3.0 cannot represent {feature} exactly in component {component:?}. \
+         Export with SchemaMode::Compatible to emit the closest schema and keep the exact \
+         constraints in x-specta-* extensions."
+    )]
     UnsupportedSchemaFeature {
         /// Component containing the unsupported shape.
         component: String,
