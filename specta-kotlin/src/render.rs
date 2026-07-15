@@ -441,6 +441,7 @@ fn render_struct(
                     generic_scope,
                     field,
                     &format!("{path}.{index}"),
+                    true,
                 )?);
                 if field.optional {
                     out.push_str(" = null");
@@ -772,7 +773,7 @@ fn render_property(
     depth: usize,
 ) -> Result<(), Error> {
     let indent = kotlin.indentation(depth);
-    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path)?;
+    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path, false)?;
     let nullable = field
         .ty
         .as_ref()
@@ -811,6 +812,7 @@ fn field_datatype(
     generic_scope: &[Generic],
     field: &Field,
     path: &str,
+    allow_generic: bool,
 ) -> Result<String, Error> {
     let ty = field.ty.as_ref().ok_or_else(|| Error::UnsupportedType {
         path: path.to_owned(),
@@ -818,7 +820,10 @@ fn field_datatype(
     })?;
     let mut rendered = datatype(kotlin, format, types, ty, generic_scope, path)?;
     let nullability = datatype_nullability(format, types, ty, path, &mut Vec::new())?;
-    if kotlin.serialization == Serialization::Kotlinx && nullability == Nullability::Generic {
+    if kotlin.serialization == Serialization::Kotlinx
+        && nullability == Nullability::Generic
+        && !allow_generic
+    {
         return Err(Error::UnsupportedType {
             path: path.into(),
             reason: "Kotlinx missing-field behavior cannot be inferred for an unconstrained generic",

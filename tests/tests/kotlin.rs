@@ -109,6 +109,10 @@ struct KotlinxGenericProperty<T> {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct KotlinxGenericNewtype<T>(T);
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -665,6 +669,16 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         )
         .expect_err("Kotlinx generic nullability depends on the instantiation");
     assert!(error.to_string().contains("unconstrained generic"));
+
+    let supported = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<KotlinxGenericNewtype<Option<String>>>(),
+            IdentityFormat,
+        )
+        .expect("generic Kotlinx value classes preserve scalar encoding");
+    assert!(supported.contains("value class KotlinxGenericNewtype<T>"));
+    assert!(supported.contains("public val value: T"));
 
     let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)
