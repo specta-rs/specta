@@ -77,8 +77,7 @@ pub mod internal {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(|types| {
-                // The side-effect of this is registering the type.
-                T::definition(types);
+                types.register_mut::<T>();
             });
     }
 

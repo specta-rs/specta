@@ -1,0 +1,26 @@
+[package]
+name = "specta-java"
+description = "Export your Rust types to Java"
+version = "0.0.1"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-java/latest/specta-java"
+keywords = ["specta", "java", "typesafe", "codegen"]
+categories = ["development-tools", "compilers"]
+readme = "README.md"
+
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.26", path = "../specta" }
+
+[dev-dependencies]
+specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive"] }
+specta-serde = { version = "=0.0.13", path = "../specta-serde" }
