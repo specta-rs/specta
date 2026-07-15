@@ -479,18 +479,28 @@ fn flatten_of_one_side_skipped_vec_is_rejected() {
 }
 
 #[test]
-fn flatten_of_one_side_skipped_vec_is_accepted_under_unified_format() {
-    // Unified mode drops any field skipped in either direction
-    // (`should_skip_field_for_mode` in lib.rs: `Unified => skip_serializing
-    // || skip_deserializing`), so the field never flattens in the unified
-    // output and its shape must not be validated - this exported fine on
-    // main before flatten validation existed.
-    Typescript::default()
+fn flatten_of_one_side_skipped_vec_under_unified_format_errors_on_the_skip() {
+    // Since #518, unified `Format` rejects one-sided skips outright instead
+    // of guessing a shape. The flatten validator must stay out of the way:
+    // the field never flattens in unified mode (any skip kills it there), so
+    // the error must be the directional-skip incompatibility, not a bogus
+    // `InvalidFlattenTarget` fired first for an unreachable shape.
+    let err = Typescript::default()
         .export(
             &Types::default().register::<FlattenSkipSerializingVecInvalid>(),
             specta_serde::Format,
         )
-        .expect("unified mode drops one-side-skipped fields entirely");
+        .expect_err("unified mode rejects one-sided skips since #518");
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("Incompatible field skip"),
+        "expected the #518 directional-skip error: {msg}"
+    );
+    assert!(
+        !msg.contains("flatten"),
+        "flatten validation must not fire for a direction that never flattens: {msg}"
+    );
 }
 
 // A one-sided skip also means only the *live* phase's shape matters for a
@@ -928,13 +938,27 @@ enum VariantSkipUnifiedEnum {
 }
 
 #[test]
-fn flatten_in_one_side_skipped_variant_is_accepted_under_unified_format() {
-    Typescript::default()
+fn flatten_in_one_side_skipped_variant_under_unified_format_errors_on_the_skip() {
+    // Since #518, unified `Format` rejects one-sided variant skips outright.
+    // The flatten validator must stay out of the way: the variant never
+    // exists in unified mode, so the error must be the directional-skip
+    // incompatibility, not a bogus `InvalidFlattenTarget` for the Vec.
+    let err = Typescript::default()
         .export(
             &Types::default().register::<VariantSkipUnifiedEnum>(),
             specta_serde::Format,
         )
-        .expect("unified mode drops one-side-skipped variants entirely");
+        .expect_err("unified mode rejects one-sided variant skips since #518");
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("Incompatible variant skip"),
+        "expected the #518 directional-skip error: {msg}"
+    );
+    assert!(
+        !msg.contains("flatten"),
+        "flatten validation must not fire for a variant that never exists in unified mode: {msg}"
+    );
 }
 
 #[test]

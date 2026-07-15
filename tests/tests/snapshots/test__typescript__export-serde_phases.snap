@@ -251,11 +251,11 @@ Struct2: export type Struct2 = {
 	b: string,
 };
 
-Enum: export type Enum = { t: "A" } | { t: "B" };
+Enum: export type EnumNew = { t: "A" } | { t: "B" };
 
-Enum2: export type Enum2 = { t: "C" } | { t: "B" } | { t: "D"; enumField: null };
+Enum2: export type Enum2New = { t: "C" } | { t: "B" } | { t: "D"; enumField: null };
 
-Enum3: export type Enum3 = { t: "A"; b: string };
+Enum3: export type Enum3New = { t: "A"; b: string };
 
 StructRenameAllUppercase: export type StructRenameAllUppercase = {
 	A: number,

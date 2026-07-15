@@ -982,7 +982,7 @@ enum Enum {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-#[serde(rename = "EnumNew", tag = "t")]
+#[serde(rename = "Enum2New", tag = "t")]
 enum Enum2 {
     #[serde(rename = "C")]
     A,
@@ -1031,7 +1031,7 @@ struct RenameSerdeSpecialChar {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-#[serde(rename = "EnumNew", tag = "t")]
+#[serde(rename = "Enum3New", tag = "t")]
 enum Enum3 {
     A {
         #[serde(rename = "b")]
