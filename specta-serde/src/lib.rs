@@ -2973,7 +2973,12 @@ fn internal_tag_payload_compatibility(
                     Ok(EnumRepr::Untagged)
                 ) =>
         {
-            Ok(Some(contextualize_rewritten_external_units(enm)?))
+            Ok(Some(contextualize_rewritten_external_units(
+                enm,
+                original_types,
+                seen,
+                mode,
+            )?))
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes) {
             Ok(EnumRepr::Untagged) => {
@@ -3380,6 +3385,9 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
 
 fn contextualize_rewritten_external_units(
     enm: &Enum,
+    original_types: &Types,
+    seen: &mut HashSet<Reference>,
+    mode: PhaseRewrite,
 ) -> Result<InternalTagPayloadCompatibility, Error> {
     let mut rewritten = enm.clone();
     let mut changed = false;
@@ -3410,6 +3418,25 @@ fn contextualize_rewritten_external_units(
             continue;
         }
         if !is_generated_string_literal_datatype(ty) {
+            let Some(compatibility) =
+                internal_tag_payload_compatibility(ty, original_types, seen, mode)?
+            else {
+                return Err(Error::invalid_internally_tagged_variant(
+                    name.clone(),
+                    "an inline untagged payload cannot be merged with an internal tag",
+                ));
+            };
+            if compatibility.is_effectively_empty {
+                *variant = clone_variant_with_unnamed_fields(
+                    variant,
+                    vec![Field::new(named_fields_datatype(Vec::new()))],
+                );
+                changed = true;
+            } else if let Some(replacement) = compatibility.replacement {
+                *variant =
+                    clone_variant_with_unnamed_fields(variant, vec![Field::new(replacement)]);
+                changed = true;
+            }
             continue;
         }
 

@@ -287,6 +287,13 @@ enum ExternalWithInvalidUntagged {
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
+enum ExternalWithInvalidUntaggedTuple {
+    #[serde(untagged)]
+    Tuple(i32, i32),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
 enum ExternalWithUntaggedUnit {
     #[serde(untagged)]
     Unit,
@@ -341,6 +348,13 @@ enum InlineExternalWithOtherWrapper {
 #[serde(tag = "kind")]
 enum InvalidUntaggedExternalWrapper {
     Value(ExternalWithInvalidUntagged),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InlineInvalidUntaggedExternalWrapper {
+    Value(#[specta(inline)] ExternalWithInvalidUntaggedTuple),
 }
 
 #[derive(Type, Serialize)]
@@ -853,13 +867,25 @@ fn contextual_untagged_scalar_payload_is_rejected() {
         .is_err()
     );
 
-    let err = specta_serde::Format
-        .map_types(&Types::default().register::<InvalidUntaggedExternalWrapper>())
-        .expect_err("TaggedSerializer rejects scalar untagged payloads");
     assert!(
-        err.to_string().contains("cannot be merged"),
-        "unexpected error: {err}"
+        serde_json::to_value(InlineInvalidUntaggedExternalWrapper::Value(
+            ExternalWithInvalidUntaggedTuple::Tuple(1, 2)
+        ))
+        .is_err()
     );
+
+    for types in [
+        Types::default().register::<InvalidUntaggedExternalWrapper>(),
+        Types::default().register::<InlineInvalidUntaggedExternalWrapper>(),
+    ] {
+        let err = specta_serde::Format
+            .map_types(&types)
+            .expect_err("TaggedSerializer rejects scalar and tuple untagged payloads");
+        assert!(
+            err.to_string().contains("cannot be merged"),
+            "unexpected error: {err}"
+        );
+    }
 }
 
 #[test]
