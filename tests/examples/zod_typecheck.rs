@@ -70,6 +70,15 @@ enum ExternalEnum {
     Tuple(i32, bool),
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[serde(untagged)]
+enum UntaggedMatchingField {
+    Variant {
+        #[serde(rename = "Variant")]
+        value: String,
+    },
+}
+
 mod r#type {
     use super::*;
 
@@ -111,6 +120,7 @@ fn main() {
                 .register::<DefinedMapKey>()
                 .register::<OpaqueTypes>()
                 .register::<ExternalEnum>()
+                .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),
         );
     let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {

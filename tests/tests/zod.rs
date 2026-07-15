@@ -82,6 +82,16 @@ enum SerdeTaggedEnum {
     StringValue(String),
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedMatchingField {
+    Variant {
+        #[serde(rename = "Variant")]
+        value: String,
+    },
+}
+
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
@@ -510,6 +520,16 @@ fn zod_empty_named_shapes_are_strict() {
 
     let empty_variant = export_for::<EmptyNamedVariant>().unwrap();
     assert!(empty_variant.contains("z.strictObject({"));
+}
+
+#[test]
+fn zod_untagged_matching_field_name_is_not_strict() {
+    let rendered = export_for::<UntaggedMatchingField>().unwrap();
+    assert!(rendered.contains("z.object({"));
+    assert!(!rendered.contains("z.strictObject({"));
+
+    let value = serde_json::json!({ "Variant": "value", "extra": true });
+    assert!(serde_json::from_value::<UntaggedMatchingField>(value).is_ok());
 }
 
 #[test]

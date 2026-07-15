@@ -4,6 +4,7 @@ import {
   ExternalEnumSchema,
   GenericSchema,
   RecursiveSchema,
+  UntaggedMatchingFieldSchema,
   WireTypesSchema,
 } from "./generated/bindings";
 
@@ -25,6 +26,7 @@ test("generated schemas validate representative wire values", () => {
     remote_keys: { "42": "value" },
   }).success).toBe(true);
   expect(ExternalEnumSchema.safeParse({ Newtype: "value", Tuple: [1, true] }).success).toBe(false);
+  expect(UntaggedMatchingFieldSchema.safeParse({ Variant: "value", extra: true }).success).toBe(true);
 });
 
 test("generated schemas reject invalid primitive wire values", () => {

@@ -15,6 +15,8 @@ use crate::{Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES};
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
+const STRICT_OBJECT_MARKER: &str = "specta:strict_object";
+
 fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
@@ -1284,10 +1286,7 @@ fn enum_dt(
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| {
-            let strict_object = matches!(&variant.fields, Fields::Named(named) if
-                named.fields.iter().filter(|(_, field)| field.ty.is_some()).count() == 1
-                    && named.fields.iter().any(|(field_name, field)|
-                        field.ty.is_some() && field_name.as_ref() == name.as_ref()));
+            let strict_object = variant.attributes.contains_key(STRICT_OBJECT_MARKER);
             enum_variant_dt(
                 exporter,
                 types,
