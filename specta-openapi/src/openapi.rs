@@ -105,7 +105,7 @@ impl OpenApi {
     /// let document = OpenApi::default()
     ///     .operation(
     ///         Operation::get("/recipes/{slug}")
-    ///             .path_param("slug")
+    ///             .path_param::<String>("slug")
     ///             .response::<Recipe>(200, "The recipe")
     ///             .response::<ApiError>(404, "No such recipe"),
     ///     )
