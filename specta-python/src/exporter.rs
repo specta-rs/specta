@@ -182,7 +182,7 @@ fn append_raw(out: &mut String, snippets: &[Cow<'static, str>]) {
 
 fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
     let mut seen = HashMap::<String, String>::new();
-    if exporter.layout == Layout::Namespaces {
+    if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
         for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
             let segments = ndt
                 .module_path

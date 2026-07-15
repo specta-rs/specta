@@ -125,6 +125,7 @@ fn export_named_inner(
                 is_identifier(field_name)
                     && !is_reserved(field_name)
                     && !field_name.starts_with("__")
+                    && field_name.as_ref() == normalized_identifier(field_name)
             })
     {
         out.push_str(indent);

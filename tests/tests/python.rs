@@ -311,13 +311,29 @@ fn python_preserves_dunder_wire_keys() {
         private: String,
     }
 
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Normalized {
+        #[serde(rename = "K")]
+        kelvin: String,
+    }
+
     let output = Python::default()
-        .export(&Types::default().register::<Dunder>(), specta_serde::Format)
+        .export(
+            &Types::default()
+                .register::<Dunder>()
+                .register::<Normalized>(),
+            specta_serde::Format,
+        )
         .unwrap();
     assert!(output.contains(
         "type Dunder = _specta_typing.TypedDict(\"test__python__Dunder\", {\"__private\": _specta_builtins.str})"
     ));
     assert!(!output.contains("class Dunder("));
+    assert!(output.contains(
+        "type Normalized = _specta_typing.TypedDict(\"test__python__Normalized\", {\"K\": _specta_builtins.str})"
+    ));
+    assert!(!output.contains("class Normalized("));
 }
 
 #[test]
@@ -500,6 +516,15 @@ fn python_reports_name_collisions() {
     let error = Python::default()
         .layout(Layout::Namespaces)
         .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("duplicate exported Python name"));
+
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+    let error = Python::default()
+        .layout(Layout::Files)
+        .export_to(temp.path().join("bindings"), &types, IdentityFormat)
         .unwrap_err();
     assert!(error.to_string().contains("duplicate exported Python name"));
 }
