@@ -65,11 +65,10 @@ impl Remapper {
     }
 
     /// Remaps the BigInt-style integer primitives — `i64`, `u64`, `i128`, `u128`,
-    /// `isize` and `usize` — and arbitrary finite numbers so they export as a
-    /// plain `number` instead of erroring or exporting as `bigint`. Signed types
-    /// and arbitrary numbers map to `i32`, and unsigned types to `u32` — fixed-width
-    /// integers, so the result is a clean `number` rather than the `number | null`
-    /// that `f64` would produce.
+    /// `isize` and `usize` — so they export as a plain `number` instead of
+    /// erroring or exporting as `bigint`. Signed types map to `i32` and unsigned
+    /// types to `u32` — a fixed-width integer, so the result is a clean `number`
+    /// rather than the `number | null` that `f64` would produce.
     ///
     /// This is a convenience for the common case of calling [`rule`](Self::rule)
     /// once per integer type. `f128` is not included — it is not an integer;
@@ -100,10 +99,6 @@ impl Remapper {
     ///
     /// </div>
     pub fn dangerous_bigints_as_number(mut self) -> Self {
-        self = self.rule(
-            Reference::opaque(specta::internal::UnknownPrecisionNumber).into(),
-            Primitive::i32.into(),
-        );
         for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
             self = self.rule(
                 DataType::Primitive(signed),
@@ -220,7 +215,7 @@ impl Remapper {
 mod tests {
     use specta::{
         Types,
-        datatype::{DataType, Field, List, NamedDataType, Primitive, Reference, Struct, Tuple},
+        datatype::{DataType, Field, List, NamedDataType, Primitive, Struct, Tuple},
     };
 
     use super::Remapper;
@@ -292,13 +287,8 @@ mod tests {
     }
 
     #[test]
-    fn dangerous_bigints_as_number_remaps_every_unsafe_number() {
+    fn dangerous_bigints_as_number_remaps_every_integer() {
         let remapper = Remapper::new().dangerous_bigints_as_number();
-
-        assert_eq!(
-            remapper.remap_dt(Reference::opaque(specta::internal::UnknownPrecisionNumber).into()),
-            Primitive::i32.into(),
-        );
 
         for p in [Primitive::i64, Primitive::i128, Primitive::isize] {
             assert_eq!(

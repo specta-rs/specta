@@ -39,8 +39,3 @@ mod functions {
 }
 #[cfg(feature = "function")]
 pub use functions::*;
-
-/// Opaque marker for a finite number whose range and precision are not statically known.
-#[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UnknownPrecisionNumber;

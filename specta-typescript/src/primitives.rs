@@ -2269,12 +2269,6 @@ fn reference_opaque_dt(
     r: &OpaqueReference,
     location: Vec<Cow<'static, str>>,
 ) -> Result<(), Error> {
-    if r.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-        .is_some()
-    {
-        return Err(Error::unsafe_number_forbidden(path_string(&location)));
-    }
-
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
         return Ok(());

@@ -15,7 +15,7 @@ use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
     Type,
 };
-use specta::datatype::{DataType, Primitive, Reference};
+use specta::datatype::{DataType, Primitive};
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {
@@ -251,16 +251,6 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             // }
 
             todo!();
-        }
-        DataType::Reference(Reference::Opaque(reference))
-            if reference
-                .downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-                .is_some() =>
-        {
-            ReferenceOr::Item(Schema {
-                schema_data,
-                schema_kind: SchemaKind::Type(Type::Number(NumberType::default())),
-            })
         }
         DataType::Reference(_reference) => {
             todo!();

@@ -361,13 +361,6 @@ fn datatype(
                     s.push(']');
                 }
             }
-            Reference::Opaque(o)
-                if o.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-                    .is_some() =>
-            {
-                ctx.add_import("encoding/json");
-                s.push_str("json.Number");
-            }
             Reference::Opaque(o) => match o.type_name() {
                 "String" | "char" => s.push_str("string"),
                 "bool" => s.push_str("bool"),

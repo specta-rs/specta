@@ -147,7 +147,7 @@ fn serde_json_value_does_not_recurse_when_exported() {
 
 // https://github.com/specta-rs/specta/issues/500
 #[test]
-fn serde_json_number_exports_as_number_when_precision_loss_is_explicit() {
+fn serde_json_number_uses_untagged_wire_shape() {
     #[derive(Type)]
     struct HasJsonNumber {
         value: serde_json::Number,
@@ -156,10 +156,10 @@ fn serde_json_number_exports_as_number_when_precision_loss_is_explicit() {
     let types = Types::default().register::<HasJsonNumber>();
     let err = Typescript::default()
         .export(&types, specta_serde::Format)
-        .expect_err("unknown JSON number precision must require an explicit remap");
+        .expect_err("JSON numbers containing wide integers must require an explicit remap");
     assert!(
         err.to_string()
-            .contains("range and precision are not known"),
+            .contains("forbids exporting BigInt-style types"),
         "unexpected error: {err}"
     );
 
@@ -168,6 +168,7 @@ fn serde_json_number_exports_as_number_when_precision_loss_is_explicit() {
         .remap_types(types);
 
     insta::assert_snapshot!(
+        "serde_json_number_uses_untagged_wire_shape",
         Typescript::default()
             .export(&types, specta_serde::Format)
             .unwrap()
@@ -188,9 +189,6 @@ fn legacy_impl_bigint_errors() {
             .contains("forbids exporting BigInt-style types")
             || err
                 .to_string()
-                .contains("range and precision are not known")
-            || err
-                .to_string()
                 .contains("Detected multiple types with the same name"),
         "unexpected error: {err}"
     );
@@ -208,10 +206,6 @@ fn legacy_impl_individual_bigint_errors() {
                 if err
                     .to_string()
                     .contains("forbids exporting BigInt-style types") => {}
-            Err(err)
-                if err
-                    .to_string()
-                    .contains("range and precision are not known") => {}
             Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
         }
     }

@@ -1078,15 +1078,6 @@ fn reference_to_swift(
                 Ok(format!("{}<{}>", name, generics))
             }
         }
-        Reference::Opaque(reference)
-            if reference
-                .downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-                .is_some() =>
-        {
-            Err(Error::UnsupportedType(
-                "Swift cannot represent a number with unknown range and precision".to_string(),
-            ))
-        }
         Reference::Opaque(_) => Err(Error::UnsupportedType(
             "Opaque references are not supported by Swift exporter".to_string(),
         )),

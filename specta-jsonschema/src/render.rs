@@ -205,13 +205,6 @@ impl<'a> Renderer<'a> {
             Reference::Named(reference) => {
                 self.render_named_reference(reference, generics, path, depth)
             }
-            Reference::Opaque(reference)
-                if reference
-                    .downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-                    .is_some() =>
-            {
-                Ok(number_schema(None))
-            }
             Reference::Opaque(reference) => Err(Error::UnsupportedOpaqueReference {
                 path: path.into(),
                 reference: reference.clone(),

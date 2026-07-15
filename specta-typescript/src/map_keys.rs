@@ -180,10 +180,7 @@ fn validate_map_key_inner(
             // like taurpc (which converts `i64` -> `define("number")` to
             // satisfy the BigInt-forbidden filter). Other opaque flavors --
             // Tauri channels, branded types -- still fail loudly.
-            if r.downcast_ref::<crate::opaque::Define>().is_some()
-                || r.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-                    .is_some()
-            {
+            if r.downcast_ref::<crate::opaque::Define>().is_some() {
                 Ok(())
             } else {
                 Err(Error::invalid_map_key(

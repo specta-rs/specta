@@ -755,7 +755,7 @@ fn reference_dt(
         Reference::Named(r) => {
             reference_named_dt(s, exporter, types, r, location, generics, type_render_stack)
         }
-        Reference::Opaque(r) => reference_opaque_dt(s, r, location),
+        Reference::Opaque(r) => reference_opaque_dt(s, r),
     }
 }
 
@@ -763,17 +763,7 @@ fn generic_dt(s: &mut String, g: &GenericReference) {
     s.push_str(g.name());
 }
 
-fn reference_opaque_dt(
-    s: &mut String,
-    r: &OpaqueReference,
-    location: Vec<Cow<'static, str>>,
-) -> Result<(), Error> {
-    if r.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
-        .is_some()
-    {
-        return Err(Error::unsafe_number_forbidden(location.join(".")));
-    }
-
+fn reference_opaque_dt(s: &mut String, r: &OpaqueReference) -> Result<(), Error> {
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
         return Ok(());

@@ -135,12 +135,36 @@ const _: () = {
 
     struct SerdeNumber;
     impl Type for SerdeNumber {
-        /// `serde_json::Number` is finite and serializes as one bare JSON number, but it
-        /// may contain integers outside JavaScript's safe range (and, with Serde's
-        /// `arbitrary_precision`, values wider than `u64`). Keep that uncertainty in the
-        /// datatype so exporters can require an explicit lossy conversion where needed.
+        /// `serde_json::Number` serializes as an untagged JSON number, but retains its
+        /// `f64`/`i64`/`u64` variants so exporters can guard integers outside JavaScript's
+        /// safe range instead of silently treating every value as an `f64`.
         fn definition(_: &mut Types) -> DataType {
-            Reference::opaque(crate::internal::UnknownPrecisionNumber).into()
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "f64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
+                    ),
+                    (
+                        "i64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
+                    ),
+                    (
+                        "u64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
+                    ),
+                ],
+                attributes,
+            })
         }
     }
 };
