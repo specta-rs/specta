@@ -33,6 +33,7 @@ mod serde_other;
 mod serde_unified_asymmetry;
 mod serde_unknown_attrs;
 mod serde_untagged_unit;
+mod serde_validate_coverage;
 mod serde_validate_recursion;
 mod swift;
 mod types;
