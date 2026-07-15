@@ -119,6 +119,20 @@ struct ConditionalThenSerializeSkipped(
     #[serde(skip_serializing)] u32,
 );
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ConditionalThenSkippedTuple(
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+    #[serde(skip)] u8,
+);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedThenConditionalTuple(
+    #[serde(skip)] u8,
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+);
+
 #[derive(Clone, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(from = "Wire", into = "Wire")]
@@ -587,6 +601,46 @@ fn phases_accepts_conditional_omission_before_serialize_skipped_items() {
             specta_serde::PhasesFormat,
         )
         .expect("serialize-skipped items do not occupy tuple positions");
+}
+
+#[test]
+fn skipped_tuple_slots_preserve_conditional_optionality() {
+    assert_eq!(
+        serde_json::to_string(&ConditionalThenSkippedTuple(None, 0)).unwrap(),
+        "[]"
+    );
+    assert_eq!(
+        serde_json::to_string(&SkippedThenConditionalTuple(0, None)).unwrap(),
+        "[]"
+    );
+
+    let unified = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<ConditionalThenSkippedTuple>()
+                .register::<SkippedThenConditionalTuple>(),
+            specta_serde::Format,
+        )
+        .expect("skipped slots should preserve a trailing conditional element");
+    assert!(unified.contains("ConditionalThenSkippedTuple = [(string | null)?]"));
+    assert!(unified.contains("SkippedThenConditionalTuple = [(string | null)?]"));
+
+    let phased = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<ConditionalThenSkippedTuple>()
+                .register::<SkippedThenConditionalTuple>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase splitting should retain skipped tuple slots");
+    assert!(
+        phased.contains("ConditionalThenSkippedTuple_Serialize = [string?]"),
+        "unexpected phased output: {phased}"
+    );
+    assert!(
+        phased.contains("SkippedThenConditionalTuple_Serialize = [string?]"),
+        "unexpected phased output: {phased}"
+    );
 }
 
 #[test]

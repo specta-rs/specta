@@ -1310,6 +1310,13 @@ fn rewrite_fields_for_phase(
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
+            // Compute this before rewriting consumes `skip_serializing_if`.
+            // If skipped slots collapse a declared tuple to one live field,
+            // retaining the markers is what lets the renderer keep both the
+            // sequence shape and that field's trailing optional marker.
+            let preserve_conditional_skip_slots =
+                unnamed_conditional_skip_slots_need_preserving(unnamed, mode)?;
+
             for field in &mut unnamed.fields {
                 if should_skip_field_for_mode(field, mode)? {
                     // Always demote to a `ty: None` marker: an explicit
@@ -1328,6 +1335,7 @@ fn rewrite_fields_for_phase(
             }
 
             if !preserve_skipped_unnamed_fields
+                && !preserve_conditional_skip_slots
                 && !unnamed_skip_slots_need_preserving(unnamed, container_default)?
             {
                 unnamed.fields.retain(|field| field.ty.as_ref().is_some());
@@ -1661,6 +1669,28 @@ fn unnamed_skip_slots_need_preserving(
     }
 
     Ok(false)
+}
+
+fn unnamed_conditional_skip_slots_need_preserving(
+    unnamed: &UnnamedFields,
+    mode: PhaseRewrite,
+) -> Result<bool, Error> {
+    if unnamed.fields.len() <= 1 {
+        return Ok(false);
+    }
+
+    let mut has_skipped_slot = false;
+    let mut has_live_conditional_omission = false;
+    for field in &unnamed.fields {
+        let skipped = field.ty.is_none() || should_skip_field_for_mode(field, mode)?;
+        has_skipped_slot |= skipped;
+        has_live_conditional_omission |= !skipped
+            && (field.optional
+                || SerdeFieldAttrs::from_attributes(&field.attributes)?
+                    .is_some_and(|attrs| attrs.skip_serializing_if.is_some()));
+    }
+
+    Ok(has_skipped_slot && has_live_conditional_omission)
 }
 
 fn skipped_field_marker(field: &Field) -> Field {
