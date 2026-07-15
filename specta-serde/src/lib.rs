@@ -905,6 +905,7 @@ fn rewrite_datatype_for_phase(
             }
 
             rewrite_enum_repr_for_phase(e, mode, original_types)?;
+            normalize_enum_attrs_for_phase(e, mode)?;
         }
         DataType::Tuple(tuple) => {
             for ty in &mut tuple.elements {
@@ -1287,6 +1288,41 @@ fn normalize_container_attrs_for_phase(
     if let Some(rename) = rename {
         attrs.insert(parser::CONTAINER_RENAME_SERIALIZE, rename.clone());
         attrs.insert(parser::CONTAINER_RENAME_DESERIALIZE, rename);
+    }
+
+    Ok(())
+}
+
+/// Enum counterpart of [`normalize_container_attrs_for_phase`]: tagged enum
+/// reprs are rebuilt without the original variant attrs by
+/// [`rewrite_enum_repr_for_phase`], but untagged enums keep their
+/// `DataType::Enum` shape (the repr rewrite returns early for them) and
+/// variant-level `#[serde(untagged)]` variants keep their attrs via
+/// [`clone_variant_with_unnamed_fields`], so the consumed directional attrs
+/// must be stripped here as well.
+fn normalize_enum_attrs_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<(), Error> {
+    if mode == PhaseRewrite::Unified {
+        return Ok(());
+    }
+
+    normalize_container_attrs_for_phase(&mut e.attributes, mode)?;
+
+    for (_, variant) in &mut e.variants {
+        // Variant renames were already consumed by `serialized_variant_name`
+        // (and are wire-irrelevant for untagged variants), `rename_all` was
+        // applied to the variant's field names by `rewrite_fields_for_phase`,
+        // and variants skipped in this phase were already dropped by
+        // `filter_enum_variants_for_phase`.
+        for key in [
+            parser::VARIANT_RENAME_SERIALIZE,
+            parser::VARIANT_RENAME_DESERIALIZE,
+            parser::VARIANT_RENAME_ALL_SERIALIZE,
+            parser::VARIANT_RENAME_ALL_DESERIALIZE,
+            parser::VARIANT_SKIP_SERIALIZING,
+            parser::VARIANT_SKIP_DESERIALIZING,
+        ] {
+            variant.attributes.remove(key);
+        }
     }
 
     Ok(())
@@ -2708,6 +2744,22 @@ mod tests {
         field_one: String,
     }
 
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(untagged)]
+    enum UntaggedWithDirectionalVariantAttrs {
+        A(String),
+        #[serde(skip_deserializing)]
+        B(u32),
+        #[serde(rename(serialize = "CSer"))]
+        C(bool),
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(untagged, rename_all(serialize = "camelCase"))]
+    enum UntaggedWithDirectionalContainerAttrs {
+        A { field_one: String },
+    }
+
     #[test]
     fn selects_split_named_reference_for_each_phase() {
         let mut types = specta::Types::default();
@@ -2847,6 +2899,34 @@ mod tests {
                     .unwrap_or_else(|err| {
                         panic!(
                             "Unified validation should accept phase-split {name} {phase:?} shape: {err}"
+                        )
+                    });
+            }
+        }
+    }
+
+    #[test]
+    fn phase_split_untagged_enum_directional_attrs_pass_unified_mode_validation() {
+        // Untagged enums keep their `DataType::Enum` shape through a phase
+        // split (`rewrite_enum_repr_for_phase` returns early for them), so the
+        // consumed directional variant/container attrs must be stripped from
+        // the kept variants too, or unified-mode validation of the
+        // post-`apply_phases` graph rejects the already-split enums.
+        let mut types = specta::Types::default();
+        let variant_dt = UntaggedWithDirectionalVariantAttrs::definition(&mut types);
+        let container_dt = UntaggedWithDirectionalContainerAttrs::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        for (name, dt) in [
+            ("variant attrs", &variant_dt),
+            ("container attrs", &container_dt),
+        ] {
+            for phase in [Phase::Serialize, Phase::Deserialize] {
+                let phased = select_phase_datatype(dt, &resolved, phase);
+                validate_datatype_for_mode(&phased, &resolved, ApplyMode::Unified)
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "Unified validation should accept phase-split untagged enum {name} {phase:?} shape: {err}"
                         )
                     });
             }
