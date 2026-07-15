@@ -103,7 +103,7 @@ Unit2: Record<string, never>
 Unit3: []
 Unit4: null
 Unit5: "A"
-Unit6: { A: null }
+Unit6: { A: [] }
 Unit7: { A: Record<string, never> }
 SimpleStruct: {
 	a: number,
@@ -181,7 +181,7 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: { type: "A" } | { type: "B"; data: string }
+SkippedFieldWithinVariant: { type: "A"; data?: null } | { type: "B"; data: string }
 KebabCase: {
 	"test-ing": string,
 }

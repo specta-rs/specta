@@ -53,7 +53,7 @@ export type Unit4 = null;
 
 export type Unit5 = "A";
 
-export type Unit6 = { A: null };
+export type Unit6 = { A: [] };
 
 export type Unit7 = { A: Record<string, never> };
 
@@ -148,7 +148,7 @@ export type InlineTuple2 = {
 }, boolean],
 };
 
-export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
+export type SkippedFieldWithinVariant = { type: "A"; data?: null } | { type: "B"; data: string };
 
 export type KebabCase = {
 	"test-ing": string,
