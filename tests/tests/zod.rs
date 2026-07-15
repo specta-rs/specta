@@ -491,6 +491,30 @@ fn zod_accepts_variant_untagged_scalar_map_keys() {
 }
 
 #[test]
+fn zod_rejects_tagged_unit_object_map_keys_when_tag_matches_variant() {
+    #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+    #[specta(collect = false)]
+    #[serde(tag = "kind")]
+    enum MatchingTagKey {
+        #[serde(rename = "kind")]
+        Kind,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MatchingTagMap {
+        values: HashMap<MatchingTagKey, String>,
+    }
+
+    let runtime =
+        serde_json::to_string(&HashMap::from([(MatchingTagKey::Kind, "value")])).unwrap_err();
+    assert!(runtime.to_string().contains("key must be a string"));
+
+    let err = export_for::<MatchingTagMap>().unwrap_err().to_string();
+    assert!(err.contains("Invalid map key"), "{err}");
+}
+
+#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     #[derive(Type)]
     #[specta(collect = false)]

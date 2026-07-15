@@ -25,31 +25,6 @@ fn validate_map_key_inner(
     path: String,
     visiting: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
-    fn unwrap_synthetic_variant_fields<'a>(
-        variant_name: &str,
-        fields: &'a Fields,
-    ) -> Option<&'a Fields> {
-        let Fields::Named(named) = fields else {
-            return None;
-        };
-        let mut live_fields = named
-            .fields
-            .iter()
-            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name.as_ref(), ty)));
-        let (field_name, DataType::Enum(inner)) = live_fields.next()? else {
-            return None;
-        };
-        if field_name != variant_name || live_fields.next().is_some() {
-            return None;
-        }
-        match inner.variants.as_slice() {
-            [(inner_name, inner_variant)] if inner_name == variant_name => {
-                Some(&inner_variant.fields)
-            }
-            _ => None,
-        }
-    }
-
     match key_ty {
         DataType::Primitive(primitive) if primitive_is_valid_key(primitive.clone()) => Ok(()),
         DataType::Primitive(primitive) => Err(Error::invalid_map_key(
@@ -60,9 +35,7 @@ fn validate_map_key_inner(
             let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
             let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
             for (variant_name, variant) in &enm.variants {
-                let fields = unwrap_synthetic_variant_fields(variant_name, &variant.fields)
-                    .unwrap_or(&variant.fields);
-                match fields {
+                match &variant.fields {
                     Fields::Unit
                         if !untagged
                             && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) => {}
