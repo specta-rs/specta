@@ -43,6 +43,11 @@ pub enum Error {
         /// Rust path of the hidden named type.
         name: String,
     },
+    /// A registered root has a wire shape that C# cannot declare as a named type.
+    UnsupportedRoot {
+        /// Rust path of the unsupported root.
+        path: String,
+    },
     /// An anonymous structural type cannot be declared at this C# use site.
     UnsupportedType {
         /// Export location of the unsupported type.
@@ -136,6 +141,10 @@ impl fmt::Display for Error {
                     "named type '{name}' referenced at {path} is not exported"
                 )
             }
+            Self::UnsupportedRoot { path } => write!(
+                f,
+                "registered non-object type '{path}' cannot be declared as a C# root"
+            ),
             Self::UnsupportedType { path, kind } => {
                 write!(
                     f,

@@ -21,6 +21,7 @@ pub(crate) fn export(
 ) -> Result<String, Error> {
     let types = format_types(types, format)?;
     validate_names(exporter, &types)?;
+    validate_non_object_roots(&types)?;
     let ndts = types
         .into_sorted_iter()
         .filter(|ndt| is_emitted_named(ndt))
@@ -51,6 +52,7 @@ pub(crate) fn export_to(
 
     let types = format_types(types, format)?;
     validate_names(exporter, &types)?;
+    validate_non_object_roots(&types)?;
 
     let mut files = Vec::new();
     for ndt in types.into_sorted_iter().filter(|ndt| is_emitted_named(ndt)) {
@@ -1277,6 +1279,129 @@ fn is_emitted_named(ndt: &NamedDataType) -> bool {
     ndt.ty.as_ref().is_some_and(
         |ty| !matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)),
     )
+}
+
+fn validate_non_object_roots(types: &Types) -> Result<(), Error> {
+    fn collect(
+        types: &Types,
+        ty: &DataType,
+        referenced: &mut HashSet<String>,
+        expanded: &mut HashSet<String>,
+    ) {
+        match ty {
+            DataType::List(list) => collect(types, &list.ty, referenced, expanded),
+            DataType::Map(map) => {
+                collect(types, map.key_ty(), referenced, expanded);
+                collect(types, map.value_ty(), referenced, expanded);
+            }
+            DataType::Nullable(inner) => collect(types, inner, referenced, expanded),
+            DataType::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    collect(types, element, referenced, expanded);
+                }
+            }
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    collect(types, dt, referenced, expanded);
+                }
+                NamedReferenceType::Reference { generics, .. } => {
+                    for (_, generic) in generics {
+                        collect(types, generic, referenced, expanded);
+                    }
+                    let Some(ndt) = types.get(reference) else {
+                        return;
+                    };
+                    if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
+                        && is_non_object_struct(&strct.fields)
+                    {
+                        let path = rust_path(ndt);
+                        referenced.insert(path.clone());
+                        if expanded.insert(path)
+                            && let Fields::Unnamed(fields) = &strct.fields
+                        {
+                            for field in fields.fields.iter().filter_map(|field| field.ty.as_ref())
+                            {
+                                collect(types, field, referenced, expanded);
+                            }
+                        }
+                    }
+                }
+                NamedReferenceType::Recursive(_) => {}
+            },
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Unit => {}
+                Fields::Unnamed(fields) => {
+                    for field in fields.fields.iter().filter_map(|field| field.ty.as_ref()) {
+                        collect(types, field, referenced, expanded);
+                    }
+                }
+                Fields::Named(fields) => {
+                    for field in fields
+                        .fields
+                        .iter()
+                        .filter_map(|(_, field)| field.ty.as_ref())
+                    {
+                        collect(types, field, referenced, expanded);
+                    }
+                }
+            },
+            DataType::Enum(enm) => {
+                for variant in enm
+                    .variants
+                    .iter()
+                    .filter(|(_, variant)| !variant.skip)
+                    .map(|(_, variant)| variant)
+                {
+                    match &variant.fields {
+                        Fields::Unit => {}
+                        Fields::Unnamed(fields) => {
+                            for field in fields.fields.iter().filter_map(|field| field.ty.as_ref())
+                            {
+                                collect(types, field, referenced, expanded);
+                            }
+                        }
+                        Fields::Named(fields) => {
+                            for field in fields
+                                .fields
+                                .iter()
+                                .filter_map(|(_, field)| field.ty.as_ref())
+                            {
+                                collect(types, field, referenced, expanded);
+                            }
+                        }
+                    }
+                }
+            }
+            DataType::Intersection(items) => {
+                for item in items {
+                    collect(types, item, referenced, expanded);
+                }
+            }
+            DataType::Primitive(_)
+            | DataType::Generic(_)
+            | DataType::Reference(Reference::Opaque(_)) => {}
+        }
+    }
+
+    let mut referenced = HashSet::new();
+    let mut expanded = HashSet::new();
+    for ndt in types
+        .into_unsorted_iter()
+        .filter(|ndt| is_emitted_named(ndt))
+    {
+        if let Some(ty) = ndt.ty.as_ref() {
+            collect(types, ty, &mut referenced, &mut expanded);
+        }
+    }
+    if let Some(ndt) = types.into_sorted_iter().find(|ndt| {
+        matches!(ndt.ty.as_ref(), Some(DataType::Struct(strct)) if is_non_object_struct(&strct.fields))
+            && !referenced.contains(&rust_path(ndt))
+    }) {
+        return Err(Error::UnsupportedRoot {
+            path: rust_path(ndt),
+        });
+    }
+    Ok(())
 }
 
 fn validate_non_object_recursion(

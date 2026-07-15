@@ -557,6 +557,25 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
 }
 
 #[test]
+fn directly_registered_non_object_roots_are_rejected() {
+    let types = Types::default().register::<WireNewtype>();
+    assert!(matches!(
+        CSharp::new().export(&types, specta_serde::Format),
+        Err(Error::UnsupportedRoot { .. })
+    ));
+
+    let root = workspace_scratch("non-object-root-files");
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(matches!(
+        CSharp::new()
+            .layout(Layout::Files)
+            .export_to(&root, &types, specta_serde::Format),
+        Err(Error::UnsupportedRoot { .. })
+    ));
+    assert!(!root.exists());
+}
+
+#[test]
 fn serde_unit_enums_keep_their_string_wire_shape() {
     let output = CSharp::new()
         .export(&Types::default().register::<Status>(), specta_serde::Format)
