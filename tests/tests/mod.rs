@@ -23,6 +23,7 @@ mod jsonschema;
 mod kotlin;
 mod layouts;
 mod legacy_impls;
+mod macro_doc_attrs;
 mod maybe_undefined;
 mod openapi;
 mod python;
