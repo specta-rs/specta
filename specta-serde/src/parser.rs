@@ -17,11 +17,11 @@ const CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 const CONTAINER_DEFAULT: &str = "serde:container:default";
 const CONTAINER_TRANSPARENT: &str = "serde:container:transparent";
 const CONTAINER_FROM_TYPE_SRC: &str = "serde:container:from_type_src";
-const CONTAINER_FROM_RESOLVED: &str = "serde:container:from_resolved";
+pub(crate) const CONTAINER_FROM_RESOLVED: &str = "serde:container:from_resolved";
 const CONTAINER_TRY_FROM_TYPE_SRC: &str = "serde:container:try_from_type_src";
-const CONTAINER_TRY_FROM_RESOLVED: &str = "serde:container:try_from_resolved";
+pub(crate) const CONTAINER_TRY_FROM_RESOLVED: &str = "serde:container:try_from_resolved";
 const CONTAINER_INTO_TYPE_SRC: &str = "serde:container:into_type_src";
-const CONTAINER_INTO_RESOLVED: &str = "serde:container:into_resolved";
+pub(crate) const CONTAINER_INTO_RESOLVED: &str = "serde:container:into_resolved";
 const CONTAINER_VARIANT_IDENTIFIER: &str = "serde:container:variant_identifier";
 const CONTAINER_FIELD_IDENTIFIER: &str = "serde:container:field_identifier";
 
