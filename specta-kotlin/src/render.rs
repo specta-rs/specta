@@ -227,11 +227,9 @@ fn contains_named_reference_inner(
                     }
                 }
                 NamedReferenceType::Inline { dt, .. } => {
-                    if contains_named_reference_inner(format, types, dt, target, visited)? {
-                        return Ok(true);
-                    }
+                    return contains_named_reference_inner(format, types, dt, target, visited);
                 }
-                NamedReferenceType::Recursive(_) => {}
+                NamedReferenceType::Recursive(_) => return Ok(false),
             }
 
             let Some(ndt) = types.get(reference) else {
@@ -1135,7 +1133,8 @@ fn normalized_variant_fields(
     let Some((field_name, field, payload)) = payload else {
         return fields.clone();
     };
-    if !serde_untagged && literal_enum_value(payload) == Some(variant_name) {
+    if field_name.is_none() && !serde_untagged && literal_enum_value(payload) == Some(variant_name)
+    {
         return Fields::Unit;
     }
     if field_name.is_some_and(|name| name.eq_ignore_ascii_case(variant_name)) {

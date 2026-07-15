@@ -115,7 +115,7 @@ enum GenericSkippedVariant<T> {
 #[derive(Type, Serialize)]
 #[specta(inline, collect = false)]
 enum InlineLiteralPayload {
-    Only,
+    Value,
 }
 
 #[derive(Type, Serialize)]
