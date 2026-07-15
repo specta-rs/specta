@@ -3649,12 +3649,12 @@ fn external_enum_tagged_payload_datatype(
             serialized_variant_name(variant_name, &variant, &container_attrs, mode)?;
         let aliases = variant_attrs
             .as_ref()
-            .filter(|_| mode == PhaseRewrite::Deserialize)
+            .filter(|_| matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize))
             .map(|attrs| attrs.aliases.as_slice())
             .unwrap_or(&[]);
 
         for name in std::iter::once(serialized_name).chain(aliases.iter().cloned()) {
-            let widen_tag = mode == PhaseRewrite::Deserialize
+            let widen_tag = matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize)
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             if widen_tag {
                 return Err(Error::invalid_internally_tagged_variant(

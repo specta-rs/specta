@@ -177,6 +177,7 @@ enum NestedGenericNewtypeExternalWrapper {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum ExternalWithSerdeAttrs {
+    #[serde(alias = "OldRenamed")]
     Renamed {
         #[serde(rename = "wire_value")]
         value: i32,
@@ -779,6 +780,14 @@ fn contextual_external_enum_applies_serde_field_and_variant_semantics() {
         .unwrap(),
         serde_json::json!({ "kind": "Value", "raw_value": 1 })
     );
+    assert!(matches!(
+        serde_json::from_value::<ExternalWithSerdeAttrsWrapper>(serde_json::json!({
+            "kind": "Value",
+            "OldRenamed": { "wire_value": 1 },
+        }))
+        .unwrap(),
+        ExternalWithSerdeAttrsWrapper::Value(ExternalWithSerdeAttrs::Renamed { value: 1 })
+    ));
 
     let types = Types::default().register::<ExternalWithSerdeAttrsWrapper>();
     let mapped = specta_serde::Format
@@ -794,6 +803,10 @@ fn contextual_external_enum_applies_serde_field_and_variant_semantics() {
     assert!(contains_named_field(wrapper, "wire_value", |ty| matches!(
         ty,
         DataType::Primitive(specta::datatype::Primitive::i32)
+    )));
+    assert!(contains_named_field(wrapper, "OldRenamed", |ty| matches!(
+        ty,
+        DataType::Struct(_)
     )));
     assert!(contains_named_field(wrapper, "Skipped", |ty| matches!(
         ty,
@@ -1082,6 +1095,12 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
 
 #[test]
 fn inline_external_other_is_rejected_in_contextual_deserialize_shape() {
+    assert!(
+        specta_serde::Format
+            .map_types(&Types::default().register::<InlineExternalWithOtherWrapper>())
+            .is_err(),
+        "unified contextual payloads cannot represent an arbitrary inner map key"
+    );
     assert!(
         specta_serde::PhasesFormat
             .map_types(&Types::default().register::<InlineExternalWithOtherWrapper>())
