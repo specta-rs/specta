@@ -103,6 +103,12 @@ struct UsesNullableAlias {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct KotlinxGenericProperty<T> {
+    value: T,
+}
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -346,6 +352,27 @@ fn kotlin_rejects_generics_that_shadow_their_declaration() {
 }
 
 #[test]
+fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
+    use specta::datatype::{Enum, GenericDefinition, NamedDataType, Variant};
+
+    for variant in ["Collision", "T"] {
+        let mut types = Types::default();
+        NamedDataType::new("Collision", &mut types, |_, datatype| {
+            datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
+            let mut enm = Enum::default();
+            enm.variants
+                .push((Cow::Owned(variant.to_owned()), Variant::unit()));
+            datatype.ty = Some(DataType::Enum(enm));
+        });
+
+        let output = Kotlin::default()
+            .export(&types, IdentityFormat)
+            .expect("variant collisions should be renamed without shadowing parent scope");
+        assert!(output.contains(&format!("class {variant}Variant<T>")));
+    }
+}
+
+#[test]
 fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
     use specta::datatype::{Field, Generic, GenericDefinition, NamedDataType, Primitive, Struct};
 
@@ -489,6 +516,15 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
     assert!(supported.contains("typealias NullableAlias = kotlin.String?"));
     assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
     assert!(supported.contains("val alias: NullableAlias = null"));
+
+    let error = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<KotlinxGenericProperty<Option<String>>>(),
+            IdentityFormat,
+        )
+        .expect_err("Kotlinx generic nullability depends on the instantiation");
+    assert!(error.to_string().contains("unconstrained generic"));
 
     let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)

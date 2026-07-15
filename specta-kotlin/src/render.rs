@@ -471,9 +471,11 @@ fn render_enum(
     let serde_untagged = enm.attributes.contains_key("serde:container:untagged");
     ensure_unique(
         path,
-        variants.iter().map(|(name, _)| {
-            safe_member_name(&convert_variant_name(kotlin.naming, name), "Variant")
-        }),
+        std::iter::once(name.to_owned())
+            .chain(generics.iter().cloned())
+            .chain(variants.iter().map(|(variant_name, _)| {
+                variant_declaration_name(kotlin, variant_name, name, generics)
+            })),
     )?;
     let unit_only = generics.is_empty()
         && variants.iter().all(|(name, variant)| {
@@ -569,10 +571,7 @@ fn render_variant(
     render_kdoc(out, &indent, &variant.docs);
     render_deprecated(out, &indent, variant.deprecated.as_ref());
     annotation(out, &indent, kotlin, "Serializable", None);
-    let converted = safe_member_name(
-        &convert_variant_name(kotlin.naming, original_name),
-        "Variant",
-    );
+    let converted = variant_declaration_name(kotlin, original_name, parent, generics);
     if converted != original_name {
         annotation(out, &indent, kotlin, "SerialName", Some(original_name));
     }
@@ -722,9 +721,9 @@ fn render_property(
     let nullable = field
         .ty
         .as_ref()
-        .map(|ty| datatype_is_nullable(format, types, ty, path, &mut Vec::new()))
+        .map(|ty| datatype_nullability(format, types, ty, path, &mut Vec::new()))
         .transpose()?
-        .unwrap_or(false);
+        .is_some_and(|nullability| nullability == Nullability::Nullable);
     render_kdoc(out, &indent, &field.docs);
     render_deprecated(out, &indent, field.deprecated.as_ref());
     let converted = safe_member_name(
@@ -763,7 +762,14 @@ fn field_datatype(
         reason: "skipped field cannot be rendered",
     })?;
     let mut rendered = datatype(kotlin, format, types, ty, generic_scope, path)?;
-    let nullable = datatype_is_nullable(format, types, ty, path, &mut Vec::new())?;
+    let nullability = datatype_nullability(format, types, ty, path, &mut Vec::new())?;
+    if kotlin.serialization == Serialization::Kotlinx && nullability == Nullability::Generic {
+        return Err(Error::UnsupportedType {
+            path: path.into(),
+            reason: "Kotlinx missing-field behavior cannot be inferred for an unconstrained generic",
+        });
+    }
+    let nullable = nullability == Nullability::Nullable;
     if kotlin.serialization == Serialization::Kotlinx && field.optional && !nullable {
         return Err(Error::UnsupportedType {
             path: path.into(),
@@ -776,33 +782,44 @@ fn field_datatype(
     Ok(rendered)
 }
 
-fn datatype_is_nullable(
-    format: Option<&dyn Format>,
-    types: &Types,
-    dt: &DataType,
-    path: &str,
-    visited: &mut Vec<*const NamedDataType>,
-) -> Result<bool, Error> {
-    let mapped = map_datatype(format, types, dt)?;
-    datatype_is_nullable_mapped(format, types, &mapped, path, visited)
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Nullability {
+    Nullable,
+    NonNullable,
+    Generic,
 }
 
-fn datatype_is_nullable_mapped(
+fn datatype_nullability(
     format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
     path: &str,
     visited: &mut Vec<*const NamedDataType>,
-) -> Result<bool, Error> {
+) -> Result<Nullability, Error> {
+    let mapped = map_datatype(format, types, dt)?;
+    datatype_nullability_mapped(format, types, &mapped, path, visited)
+}
+
+fn datatype_nullability_mapped(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    path: &str,
+    visited: &mut Vec<*const NamedDataType>,
+) -> Result<Nullability, Error> {
     let DataType::Reference(Reference::Named(reference)) = dt else {
-        return Ok(matches!(dt, DataType::Nullable(_)));
+        return Ok(match dt {
+            DataType::Nullable(_) => Nullability::Nullable,
+            DataType::Generic(_) => Nullability::Generic,
+            _ => Nullability::NonNullable,
+        });
     };
 
     match &reference.inner {
         NamedReferenceType::Inline { dt, .. } => {
-            return datatype_is_nullable(format, types, dt, path, visited);
+            return datatype_nullability(format, types, dt, path, visited);
         }
-        NamedReferenceType::Recursive(_) => return Ok(false),
+        NamedReferenceType::Recursive(_) => return Ok(Nullability::NonNullable),
         NamedReferenceType::Reference { .. } => {}
     }
 
@@ -811,14 +828,14 @@ fn datatype_is_nullable_mapped(
         .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
     let pointer = ndt as *const NamedDataType;
     if visited.contains(&pointer) {
-        return Ok(false);
+        return Ok(Nullability::NonNullable);
     }
     let Some(original) = &ndt.ty else {
-        return Ok(false);
+        return Ok(Nullability::NonNullable);
     };
     let mut aliased = map_datatype(format, types, original)?;
     if matches!(aliased, DataType::Struct(_) | DataType::Enum(_)) {
-        return Ok(false);
+        return Ok(Nullability::NonNullable);
     }
 
     if let NamedReferenceType::Reference { generics, .. } = &reference.inner {
@@ -833,7 +850,7 @@ fn datatype_is_nullable_mapped(
     }
 
     visited.push(pointer);
-    let nullable = datatype_is_nullable_mapped(format, types, &aliased, path, visited);
+    let nullable = datatype_nullability_mapped(format, types, &aliased, path, visited);
     visited.pop();
     nullable
 }
@@ -1363,6 +1380,20 @@ fn convert_variant_name(convention: NamingConvention, name: &str) -> String {
         NamingConvention::Preserve | NamingConvention::PascalCase => pascal_case(name),
         NamingConvention::CamelCase => camel_case(name),
         NamingConvention::SnakeCase => snake_case(name),
+    }
+}
+
+fn variant_declaration_name(
+    kotlin: &Kotlin,
+    original: &str,
+    parent: &str,
+    generics: &[String],
+) -> String {
+    let converted = safe_member_name(&convert_variant_name(kotlin.naming, original), "Variant");
+    if converted == parent || generics.iter().any(|generic| generic == &converted) {
+        format!("{converted}Variant")
+    } else {
+        converted
     }
 }
 
