@@ -18,6 +18,12 @@ struct Inner1 {
     x: i32,
 }
 
+impl Inner1 {
+    fn is_zero(&self) -> bool {
+        self.x == 0
+    }
+}
+
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Inner2 {
@@ -34,11 +40,41 @@ struct FlatOpt {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlatConditional {
+    a: i32,
+    #[serde(flatten, skip_serializing_if = "Inner1::is_zero")]
+    inner: Inner1,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "t")]
 enum InternalFlattenOpt {
     A {
         #[serde(flatten)]
         inner: Option<Inner1>,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalFlattenConditional {
+    A {
+        #[serde(flatten, skip_serializing_if = "Inner1::is_zero")]
+        inner: Inner1,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalFlattenConditionalAlias {
+    A {
+        #[serde(alias = "old_value")]
+        value: String,
+        #[serde(flatten, skip_serializing_if = "Inner1::is_zero")]
+        inner: Inner1,
     },
 }
 
@@ -147,6 +183,33 @@ fn flat_opt_serde_evidence() {
 
     let de_some: FlatOpt = serde_json::from_str(r#"{"a":1,"x":2}"#).unwrap();
     assert_eq!(de_some.inner.unwrap().x, 2);
+}
+
+#[test]
+fn conditional_flatten_serde_evidence() {
+    assert_eq!(
+        serde_json::to_string(&FlatConditional {
+            a: 1,
+            inner: Inner1 { x: 0 },
+        })
+        .unwrap(),
+        r#"{"a":1}"#,
+    );
+    assert_eq!(
+        serde_json::to_string(&InternalFlattenConditional::A {
+            inner: Inner1 { x: 0 },
+        })
+        .unwrap(),
+        r#"{"t":"A"}"#,
+    );
+    assert_eq!(
+        serde_json::to_string(&InternalFlattenConditionalAlias::A {
+            value: "current".into(),
+            inner: Inner1 { x: 0 },
+        })
+        .unwrap(),
+        r#"{"t":"A","value":"current"}"#,
+    );
 }
 
 #[test]
@@ -345,6 +408,45 @@ fn flat_opt_exports_union_instead_of_nullable_intersection() {
         rendered.contains(expected),
         "expected:\n{expected}\n\ngot:\n{rendered}"
     );
+}
+
+#[test]
+fn conditional_flatten_exports_optional_union() {
+    let types = Types::default()
+        .register::<FlatConditional>()
+        .register::<InternalFlattenConditional>()
+        .register::<InternalFlattenConditionalAlias>();
+    let rendered = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect("export should succeed");
+
+    for expected in [
+        "export type FlatConditional = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
+        "export type InternalFlattenConditional = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
+        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n});",
+    ] {
+        assert!(
+            rendered.contains(expected),
+            "expected:\n{expected}\n\ngot:\n{rendered}"
+        );
+    }
+
+    let phased = Typescript::default()
+        .export(&types, specta_serde::PhasesFormat)
+        .expect("phased export should succeed");
+    for expected in [
+        "export type FlatConditional_Serialize = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
+        "export type FlatConditional_Deserialize = {\n\ta: number,\n} & Inner1;",
+        "export type InternalFlattenConditional_Serialize = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
+        "export type InternalFlattenConditional_Deserialize = {\n\tt: \"A\",\n} & Inner1;",
+        "export type InternalFlattenConditionalAlias_Serialize = {\n\tt: \"A\",\n} & {\n\tvalue: string,\n} & Inner1 | {\n\tt: \"A\",\n} & {\n\tvalue: string,\n};",
+        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1;",
+    ] {
+        assert!(
+            phased.contains(expected),
+            "expected:\n{expected}\n\ngot:\n{phased}"
+        );
+    }
 }
 
 #[test]

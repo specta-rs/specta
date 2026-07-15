@@ -149,9 +149,11 @@ pub enum Phase {
 /// container, variant, and field behavior that affects the exported shape, such
 /// as renames, tagging, defaults, flattening, and compatible conversion attrs.
 ///
-/// If serde metadata produces different serialize and deserialize shapes, this
-/// formatter returns an error instead of guessing. In that case, use
-/// [`PhasesFormat`].
+/// When a single safe type can contain both directions, this formatter widens
+/// the shared shape. For example, conditional serialization makes a field
+/// optional and aliases add accepted names. Use [`PhasesFormat`] when consumers
+/// need exact directional shapes or when the two directions cannot be safely
+/// unified.
 pub struct Format;
 
 impl specta::Format for Format {
@@ -887,6 +889,8 @@ fn rewrite_datatype_for_phase(
                 Fields::Unnamed(unnamed) if !container_transparent => Some(unnamed.fields.len()),
                 Fields::Unit | Fields::Named(_) | Fields::Unnamed(_) => None,
             };
+            let conditional_omission_applies = !container_transparent
+                && !matches!(&s.fields, Fields::Unnamed(unnamed) if unnamed.fields.len() == 1);
 
             rewrite_fields_for_phase(
                 &mut s.fields,
@@ -900,6 +904,7 @@ fn rewrite_datatype_for_phase(
                 // `ty: None` slots across later passes; see
                 // `PRESERVED_ARITY_PAYLOAD_MARKER`.
                 s.attributes.contains_key(PRESERVED_ARITY_PAYLOAD_MARKER),
+                conditional_omission_applies,
             )?;
 
             // A declared-multi-field tuple struct stays an array even when
@@ -933,21 +938,26 @@ fn rewrite_datatype_for_phase(
 
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
             normalize_container_attrs_for_phase(&mut s.attributes, mode)?;
-            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
+            if let Some(intersection) = lower_flattened_struct(s, mode)? {
                 *ty = intersection;
                 return Ok(());
             }
-            if let Some(intersection) = lower_flattened_struct(s)? {
+            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
                 *ty = intersection;
             }
         }
         DataType::Enum(e) => {
             filter_enum_variants_for_phase(e, mode)?;
             let container_attrs = SerdeContainerAttrs::from_attributes(&e.attributes)?;
+            let repr = EnumRepr::from_attrs(&e.attributes)?;
 
             for (variant_name, variant) in &mut e.variants {
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, variant_name)?;
+                let conditional_omission_applies = !matches!(
+                    &variant.fields,
+                    Fields::Unnamed(unnamed) if unnamed.fields.len() == 1
+                );
 
                 rewrite_fields_for_phase(
                     &mut variant.fields,
@@ -958,10 +968,27 @@ fn rewrite_datatype_for_phase(
                     rename_rule,
                     false,
                     true,
+                    conditional_omission_applies,
                 )?;
 
-                if let Some(aliases) = lower_field_aliases_for_phase(&mut variant.fields, mode)? {
-                    variant.fields = Variant::unnamed().field(Field::new(aliases)).build().fields;
+                let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
+                    if named.fields.iter().any(|(_, field)| field_is_flattened(field))
+                        && named.fields.iter().any(|(_, field)| field_has_aliases(field)));
+
+                let lowered = if has_flattened_aliases {
+                    if matches!(&repr, EnumRepr::Internal { .. }) {
+                        None
+                    } else {
+                        let mut strct = Struct::unit();
+                        std::mem::swap(&mut strct.fields, &mut variant.fields);
+                        lower_flattened_struct(&mut strct, mode)?
+                    }
+                } else {
+                    lower_field_aliases_for_phase(&mut variant.fields, mode)?
+                };
+
+                if let Some(lowered) = lowered {
+                    variant.fields = Variant::unnamed().field(Field::new(lowered)).build().fields;
                 }
             }
 
@@ -1055,7 +1082,10 @@ fn rewrite_datatype_for_phase(
     Ok(())
 }
 
-fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error> {
+fn lower_flattened_struct(
+    strct: &mut Struct,
+    mode: PhaseRewrite,
+) -> Result<Option<DataType>, Error> {
     let Fields::Named(named) = &mut strct.fields else {
         return Ok(None);
     };
@@ -1082,9 +1112,11 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
                 // it can become a union branch instead of being merged
                 // unconditionally into the intersection - see
                 // `flatten_intersection_with_optionals` for why.
-                match strip_nullable(ty) {
-                    (inner, true) => optional.push(inner),
-                    (ty, false) => mandatory.push(ty),
+                let (ty, was_nullable) = strip_nullable(ty);
+                if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER) || was_nullable {
+                    optional.push(ty);
+                } else {
+                    mandatory.push(ty);
                 }
             }
         } else {
@@ -1098,7 +1130,9 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
     };
     if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
         base.attributes = strct.attributes.clone();
-        mandatory.insert(0, DataType::Struct(base));
+        let base = lower_field_aliases_for_phase(&mut base.fields, mode)?
+            .unwrap_or(DataType::Struct(base));
+        mandatory.insert(0, base);
     }
 
     Ok(Some(flatten_intersection_with_optionals(
@@ -1119,8 +1153,8 @@ fn strip_nullable(mut ty: DataType) -> (DataType, bool) {
     (ty, was_nullable)
 }
 
-/// Builds the `DataType` for a flattened intersection where some parts came
-/// from `#[serde(flatten)]`-ed `Option<T>` fields.
+/// Builds the `DataType` for a flattened intersection where some parts can be
+/// absent because they are `Option<T>` or use `skip_serializing_if`.
 ///
 /// Serde contributes nothing for a flattened `Option<T>` field when it's
 /// `None`, and merges `T`'s fields when it's `Some`. Naively intersecting the
@@ -1194,7 +1228,7 @@ fn lower_field_aliases_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
 ) -> Result<Option<DataType>, Error> {
-    if mode != PhaseRewrite::Deserialize {
+    if !matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize) {
         return Ok(None);
     }
 
@@ -1289,10 +1323,18 @@ fn rewrite_fields_for_phase(
     rename_all_rule: Option<RenameRule>,
     container_default: bool,
     preserve_skipped_unnamed_fields: bool,
+    conditional_omission_applies: bool,
 ) -> Result<(), Error> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
+            // Compute this before rewriting consumes `skip_serializing_if`.
+            // If skipped slots collapse a declared tuple to one live field,
+            // retaining the markers is what lets the renderer keep both the
+            // sequence shape and that field's trailing optional marker.
+            let preserve_conditional_skip_slots =
+                unnamed_conditional_skip_slots_need_preserving(unnamed, mode)?;
+
             for field in &mut unnamed.fields {
                 if should_skip_field_for_mode(field, mode)? {
                     // Always demote to a `ty: None` marker: an explicit
@@ -1307,10 +1349,18 @@ fn rewrite_fields_for_phase(
                 }
 
                 apply_field_attrs(field, mode, container_default)?;
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
+                rewrite_field_for_phase(
+                    field,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    conditional_omission_applies,
+                )?;
             }
 
             if !preserve_skipped_unnamed_fields
+                && !preserve_conditional_skip_slots
                 && !unnamed_skip_slots_need_preserving(unnamed, container_default)?
             {
                 unnamed.fields.retain(|field| field.ty.as_ref().is_some());
@@ -1341,7 +1391,14 @@ fn rewrite_fields_for_phase(
                     *name = Cow::Owned(key);
                 }
 
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
+                rewrite_field_for_phase(
+                    field,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    conditional_omission_applies,
+                )?;
             }
         }
     }
@@ -1385,14 +1442,21 @@ fn rewrite_field_for_phase(
     original_types: &Types,
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
+    conditional_omission_applies: bool,
 ) -> Result<(), Error> {
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)?
         && attrs.skip_serializing_if.is_some()
     {
-        if let PhaseRewrite::Serialize = mode {
+        if conditional_omission_applies
+            && matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize)
+        {
             field.optional = true;
+            if attrs.flatten {
+                field.attributes.insert(CONDITIONAL_OMISSION_MARKER, true);
+            }
 
-            if attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
+            if mode == PhaseRewrite::Serialize
+                && attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
                 && let Some(DataType::Nullable(inner)) = field.ty.take()
             {
                 field.ty = Some(*inner);
@@ -1648,6 +1712,28 @@ fn unnamed_skip_slots_need_preserving(
     Ok(false)
 }
 
+fn unnamed_conditional_skip_slots_need_preserving(
+    unnamed: &UnnamedFields,
+    mode: PhaseRewrite,
+) -> Result<bool, Error> {
+    if unnamed.fields.len() <= 1 {
+        return Ok(false);
+    }
+
+    let mut has_skipped_slot = false;
+    let mut has_live_conditional_omission = false;
+    for field in &unnamed.fields {
+        let skipped = field.ty.is_none() || should_skip_field_for_mode(field, mode)?;
+        has_skipped_slot |= skipped;
+        has_live_conditional_omission |= !skipped
+            && (field.optional
+                || SerdeFieldAttrs::from_attributes(&field.attributes)?
+                    .is_some_and(|attrs| attrs.skip_serializing_if.is_some()));
+    }
+
+    Ok(has_skipped_slot && has_live_conditional_omission)
+}
+
 fn skipped_field_marker(field: &Field) -> Field {
     let mut skipped = Field::default();
     skipped.optional = field.optional;
@@ -1697,6 +1783,11 @@ const ENUM_OTHER_VARIANT_MARKER: &str = "specta_serde:variant_other";
 /// by keeping those marker slots instead of applying the default
 /// live-fields-only retain for unnamed structs.
 const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_payload";
+
+/// Marks flattened fields whose payload may be absent from serialization.
+/// `Field::optional` cannot carry this distinction because serde defaults can
+/// also set it, while defaults do not make flattened payloads optional.
+const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
@@ -1752,13 +1843,13 @@ fn rewrite_enum_repr_for_phase(
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
         let aliases = variant_attrs
             .as_ref()
-            .filter(|_| mode == PhaseRewrite::Deserialize)
+            .filter(|_| matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize))
             .map(|attrs| attrs.aliases.as_slice())
             .unwrap_or(&[]);
         let names = std::iter::once(serialized_name).chain(aliases.iter().cloned());
 
         for serialized_name in names {
-            let widen_tag = mode == PhaseRewrite::Deserialize
+            let widen_tag = matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize)
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {
@@ -1770,6 +1861,7 @@ fn rewrite_enum_repr_for_phase(
                     &variant,
                     original_types,
                     widen_tag,
+                    mode,
                 )?,
                 EnumRepr::Adjacent { tag, content } => {
                     if tag == content {
@@ -2335,6 +2427,7 @@ fn transform_internal_variant(
     variant: &Variant,
     original_types: &Types,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
@@ -2370,9 +2463,13 @@ fn transform_internal_variant(
                             // a flattened `Option<T>` field needs to become a
                             // union branch rather than an unconditional
                             // intersection part.
-                            match strip_nullable(ty) {
-                                (inner, true) => optional_parts.push(inner),
-                                (ty, false) => mandatory_parts.push(ty),
+                            let (ty, was_nullable) = strip_nullable(ty);
+                            if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER)
+                                || was_nullable
+                            {
+                                optional_parts.push(ty);
+                            } else {
+                                mandatory_parts.push(ty);
                             }
                         }
                     } else {
@@ -2382,7 +2479,13 @@ fn transform_internal_variant(
                 let mut mandatory = Vec::with_capacity(mandatory_parts.len() + 2);
                 mandatory.push(named_fields_datatype(fields));
                 if !leftover.is_empty() {
-                    mandatory.push(named_fields_datatype(leftover));
+                    let DataType::Struct(mut leftover) = named_fields_datatype(leftover) else {
+                        unreachable!("named_fields_datatype always builds a struct")
+                    };
+                    mandatory.push(
+                        lower_field_aliases_for_phase(&mut leftover.fields, mode)?
+                            .unwrap_or(DataType::Struct(leftover)),
+                    );
                 }
                 mandatory.extend(mandatory_parts);
                 return Ok(clone_variant_with_unnamed_fields(

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use specta::{
     Types,
@@ -136,6 +136,11 @@ fn inner(
             )?;
         }
         DataType::Struct(strct) => {
+            let container_attrs = SerdeContainerAttrs::from_attributes(&strct.attributes)?;
+            let declared_deserialize_live = root_directions.deserialize
+                && !container_attrs.as_ref().is_some_and(|attrs| {
+                    attrs.resolved_from.is_some() || attrs.resolved_try_from.is_some()
+                });
             validate_container_attributes(
                 &strct.attributes,
                 types,
@@ -145,7 +150,7 @@ fn inner(
                 env,
                 root_directions,
             )?;
-            if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
+            if let Some(attrs) = &container_attrs {
                 if attrs.variant_identifier || attrs.field_identifier {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -197,6 +202,13 @@ fn inner(
             match &strct.fields {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
+                    if root_directions.serialize
+                        && !container_attrs
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.resolved_into.is_some())
+                    {
+                        validate_unnamed_conditional_omission(unnamed, &path)?;
+                    }
                     for (idx, (field, _)) in unnamed
                         .fields
                         .iter()
@@ -228,6 +240,7 @@ fn inner(
                         named,
                         struct_field_key_rules(&strct.attributes, &path)?,
                         &path,
+                        declared_deserialize_live,
                         mode,
                     )?;
                     for (name, (field, ty)) in named
@@ -266,6 +279,17 @@ fn inner(
             }
         }
         DataType::Enum(enm) => {
+            let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
+            let declared_directions = FlattenDirections {
+                serialize: root_directions.serialize
+                    && !container_attrs
+                        .as_ref()
+                        .is_some_and(|attrs| attrs.resolved_into.is_some()),
+                deserialize: root_directions.deserialize
+                    && !container_attrs.as_ref().is_some_and(|attrs| {
+                        attrs.resolved_from.is_some() || attrs.resolved_try_from.is_some()
+                    }),
+            };
             // Untagged enums never emit variant names, so attrs that only
             // rename variant labels are not part of the wire shape for them.
             let variant_names_emitted =
@@ -279,7 +303,6 @@ fn inner(
                 env,
                 root_directions,
             )?;
-            let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
             if container_attrs.as_ref().is_some_and(|attrs| attrs.default) {
                 return Err(Error::invalid_phased_type_usage(
                     path,
@@ -287,7 +310,22 @@ fn inner(
                 ));
             }
             validate_identifier_enum(enm, &path, mode)?;
-            validate_enum(enm, types, path.clone(), mode)?;
+            validate_enum(
+                enm,
+                types,
+                path.clone(),
+                mode,
+                declared_directions.deserialize,
+            )?;
+            if variant_names_emitted {
+                validate_variant_aliases(
+                    enm,
+                    &container_attrs,
+                    &path,
+                    declared_directions.deserialize,
+                    mode,
+                )?;
+            }
 
             for (variant_name, variant) in &enm.variants {
                 let variant_is_rendered = variant_is_rendered(variant)?;
@@ -305,6 +343,7 @@ fn inner(
                                 named,
                                 variant_field_key_rules(&container_attrs, variant, variant_name)?,
                                 &format!("{path}::{variant_name}"),
+                                declared_directions.deserialize && variant_directions.deserialize,
                                 mode,
                             )?;
                         }
@@ -343,6 +382,12 @@ fn inner(
                         }
                     }
                     Fields::Unnamed(unnamed) => {
+                        if declared_directions.serialize && variant_is_serialized(variant)? {
+                            validate_unnamed_conditional_omission(
+                                unnamed,
+                                &format!("{path}::{variant_name}"),
+                            )?;
+                        }
                         for (idx, (field, _)) in
                             unnamed
                                 .fields
@@ -672,12 +717,6 @@ fn validate_variant_attributes(
 
     let has_type_override = has_type_override(&variant.attributes);
 
-    if mode == ApplyMode::Unified && !serde_attrs.aliases.is_empty() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(alias = ...)]` requires `PhasesFormat` because aliases widen deserialize-only input shape",
-        ));
-    }
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
@@ -761,12 +800,14 @@ fn validate_named_field_keys(
     named: &NamedFields,
     (rule_serialize, rule_deserialize): (Option<RenameRule>, Option<RenameRule>),
     path: &str,
+    declared_deserialize_live: bool,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    if mode != ApplyMode::Unified {
+    if mode != ApplyMode::Unified || !declared_deserialize_live {
         return Ok(());
     }
 
+    let mut occupied_deserialize_keys = HashMap::new();
     for (name, field) in &named.fields {
         if !field_has_live_key(field)? {
             continue;
@@ -793,6 +834,31 @@ fn validate_named_field_keys(
                 Some(serialize_key),
                 Some(deserialize_key),
             ));
+        }
+
+        occupied_deserialize_keys.insert(deserialize_key, name.as_ref());
+    }
+
+    for (name, field) in &named.fields {
+        if !field_has_live_key(field)? {
+            continue;
+        }
+
+        let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+            continue;
+        };
+        for alias in attrs.aliases {
+            if let Some(owner) = occupied_deserialize_keys.get(alias.as_str())
+                && *owner != name.as_ref()
+            {
+                return Err(Error::invalid_phased_type_usage(
+                    format!("{path}.{name}"),
+                    format!(
+                        "field alias `{alias}` collides with a key already accepted by `{owner}`; unified alias lowering cannot represent serde's key precedence safely"
+                    ),
+                ));
+            }
+            occupied_deserialize_keys.insert(alias, name.as_ref());
         }
     }
 
@@ -846,6 +912,58 @@ fn validate_variant_key(
     Ok(())
 }
 
+fn validate_variant_aliases(
+    enm: &Enum,
+    container_attrs: &Option<SerdeContainerAttrs>,
+    path: &str,
+    declared_deserialize_live: bool,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    if mode != ApplyMode::Unified || !declared_deserialize_live {
+        return Ok(());
+    }
+
+    let mut occupied_deserialize_names = HashMap::new();
+    for (name, variant) in &enm.variants {
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if !FlattenDirections::for_variant(variant)?.deserialize
+            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+        {
+            continue;
+        }
+
+        occupied_deserialize_names.insert(
+            serialized_variant_name(name, variant, container_attrs, PhaseRewrite::Deserialize)?,
+            name.as_ref(),
+        );
+    }
+
+    for (name, variant) in &enm.variants {
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if !FlattenDirections::for_variant(variant)?.deserialize
+            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+        {
+            continue;
+        }
+
+        for alias in attrs.into_iter().flat_map(|attrs| attrs.aliases) {
+            if let Some(owner) = occupied_deserialize_names.get(alias.as_str())
+                && *owner != name.as_ref()
+            {
+                return Err(Error::invalid_phased_type_usage(
+                    format!("{path}::{name}"),
+                    format!(
+                        "variant alias `{alias}` collides with a name already accepted by `{owner}`; unified alias lowering cannot represent serde's name precedence safely"
+                    ),
+                ));
+            }
+            occupied_deserialize_names.insert(alias, name.as_ref());
+        }
+    }
+
+    Ok(())
+}
+
 /// Whether the variant is rendered in at least one phase. `#[specta(skip)]`
 /// variants (also set by `#[serde(skip)]` at derive time) and variants
 /// serde-skipped in both directions are dropped by
@@ -859,6 +977,15 @@ fn variant_is_rendered(variant: &Variant) -> Result<bool, Error> {
 
     Ok(!SerdeVariantAttrs::from_attributes(&variant.attributes)?
         .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
+}
+
+fn variant_is_serialized(variant: &Variant) -> Result<bool, Error> {
+    if variant.skip {
+        return Ok(false);
+    }
+
+    Ok(!SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing))
 }
 
 /// Whether a named field's *key* is part of the local wire shape: excludes
@@ -906,13 +1033,6 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
 
     let has_type_override = has_type_override(&field.attributes);
 
-    if mode == ApplyMode::Unified && !serde_attrs.aliases.is_empty() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(alias = ...)]` requires `PhasesFormat` because aliases widen deserialize-only input shape",
-        ));
-    }
-
     if serde_attrs.has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
@@ -923,14 +1043,43 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         ensure_codec_override(has_type_override, &path, "with")?;
     }
 
-    if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`skip_serializing_if` requires `PhasesFormat` because unified mode cannot represent conditional omission",
-        ));
+    Ok(())
+}
+
+fn validate_unnamed_conditional_omission(
+    unnamed: &specta::datatype::UnnamedFields,
+    path: &str,
+) -> Result<(), Error> {
+    let mut conditional_omission = None;
+    for (idx, field) in unnamed.fields.iter().enumerate() {
+        if unnamed_field_is_absent_from_serialization(field)? {
+            continue;
+        }
+
+        if let Some(omitted_idx) = conditional_omission {
+            return Err(Error::invalid_phased_type_usage(
+                format!("{path}[{omitted_idx}]"),
+                "`skip_serializing_if` on an unnamed field is only representable on the final live field because omitting an earlier element shifts every following value",
+            ));
+        }
+
+        let has_skip_serializing_if = SerdeFieldAttrs::from_attributes(&field.attributes)?
+            .is_some_and(|attrs| attrs.skip_serializing_if.is_some());
+        if has_skip_serializing_if {
+            conditional_omission = Some(idx);
+        }
     }
 
     Ok(())
+}
+
+fn unnamed_field_is_absent_from_serialization(field: &Field) -> Result<bool, Error> {
+    if field.ty.is_none() {
+        return Ok(true);
+    }
+
+    Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing))
 }
 
 /// Validates a `#[serde(flatten)]`-ed field's own type, independent of the
@@ -1579,7 +1728,13 @@ fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
         .unwrap_or(false)
 }
 
-fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<(), Error> {
+fn validate_enum(
+    enm: &Enum,
+    types: &Types,
+    path: String,
+    mode: ApplyMode,
+    declared_deserializes: bool,
+) -> Result<(), Error> {
     let valid_variants = enm
         .variants
         .iter()
@@ -1595,7 +1750,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
     let repr = EnumRepr::from_attrs(&enm.attributes)?;
 
     validate_untagged_variants(enm, &path)?;
-    validate_other_variant(enm, &path, &repr, mode)?;
+    validate_other_variant(enm, &path, &repr, mode, declared_deserializes)?;
     validate_adjacent_collapsed_newtype_variants(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
@@ -1698,10 +1853,13 @@ fn validate_other_variant(
     path: &str,
     repr: &EnumRepr,
     mode: ApplyMode,
+    declared_deserializes: bool,
 ) -> Result<(), Error> {
     let mut other_variants = Vec::new();
     for (name, variant) in &enm.variants {
-        if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.other)
+        if variant_is_rendered(variant)?
+            && SerdeVariantAttrs::from_attributes(&variant.attributes)?
+                .is_some_and(|attrs| attrs.other)
         {
             other_variants.push((name, variant));
         }
@@ -1711,10 +1869,10 @@ fn validate_other_variant(
         return Ok(());
     }
 
-    if mode == ApplyMode::Unified {
+    if mode == ApplyMode::Unified && declared_deserializes {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`#[serde(other)]` requires `PhasesFormat` because it widens deserialize-only input shape",
+            "`#[serde(other)]` requires `PhasesFormat` because a shared tag type cannot exclude known variants soundly",
         ));
     }
 

@@ -1066,7 +1066,15 @@ fn render_datatype(
                 if idx != 0 {
                     s.push_str(" & ");
                 }
+
+                let needs_parentheses = parts.len() > 1 && intersection_part_is_union(ty);
+                if needs_parentheses {
+                    s.push('(');
+                }
                 render_datatype(s, ctx, ty, location.clone(), mode)?;
+                if needs_parentheses {
+                    s.push(')');
+                }
             }
         }
         (RenderMode::ShallowInline, DataType::Intersection(parts)) => intersection_dt(
@@ -1142,6 +1150,15 @@ fn push_list(s: &mut String, ty: &str, length: Option<usize>) {
     } else {
         s.push_str(&ty);
         s.push_str("[]");
+    }
+}
+
+fn intersection_part_is_union(ty: &DataType) -> bool {
+    match ty {
+        DataType::Nullable(_) => true,
+        DataType::Enum(enm) => enm.variants.len() > 1,
+        DataType::Intersection(parts) if parts.len() == 1 => intersection_part_is_union(&parts[0]),
+        _ => false,
     }
 }
 

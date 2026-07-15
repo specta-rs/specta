@@ -1,6 +1,0 @@
----
-source: tests/tests/maybe_undefined.rs
-assertion_line: 102
-expression: err.to_string()
----
-Format error: type graph formatter failed: Invalid phased type usage at 'UpdateUser.name': `skip_serializing_if` requires `PhasesFormat` because unified mode cannot represent conditional omission
