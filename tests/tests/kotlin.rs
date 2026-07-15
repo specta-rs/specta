@@ -139,6 +139,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         )
         .expect("plain records have compatible Kotlinx declarations");
     assert!(supported.contains("@Serializable"));
+    assert!(supported.contains("@EncodeDefault"));
     assert!(supported.contains("val maybe: String? = null"));
 
     let error = Kotlin::default()

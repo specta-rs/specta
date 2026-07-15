@@ -29,12 +29,16 @@ pub(crate) fn render_file(
         out.push_str(kotlin.header.trim_end());
         out.push_str("\n\n");
     }
+    if kotlin.serialization == Serialization::Kotlinx {
+        out.push_str("@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\n");
+    }
     if let Some(package) = &kotlin.package {
         out.push_str("package ");
         out.push_str(&package_name(package)?);
         out.push_str("\n\n");
     }
     if kotlin.serialization == Serialization::Kotlinx {
+        out.push_str("import kotlinx.serialization.EncodeDefault\n");
         out.push_str("import kotlinx.serialization.SerialName\n");
         out.push_str("import kotlinx.serialization.Serializable\n\n");
     }
@@ -542,6 +546,7 @@ fn render_property(
     depth: usize,
 ) -> Result<(), Error> {
     let indent = kotlin.indentation(depth);
+    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path)?;
     render_kdoc(out, &indent, &field.docs);
     render_deprecated(out, &indent, field.deprecated.as_ref());
     let converted = safe_member_name(
@@ -551,13 +556,16 @@ fn render_property(
     if converted != original_name {
         annotation(out, &indent, kotlin, "SerialName", Some(original_name));
     }
+    if kotlin.serialization == Serialization::Kotlinx && rendered.ends_with('?') && !field.optional
+    {
+        annotation(out, &indent, kotlin, "EncodeDefault", None);
+    }
     out.push_str(&indent);
     out.push_str("public ");
     out.push_str(property_keyword(kotlin));
     out.push(' ');
     out.push_str(&identifier(&converted, path)?);
     out.push_str(": ");
-    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path)?;
     out.push_str(&rendered);
     if field.optional || (kotlin.serialization == Serialization::Kotlinx && rendered.ends_with('?'))
     {
@@ -738,13 +746,13 @@ fn primitive_name(primitive: &Primitive) -> &'static str {
     match primitive {
         Primitive::i8 => "Byte",
         Primitive::i16 => "Short",
-        Primitive::i32 | Primitive::isize => "Int",
-        Primitive::i64 => "Long",
+        Primitive::i32 => "Int",
+        Primitive::i64 | Primitive::isize => "Long",
         Primitive::i128 => "java.math.BigInteger",
         Primitive::u8 => "UByte",
         Primitive::u16 => "UShort",
-        Primitive::u32 | Primitive::usize => "UInt",
-        Primitive::u64 => "ULong",
+        Primitive::u32 => "UInt",
+        Primitive::u64 | Primitive::usize => "ULong",
         Primitive::u128 => "java.math.BigInteger",
         Primitive::f16 | Primitive::f32 => "Float",
         Primitive::f64 => "Double",
