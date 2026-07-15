@@ -696,6 +696,37 @@ fn python_rejects_normalized_generic_parameter_collisions() {
 }
 
 #[test]
+fn python_rejects_generic_parameters_shadowing_concrete_references() {
+    use specta::datatype::{Field, GenericDefinition, NamedDataType, Struct};
+
+    let mut types = Types::default();
+    let concrete = NamedDataType::new("T", &mut types, |_, datatype| {
+        datatype.ty = Some(Struct::unit().into());
+    });
+    NamedDataType::new("Wrapper", &mut types, |_, datatype| {
+        datatype.generics = vec![GenericDefinition::new("T".into(), None)].into();
+        datatype.ty = Some(
+            Struct::named()
+                .field(
+                    "concrete",
+                    Field::new(concrete.reference(Vec::new()).into()),
+                )
+                .build(),
+        );
+    });
+
+    let error = Python::default()
+        .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate exported Python name 'T'")
+    );
+    assert!(error.to_string().contains("generic parameter T"));
+}
+
+#[test]
 fn python_rejects_identifiers_with_invalid_original_characters() {
     let mut types = Types::default().register::<namespace_dunder::Secret>();
     types.iter_mut(|datatype| datatype.name = "℡".into());

@@ -882,6 +882,17 @@ fn reference_to_python(
                     ));
                 }
                 let name = referenced_type_name(ctx, ndt);
+                let normalized_name = normalized_identifier(&name);
+                if let Some(generic) = generics
+                    .iter()
+                    .find(|generic| normalized_identifier(generic.name()) == normalized_name)
+                {
+                    return Err(Error::duplicate_name(
+                        name,
+                        format!("generic parameter {}", generic.name()),
+                        rust_type_path(ndt),
+                    ));
+                }
                 if ndt.generics.is_empty() {
                     return Ok(name);
                 }
