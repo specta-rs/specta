@@ -692,9 +692,7 @@ fn untagged_variant_label_renames_are_not_direction_dependent_under_format() {
             &Types::default().register::<TaggedWithUntaggedVariantOneSidedRename>(),
             specta_serde::Format,
         )
-        .expect(
-            "one-sided rename on a variant-level untagged variant should export under Format",
-        );
+        .expect("one-sided rename on a variant-level untagged variant should export under Format");
     assert!(
         rendered.contains("{ A: string } | number"),
         "got: {rendered}"
@@ -890,7 +888,9 @@ fn directional_attrs_on_dead_variants_export_fine_under_format() {
         let rendered = Typescript::default()
             .export(&Types::default().register::<T>(), specta_serde::Format)
             .unwrap_or_else(|err| {
-                panic!("{name}: directional attrs on dead variants should export under Format: {err}")
+                panic!(
+                    "{name}: directional attrs on dead variants should export under Format: {err}"
+                )
             });
         // The dead variant must not appear in the unified output either.
         assert!(!rendered.contains('B'), "got: {rendered}");

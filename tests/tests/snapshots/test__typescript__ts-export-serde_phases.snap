@@ -231,16 +231,16 @@ export type EmptyStructWithTag = {
 	a: "EmptyStructWithTag",
 };
 
-export type Enum = { t: "A" } | { t: "B" };
+export type Enum2New = { t: "C" } | { t: "B" } | { t: "D"; enumField: null };
 
-export type Enum2 = { t: "C" } | { t: "B" } | { t: "D"; enumField: null };
-
-export type Enum3 = { t: "A"; b: string };
+export type Enum3New = { t: "A"; b: string };
 
 export type EnumMacroAttributes = ({ A: string }) & { D?: never; bbb?: never; cccc?: never } | ({ bbb: number }) & { A?: never; D?: never; cccc?: never } | ({ cccc: number }) & { A?: never; D?: never; bbb?: never } | ({ D: {
 	a: string,
 	bbbbbb: number,
 } }) & { A?: never; bbb?: never; cccc?: never };
+
+export type EnumNew = { t: "A" } | { t: "B" };
 
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -789,9 +789,9 @@ export type Primitives = {
 	BracedStruct: BracedStruct,
 	Struct: StructNew,
 	Struct2: Struct2,
-	Enum: Enum,
-	Enum2: Enum2,
-	Enum3: Enum3,
+	Enum: EnumNew,
+	Enum2: Enum2New,
+	Enum3: Enum3New,
 	StructRenameAllUppercase: StructRenameAllUppercase,
 	RenameSerdeSpecialChar: RenameSerdeSpecialChar,
 	EnumRenameAllUppercase: EnumRenameAllUppercase,

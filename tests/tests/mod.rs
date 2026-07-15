@@ -22,6 +22,7 @@ mod legacy_impls;
 mod maybe_undefined;
 mod references;
 mod semantic;
+mod serde_container_rename;
 mod serde_conversions;
 mod serde_enum_rewrite;
 mod serde_flatten_option;
