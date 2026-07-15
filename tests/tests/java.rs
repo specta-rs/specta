@@ -619,6 +619,26 @@ struct GenericNameCollision<T> {
     value: T,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineShadowInner {
+    concrete: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineShadowOuter {
+    #[specta(inline)]
+    t: InlineShadowInner,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ExplicitOptionalField {
+    #[specta(optional)]
+    count: i32,
+}
+
 #[test]
 fn normalized_generic_names_are_used_consistently() {
     let temp = temp_dir();
@@ -653,6 +673,43 @@ fn generic_names_do_not_capture_named_type_references() {
     assert!(source.contains("GenericNameCollision<TType>"));
     assert!(source.contains("T concrete"));
     assert!(source.contains("TType value"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn inline_declarations_do_not_capture_named_type_references() {
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default()
+                .register::<T>()
+                .register::<InlineShadowOuter>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("TInline t"));
+    assert!(source.contains("public record TInline("));
+    assert!(source.contains("T concrete"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn optional_fields_use_the_configured_optional_representation() {
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .optionals(OptionalStyle::Optional)
+        .export_to(
+            &path,
+            &Types::default().register::<ExplicitOptionalField>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("java.util.Optional<java.lang.Integer> count"));
     compile_java(temp.path(), &[&path]);
 }
 

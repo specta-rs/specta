@@ -542,7 +542,10 @@ fn rendered_field<'a>(
 ) -> Result<RenderedField<'a>, Error> {
     let field_path = format!("{path}.{name}");
     let java_name = value_identifier(name, &field_path)?;
-    let (ty, nested) = field_datatype(ctx, ty, &java_name, &field_path)?;
+    let (mut ty, nested) = field_datatype(ctx, ty, &java_name, &field_path)?;
+    if field.optional && !matches!(ty.as_str(), value if value.starts_with("java.util.Optional<")) {
+        ty = optional_type(ctx.java, ty);
+    }
     Ok(RenderedField {
         name: java_name,
         ty,
@@ -570,7 +573,7 @@ fn field_datatype(
     {
         return field_datatype(ctx, dt, field_name, path);
     }
-    let type_name = type_identifier(field_name, path)?;
+    let type_name = nested_type_identifier(ctx, field_name, path)?;
     let generic_names = ctx
         .generic_scope
         .iter()
@@ -659,6 +662,33 @@ fn field_datatype(
         _ => return Ok((datatype(ctx, datatype_value, path)?, None)),
     }
     Ok((format!("{type_name}{generics}"), Some(nested)))
+}
+
+fn nested_type_identifier(ctx: &Context<'_>, name: &str, path: &str) -> Result<String, Error> {
+    let base = type_identifier(name, path)?;
+    let mut occupied = ctx
+        .types
+        .into_sorted_iter()
+        .filter(|datatype| datatype.ty.is_some())
+        .map(|datatype| rendered_type_name(ctx.java, datatype))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    occupied.extend(
+        ctx.generic_scope
+            .iter()
+            .map(|generic| generic.identifier.clone()),
+    );
+    occupied.insert(class_name(ctx.java)?);
+    if !occupied.contains(&base) {
+        return Ok(base);
+    }
+
+    let mut identifier = format!("{base}Inline");
+    let mut suffix = 2;
+    while occupied.contains(&identifier) {
+        identifier = format!("{base}Inline{suffix}");
+        suffix += 1;
+    }
+    Ok(identifier)
 }
 
 struct Context<'a> {
