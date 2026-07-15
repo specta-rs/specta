@@ -1922,8 +1922,11 @@ fn primitive_name(primitive: &Primitive) -> &'static str {
 }
 
 fn opaque_name(name: &str) -> Option<&'static str> {
+    if name.starts_with("chrono::datetime::DateTime<") {
+        return Some("global::System.DateTimeOffset");
+    }
     Some(match name {
-        "String" | "str" => "string",
+        "String" | "alloc::string::String" | "std::string::String" | "str" => "string",
         "char" => "char",
         "bool" => "bool",
         "i8" => "sbyte",
@@ -1936,9 +1939,13 @@ fn opaque_name(name: &str) -> Option<&'static str> {
         "u64" => "ulong",
         "f32" => "float",
         "f64" => "double",
-        "Uuid" | "UUID" => "global::System.Guid",
-        "Duration" => "global::System.TimeSpan",
-        "SystemTime" | "DateTime" | "NaiveDateTime" => "global::System.DateTimeOffset",
+        "Uuid" | "UUID" | "uuid::Uuid" => "global::System.Guid",
+        "Duration" | "core::time::Duration" | "std::time::Duration" => "global::System.TimeSpan",
+        "SystemTime"
+        | "std::time::SystemTime"
+        | "DateTime"
+        | "NaiveDateTime"
+        | "chrono::naive::datetime::NaiveDateTime" => "global::System.DateTimeOffset",
         _ => return None,
     })
 }

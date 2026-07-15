@@ -778,6 +778,27 @@ fn opaque_types_require_an_explicit_or_builtin_mapping() {
         .unwrap(),
         "CustomType"
     );
+
+    for (datatype, expected) in [
+        (
+            specta::datatype::Reference::opaque(String::new()).into(),
+            "string",
+        ),
+        (
+            specta::datatype::Reference::opaque(std::time::Duration::ZERO).into(),
+            "global::System.TimeSpan",
+        ),
+        (
+            specta::datatype::Reference::opaque(std::time::SystemTime::UNIX_EPOCH).into(),
+            "global::System.DateTimeOffset",
+        ),
+    ] {
+        assert_eq!(
+            specta_csharp::primitives::datatype(&CSharp::new(), &Types::default(), &datatype,)
+                .unwrap(),
+            expected
+        );
+    }
 }
 
 #[test]
