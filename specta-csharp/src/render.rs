@@ -1928,9 +1928,8 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
         let Some(ty) = ndt.ty.as_ref() else {
             return;
         };
-        let mut ty = ty.clone();
-        match map_children(format, source, &mut ty, &rust_path(ndt)) {
-            Ok(()) => ndt.ty = Some(ty),
+        match map_datatype(format, source, ty, &rust_path(ndt)) {
+            Ok(ty) => ndt.ty = Some(ty),
             Err(err) => failure = Some(err),
         }
     });

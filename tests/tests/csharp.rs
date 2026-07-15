@@ -36,6 +36,25 @@ impl Format for RejectingFormat {
     }
 }
 
+struct RootRejectingFormat;
+
+impl Format for RootRejectingFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
+    }
+
+    fn map_type(
+        &'_ self,
+        _types: &Types,
+        datatype: &specta::datatype::DataType,
+    ) -> Result<Cow<'_, specta::datatype::DataType>, specta::FormatError> {
+        if matches!(datatype, specta::datatype::DataType::Struct(_)) {
+            return Err(std::io::Error::other("root rejected for test").into());
+        }
+        Ok(Cow::Owned(datatype.clone()))
+    }
+}
+
 /// A documented generic response.
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -683,6 +702,20 @@ fn datatype_format_errors_include_the_named_type_path() {
 
     assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
     assert!(message.contains("rejected for test"));
+}
+
+#[test]
+fn datatype_format_is_applied_to_the_named_root() {
+    let error = CSharp::new()
+        .export(
+            &Types::default().register::<KeywordFields>(),
+            RootRejectingFormat,
+        )
+        .unwrap_err();
+    let message = error.to_string();
+
+    assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
+    assert!(message.contains("root rejected for test"));
 }
 
 #[test]
