@@ -60,26 +60,10 @@ public sealed record Response<T>
     public required global::System.Collections.Generic.IReadOnlyDictionary<string, ulong> Counts { get; init; }
 }
 
-public abstract record Status
+public enum Status
 {
-    public sealed record InProgress : Status
-    {
-        public enum Item1Value
-        {
-            InProgress,
-        }
-        [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-        public required Item1Value Item1 { get; init; }
-    }
-    public sealed record Complete : Status
-    {
-        public enum Item1Value
-        {
-            Complete,
-        }
-        [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-        public required Item1Value Item1 { get; init; }
-    }
+    InProgress,
+    Complete,
 }
 
 internal static class BindingMarker { }

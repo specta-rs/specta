@@ -59,26 +59,10 @@ namespace Company.Api.Test.Csharp
     public required global::System.Collections.Generic.IReadOnlyDictionary<string, ulong> Counts { get; init; }
   }
 
-  internal abstract record Status
+  internal enum Status
   {
-    public sealed record InProgress : Status
-    {
-      internal enum Item1Value
-      {
-        InProgress,
-      }
-      [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-      public required Item1Value Item1 { get; init; }
-    }
-    public sealed record Complete : Status
-    {
-      internal enum Item1Value
-      {
-        Complete,
-      }
-      [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-      public required Item1Value Item1 { get; init; }
-    }
+    InProgress,
+    Complete,
   }
 }
 

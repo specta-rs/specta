@@ -321,13 +321,7 @@ fn render_named(
             &strct.fields,
             &path,
         ),
-        DataType::Enum(enm)
-            if enm
-                .variants
-                .iter()
-                .filter(|(_, v)| !v.skip)
-                .all(|(_, v)| matches!(v.fields, Fields::Unit)) =>
-        {
+        DataType::Enum(enm) if is_simple_enum(enm) => {
             render_simple_enum(out, exporter, base, &name, &generics, enm, &path)
         }
         DataType::Enum(enm) => {
@@ -518,13 +512,7 @@ fn render_field_property(
                 &strct.fields,
                 &format!("{path}.{wire_name}"),
             )?,
-            DataType::Enum(enm)
-                if enm
-                    .variants
-                    .iter()
-                    .filter(|(_, variant)| !variant.skip)
-                    .all(|(_, variant)| matches!(variant.fields, Fields::Unit)) =>
-            {
+            DataType::Enum(enm) if is_simple_enum(enm) => {
                 render_simple_enum(out, exporter, indent, name, "", enm, path)?;
             }
             DataType::Enum(enm) => {
@@ -1227,6 +1215,42 @@ fn is_non_object_struct(fields: &Fields) -> bool {
     matches!(fields, Fields::Unit | Fields::Unnamed(_))
 }
 
+fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
+    let variants = enm
+        .variants
+        .iter()
+        .filter(|(_, variant)| !variant.skip)
+        .collect::<Vec<_>>();
+    variants
+        .iter()
+        .all(|(_, variant)| matches!(variant.fields, Fields::Unit))
+        || (enm
+            .attributes
+            .contains_key("specta_serde:enum_repr_rewritten")
+            && variants.iter().all(|(wire_name, variant)| {
+                let Fields::Unnamed(fields) = &variant.fields else {
+                    return false;
+                };
+                let [field] = fields.fields.as_slice() else {
+                    return false;
+                };
+                let Some(DataType::Enum(literal)) = field.ty.as_ref() else {
+                    return false;
+                };
+                let mut literal_variants =
+                    literal.variants.iter().filter(|(_, variant)| !variant.skip);
+                literal
+                    .attributes
+                    .contains_key("specta_serde:enum_repr_rewritten")
+                    && matches!(
+                        (literal_variants.next(), literal_variants.next()),
+                        (Some((literal_name, variant)), None)
+                            if literal_name == wire_name
+                                && matches!(variant.fields, Fields::Unit)
+                    )
+            }))
+}
+
 fn is_emitted_named(ndt: &NamedDataType) -> bool {
     ndt.ty.as_ref().is_some_and(
         |ty| !matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)),
@@ -1241,6 +1265,27 @@ fn render_non_object_struct(
     path: &str,
     generic_layers: &[GenericArguments<'_>],
 ) -> Result<(), Error> {
+    render_non_object_struct_inner(
+        out,
+        exporter,
+        types,
+        fields,
+        path,
+        generic_layers,
+        &mut HashSet::new(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_non_object_struct_inner(
+    out: &mut String,
+    exporter: &CSharp,
+    types: &Types,
+    fields: &Fields,
+    path: &str,
+    generic_layers: &[GenericArguments<'_>],
+    visited_non_objects: &mut HashSet<String>,
+) -> Result<(), Error> {
     let fields = match fields {
         Fields::Unit => Vec::new(),
         Fields::Unnamed(fields) => fields
@@ -1252,14 +1297,30 @@ fn render_non_object_struct(
     };
     match fields.as_slice() {
         [] => out.push_str("object?"),
-        [field] => wire_datatype(out, exporter, types, field, path, generic_layers)?,
+        [field] => wire_datatype(
+            out,
+            exporter,
+            types,
+            field,
+            path,
+            generic_layers,
+            visited_non_objects,
+        )?,
         fields => {
             out.push('(');
             for (index, field) in fields.iter().enumerate() {
                 if index != 0 {
                     out.push_str(", ");
                 }
-                wire_datatype(out, exporter, types, field, path, generic_layers)?;
+                wire_datatype(
+                    out,
+                    exporter,
+                    types,
+                    field,
+                    path,
+                    generic_layers,
+                    visited_non_objects,
+                )?;
             }
             out.push(')');
         }
@@ -1274,6 +1335,7 @@ fn wire_datatype(
     ty: &DataType,
     path: &str,
     generic_layers: &[GenericArguments<'_>],
+    visited_non_objects: &mut HashSet<String>,
 ) -> Result<(), Error> {
     if contains_recursive_inline(ty) {
         return Err(Error::RecursiveInline { path: path.into() });
@@ -1289,6 +1351,7 @@ fn wire_datatype(
                         value,
                         path,
                         &generic_layers[..layer_index],
+                        visited_non_objects,
                     );
                 }
             }
@@ -1296,19 +1359,51 @@ fn wire_datatype(
         }
         DataType::List(list) => {
             out.push_str("global::System.Collections.Generic.IReadOnlyList<");
-            wire_datatype(out, exporter, types, &list.ty, path, generic_layers)?;
+            wire_datatype(
+                out,
+                exporter,
+                types,
+                &list.ty,
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
             out.push('>');
         }
         DataType::Map(map) => {
             out.push_str("global::System.Collections.Generic.IReadOnlyDictionary<");
-            wire_datatype(out, exporter, types, map.key_ty(), path, generic_layers)?;
+            wire_datatype(
+                out,
+                exporter,
+                types,
+                map.key_ty(),
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
             out.push_str(", ");
-            wire_datatype(out, exporter, types, map.value_ty(), path, generic_layers)?;
+            wire_datatype(
+                out,
+                exporter,
+                types,
+                map.value_ty(),
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
             out.push('>');
         }
         DataType::Nullable(inner) => {
             let mut rendered = String::new();
-            wire_datatype(&mut rendered, exporter, types, inner, path, generic_layers)?;
+            wire_datatype(
+                &mut rendered,
+                exporter,
+                types,
+                inner,
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
             out.push_str(&rendered);
             if !rendered.ends_with('?') {
                 out.push('?');
@@ -1318,7 +1413,15 @@ fn wire_datatype(
             [] => out.push_str("global::System.ValueTuple"),
             [element] => {
                 out.push_str("global::System.ValueTuple<");
-                wire_datatype(out, exporter, types, element, path, generic_layers)?;
+                wire_datatype(
+                    out,
+                    exporter,
+                    types,
+                    element,
+                    path,
+                    generic_layers,
+                    visited_non_objects,
+                )?;
                 out.push('>');
             }
             elements => {
@@ -1327,14 +1430,30 @@ fn wire_datatype(
                     if index != 0 {
                         out.push_str(", ");
                     }
-                    wire_datatype(out, exporter, types, element, path, generic_layers)?;
+                    wire_datatype(
+                        out,
+                        exporter,
+                        types,
+                        element,
+                        path,
+                        generic_layers,
+                        visited_non_objects,
+                    )?;
                 }
                 out.push(')');
             }
         },
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => {
-                wire_datatype(out, exporter, types, dt, path, generic_layers)?;
+                wire_datatype(
+                    out,
+                    exporter,
+                    types,
+                    dt,
+                    path,
+                    generic_layers,
+                    visited_non_objects,
+                )?;
             }
             NamedReferenceType::Recursive(_) => {
                 return Err(Error::RecursiveInline { path: path.into() });
@@ -1346,9 +1465,24 @@ fn wire_datatype(
                 if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                     && is_non_object_struct(&strct.fields)
                 {
+                    let key = format!("{}::{generics:?}", rust_path(ndt));
+                    if visited_non_objects.len() >= 128 || !visited_non_objects.insert(key.clone())
+                    {
+                        return Err(Error::RecursiveInline { path: path.into() });
+                    }
                     let mut layers = generic_layers.to_vec();
                     layers.push(generics);
-                    render_non_object_struct(out, exporter, types, &strct.fields, path, &layers)?;
+                    let result = render_non_object_struct_inner(
+                        out,
+                        exporter,
+                        types,
+                        &strct.fields,
+                        path,
+                        &layers,
+                        visited_non_objects,
+                    );
+                    visited_non_objects.remove(&key);
+                    result?;
                 } else {
                     reference_name(out, exporter, ndt);
                     if !generics.is_empty() {
@@ -1357,7 +1491,15 @@ fn wire_datatype(
                             if index != 0 {
                                 out.push_str(", ");
                             }
-                            wire_datatype(out, exporter, types, generic, path, generic_layers)?;
+                            wire_datatype(
+                                out,
+                                exporter,
+                                types,
+                                generic,
+                                path,
+                                generic_layers,
+                                visited_non_objects,
+                            )?;
                         }
                         out.push('>');
                     }
@@ -1365,7 +1507,15 @@ fn wire_datatype(
             }
         },
         DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
-            render_non_object_struct(out, exporter, types, &strct.fields, path, generic_layers)?;
+            render_non_object_struct_inner(
+                out,
+                exporter,
+                types,
+                &strct.fields,
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
         }
         _ => datatype(out, exporter, types, ty, path)?,
     }

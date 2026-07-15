@@ -251,6 +251,16 @@ struct NonObjectWireShapes {
     optional_unit_reference: Option<WireUnit>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RecursiveWireNode(Box<RecursiveWireNode>);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RecursiveWireOwner {
+    node: RecursiveWireNode,
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct Foo {
@@ -532,6 +542,30 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
     assert!(!root.join("Test/Csharp/WireNewtype.cs").exists());
     assert!(!root.join("Test/Csharp/WireTuple.cs").exists());
     std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn serde_unit_enums_keep_their_string_wire_shape() {
+    let output = CSharp::new()
+        .export(&Types::default().register::<Status>(), specta_serde::Format)
+        .unwrap();
+
+    assert!(output.contains("enum Status"));
+    assert!(output.contains("InProgress,"));
+    assert!(output.contains("Complete,"));
+    assert!(!output.contains("abstract record Status"));
+    assert!(!output.contains("Item1"));
+}
+
+#[test]
+fn recursive_non_object_structs_return_an_error() {
+    assert!(matches!(
+        CSharp::new().export(
+            &Types::default().register::<RecursiveWireOwner>(),
+            specta_serde::Format,
+        ),
+        Err(Error::RecursiveInline { .. })
+    ));
 }
 
 #[test]
