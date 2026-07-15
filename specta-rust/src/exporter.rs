@@ -442,7 +442,16 @@ fn render_field_type(
     if field.optional && !matches!(ty.as_str(), s if s.starts_with("Option<")) {
         ty = format!("Option<{ty}>");
     }
-    Ok(if recursive { format!("Box<{ty}>") } else { ty })
+    Ok(if !recursive {
+        ty
+    } else if let Some(inner) = ty
+        .strip_prefix("Option<")
+        .and_then(|ty| ty.strip_suffix('>'))
+    {
+        format!("Option<Box<{inner}>>")
+    } else {
+        format!("Box<{ty}>")
+    })
 }
 
 fn is_direct_recursive_field(types: &Types, ty: &DataType, path: &str) -> bool {
@@ -766,7 +775,11 @@ fn render_derives(out: &mut String, exporter: &Rust, depth: usize) {
 }
 
 fn render_name_allow(out: &mut String, depth: usize) {
-    line(out, depth, "#[allow(non_camel_case_types, non_snake_case)]");
+    line(
+        out,
+        depth,
+        "#[allow(deprecated, non_camel_case_types, non_snake_case)]",
+    );
 }
 
 fn render_docs(out: &mut String, docs: &str, depth: usize) {

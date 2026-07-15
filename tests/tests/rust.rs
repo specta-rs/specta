@@ -257,6 +257,36 @@ fn generated_single_file_layouts_compile_when_included() {
 }
 
 #[test]
+fn recursive_nullable_fields_keep_option_outside_box() {
+    let output = Rust::default().export(&types(), Identity).unwrap();
+    assert!(
+        output.contains("pub direct: Option<Box<Recursive>>,"),
+        "unexpected recursive nullable field:\n{output}"
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn internal_deprecated_references_compile_with_denied_warnings() {
+    #[deprecated = "use New"]
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Old;
+
+    #[allow(deprecated)]
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct New {
+        old: Old,
+    }
+
+    #[allow(deprecated)]
+    let types = Types::default().register::<Old>().register::<New>();
+    let output = Rust::default().export(&types, Identity).unwrap();
+    compile_source("deprecated-reference", &output);
+}
+
+#[test]
 fn files_layout_writes_module_tree() {
     let root = test_output_dir("files");
     let _ = fs::remove_dir_all(&root);
