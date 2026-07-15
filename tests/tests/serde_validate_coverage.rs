@@ -478,6 +478,65 @@ fn flatten_of_one_side_skipped_vec_is_rejected() {
     );
 }
 
+/// Renders `T`'s inline (non-reference) datatype through `map_type`, the
+/// per-phase entry exporters use for inline/function datatypes. For
+/// `PhasesFormat` this renders the *serialize* shape only.
+fn phases_map_type_inline<T: Type>() -> Result<(), specta::FormatError> {
+    use specta::Format as _;
+    use specta::datatype::{DataType, Reference};
+
+    let mut types = Types::default();
+    let dt = T::definition(&mut types);
+    let DataType::Reference(Reference::Named(reference)) = &dt else {
+        panic!("expected a named reference");
+    };
+    let ty = types
+        .get(reference)
+        .and_then(|ndt| ndt.ty.clone())
+        .expect("definition should be registered");
+
+    // Wrap the struct so the datatype is anonymous rather than structurally
+    // equal to the registered definition (which `map_type` intentionally
+    // skips - registered definitions are validated by `map_types`). This
+    // models an inline/function datatype containing the struct's shape.
+    specta_serde::PhasesFormat
+        .map_type(&types, &DataType::Nullable(Box::new(ty)))
+        .map(|_| ())
+}
+
+#[test]
+fn phases_map_type_serialize_phase_ignores_deserialize_only_flatten() {
+    // `PhasesFormat::map_type` selects and rewrites the *serialize* phase
+    // only; a `#[serde(flatten, skip_serializing)]` field is dropped by that
+    // rewrite, so its deserialize-only Vec shape is unreachable in this
+    // rendering and must not be rejected. (The whole-graph export still
+    // rejects the construct - `flatten_of_one_side_skipped_vec_is_rejected`
+    // above - because the deserialize phase is rendered there too.)
+    phases_map_type_inline::<FlattenSkipSerializingVecInvalid>()
+        .expect("the serialize-phase mapping never renders the deserialize-only flattened Vec");
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenSkipDeserializingVecInvalid {
+    a: i32,
+    #[serde(flatten, skip_deserializing, default)]
+    v: Vec<u8>,
+}
+
+#[test]
+fn phases_map_type_serialize_phase_still_rejects_live_flatten() {
+    // Control: with the skip on the *deserialize* side, the Vec is live in
+    // the serialize phase that `map_type` renders, so it must still error.
+    let err = phases_map_type_inline::<FlattenSkipDeserializingVecInvalid>()
+        .expect_err("the flattened Vec is live in the serialize phase");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 #[test]
 fn flatten_of_one_side_skipped_vec_under_unified_format_errors_on_the_skip() {
     // Since #518, unified `Format` rejects one-sided skips outright instead

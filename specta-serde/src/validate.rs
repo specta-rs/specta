@@ -9,7 +9,7 @@ use specta::{
 };
 
 use crate::{
-    Error, PhaseRewrite, container_rename_all_rule, enum_variant_field_rename_rule,
+    Error, Phase, PhaseRewrite, container_rename_all_rule, enum_variant_field_rename_rule,
     inflection::RenameRule,
     parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phase_field_key,
@@ -38,6 +38,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             mode,
             true,
             None,
+            FlattenDirections::LIVE,
         )?;
     }
 
@@ -57,6 +58,7 @@ pub(crate) fn validate_datatype_for_mode(
         mode,
         true,
         None,
+        FlattenDirections::LIVE,
     )
 }
 
@@ -64,6 +66,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     dt: &DataType,
     types: &Types,
     mode: ApplyMode,
+    phase: Phase,
 ) -> Result<(), Error> {
     inner(
         dt,
@@ -73,6 +76,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
         mode,
         false,
         None,
+        FlattenDirections::for_phase(phase),
     )
 }
 
@@ -84,6 +88,7 @@ fn inner(
     mode: ApplyMode,
     follow_named_references: bool,
     env: Option<&GenericEnv<'_>>,
+    root_directions: FlattenDirections,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(
@@ -94,6 +99,7 @@ fn inner(
             mode,
             follow_named_references,
             env,
+            root_directions,
         )?,
         DataType::Map(map) => {
             inner(
@@ -104,6 +110,7 @@ fn inner(
                 mode,
                 follow_named_references,
                 env,
+                root_directions,
             )?;
             inner(
                 map.value_ty(),
@@ -113,6 +120,7 @@ fn inner(
                 mode,
                 follow_named_references,
                 env,
+                root_directions,
             )?;
         }
         DataType::List(list) => {
@@ -124,6 +132,7 @@ fn inner(
                 mode,
                 follow_named_references,
                 env,
+                root_directions,
             )?;
         }
         DataType::Struct(strct) => {
@@ -134,6 +143,7 @@ fn inner(
                 &path,
                 mode,
                 env,
+                root_directions,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
                 if attrs.variant_identifier || attrs.field_identifier {
@@ -190,6 +200,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             env,
+                            root_directions,
                         )?;
                     }
                 }
@@ -212,7 +223,7 @@ fn inner(
                             types,
                             &format!("{path}.{name}"),
                             mode,
-                            FlattenDirections::LIVE,
+                            root_directions,
                             env,
                         )?;
                     }
@@ -229,6 +240,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             env,
+                            root_directions,
                         )?;
                     }
                 }
@@ -246,6 +258,7 @@ fn inner(
                 &path,
                 mode,
                 env,
+                root_directions,
             )?;
             let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
             if container_attrs.as_ref().is_some_and(|attrs| attrs.default) {
@@ -260,7 +273,8 @@ fn inner(
             for (variant_name, variant) in &enm.variants {
                 let variant_is_rendered = variant_is_rendered(variant)?;
                 validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
-                let variant_directions = FlattenDirections::for_variant(variant)?;
+                let variant_directions =
+                    FlattenDirections::for_variant(variant)?.and(root_directions);
                 if variant_names_emitted && variant_is_rendered {
                     validate_variant_key(variant_name, variant, &container_attrs, &path, mode)?;
                 }
@@ -303,6 +317,7 @@ fn inner(
                                 mode,
                                 follow_named_references,
                                 env,
+                                root_directions,
                             )?;
                         }
                     }
@@ -339,6 +354,7 @@ fn inner(
                                 mode,
                                 follow_named_references,
                                 env,
+                                root_directions,
                             )?;
                         }
                     }
@@ -355,6 +371,7 @@ fn inner(
                     mode,
                     follow_named_references,
                     env,
+                    root_directions,
                 )?;
             }
         }
@@ -368,6 +385,7 @@ fn inner(
                     mode,
                     follow_named_references,
                     env,
+                    root_directions,
                 )?;
             }
         }
@@ -387,6 +405,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             env,
+                            root_directions,
                         )?;
                     }
                 }
@@ -433,6 +452,7 @@ fn inner(
                             mode,
                             follow_named_references,
                             reference_frame.as_ref().or(env),
+                            root_directions,
                         )?;
                     }
                 }
@@ -454,6 +474,7 @@ fn inner(
                         mode,
                         follow_named_references,
                         env,
+                        root_directions,
                     )?;
                     inner(
                         &phased.deserialize,
@@ -463,6 +484,7 @@ fn inner(
                         mode,
                         follow_named_references,
                         env,
+                        root_directions,
                     )?;
                 }
             }
@@ -539,6 +561,7 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
     env: Option<&GenericEnv<'_>>,
+    root_directions: FlattenDirections,
 ) -> Result<(), Error> {
     let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(());
@@ -568,6 +591,7 @@ fn validate_container_attributes(
                 mode,
                 true,
                 env,
+                root_directions,
             )?;
         }
     }
@@ -930,6 +954,25 @@ impl FlattenDirections {
         serialize: true,
         deserialize: true,
     };
+
+    /// The single direction a per-phase rendering serves:
+    /// `PhasesFormat::map_type` selects and rewrites one phase of an inline
+    /// datatype, so only that phase's flatten shapes are reachable there.
+    fn for_phase(phase: Phase) -> Self {
+        match phase {
+            Phase::Serialize => Self::SERIALIZE_ONLY,
+            Phase::Deserialize => Self::DESERIALIZE_ONLY,
+        }
+    }
+
+    /// Both liveness constraints apply (e.g. a variant's own skips *and* the
+    /// walk's root phase).
+    fn and(self, other: Self) -> Self {
+        Self {
+            serialize: self.serialize && other.serialize,
+            deserialize: self.deserialize && other.deserialize,
+        }
+    }
 
     /// Only the serialize direction is reachable (an `into` conversion wire,
     /// or a `Phased` override's serialize side).

@@ -526,10 +526,15 @@ impl specta::Format for PhasesFormat {
 
         let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
 
+        // Only the serialize phase is selected and rewritten here, so
+        // validation must treat deserialize-only shapes (e.g. a
+        // `#[serde(flatten, skip_serializing)]` field, dropped by the
+        // serialize rewrite) as unreachable.
         validate::validate_datatype_for_mode_shallow(
             &selected,
             types,
             validate::ApplyMode::Phases,
+            Phase::Serialize,
         )?;
 
         rewrite_datatype_for_phase(
