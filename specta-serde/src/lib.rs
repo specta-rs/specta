@@ -168,28 +168,24 @@ impl specta::Format for Format {
 
             let ndt_name = ndt.name.to_string();
 
-            if let Some(ty) = ndt.ty.as_mut() {
-                if rewrite_err.is_some() {
-                    return;
-                }
+            // Compute the container rename before `rewrite_datatype_for_phase` runs: some
+            // rewrites (e.g. enum representation lowering) clear the container's serde
+            // attributes once applied, so the rename must be read from the untouched type.
+            if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
+                rewrite_err = Some(err);
+                return;
+            }
 
-                if let Err(err) = rewrite_datatype_for_phase(
+            if let Some(ty) = ndt.ty.as_mut()
+                && let Err(err) = rewrite_datatype_for_phase(
                     ty,
                     PhaseRewrite::Unified,
                     types,
                     &generated,
                     &split_types,
                     Some(ndt_name.as_str()),
-                ) {
-                    rewrite_err = Some(err);
-                }
-            }
-
-            if rewrite_err.is_some() {
-                return;
-            }
-
-            if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
+                )
+            {
                 rewrite_err = Some(err);
             }
         });
@@ -431,6 +427,14 @@ impl specta::Format for PhasesFormat {
                 return;
             }
 
+            // As above: apply the container rename before `rewrite_datatype_for_phase`
+            // mutates (and, for some enum representations, clears) the container's
+            // serde attributes.
+            if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
+                rewrite_err = Some(err);
+                return;
+            }
+
             if let Some(ty) = ndt.ty.as_mut()
                 && let Err(err) = rewrite_datatype_for_phase(
                     ty,
@@ -441,11 +445,6 @@ impl specta::Format for PhasesFormat {
                     Some(ndt_name.as_str()),
                 )
             {
-                rewrite_err = Some(err);
-                return;
-            }
-
-            if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
                 rewrite_err = Some(err);
             }
         });
@@ -2538,10 +2537,12 @@ fn renamed_type_name_for_phase(
     mode: PhaseRewrite,
     current_name: &str,
 ) -> Result<Option<String>, Error> {
-    let DataType::Struct(strct) = ty else {
-        return Ok(None);
+    let attributes = match ty {
+        DataType::Struct(strct) => &strct.attributes,
+        DataType::Enum(e) => &e.attributes,
+        _ => return Ok(None),
     };
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes)? else {
         return Ok(None);
     };
 

@@ -1,5 +1,6 @@
 ---
 source: tests/tests/typescript.rs
+assertion_line: 1096
 expression: output
 ---
 Issue374: Issue374_Serialize
@@ -97,9 +98,9 @@ GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
 Struct: StructNew
 Struct2: Struct2
-Enum: Enum
-Enum2: Enum2
-Enum3: Enum3
+Enum: EnumNew
+Enum2: Enum2New
+Enum3: Enum3New
 StructRenameAllUppercase: StructRenameAllUppercase
 RenameSerdeSpecialChar: RenameSerdeSpecialChar
 EnumRenameAllUppercase: EnumRenameAllUppercase
