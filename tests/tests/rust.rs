@@ -89,6 +89,16 @@ struct MutualB {
     a: Box<MutualA>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericRecursiveWrapper<T>(Box<T>);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericRecursiveNode {
+    child: GenericRecursiveWrapper<GenericRecursiveNode>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Page<T> {
@@ -264,6 +274,21 @@ fn recursive_nullable_fields_keep_option_outside_box() {
         output.contains("pub direct: ::std::option::Option<::std::boxed::Box<Recursive>>,"),
         "unexpected recursive nullable field:\n{output}"
     );
+}
+
+#[test]
+fn recursion_detection_substitutes_generic_arguments() {
+    let types = Types::default()
+        .register::<GenericRecursiveWrapper<GenericRecursiveNode>>()
+        .register::<GenericRecursiveNode>();
+    let output = Rust::default().export(&types, Identity).unwrap();
+    assert!(
+        output.contains(
+            "pub child: ::std::boxed::Box<GenericRecursiveWrapper<GenericRecursiveNode>>,",
+        ),
+        "generic recursion was not boxed:\n{output}"
+    );
+    compile_source("generic-recursion", &output);
 }
 
 #[test]

@@ -9,8 +9,8 @@ use std::{
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Deprecated, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
-        OpaqueReference, Primitive, Reference,
+        DataType, Deprecated, Field, Fields, Generic, NamedDataType, NamedReference,
+        NamedReferenceType, OpaqueReference, Primitive, Reference,
     },
 };
 
@@ -465,31 +465,39 @@ fn is_direct_recursive_field(types: &Types, ty: &DataType, path: &str) -> bool {
     let mut targets = Vec::new();
     collect_direct_targets(types, ty, &mut targets);
     targets.into_iter().any(|target| {
-        let target_path = rust_path(target);
+        let target_path = rust_path(target.ndt);
         target_path == owner
             || reaches_directly(types, target, &owner, &mut HashSet::from([target_path]))
     })
 }
 
+struct DirectTarget<'a> {
+    ndt: &'a NamedDataType,
+    generics: Vec<(Generic, DataType)>,
+}
+
 fn reaches_directly(
     types: &Types,
-    current: &NamedDataType,
+    current: DirectTarget<'_>,
     target: &str,
     visited: &mut HashSet<String>,
 ) -> bool {
-    let Some(ty) = &current.ty else { return false };
+    let Some(mut ty) = current.ndt.ty.clone() else {
+        return false;
+    };
+    substitute_generics(&mut ty, &current.generics);
     let mut next = Vec::new();
-    collect_direct_targets(types, ty, &mut next);
-    next.into_iter().any(|ndt| {
-        let path = rust_path(ndt);
-        path == target || (visited.insert(path) && reaches_directly(types, ndt, target, visited))
+    collect_direct_targets(types, &ty, &mut next);
+    next.into_iter().any(|next| {
+        let path = rust_path(next.ndt);
+        path == target || (visited.insert(path) && reaches_directly(types, next, target, visited))
     })
 }
 
 fn collect_direct_targets<'a>(
     types: &'a Types,
-    ty: &'a DataType,
-    targets: &mut Vec<&'a NamedDataType>,
+    ty: &DataType,
+    targets: &mut Vec<DirectTarget<'a>>,
 ) {
     match ty {
         DataType::Reference(Reference::Named(reference)) => {
@@ -499,7 +507,14 @@ fn collect_direct_targets<'a>(
                 {
                     collect_direct_targets(types, dt, targets);
                 } else {
-                    targets.push(ndt);
+                    targets.push(DirectTarget {
+                        ndt,
+                        generics: match &reference.inner {
+                            NamedReferenceType::Reference { generics, .. } => generics.clone(),
+                            NamedReferenceType::Recursive(_)
+                            | NamedReferenceType::Inline { .. } => Vec::new(),
+                        },
+                    });
                 }
             } else if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
                 collect_direct_targets(types, dt, targets);
@@ -533,10 +548,79 @@ fn collect_direct_targets<'a>(
     }
 }
 
+fn substitute_generics(ty: &mut DataType, generics: &[(Generic, DataType)]) {
+    match ty {
+        DataType::Generic(generic) => {
+            if let Some((_, replacement)) = generics.iter().find(|(key, _)| key == generic) {
+                *ty = replacement.clone();
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                substitute_field_generics(&mut variant.fields, generics);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in &mut tuple.elements {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Reference {
+                generics: reference_generics,
+                ..
+            } => {
+                for (_, ty) in reference_generics {
+                    substitute_generics(ty, generics);
+                }
+            }
+            NamedReferenceType::Inline { dt, .. } => substitute_generics(dt, generics),
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Intersection(elements) => {
+            for ty in elements {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType)]) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => {
+            for ty in fields
+                .fields
+                .iter_mut()
+                .filter_map(|field| field.ty.as_mut())
+            {
+                substitute_generics(ty, generics);
+            }
+        }
+        Fields::Named(fields) => {
+            for ty in fields
+                .fields
+                .iter_mut()
+                .filter_map(|(_, field)| field.ty.as_mut())
+            {
+                substitute_generics(ty, generics);
+            }
+        }
+    }
+}
+
 fn collect_direct_field_targets<'a>(
     types: &'a Types,
-    fields: &'a Fields,
-    targets: &mut Vec<&'a NamedDataType>,
+    fields: &Fields,
+    targets: &mut Vec<DirectTarget<'a>>,
 ) {
     match fields {
         Fields::Unit => {}
