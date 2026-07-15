@@ -378,7 +378,11 @@ fn render_struct(
                 let mut field_type =
                     render_datatype(exporter, types, ty, generics, path, true, ctx)?;
                 path.pop();
-                if field.optional && !can_be_nil(&field_type) {
+                if field.optional
+                    && (!can_be_nil(&field_type)
+                        || field_type.starts_with("[]")
+                        || field_type.starts_with("map["))
+                {
                     field_type.insert(0, '*');
                 }
                 if !comments.is_empty() {

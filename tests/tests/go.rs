@@ -208,6 +208,15 @@ fn go_output_is_accepted_by_go_toolchain() {
     #[specta(collect = false)]
     struct BigNumber(i128);
 
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct OptionalCollections {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        values: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        lookup: Option<HashMap<String, i32>>,
+    }
+
     let newtypes = temp.path().join("newtypes.go");
     Go::default()
         .package_name("bindings")
@@ -217,9 +226,19 @@ fn go_output_is_accepted_by_go_toolchain() {
             IdentityFormat,
         )
         .unwrap();
+    let optional_collections = temp.path().join("optional_collections.go");
+    Go::default()
+        .package_name("bindings")
+        .export_to(
+            &optional_collections,
+            &Types::default().register::<OptionalCollections>(),
+            specta_serde::PhasesFormat,
+        )
+        .unwrap();
 
     let before = std::fs::read_to_string(&output).unwrap();
     let newtypes_before = std::fs::read_to_string(&newtypes).unwrap();
+    let optional_collections_before = std::fs::read_to_string(&optional_collections).unwrap();
     assert!(
         newtypes_before.contains("type Stamp = time.Time"),
         "{newtypes_before}"
@@ -241,6 +260,10 @@ fn go_output_is_accepted_by_go_toolchain() {
     );
     assert_eq!(before, std::fs::read_to_string(&output).unwrap());
     assert_eq!(newtypes_before, std::fs::read_to_string(&newtypes).unwrap());
+    assert_eq!(
+        optional_collections_before,
+        std::fs::read_to_string(&optional_collections).unwrap()
+    );
     std::fs::write(
         temp.path().join("bindings_test.go"),
         r#"package bindings
@@ -275,6 +298,26 @@ func TestMethodBackedNewtypes(t *testing.T) {
 	}
 	if got := number.String(); got != "12345678901234567890" {
 		t.Fatalf("big number: %s", got)
+	}
+}
+
+func TestOptionalCollectionsPreserveEmptyValues(t *testing.T) {
+	values := []string{}
+	lookup := map[string]int32{}
+	present, err := json.Marshal(OptionalCollectionsSerialize{Values: &values, Lookup: &lookup})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(present), `{"values":[],"lookup":{}}`; got != want {
+		t.Fatalf("present: got %s, want %s", got, want)
+	}
+
+	absent, err := json.Marshal(OptionalCollectionsSerialize{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(absent), `{}`; got != want {
+		t.Fatalf("absent: got %s, want %s", got, want)
 	}
 }
 "#,
@@ -464,6 +507,24 @@ fn go_reports_invalid_configuration_and_map_keys() {
         )
         .unwrap_err();
     assert!(err.to_string().contains("encoding/json"), "{err}");
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct OptionalCollections {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        values: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        lookup: Option<HashMap<String, i32>>,
+    }
+
+    let optional = Go::default()
+        .export(
+            &Types::default().register::<OptionalCollections>(),
+            specta_serde::PhasesFormat,
+        )
+        .unwrap();
+    assert!(optional.contains("Values *[]string"), "{optional}");
+    assert!(optional.contains("Lookup *map[string]int32"), "{optional}");
 }
 
 #[test]
