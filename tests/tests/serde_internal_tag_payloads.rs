@@ -145,6 +145,13 @@ enum ConcreteExternalPayloadWrapper {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
+enum GenericOptionExternalPayloadWrapper<T> {
+    Value(GenericExternalPayload<Option<T>>),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
 enum InlineGenericExternalPayloadWrapper {
     Value(#[specta(inline)] GenericExternalPayload<i32>),
 }
@@ -699,6 +706,23 @@ fn contextual_external_enum_shape_substitutes_concrete_generics() {
             "the concrete generic argument must replace the inner placeholder: {wrapper:#?}"
         );
     }
+
+    let mapped = specta_serde::Format
+        .map_types(&Types::default().register::<GenericOptionExternalPayloadWrapper<i32>>())
+        .expect("contextual generic substitution should be applied exactly once")
+        .into_owned();
+    let wrapper = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "GenericOptionExternalPayloadWrapper")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped generic option wrapper definition should exist");
+    assert!(
+        contains_named_field(wrapper, "Newtype", |ty| matches!(
+            ty,
+            DataType::Nullable(inner) if !matches!(inner.as_ref(), DataType::Nullable(_))
+        )),
+        "the contextual payload must remain `Option<T>`, not `Option<Option<T>>`: {wrapper:#?}"
+    );
 }
 
 #[test]

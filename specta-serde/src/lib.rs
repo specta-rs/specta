@@ -2955,15 +2955,9 @@ fn internal_tag_payload_compatibility(
                 return Ok(Some(InternalTagPayloadCompatibility::merge_as_is()));
             }
 
-            let mut compatible =
+            let compatible =
                 internal_tag_payload_compatibility(&referenced_ty, original_types, seen, mode)?;
             seen.remove(&key);
-            if let Some(replacement) = compatible
-                .as_mut()
-                .and_then(|payload| payload.replacement.as_mut())
-            {
-                substitute_generics(replacement, named_reference_generics(reference));
-            }
             Ok(compatible)
         }
         DataType::Enum(enm)
