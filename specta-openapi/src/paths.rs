@@ -1,26 +1,20 @@
 //! Lowering of [`Operation`]s into the document's `paths` object.
 
-use std::collections::HashMap;
-
+use crate::{
+    Error,
+    operation::{Body, Method, Operation, ParameterLocation},
+    resolve::Resolved,
+};
 use indexmap::IndexMap;
 use openapiv3::{
     MediaType, Operation as OpenApiOperation, Parameter as OpenApiParameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    Schema, SchemaData, SchemaKind, StatusCode, StringType, Type as SchemaType,
-};
-use specta::datatype::NamedReference;
-
-use crate::{
-    Error,
-    operation::{Body, Method, Operation, ParameterLocation},
+    StatusCode,
 };
 
 const JSON: &str = "application/json";
 
-pub(crate) fn paths(
-    operations: &[Operation],
-    resolved: &HashMap<NamedReference, String>,
-) -> Result<Paths, Error> {
+pub(crate) fn paths(operations: &[Operation], resolved: &Resolved) -> Result<Paths, Error> {
     let mut paths: IndexMap<String, ReferenceOr<PathItem>> = IndexMap::new();
 
     for operation in operations {
@@ -57,10 +51,7 @@ pub(crate) fn paths(
     })
 }
 
-fn lower(
-    operation: &Operation,
-    resolved: &HashMap<NamedReference, String>,
-) -> Result<OpenApiOperation, Error> {
+fn lower(operation: &Operation, resolved: &Resolved) -> Result<OpenApiOperation, Error> {
     if operation.responses.is_empty() {
         return Err(Error::OperationWithoutResponses {
             path: operation.path.to_string(),
@@ -93,7 +84,11 @@ fn lower(
         summary: operation.summary.as_ref().map(ToString::to_string),
         description: operation.description.as_ref().map(ToString::to_string),
         operation_id: operation.operation_id.as_ref().map(ToString::to_string),
-        parameters: operation.parameters.iter().map(parameter).collect(),
+        parameters: operation
+            .parameters
+            .iter()
+            .map(|p| parameter(p, resolved))
+            .collect::<Result<Vec<_>, _>>()?,
         request_body,
         responses,
         ..Default::default()
@@ -102,47 +97,44 @@ fn lower(
 
 fn content_of(
     body: Option<&Body>,
-    resolved: &HashMap<NamedReference, String>,
+    resolved: &Resolved,
 ) -> Result<IndexMap<String, MediaType>, Error> {
     let Some(body) = body else {
         return Ok(IndexMap::new());
     };
-    let reference = resolved
-        .get(&body.reference)
+    let schema = resolved
+        .get(&body.dt)
         .ok_or(Error::UnresolvedOperationTypes)?;
     Ok(IndexMap::from_iter([(
         JSON.to_string(),
         MediaType {
-            schema: Some(ReferenceOr::Reference {
-                reference: reference.clone(),
-            }),
+            schema: Some(schema.clone()),
             ..Default::default()
         },
     )]))
 }
 
-/// Parameters are declared by name and typed as strings.
-///
-/// A path or query parameter arrives as text and is parsed by the extractor, so `string` is what
-/// the wire actually carries. Richer parameter schemas are a separate question from the bodies this
-/// is here to type.
-fn parameter(parameter: &crate::operation::Parameter) -> ReferenceOr<OpenApiParameter> {
+/// Lowers a parameter, carrying the schema of whatever the extractor parses it into.
+fn parameter(
+    parameter: &crate::operation::Parameter,
+    resolved: &Resolved,
+) -> Result<ReferenceOr<OpenApiParameter>, Error> {
+    let schema = resolved
+        .get(&parameter.ty.dt)
+        .ok_or(Error::UnresolvedOperationTypes)?;
     let data = ParameterData {
         name: parameter.name.to_string(),
         description: parameter.description.as_ref().map(ToString::to_string),
         required: parameter.required,
         deprecated: None,
-        format: ParameterSchemaOrContent::Schema(ReferenceOr::Item(Schema {
-            schema_data: SchemaData::default(),
-            schema_kind: SchemaKind::Type(SchemaType::String(StringType::default())),
-        })),
+        format: ParameterSchemaOrContent::Schema(schema.clone()),
         example: None,
         examples: IndexMap::new(),
         explode: None,
         extensions: IndexMap::new(),
     };
 
-    ReferenceOr::Item(match parameter.location {
+    Ok(ReferenceOr::Item(match parameter.location {
         ParameterLocation::Path => OpenApiParameter::Path {
             parameter_data: data,
             style: Default::default(),
@@ -157,5 +149,5 @@ fn parameter(parameter: &crate::operation::Parameter) -> ReferenceOr<OpenApiPara
             parameter_data: data,
             style: Default::default(),
         },
-    })
+    }))
 }
