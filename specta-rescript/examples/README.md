@@ -7,8 +7,8 @@ Each example focuses on a different aspect of ReScript code generation. Pre-gene
 **Generate `.res` files** by running any example:
 
 ```bash
-cargo run -p specta-rescript --example simple_usage
-cargo run -p specta-rescript --example basic_types
+cargo run -p specta-rescript --example rescript_simple_usage
+cargo run -p specta-rescript --example rescript_basic_types
 # etc.
 ```
 

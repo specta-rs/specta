@@ -1,10 +1,10 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, collections::HashMap, path::Path};
 
 use specta::{Format as FormatTrait, Types};
 
 use crate::{
     error::{Error, Result},
-    primitives::export_type,
+    primitives::{export_type, type_name},
     toposort::topological_sort,
 };
 
@@ -60,6 +60,8 @@ impl ReScript {
             Cow::Borrowed(types)
         };
 
+        validate_type_names(&processed)?;
+
         let mut out = String::new();
 
         if !self.header.is_empty() {
@@ -112,4 +114,19 @@ impl ReScript {
         std::fs::write(path, content)?;
         Ok(())
     }
+}
+
+fn validate_type_names(types: &Types) -> Result<()> {
+    let mut names = HashMap::new();
+    for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
+        let name = type_name(&ty.name);
+        if let Some(first) = names.insert(name.clone(), ty) {
+            return Err(Error::DuplicateTypeName {
+                name,
+                first: format!("{}::{}", first.module_path, first.name),
+                second: format!("{}::{}", ty.module_path, ty.name),
+            });
+        }
+    }
+    Ok(())
 }

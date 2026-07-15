@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ptr;
 
 use specta::{
     Types,
@@ -59,62 +60,73 @@ pub(crate) fn is_self_recursive(dt: &DataType, types: &Types, ty: &NamedDataType
     deps(dt, types, &mut dependencies);
     dependencies
         .iter()
-        .any(|dependency| dependency.name == ty.name)
+        .any(|dependency| ptr::eq(*dependency, ty))
+}
+
+type TypeId = *const NamedDataType;
+
+fn type_id(ty: &NamedDataType) -> TypeId {
+    ptr::from_ref(ty)
 }
 
 struct Tarjan<'a> {
     types: &'a Types,
     next_index: usize,
-    indices: HashMap<&'a str, usize>,
-    lowlinks: HashMap<&'a str, usize>,
+    indices: HashMap<TypeId, usize>,
+    lowlinks: HashMap<TypeId, usize>,
     stack: Vec<&'a NamedDataType>,
-    on_stack: HashMap<&'a str, bool>,
+    on_stack: HashMap<TypeId, bool>,
     groups: Vec<Vec<&'a NamedDataType>>,
 }
 
 impl<'a> Tarjan<'a> {
     fn visit(&mut self, ty: &'a NamedDataType) {
-        let name = ty.name.as_ref();
+        let id = type_id(ty);
         let index = self.next_index;
         self.next_index += 1;
-        self.indices.insert(name, index);
-        self.lowlinks.insert(name, index);
+        self.indices.insert(id, index);
+        self.lowlinks.insert(id, index);
         self.stack.push(ty);
-        self.on_stack.insert(name, true);
+        self.on_stack.insert(id, true);
 
         let mut dependencies = Vec::new();
         if let Some(dt) = &ty.ty {
             deps(dt, self.types, &mut dependencies);
         }
-        dependencies.sort_by(|a, b| a.name.cmp(&b.name));
-        dependencies.dedup_by(|a, b| a.name == b.name);
+        dependencies.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then(a.module_path.cmp(&b.module_path))
+                .then(a.location.cmp(&b.location))
+        });
+        dependencies.dedup_by(|a, b| ptr::eq(*a, *b));
 
         for dependency in dependencies {
-            let dependency_name = dependency.name.as_ref();
-            if !self.indices.contains_key(dependency_name) {
+            let dependency_id = type_id(dependency);
+            if !self.indices.contains_key(&dependency_id) {
                 self.visit(dependency);
-                let dependency_lowlink = self.lowlinks[dependency_name];
+                let dependency_lowlink = self.lowlinks[&dependency_id];
                 self.lowlinks
-                    .entry(name)
+                    .entry(id)
                     .and_modify(|lowlink| *lowlink = (*lowlink).min(dependency_lowlink));
-            } else if self.on_stack.get(dependency_name) == Some(&true) {
-                let dependency_index = self.indices[dependency_name];
+            } else if self.on_stack.get(&dependency_id) == Some(&true) {
+                let dependency_index = self.indices[&dependency_id];
                 self.lowlinks
-                    .entry(name)
+                    .entry(id)
                     .and_modify(|lowlink| *lowlink = (*lowlink).min(dependency_index));
             }
         }
 
-        if self.lowlinks[name] == self.indices[name] {
+        if self.lowlinks[&id] == self.indices[&id] {
             let mut group = Vec::new();
             loop {
                 let member = self
                     .stack
                     .pop()
                     .expect("current type is on the Tarjan stack");
-                self.on_stack.insert(member.name.as_ref(), false);
+                self.on_stack.insert(type_id(member), false);
                 group.push(member);
-                if member.name == ty.name {
+                if ptr::eq(member, ty) {
                     break;
                 }
             }
@@ -137,7 +149,7 @@ pub(crate) fn topological_sort(types: &Types) -> Vec<Vec<&NamedDataType>> {
     };
 
     for ty in types.into_sorted_iter() {
-        if !tarjan.indices.contains_key(ty.name.as_ref()) {
+        if !tarjan.indices.contains_key(&type_id(ty)) {
             tarjan.visit(ty);
         }
     }
@@ -147,7 +159,10 @@ pub(crate) fn topological_sort(types: &Types) -> Vec<Vec<&NamedDataType>> {
 #[cfg(test)]
 mod tests {
     use super::topological_sort;
-    use specta::{Type, Types};
+    use specta::{
+        Type, Types,
+        datatype::{NamedDataType, Primitive},
+    };
 
     #[derive(Type)]
     struct Leaf {
@@ -184,5 +199,18 @@ mod tests {
                 .iter()
                 .any(|group| group.iter().any(|ty| ty.name == "Node"))
         );
+    }
+
+    #[test]
+    fn duplicate_display_names_keep_distinct_identities() {
+        let mut types = Types::default();
+        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+            ty.ty = Some(Primitive::str.into());
+        });
+        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+            ty.ty = Some(Primitive::i32.into());
+        });
+
+        assert_eq!(topological_sort(&types).into_iter().flatten().count(), 2);
     }
 }

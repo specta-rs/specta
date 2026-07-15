@@ -24,36 +24,39 @@ specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive"] }
 specta-serde = { version = "=0.0.13", path = "../specta-serde" }
 thiserror = "2.0"
 
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
 [[example]]
-name = "simple_usage"
+name = "rescript_simple_usage"
 path = "examples/simple_usage.rs"
 
 [[example]]
-name = "basic_types"
+name = "rescript_basic_types"
 path = "examples/basic_types.rs"
 
 [[example]]
-name = "variants"
+name = "rescript_variants"
 path = "examples/variants.rs"
 
 
 [[example]]
-name = "result_types"
+name = "rescript_result_types"
 path = "examples/result_types.rs"
 
 
 [[example]]
-name = "generics"
+name = "rescript_generics"
 path = "examples/generics.rs"
 
 [[example]]
-name = "comments_example"
+name = "rescript_comments_example"
 path = "examples/comments_example.rs"
 
 [[example]]
-name = "comprehensive_demo"
+name = "rescript_comprehensive_demo"
 path = "examples/comprehensive_demo.rs"
 
 [[example]]
-name = "recursive"
+name = "rescript_recursive"
 path = "examples/recursive.rs"

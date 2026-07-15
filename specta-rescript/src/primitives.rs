@@ -18,7 +18,7 @@ use crate::error::{Error, Result};
 /// ReScript requires type names to start with a lowercase letter.
 /// Strategy: lowercase only the first character to preserve the rest.
 /// e.g. "MyType" -> "myType", "UUID" -> "uUID"
-fn type_name(name: &str) -> String {
+pub(crate) fn type_name(name: &str) -> String {
     let mut chars = name.chars();
     match chars.next() {
         Some(first) => first.to_lowercase().collect::<String>() + chars.as_str(),
@@ -309,6 +309,9 @@ fn render_named_fields(
         .iter()
         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, field, ty)))
         .map(|(name, field, ty)| {
+            if !is_valid_record_label(name) {
+                return Err(Error::InvalidRecordLabel(name.to_string()));
+            }
             let ty_str = datatype_to_rescript(types, scope, ty)?;
             let final_ty = if field.optional {
                 format!("option<{}>", ty_str)
@@ -323,6 +326,12 @@ fn render_named_fields(
             Ok(out)
         })
         .collect()
+}
+
+fn is_valid_record_label(name: &str) -> bool {
+    let mut chars = name.chars();
+    matches!(chars.next(), Some('a'..='z' | '_'))
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '\''))
 }
 
 /// Format a `Deprecated` into a human-readable note string.
@@ -392,14 +401,16 @@ fn render_enum_variants(
                 _ => variant_name.to_string(),
             },
 
-            Fields::Named(nf) if nf.fields.is_empty() => variant_name.to_string(),
-
             Fields::Named(nf) => {
+                let field_parts = render_named_fields(types, scope, nf)?;
+                if field_parts.is_empty() {
+                    variant_lines.push(format!("{}{}", prefix, variant_name));
+                    continue;
+                }
+
                 // Generate an auxiliary record type: `{enumName}{VariantName}Fields`
                 // The enum name is already lowercased; variant name stays PascalCase.
                 let aux_name = format!("{}{}Fields", enum_rescript_name, variant_name);
-
-                let field_parts = render_named_fields(types, scope, nf)?;
 
                 let aux_decl = format!(
                     "type {}{} = {{\n{},\n}}",

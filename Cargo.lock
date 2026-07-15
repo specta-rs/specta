@@ -2190,6 +2190,7 @@ dependencies = [
 name = "specta-rescript"
 version = "0.0.1"
 dependencies = [
+ "serde",
  "specta",
  "specta-serde",
  "thiserror",

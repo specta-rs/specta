@@ -1,4 +1,7 @@
-use specta::{Type, Types};
+use specta::{
+    Type, Types,
+    datatype::{NamedDataType, Primitive},
+};
 use specta_rescript::ReScript;
 
 fn export<T: specta::Type>() -> String {
@@ -160,6 +163,56 @@ fn test_unit_struct() {
     struct Empty;
     let out = export::<Empty>();
     assert!(out.contains("type empty = unit"), "output: {out}");
+}
+
+#[test]
+fn test_serde_record_label_is_validated() {
+    #[derive(Type, serde::Serialize)]
+    struct RenamedField {
+        #[serde(rename = "kebab-case")]
+        value: String,
+    }
+
+    let error = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<RenamedField>())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_rescript::Error::InvalidRecordLabel(label) if label == "kebab-case"
+    ));
+}
+
+#[test]
+fn test_named_variant_with_only_skipped_fields_is_unit() {
+    #[derive(Type)]
+    enum SkippedFields {
+        Empty {
+            #[specta(skip)]
+            value: String,
+        },
+        Value(String),
+    }
+
+    let out = export::<SkippedFields>();
+    assert!(out.contains("  | Empty\n"), "output: {out}");
+    assert!(!out.contains("skippedFieldsEmptyFields"), "output: {out}");
+}
+
+#[test]
+fn test_duplicate_rescript_type_names_are_rejected() {
+    let mut types = Types::default();
+    NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        ty.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        ty.ty = Some(Primitive::i32.into());
+    });
+
+    assert!(matches!(
+        ReScript::default().export(&types),
+        Err(specta_rescript::Error::DuplicateTypeName { name, .. }) if name == "duplicate"
+    ));
 }
 
 // ---------------------------------------------------------------------------

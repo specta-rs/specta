@@ -11,6 +11,21 @@ pub enum Error {
     #[error("Invalid type: {0}")]
     InvalidType(String),
 
+    /// A record label cannot be represented in ReScript source.
+    #[error("Invalid ReScript record label: {0}")]
+    InvalidRecordLabel(String),
+
+    /// Multiple Rust types map to the same ReScript type name.
+    #[error("Duplicate ReScript type name '{name}' for '{first}' and '{second}'")]
+    DuplicateTypeName {
+        /// Conflicting ReScript type name.
+        name: String,
+        /// First Rust type path.
+        first: String,
+        /// Second Rust type path.
+        second: String,
+    },
+
     /// IO error during file operations.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
