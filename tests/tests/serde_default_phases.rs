@@ -125,6 +125,35 @@ enum VariantFieldDefault {
     },
 }
 
+/// `#[serde(skip, default = "...")]` is a common pattern for non-wire
+/// cache/state fields: `skip` removes the field from BOTH phases, so its
+/// `default` never affects the wire shape and must not force a phase split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedDefault {
+    #[serde(skip, default)]
+    cache: i32,
+    a: i32,
+}
+
+/// A dependent of [`SkippedDefault`] must not be dragged into a split either.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedDefaultParent {
+    inner: SkippedDefault,
+}
+
+/// Same pattern with an explicit default path on a struct-variant field.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkippedDefaultVariant {
+    A {
+        #[serde(skip, default = "i32::default")]
+        cache: i32,
+        x: i32,
+    },
+}
+
 fn named_field_optional(dt: &DataType, types: &Types, field_name: &str) -> bool {
     let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
         panic!("expected named reference, got {dt:?}");
@@ -401,4 +430,38 @@ fn variant_field_default_splits_enum() {
         .expect("PhasesFormat should support `#[serde(default)]` on variant fields");
 
     insta::assert_snapshot!("serde-default-phases-variant-field-default", rendered);
+}
+
+/// A field skipped in BOTH phases never appears on the wire, so its
+/// `default` is wire-irrelevant and must not split the type — nor cascade a
+/// split into dependents. (Plain `#[serde(default)]` splitting is covered by
+/// the tests above as the control.)
+#[test]
+fn default_on_both_phase_skipped_field_does_not_split() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SkippedDefaultParent>()
+                .register::<SkippedDefaultVariant>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept `#[serde(skip, default)]` fields");
+
+    for split_name in [
+        "SkippedDefault_Serialize",
+        "SkippedDefaultParent_Serialize",
+        "SkippedDefaultVariant_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "`#[serde(skip, default)]` never reaches the wire and must not \
+             cause a phase split (found `{split_name}`): {rendered}"
+        );
+    }
+
+    // serde_json ground truth: the skipped field is absent in both phases.
+    let value = SkippedDefault { cache: 9, a: 1 };
+    assert_eq!(serde_json::to_string(&value).unwrap(), r#"{"a":1}"#);
+    let parsed: SkippedDefault = serde_json::from_str(r#"{"a":1,"cache":9}"#).unwrap();
+    assert_eq!((parsed.cache, parsed.a), (0, 1));
 }

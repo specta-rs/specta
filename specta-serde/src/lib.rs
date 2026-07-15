@@ -2371,8 +2371,14 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
                 || !attrs.aliases.is_empty()
                 // `#[serde(default)]` only widens the deserialize shape
                 // (absent fields fall back to `Default::default()`); serde
-                // always emits the field on serialize.
-                || attrs.default
+                // always emits the field on serialize. It is therefore only
+                // a phase difference when the field actually appears on the
+                // deserialize wire: with `skip_deserializing` (including via
+                // full `skip`, e.g. `#[serde(skip, default = "...")]` cache
+                // fields) the default is applied invisibly and neither
+                // exported shape is affected. An asymmetric skip still
+                // splits via the skip check below.
+                || (attrs.default && !attrs.skip_deserializing)
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with
