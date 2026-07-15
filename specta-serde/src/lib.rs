@@ -1774,6 +1774,11 @@ fn unnamed_live_field_count(unnamed: &UnnamedFields) -> usize {
 /// explicitly makes the check exact.
 const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
 
+/// Marker retained when an external variant's serde payload was hidden only
+/// from Specta before the enum was rewritten. The generated string-literal
+/// shape is otherwise indistinguishable from a genuine unit variant.
+const HIDDEN_EXTERNAL_PAYLOAD_MARKER: &str = "specta_serde:hidden_external_payload";
+
 /// Marker retained on a rewritten deserialize-only `#[serde(other)]` branch.
 /// Exporters use it to distinguish the widened catch-all from authored
 /// variant-level untagged branches with an equally broad string field.
@@ -1832,12 +1837,19 @@ fn rewrite_enum_repr_for_phase(
             continue;
         }
 
+        let hidden_external_payload =
+            matches!(repr, EnumRepr::External) && variant_payload_is_hidden(&variant, mode)?;
         if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
             let mut transformed_variant = transform_untagged_variant(&variant)?;
             // Clear attributes like the other transformed variants below, so
             // later passes (which still filter and walk variants before the
             // marker check) see a plain, already-rewritten variant.
             transformed_variant.attributes = Default::default();
+            if hidden_external_payload {
+                transformed_variant
+                    .attributes
+                    .insert(HIDDEN_EXTERNAL_PAYLOAD_MARKER, true);
+            }
             transformed.push((Cow::Owned(variant_name.into_owned()), transformed_variant));
             continue;
         }
@@ -1886,6 +1898,11 @@ fn rewrite_enum_repr_for_phase(
             };
 
             transformed_variant.attributes = Default::default();
+            if hidden_external_payload {
+                transformed_variant
+                    .attributes
+                    .insert(HIDDEN_EXTERNAL_PAYLOAD_MARKER, true);
+            }
             if widen_tag {
                 transformed_variant
                     .attributes
@@ -2622,24 +2639,17 @@ fn variant_collapses_to_unit(variant: &Variant) -> bool {
     }
 }
 
-/// Whether a tuple variant's payload is *hidden* rather than serde-skipped:
-/// zero live fields, at least one of which lacks a serde skip for the given
-/// phase (`#[specta(skip)]` or a hand-built `Field { ty: None, .. }`). serde
-/// still transports those values on the wire, so no payload shape is known
-/// to the export -- the variant follows the hidden-field convention (payload
-/// omitted) instead of fabricating an `[]` serde would reject. A genuinely
-/// empty tuple variant (`V()`) and an all-serde-skipped one really are `[]`
-/// on the wire and are NOT hidden.
+/// Whether a tuple variant contains a payload slot hidden from Specta but live
+/// for serde in this phase (`#[specta(skip)]` or a hand-built `Field { ty:
+/// None, .. }`). serde still transports that value on the wire, so the export
+/// cannot safely describe even the remaining visible tuple slots. Genuinely
+/// serde-skipped slots are not hidden because they are absent from the wire.
 fn variant_payload_is_hidden(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
     let Fields::Unnamed(unnamed) = &variant.fields else {
         return Ok(false);
     };
-    if unnamed.fields.is_empty() || unnamed_live_field_count(unnamed) != 0 {
-        return Ok(false);
-    }
-
     for field in &unnamed.fields {
-        if !should_skip_field_for_mode(field, mode)? {
+        if field.ty.is_none() && !should_skip_field_for_mode(field, mode)? {
             return Ok(true);
         }
     }
@@ -3443,6 +3453,15 @@ fn contextualize_rewritten_external_units(
     let mut changed = false;
 
     for (name, variant) in &mut rewritten.variants {
+        if variant
+            .attributes
+            .contains_key(HIDDEN_EXTERNAL_PAYLOAD_MARKER)
+        {
+            return Err(Error::invalid_internally_tagged_variant(
+                name.clone(),
+                "a payload hidden only from Specta cannot be represented inside an internal tag",
+            ));
+        }
         let Fields::Unnamed(fields) = &variant.fields else {
             continue;
         };
@@ -3530,6 +3549,9 @@ fn external_enum_requires_contextual_rewrite(
             .as_ref()
             .is_some_and(|attrs| attrs.other || attrs.untagged)
         {
+            return Ok(true);
+        }
+        if variant_payload_is_hidden(variant, mode)? {
             return Ok(true);
         }
 

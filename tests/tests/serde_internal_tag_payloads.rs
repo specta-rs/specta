@@ -173,6 +173,62 @@ enum HiddenNamedPayload {
     Value(HiddenNamedNewtype),
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalHiddenPayload {
+    Newtype(#[specta(skip)] i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InlineExternalHiddenPayloadWrapper {
+    Value(#[specta(inline)] ExternalHiddenPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalUntaggedHiddenPayload {
+    Live {
+        value: i32,
+    },
+    #[serde(untagged)]
+    Hidden(#[specta(skip)] i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InlineExternalUntaggedHiddenPayloadWrapper {
+    Value(#[specta(inline)] ExternalUntaggedHiddenPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalHiddenTuplePayload {
+    Tuple(#[specta(skip)] i32, #[specta(skip)] i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum ExternalHiddenTuplePayloadWrapper {
+    Value(ExternalHiddenTuplePayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalPartiallyHiddenTuplePayload {
+    Tuple(#[specta(skip)] i32, i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum ExternalPartiallyHiddenTuplePayloadWrapper {
+    Value(ExternalPartiallyHiddenTuplePayload),
+}
+
 #[derive(Debug, PartialEq, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
@@ -1061,6 +1117,10 @@ fn specta_hidden_newtype_payloads_are_rejected() {
         Types::default().register::<DirectHiddenNamedPayload>(),
         Types::default().register::<HiddenNamedPayload>(),
         Types::default().register::<ExternalWithHiddenPayloadWrapper>(),
+        Types::default().register::<InlineExternalHiddenPayloadWrapper>(),
+        Types::default().register::<InlineExternalUntaggedHiddenPayloadWrapper>(),
+        Types::default().register::<ExternalHiddenTuplePayloadWrapper>(),
+        Types::default().register::<ExternalPartiallyHiddenTuplePayloadWrapper>(),
         Types::default().register::<GenericPayload<HiddenNamed>>(),
     ] {
         assert!(
