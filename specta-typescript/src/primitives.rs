@@ -3,7 +3,10 @@
 //! These are for advanced usecases, you should generally use [crate::Typescript] or
 //! [crate::JSDoc] in end-user applications.
 
-use std::{borrow::Cow, collections::BTreeSet};
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap, HashSet},
+};
 
 use specta::{
     Format, Types,
@@ -359,7 +362,7 @@ fn export_single_internal(
         exporter,
         format,
         types,
-        ndt.ty.as_ref().expect("named datatype must have a body"),
+        &resolve_named_export_body(types, ndt),
         vec![rust_type_path(ndt)],
         Some(ndt.name.as_ref()),
         indent,
@@ -614,7 +617,7 @@ fn append_typedef_body(
         exporter,
         format,
         types,
-        dt.ty.as_ref().expect("named datatype must have a body"),
+        &resolve_named_export_body(types, dt),
         vec![rust_type_path(dt)],
         Some(dt.name.as_ref()),
         &datatype_prefix,
@@ -2116,6 +2119,180 @@ fn enum_variant_datatype(
                 fields => Some(format!("[{}]", fields.join(", "))),
             })
         }
+    }
+}
+
+/// Identity used to detect Serde `#[serde(untagged)]` alias cycles among
+/// named exports (see [`collapse_untagged_alias_cycle`]). Two named types
+/// are treated as "the same" if they share a Rust path, mirroring the
+/// identity `rust_type_path` already uses for name-collision detection
+/// elsewhere in this module.
+type AliasId = (Cow<'static, str>, Cow<'static, str>);
+
+fn alias_id(ndt: &NamedDataType) -> AliasId {
+    (ndt.module_path.clone(), ndt.name.clone())
+}
+
+/// If `variant` is a newtype-style variant whose sole live field renders as
+/// a *bare* reference to another named export - no `{}`/`[]` wrapper around
+/// it - returns that export. This is the shape a `#[serde(untagged)]`
+/// newtype variant takes, since serde adds no wire structure around it: the
+/// variant's TypeScript rendering is exactly its field's rendering.
+///
+/// This is also exactly the "alias-transparent" hop that makes TypeScript's
+/// alias resolution eager: `type X = Y` requires resolving `Y` immediately,
+/// so a cycle through only this shape of hop is what produces the illegal
+/// `type X = X | ...` (TS2456), whereas a cycle through `{ field: X }` or
+/// `X[]` does not, because object/array types defer resolution.
+fn transparent_variant_target<'a>(
+    types: &'a Types,
+    variant: &Variant,
+) -> Option<&'a NamedDataType> {
+    let Fields::Unnamed(unnamed) = &variant.fields else {
+        return None;
+    };
+
+    let mut live_fields = unnamed.fields.iter().filter(|field| field.ty.is_some());
+    let field = live_fields.next()?;
+    if live_fields.next().is_some() {
+        return None;
+    }
+
+    match field.ty.as_ref()? {
+        DataType::Reference(Reference::Named(r)) => match &r.inner {
+            NamedReferenceType::Reference { .. } => types.get(r),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Detects whether `root` is part of an alias-transparent reference cycle -
+/// i.e. whether naively rendering its variants would produce a TypeScript
+/// alias that circularly references itself, directly or through other
+/// untagged enums (`type Rec = Rec | ...`, or `type RecA = RecB | ...;
+/// type RecB = RecA | ...`).
+///
+/// Every untagged newtype variant serializes as exactly its inner value, so
+/// the wire-level value set of an enum in such a cycle is precisely the
+/// union of the *non-cyclic* branches reachable from anywhere in the cycle:
+/// any finite value must eventually bottom out at one of them, since the
+/// recursive branches never add wire structure of their own. Returns the
+/// merged, cycle-free variant list to render in `root`'s place, or `None`
+/// if `root` isn't part of such a cycle - in which case its rendering must
+/// be left completely untouched.
+///
+/// Regression test for https://github.com/specta-rs/specta/pull/517#discussion_r3584346217:
+/// exporting `#[serde(untagged)] enum Rec { A(Box<Rec>), B(Map) }` used to
+/// emit `export type Rec = Rec | Map;`, which `tsc` rejects.
+fn collapse_untagged_alias_cycle(types: &Types, root: &NamedDataType) -> Option<Enum> {
+    let DataType::Enum(root_enum) = root.ty.as_ref()? else {
+        return None;
+    };
+    let root_id = alias_id(root);
+
+    // Discover every named export reachable from `root` via alias-transparent
+    // hops, and the edges between them. This set is closed under the edge
+    // relation (we only stop descending at non-enum or already-seen nodes),
+    // so checking whether some member can reach back to `root` never needs
+    // to look outside of it.
+    let mut enums: HashMap<AliasId, &Enum> = HashMap::new();
+    enums.insert(root_id.clone(), root_enum);
+    let mut edges: HashMap<AliasId, Vec<AliasId>> = HashMap::new();
+    let mut frontier = vec![root_id.clone()];
+    while let Some(id) = frontier.pop() {
+        let enm = enums[&id];
+        let mut targets = Vec::new();
+        for (_, variant) in &enm.variants {
+            if variant.skip {
+                continue;
+            }
+            let Some(target) = transparent_variant_target(types, variant) else {
+                continue;
+            };
+            let target_id = alias_id(target);
+            targets.push(target_id.clone());
+
+            if !enums.contains_key(&target_id)
+                && let Some(DataType::Enum(target_enum)) = target.ty.as_ref()
+            {
+                enums.insert(target_id.clone(), target_enum);
+                frontier.push(target_id);
+            }
+        }
+        edges.insert(id, targets);
+    }
+
+    // A node is part of `root`'s cycle iff it can reach `root` again by
+    // following the same edges - i.e. it's mutually reachable with `root`,
+    // which is exactly strongly-connected-component membership.
+    let in_cycle: HashSet<AliasId> = enums
+        .keys()
+        .filter(|id| **id == root_id || alias_reaches(&edges, id, &root_id))
+        .cloned()
+        .collect();
+
+    let has_direct_self_loop = edges
+        .get(&root_id)
+        .is_some_and(|targets| targets.contains(&root_id));
+    if in_cycle.len() <= 1 && !has_direct_self_loop {
+        return None;
+    }
+
+    let mut variants = Vec::with_capacity(in_cycle.len());
+    for id in &in_cycle {
+        let enm = enums[id];
+        for (name, variant) in &enm.variants {
+            if variant.skip {
+                continue;
+            }
+
+            let is_back_edge = transparent_variant_target(types, variant)
+                .is_some_and(|target| in_cycle.contains(&alias_id(target)));
+            if !is_back_edge {
+                variants.push((name.clone(), variant.clone()));
+            }
+        }
+    }
+
+    let mut collapsed = Enum::default();
+    collapsed.variants = variants;
+    Some(collapsed)
+}
+
+/// Whether `target` is reachable from `start` by following `edges`.
+fn alias_reaches(
+    edges: &HashMap<AliasId, Vec<AliasId>>,
+    start: &AliasId,
+    target: &AliasId,
+) -> bool {
+    let mut seen = HashSet::new();
+    let mut frontier = vec![start.clone()];
+    while let Some(id) = frontier.pop() {
+        let Some(next_ids) = edges.get(&id) else {
+            continue;
+        };
+        for next in next_ids {
+            if next == target {
+                return true;
+            }
+            if seen.insert(next.clone()) {
+                frontier.push(next.clone());
+            }
+        }
+    }
+    false
+}
+
+/// Returns the [`DataType`] to render as `ndt`'s own top-level export body,
+/// collapsing an untagged-enum alias cycle into valid TypeScript if `ndt` is
+/// part of one (see [`collapse_untagged_alias_cycle`]). Borrows `ndt.ty`
+/// unchanged in the (overwhelmingly common) non-cyclic case.
+fn resolve_named_export_body<'a>(types: &Types, ndt: &'a NamedDataType) -> Cow<'a, DataType> {
+    let ty = ndt.ty.as_ref().expect("named datatype must have a body");
+    match collapse_untagged_alias_cycle(types, ndt) {
+        Some(collapsed) => Cow::Owned(DataType::Enum(collapsed)),
+        None => Cow::Borrowed(ty),
     }
 }
 
