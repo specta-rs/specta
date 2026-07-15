@@ -421,7 +421,12 @@ fn render_tagged_enum(
             out.push_str("    @Deprecated\n");
         }
         let java_name = type_identifier(variant_name, &format!("{path}.{variant_name}"))?;
-        let fields = fields(ctx, &variant.fields, &format!("{path}.{variant_name}"))?;
+        let variant_ctx = ctx.with_nested_type(java_name.clone());
+        let fields = fields(
+            &variant_ctx,
+            &variant.fields,
+            &format!("{path}.{variant_name}"),
+        )?;
         validate_nested_declarations(&fields, &java_name, path)?;
         if fields.is_empty() {
             write!(

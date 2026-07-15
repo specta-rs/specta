@@ -660,6 +660,39 @@ fn nested_names_do_not_redeclare_ancestor_types() {
 }
 
 #[test]
+fn variant_names_scope_nested_inline_types() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Leaf {
+        value: u8,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EventWithInlineVariant {
+        A {
+            #[specta(inline)]
+            a: Leaf,
+        },
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<EventWithInlineVariant>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("record A("));
+    assert!(source.contains("AInline a"));
+    assert!(source.contains("public record AInline("));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
 fn rejects_wrapper_and_nested_declaration_collisions() {
     #[derive(Type)]
     #[specta(collect = false)]
