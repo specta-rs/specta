@@ -511,6 +511,181 @@ fn flatten_of_generic_parameter_is_accepted() {
         .expect("flattening a generic parameter instantiated with a struct is valid serde usage");
 }
 
+// A *reference* to a generic type, on the other hand, carries concrete
+// generic arguments, so the flatten target's shape is knowable: the argument
+// must be substituted into the resolved definition instead of accepting the
+// bare `DataType::Generic` placeholder.
+// https://github.com/specta-rs/specta/pull/524#discussion_r-codex (generic
+// substitution when resolving flatten targets)
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct GenericNewtype<T>(T);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenGenericNewtypeVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    w: GenericNewtype<Vec<u8>>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenGenericNewtypeStructValid {
+    a: i32,
+    #[serde(flatten)]
+    w: GenericNewtype<Inner>,
+}
+
+#[test]
+fn serde_json_confirms_flatten_of_generic_newtype_over_vec_fails() {
+    let err = serde_json::to_string(&FlattenGenericNewtypeVecInvalid {
+        a: 1,
+        w: GenericNewtype(vec![1]),
+    })
+    .expect_err("newtype delegation exposes the Vec, which serde can't flatten");
+    assert!(
+        err.to_string()
+            .contains("can only flatten structs and maps"),
+        "unexpected serde_json error: {err}"
+    );
+
+    serde_json::to_string(&FlattenGenericNewtypeStructValid {
+        a: 1,
+        w: GenericNewtype(Inner { b: 2 }),
+    })
+    .expect("newtype delegation exposes the struct, which flattens fine");
+}
+
+#[test]
+fn flatten_of_generic_newtype_instantiated_with_vec_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenGenericNewtypeVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "the reference carries the concrete Vec<u8> argument, so the flatten target is \
+             knowably a sequence",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_generic_newtype_instantiated_with_struct_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenGenericNewtypeStructValid>(),
+            specta_serde::Format,
+        )
+        .expect("substitution must not reject a struct-shaped instantiation");
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenNestedGenericNewtypeVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    w: GenericNewtype<GenericNewtype<Vec<u8>>>,
+}
+
+#[test]
+fn flatten_of_nested_generic_newtype_over_vec_is_rejected() {
+    // The substitution environment is lexically scoped: the outer wrapper's
+    // argument (`GenericNewtype<Vec<u8>>`) must be resolved in the scope it
+    // was written in, then the inner wrapper's argument (`Vec<u8>`) in turn.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNestedGenericNewtypeVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err("newtype delegation bottoms out at the Vec through both wrappers");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// A self-recursive generic newtype must terminate: the definition's inner
+// reference (`GenericSelfRecursive<T>`) is a fixed syntactic key, so the
+// visited set catches the cycle on the second unfolding. (Non-regular
+// recursion like `struct N<T>(Box<N<Option<T>>>)` - where lazy substitution
+// is what guarantees the visited keys stay finite - can't even be derived:
+// rustc hits its recursion limit monomorphizing `Type` for it.)
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct GenericSelfRecursive<T>(Box<GenericSelfRecursive<T>>, std::marker::PhantomData<T>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenGenericSelfRecursive {
+    a: i32,
+    #[serde(flatten)]
+    v: GenericSelfRecursive<Inner>,
+}
+
+#[test]
+fn flatten_of_self_recursive_generic_terminates() {
+    let _ = with_timeout(std::time::Duration::from_secs(10), || {
+        Typescript::default().export(
+            &Types::default().register::<FlattenGenericSelfRecursive>(),
+            specta_serde::Format,
+        )
+    });
+}
+
+// Explicit `specta_serde::Phased` overrides replace the field's datatype with
+// an opaque reference holding both phase shapes; a flatten check must look
+// inside rather than trusting the opaque wrapper, since serde still has to
+// flatten the real value in both directions at runtime.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<Vec<String>, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedMapValid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<HashMap<String, String>, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[test]
+fn flatten_of_phased_override_with_sequence_phase_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedVecInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the serialize phase is a Vec, which serde can't flatten at runtime");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_phased_override_with_map_and_struct_phases_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedMapValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("both phases are map/struct-shaped, so the flatten is valid in both directions");
+}
+
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]

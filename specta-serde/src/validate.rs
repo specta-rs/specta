@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use specta::{
     Types,
     datatype::{
-        DataType, Enum, Field, Fields, NamedReference, NamedReferenceType, Reference, Variant,
+        DataType, Enum, Field, Fields, Generic, NamedReference, NamedReferenceType, Reference,
+        Variant,
     },
 };
 
@@ -587,7 +588,23 @@ fn validate_flatten_field(
         return Ok(());
     }
 
-    validate_flatten_target(ty, types, path, &mut HashSet::new())
+    validate_flatten_target(ty, types, path, &mut HashSet::new(), None)
+}
+
+/// Lexically scoped substitution environment for resolving
+/// [`DataType::Generic`] placeholders while checking a flatten target.
+///
+/// Each time [`validate_flatten_target`] follows a named reference that
+/// carries concrete generic arguments, it pushes a new frame mapping the
+/// definition's parameters to those arguments. The arguments themselves were
+/// written one scope up, so when a placeholder resolves to an argument, the
+/// argument is validated against this frame's `parent`. Substitution is lazy
+/// (no datatype is ever rewritten), which keeps the `seen` keys syntactic and
+/// guarantees termination even for non-regular recursive generics like
+/// `struct N<T>(Box<N<Option<T>>>)`.
+struct GenericEnv<'a> {
+    map: &'a [(Generic, DataType)],
+    parent: Option<&'a GenericEnv<'a>>,
 }
 
 /// `seen` tracks named references currently being resolved on this flatten
@@ -601,6 +618,7 @@ fn validate_flatten_target(
     types: &Types,
     path: &str,
     seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     match ty {
         // Maps merge directly. Enums are accepted for all four serde
@@ -620,7 +638,7 @@ fn validate_flatten_target(
         DataType::Intersection(_) => Ok(()),
         // A flattened `Option<T>` (including nested `Option<Option<T>>`)
         // contributes nothing when absent and validates as `T` when present.
-        DataType::Nullable(inner) => validate_flatten_target(inner, types, path, seen),
+        DataType::Nullable(inner) => validate_flatten_target(inner, types, path, seen, env),
         // `()` and other zero-element tuples serialize as nothing, so
         // flattening one is a harmless no-op (verified against serde_json).
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
@@ -648,7 +666,7 @@ fn validate_flatten_target(
                 return match inner_fields.as_slice() {
                     // Not exactly one live field: leave it be rather than
                     // false-positive on a shape we can't confidently resolve.
-                    [only] => validate_flatten_target(only, types, path, seen),
+                    [only] => validate_flatten_target(only, types, path, seen, env),
                     _ => Ok(()),
                 };
             }
@@ -661,7 +679,7 @@ fn validate_flatten_target(
                     // the inner value (no `#[serde(transparent)]` needed), so
                     // the flatten target is the inner value's shape.
                     [single] => match &single.ty {
-                        Some(ty) => validate_flatten_target(ty, types, path, seen),
+                        Some(ty) => validate_flatten_target(ty, types, path, seen, env),
                         // The field is skipped, so its type is unknowable
                         // here (serde still delegates to it when
                         // serializing); don't false-positive.
@@ -683,15 +701,66 @@ fn validate_flatten_target(
                 return Ok(());
             }
 
-            let result = named_reference_ty(reference, types)
-                .map_or(Ok(()), |ty| validate_flatten_target(ty, types, path, seen));
+            let result = match &reference.inner {
+                // Inline datatypes were written at the use site, so they
+                // resolve generic placeholders against the current scope.
+                NamedReferenceType::Inline { dt, .. } => {
+                    validate_flatten_target(dt, types, path, seen, env)
+                }
+                // The resolved definition's placeholders resolve against this
+                // reference's concrete arguments, which themselves were
+                // written in the current scope - hence `parent: env`.
+                NamedReferenceType::Reference { generics, .. } => types
+                    .get(reference)
+                    .and_then(|ndt| ndt.ty.as_ref())
+                    .map_or(Ok(()), |ty| {
+                        validate_flatten_target(
+                            ty,
+                            types,
+                            path,
+                            seen,
+                            Some(&GenericEnv {
+                                map: generics,
+                                parent: env,
+                            }),
+                        )
+                    }),
+                // A recursive-inline marker is a cycle we've already checked.
+                NamedReferenceType::Recursive(_) => Ok(()),
+            };
             seen.remove(&key);
 
             result
         }
-        // Can't inspect the shape behind an opaque reference or a generic
-        // parameter here; don't false-positive on it.
-        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => Ok(()),
+        // A generic placeholder is knowable whenever the enclosing definition
+        // was reached through a reference carrying concrete arguments:
+        // substitute and validate the argument in the scope it was written
+        // in. A bare placeholder (validating the generic definition itself)
+        // stays accepted - serde allows it whenever the instantiation is
+        // struct/map-shaped, so rejecting it would be a false positive.
+        DataType::Generic(generic) => {
+            match env.and_then(|env| env.map.iter().find(|(param, _)| param == generic)) {
+                Some((_, arg)) => {
+                    validate_flatten_target(arg, types, path, seen, env.and_then(|env| env.parent))
+                }
+                None => Ok(()),
+            }
+        }
+        DataType::Reference(Reference::Opaque(reference)) => {
+            // An explicit `specta_serde::Phased<Serialize, Deserialize>`
+            // override is stored as an opaque reference wrapping both phase
+            // shapes; serde still has to flatten the real value in both
+            // directions, so each phase must be a valid flatten target.
+            match reference.downcast_ref::<PhasedTy>() {
+                Some(phased) => {
+                    validate_flatten_target(&phased.serialize, types, path, seen, env)?;
+                    validate_flatten_target(&phased.deserialize, types, path, seen, env)
+                }
+                // Any other opaque reference is exporter-specific; its shape
+                // is unknowable here, so don't false-positive on it.
+                None => Ok(()),
+            }
+        }
         DataType::List(_) | DataType::Tuple(_) | DataType::Primitive(_) => {
             Err(Error::invalid_flatten_target(
                 path.to_string(),
