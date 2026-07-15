@@ -3,7 +3,8 @@
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Enum, Fields, Generic, NamedReferenceType, Primitive, Reference, Variant,
+        DataType, Enum, Field, Fields, Generic, NamedReferenceType, Primitive, Reference, Struct,
+        Variant,
     },
 };
 
@@ -221,7 +222,22 @@ pub fn export_type(
     types: &Types,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String, Error> {
-    if !matches!(&ndt.ty, Some(DataType::Struct(_) | DataType::Enum(_))) {
+    // A named tuple definition (e.g. produced by specta-serde when
+    // `#[serde(skip)]` reduces a tuple struct to one live field) renders
+    // exactly like a tuple struct with the same elements.
+    let tuple_as_struct = match &ndt.ty {
+        Some(DataType::Tuple(tuple)) => {
+            let mut builder = Struct::unnamed();
+            for element in &tuple.elements {
+                builder = builder.field(Field::new(element.clone()));
+            }
+            Some(builder.build())
+        }
+        _ => None,
+    };
+    let ndt_ty = tuple_as_struct.as_ref().or(ndt.ty.as_ref());
+
+    if !matches!(ndt_ty, Some(DataType::Struct(_) | DataType::Enum(_))) {
         return Ok(String::new());
     }
     let mut result = String::new();
@@ -259,7 +275,7 @@ pub fn export_type(
         .collect::<Vec<_>>();
 
     // Format based on type
-    match ndt.ty.as_ref().expect("checked above") {
+    match ndt_ty.expect("checked above") {
         DataType::Struct(s) => {
             let type_def = struct_to_swift(swift, format, types, s, generic_scope.clone())?;
             let name = swift.naming.convert(&ndt.name);
@@ -281,14 +297,11 @@ pub fn export_type(
             result.push('}');
         }
         DataType::Enum(e) => {
-            let formatted_enum = match apply_datatype_format(
-                None,
-                types,
-                ndt.ty.as_ref().expect("checked above"),
-            )? {
-                DataType::Enum(e) => Some(e),
-                _ => None,
-            };
+            let formatted_enum =
+                match apply_datatype_format(None, types, ndt_ty.expect("checked above"))? {
+                    DataType::Enum(e) => Some(e),
+                    _ => None,
+                };
             let e = formatted_enum
                 .as_ref()
                 .filter(|e| resolved_string_enum(e).is_some())

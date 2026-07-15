@@ -65,6 +65,17 @@ pub enum Error {
         /// Schema path being rendered.
         path: String,
     },
+
+    /// Two distinct types resolve to the same schema definition name.
+    #[error("schema definition name collision for {name:?}: {first} and {second}")]
+    DuplicateDefinitionName {
+        /// Colliding schema definition name.
+        name: String,
+        /// First Rust type path.
+        first: String,
+        /// Second Rust type path.
+        second: String,
+    },
 }
 
 impl Error {

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    datatype::{DataType, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -21,6 +21,9 @@ use crate::{
 /// [`NamedDataType`] values.
 #[derive(Default, Clone)]
 pub struct Types {
+    /// Concrete datatypes returned by explicit top-level registrations.
+    roots: Vec<DataType>,
+
     /// Registered named datatypes keyed by their stable identity.
     ///
     /// A `None` value is a placeholder for a datatype whose definition is
@@ -118,7 +121,10 @@ pub(crate) struct InlineResolutionFrame {
 
 impl fmt::Debug for Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Types").field(&self.types).finish()
+        f.debug_struct("Types")
+            .field("types", &self.types)
+            .field("roots", &self.roots)
+            .finish()
     }
 }
 
@@ -128,14 +134,23 @@ impl Types {
     /// This consumes and returns `self`, making it convenient to chain multiple
     /// registrations.
     pub fn register<T: Type>(mut self) -> Self {
-        T::definition(&mut self);
+        self.register_mut::<T>();
         self
     }
 
     /// Registers `T` and its named dependencies with the collection in-place.
     pub fn register_mut<T: Type>(&mut self) -> &mut Self {
-        T::definition(self);
+        let root = T::definition(self);
+        self.roots.push(root);
         self
+    }
+
+    /// Returns the concrete datatypes explicitly registered as top-level roots.
+    ///
+    /// Named dependencies discovered while resolving a root are available
+    /// through the normal type iterators and are not repeated here.
+    pub fn roots(&self) -> impl ExactSizeIterator<Item = &'_ DataType> {
+        self.roots.iter()
     }
 
     /// Gets the named datatype targeted by a [`NamedReference`].
@@ -173,6 +188,7 @@ impl Types {
     /// Existing completed entries in `self` are kept. A placeholder in `self` is
     /// replaced by a completed entry from `other` when available.
     pub fn extend(&mut self, other: &Self) {
+        self.roots.extend(other.roots.iter().cloned());
         for (id, other) in &other.types {
             match self.types.get(id) {
                 // Key doesn't exist - insert from other

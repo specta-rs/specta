@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsonschema.rs
-assertion_line: 8
 expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()"
 ---
 {
@@ -15,6 +14,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "b": {
+              "format": "int64",
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -31,6 +32,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "flattened": {
+              "format": "int64",
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -44,6 +47,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "generic_flattened": {
+              "format": "int64",
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -62,19 +67,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "e"
       ],
       "title": "A",
-      "type": "object"
-    },
-    "AGenericStruct": {
-      "additionalProperties": false,
-      "properties": {
-        "field": {
-          "$ref": "#/$defs/Demo_T_bool"
-        }
-      },
-      "required": [
-        "field"
-      ],
-      "title": "AGenericStruct",
       "type": "object"
     },
     "AGenericStruct_u32": {
@@ -169,6 +161,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "b": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -195,6 +189,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "a": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -214,6 +211,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "a": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -233,6 +233,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -243,16 +246,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "BracedStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "BracedStruct",
-      "type": "array"
+      "type": "string"
     },
     "ChainedGenericDefault_String_String": {
       "additionalProperties": false,
@@ -295,6 +290,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "string"
         },
         "second": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -309,9 +307,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "first": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "second": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -330,6 +334,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "description": " Some triple-slash comment\n Some more triple-slash comment",
           "properties": {
             "A": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -347,6 +354,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "properties": {
                 "a": {
                   "description": " Some triple-slash comment\n Some more triple-slash comment",
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -370,6 +380,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "description": " Some triple-slash comment\n Some more triple-slash comment",
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -384,6 +397,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -392,6 +406,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -402,6 +417,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "data": {
           "items": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -421,6 +438,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -431,6 +449,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -441,6 +460,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "data": {
           "items": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -471,9 +492,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": {
             "$ref": "#/$defs/Generic1_String"
           },
-          "propertyNames": {
-            "type": "string"
-          },
           "type": "object"
         },
         "foo": {
@@ -500,10 +518,10 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "ContainerTypeOverrideStruct",
       "type": "string"
     },
-    "ContainerTypeOverrideToGeneric": {
-      "title": "ContainerTypeOverrideToGeneric"
-    },
     "ContainerTypeOverrideToGeneric_i32": {
+      "format": "int32",
+      "maximum": 2147483647,
+      "minimum": -2147483648,
       "title": "ContainerTypeOverrideToGeneric",
       "type": "integer"
     },
@@ -516,23 +534,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "string"
         },
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       ],
       "title": "ContainerTypeOverrideTuple",
-      "type": "array"
-    },
-    "ContainerTypeOverrideTupleGeneric": {
-      "items": false,
-      "maxItems": 2,
-      "minItems": 2,
-      "prefixItems": [
-        {},
-        {
-          "type": "string"
-        }
-      ],
-      "title": "ContainerTypeOverrideTupleGeneric",
       "type": "array"
     },
     "ContainerTypeOverrideTupleGeneric_i32": {
@@ -541,6 +549,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "minItems": 2,
       "prefixItems": [
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -554,6 +565,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "flattened": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -564,38 +577,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "D",
       "type": "object"
     },
-    "Demo": {
-      "additionalProperties": false,
-      "properties": {
-        "a": {},
-        "b": {}
-      },
-      "required": [
-        "a",
-        "b"
-      ],
-      "title": "Demo",
-      "type": "object"
-    },
-    "Demo_T_bool": {
-      "additionalProperties": false,
-      "properties": {
-        "a": {},
-        "b": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "a",
-        "b"
-      ],
-      "title": "Demo",
-      "type": "object"
-    },
     "Demo_u32_bool": {
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
@@ -614,6 +601,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -650,6 +638,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
@@ -686,6 +677,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "string"
         },
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       ],
@@ -697,6 +691,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "deprecated": true,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -711,6 +708,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "deprecated": true,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -725,6 +725,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "deprecated": true,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -874,6 +877,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "bbb": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -886,6 +892,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "cccc": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -904,6 +913,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
                   "type": "string"
                 },
                 "bbbbbb": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -956,6 +968,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "additionalProperties": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "propertyNames": {
@@ -1043,16 +1058,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "ExtraBracketsInUnnamedStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "ExtraBracketsInUnnamedStruct",
-      "type": "array"
+      "type": "string"
     },
     "First": {
       "additionalProperties": false,
@@ -1071,9 +1078,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1089,6 +1102,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "c": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1100,9 +1116,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "a": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "b": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1121,6 +1143,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "c": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1132,9 +1157,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "a": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "b": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1155,6 +1186,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/FlattenA"
         },
         "c": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1173,6 +1207,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             {
               "properties": {
                 "c": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1184,9 +1221,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             {
               "properties": {
                 "a": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "b": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1200,6 +1243,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "unevaluatedProperties": false
         },
         "d": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1279,6 +1325,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             {
               "properties": {
                 "c": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1290,9 +1339,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             {
               "properties": {
                 "a": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "b": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1306,6 +1361,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "unevaluatedProperties": false
         },
         "d": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1323,6 +1381,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/FlattenB"
         },
         "d": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1388,22 +1449,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "Fourth",
       "type": "object"
     },
-    "Generic1": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {},
-        "values": {
-          "items": {},
-          "type": "array"
-        }
-      },
-      "required": [
-        "value",
-        "values"
-      ],
-      "title": "Generic1",
-      "type": "object"
-    },
     "Generic1_String": {
       "additionalProperties": false,
       "properties": {
@@ -1448,11 +1493,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "value": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
         "values": {
           "items": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -1465,141 +1514,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       ],
       "title": "Generic1",
       "type": "object"
-    },
-    "Generic2": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "A": {}
-          },
-          "required": [
-            "A"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "B": {
-              "items": false,
-              "maxItems": 3,
-              "minItems": 3,
-              "prefixItems": [
-                {},
-                {},
-                {}
-              ],
-              "type": "array"
-            }
-          },
-          "required": [
-            "B"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "C": {
-              "items": {},
-              "type": "array"
-            }
-          },
-          "required": [
-            "C"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "D": {
-              "items": {
-                "items": {
-                  "items": {},
-                  "type": "array"
-                },
-                "type": "array"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "D"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "E": {
-              "additionalProperties": false,
-              "properties": {
-                "a": {},
-                "b": {},
-                "c": {}
-              },
-              "required": [
-                "a",
-                "b",
-                "c"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "E"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "X": {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "X"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "Y": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "Y"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "Z": {
-              "items": {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "Z"
-          ],
-          "type": "object"
-        }
-      ],
-      "title": "Generic2"
     },
     "Generic2_Tuple__String_i32": {
       "oneOf": [
@@ -1646,6 +1560,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "C": {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -1690,6 +1607,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
                   "type": "string"
                 },
                 "c": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1711,6 +1631,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "X": {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -1725,6 +1648,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "Y": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1739,6 +1665,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             "Z": {
               "items": {
                 "items": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "type": "array"
@@ -1753,38 +1682,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         }
       ],
       "title": "Generic2"
-    },
-    "GenericAutoBound": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {},
-        "values": {
-          "items": {},
-          "type": "array"
-        }
-      },
-      "required": [
-        "value",
-        "values"
-      ],
-      "title": "GenericAutoBound",
-      "type": "object"
-    },
-    "GenericAutoBound2": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {},
-        "values": {
-          "items": {},
-          "type": "array"
-        }
-      },
-      "required": [
-        "value",
-        "values"
-      ],
-      "title": "GenericAutoBound2",
-      "type": "object"
     },
     "GenericAutoBound2_Tuple_": {
       "additionalProperties": false,
@@ -1826,21 +1723,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "GenericAutoBound",
       "type": "object"
     },
-    "GenericDefaultSkipped": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {}
-      },
-      "required": [
-        "value"
-      ],
-      "title": "GenericDefaultSkipped",
-      "type": "object"
-    },
     "GenericDefaultSkippedNonType": {
       "additionalProperties": false,
       "properties": {
         "value": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1876,48 +1765,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "GenericDefault",
       "type": "object"
     },
-    "GenericFlattened": {
-      "additionalProperties": false,
-      "properties": {
-        "generic_flattened": {}
-      },
-      "required": [
-        "generic_flattened"
-      ],
-      "title": "GenericFlattened",
-      "type": "object"
-    },
-    "GenericNewType1": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "items": {
-            "items": {},
-            "type": "array"
-          },
-          "type": "array"
-        }
-      ],
-      "title": "GenericNewType1",
-      "type": "array"
-    },
     "GenericNewType1_Tuple_": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "items": {
-            "items": {
-              "type": "null"
-            },
-            "type": "array"
-          },
-          "type": "array"
-        }
-      ],
+      "items": {
+        "items": {
+          "type": "null"
+        },
+        "type": "array"
+      },
       "title": "GenericNewType1",
       "type": "array"
     },
@@ -1932,114 +1786,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "pair"
       ],
       "title": "GenericParameterOrderPreserved",
-      "type": "object"
-    },
-    "GenericStruct": {
-      "additionalProperties": false,
-      "properties": {
-        "arg": {}
-      },
-      "required": [
-        "arg"
-      ],
-      "title": "GenericStruct",
-      "type": "object"
-    },
-    "GenericStruct2": {
-      "additionalProperties": false,
-      "properties": {
-        "a": {},
-        "b": {
-          "items": false,
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {},
-            {}
-          ],
-          "type": "array"
-        },
-        "c": {
-          "items": false,
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {},
-            {
-              "items": false,
-              "maxItems": 2,
-              "minItems": 2,
-              "prefixItems": [
-                {},
-                {}
-              ],
-              "type": "array"
-            }
-          ],
-          "type": "array"
-        },
-        "d": {
-          "items": {},
-          "maxItems": 3,
-          "minItems": 3,
-          "type": "array"
-        },
-        "e": {
-          "items": {
-            "items": false,
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {},
-              {}
-            ],
-            "type": "array"
-          },
-          "maxItems": 3,
-          "minItems": 3,
-          "type": "array"
-        },
-        "f": {
-          "items": {},
-          "type": "array"
-        },
-        "g": {
-          "items": {
-            "items": {},
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "h": {
-          "items": {
-            "items": {
-              "items": false,
-              "maxItems": 2,
-              "minItems": 2,
-              "prefixItems": [
-                {},
-                {}
-              ],
-              "type": "array"
-            },
-            "maxItems": 3,
-            "minItems": 3,
-            "type": "array"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h"
-      ],
-      "title": "GenericStruct2",
       "type": "object"
     },
     "GenericStruct2_Tuple_": {
@@ -2182,6 +1928,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "arg": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -2191,48 +1940,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "GenericStruct",
       "type": "object"
     },
-    "GenericTuple": {
-      "items": false,
-      "maxItems": 3,
-      "minItems": 3,
-      "prefixItems": [
-        {},
-        {
-          "items": {},
-          "type": "array"
-        },
-        {
-          "items": {
-            "items": {},
-            "type": "array"
-          },
-          "type": "array"
-        }
-      ],
-      "title": "GenericTuple",
-      "type": "array"
-    },
-    "GenericTupleStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {}
-      ],
-      "title": "GenericTupleStruct",
-      "type": "array"
-    },
     "GenericTupleStruct_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "GenericTupleStruct",
-      "type": "array"
+      "type": "string"
     },
     "GenericTuple_Tuple_": {
       "items": false,
@@ -2261,17 +1971,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "GenericTuple",
       "type": "array"
     },
-    "GenericType": {
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {}
-      ],
-      "title": "GenericType"
-    },
     "GenericType_String": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
@@ -2282,19 +1983,11 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "GenericType"
     },
     "HasGenericAlias": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "string"
+      },
       "title": "HasGenericAlias",
-      "type": "array"
+      "type": "object"
     },
     "InlineConstGenericContainer": {
       "additionalProperties": false,
@@ -2304,6 +1997,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "a": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2314,6 +2008,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "d": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2324,6 +2019,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "data": {
               "items": {
+                "format": "int64",
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2344,6 +2041,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "a": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2354,6 +2052,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "d": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2364,6 +2063,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "data": {
               "items": {
+                "format": "int64",
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2381,6 +2082,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -2461,17 +2163,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "InlineFlattenGenerics",
       "unevaluatedProperties": false
     },
-    "InlineFlattenGenericsG": {
-      "additionalProperties": false,
-      "properties": {
-        "t": {}
-      },
-      "required": [
-        "t"
-      ],
-      "title": "InlineFlattenGenericsG",
-      "type": "object"
-    },
     "InlineFlattenGenericsG_String": {
       "additionalProperties": false,
       "properties": {
@@ -2532,6 +2223,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -2540,6 +2232,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -2550,6 +2243,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "data": {
           "items": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -2576,6 +2271,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "a": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2586,6 +2282,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "d": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2596,6 +2293,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "data": {
               "items": {
+                "format": "int64",
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2620,6 +2319,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "a": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2630,6 +2330,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "d": {
               "items": {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -2640,6 +2341,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             "data": {
               "items": {
+                "format": "int64",
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2661,6 +2364,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -2685,6 +2389,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/SimpleStruct"
         },
         "val": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -2776,6 +2483,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "$ref": "#/$defs/SimpleStruct"
             },
             "val": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -2798,6 +2508,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "properties": {
             "a": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -2861,16 +2574,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "InternallyTaggedHInner": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "InternallyTaggedHInner",
-      "type": "array"
+      "type": "null"
     },
     "InternallyTaggedL": {
       "const": "A",
@@ -2919,7 +2624,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "InternallyTaggedMInner": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
@@ -2997,7 +2702,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "Issue221External"
     },
     "Issue221UntaggedMixed": {
-      "oneOf": [
+      "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
@@ -3029,9 +2734,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "additionalProperties": {
                 "type": "string"
               },
-              "propertyNames": {
-                "type": "string"
-              },
               "type": "object"
             }
           },
@@ -3044,7 +2746,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "Issue221UntaggedMixed"
     },
     "Issue221UntaggedSafe": {
-      "oneOf": [
+      "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
@@ -3101,37 +2803,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "KebabCase",
       "type": "object"
     },
-    "LifetimeGenericEnum": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "Borrowed": {}
-          },
-          "required": [
-            "Borrowed"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "Owned": {}
-          },
-          "required": [
-            "Owned"
-          ],
-          "type": "object"
-        }
-      ],
-      "title": "LifetimeGenericEnum"
-    },
     "LifetimeGenericEnum_i32": {
       "oneOf": [
         {
           "additionalProperties": false,
           "properties": {
             "Borrowed": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3144,6 +2824,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "Owned": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3155,36 +2838,23 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       ],
       "title": "LifetimeGenericEnum"
     },
-    "LifetimeGenericStruct": {
-      "additionalProperties": false,
-      "properties": {
-        "borrowed": {
-          "items": {},
-          "type": "array"
-        },
-        "owned": {
-          "items": {},
-          "type": "array"
-        }
-      },
-      "required": [
-        "borrowed",
-        "owned"
-      ],
-      "title": "LifetimeGenericStruct",
-      "type": "object"
-    },
     "LifetimeGenericStruct_i32": {
       "additionalProperties": false,
       "properties": {
         "borrowed": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
         },
         "owned": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -3231,6 +2901,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "additionalProperties": false,
               "properties": {
                 "progress": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "projectName": {
@@ -3324,16 +2997,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "MacroEnum"
     },
     "MacroStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "MacroStruct",
-      "type": "array"
+      "type": "string"
     },
     "MacroStruct2": {
       "additionalProperties": false,
@@ -3347,40 +3012,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       ],
       "title": "MacroStruct2",
       "type": "object"
-    },
-    "MaybeValidKey": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {}
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
-    },
-    "MaybeValidKey_MaybeValidKey_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/MaybeValidKey_String"
-        }
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
-    },
-    "MaybeValidKey_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
     },
     "MyEmptyInput": {
       "additionalProperties": false,
@@ -3406,6 +3037,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "B": {
+              "format": "int64",
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -3488,6 +3121,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "properties": {
         "a": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -3496,6 +3130,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -3506,6 +3141,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "data": {
           "items": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -3531,6 +3168,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "d": {
           "items": {
+            "format": "int32",
             "maximum": 255,
             "minimum": 0,
             "type": "integer"
@@ -3573,6 +3211,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "const": "b"
             },
             "value": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3660,23 +3301,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "Ninth"
     },
     "NonOptional": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
+      "anyOf": [
         {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string"
+        },
+        {
+          "type": "null"
         }
       ],
-      "title": "NonOptional",
-      "type": "array"
+      "title": "NonOptional"
     },
     "OptionalInEnum": {
       "oneOf": [
@@ -3753,11 +3386,20 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "OptionalInEnum"
     },
     "OptionalOnNamedField": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
+      "anyOf": [
         {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "OptionalOnNamedField"
+    },
+    "OptionalOnTransparentNamedField": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
           "anyOf": [
             {
               "type": "string"
@@ -3766,31 +3408,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "type": "null"
             }
           ]
-        }
-      ],
-      "title": "OptionalOnNamedField",
-      "type": "array"
-    },
-    "OptionalOnTransparentNamedField": {
-      "additionalProperties": false,
-      "properties": {
-        "b": {
-          "items": false,
-          "maxItems": 1,
-          "minItems": 1,
-          "prefixItems": [
-            {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          ],
-          "type": "array"
         }
       },
       "required": [
@@ -3812,23 +3429,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "OverridenStruct",
       "type": "object"
     },
-    "Pair": {
-      "additionalProperties": false,
-      "properties": {
-        "first": {},
-        "second": {}
-      },
-      "required": [
-        "first",
-        "second"
-      ],
-      "title": "Pair",
-      "type": "object"
-    },
     "Pair_String_i32": {
       "additionalProperties": false,
       "properties": {
         "first": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "second": {
@@ -3874,6 +3481,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "&'static [i32; 0]": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 0,
@@ -3882,6 +3492,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "&'static [i32; 1]": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 1,
@@ -3890,6 +3503,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "&'static [i32; 3]": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 3,
@@ -3898,6 +3514,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "&'static [i32]": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -3906,6 +3525,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "boolean"
         },
         "&'static i32": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "&'static str": {
@@ -3931,6 +3553,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
                   "type": "string"
                 },
                 {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -3976,6 +3601,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "type": "string"
             },
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
@@ -3990,6 +3618,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "type": "string"
             },
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4016,6 +3647,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "prefixItems": [
             {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -4149,6 +3783,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/ContainerTypeOverrideTupleGeneric_i32"
         },
         "Cow<'static, i32>": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "Cow<'static, str>": {
@@ -4324,6 +3961,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "HashMap<BasicEnum, i32>": {
           "additionalProperties": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "propertyNames": {
@@ -4342,17 +3982,11 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": {
             "type": "null"
           },
-          "propertyNames": {
-            "type": "string"
-          },
           "type": "object"
         },
         "HashMap<TransparentStruct, ()>": {
           "additionalProperties": {
             "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/TransparentStruct"
           },
           "type": "object"
         },
@@ -4393,15 +4027,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "minItems": 6,
           "prefixItems": [
             {
-              "items": false,
-              "maxItems": 1,
-              "minItems": 1,
-              "prefixItems": [
-                {
-                  "type": "string"
-                }
-              ],
-              "type": "array"
+              "type": "string"
             },
             {
               "items": {
@@ -4425,9 +4051,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             },
             {
               "additionalProperties": {
-                "type": "string"
-              },
-              "propertyNames": {
                 "type": "string"
               },
               "type": "object"
@@ -4486,15 +4109,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "array"
         },
         "InlineGenericNewtype<String>": {
-          "items": false,
-          "maxItems": 1,
-          "minItems": 1,
-          "prefixItems": [
-            {
-              "type": "string"
-            }
-          ],
-          "type": "array"
+          "type": "string"
         },
         "InlineOptionalType": {
           "$ref": "#/$defs/InlineOptionalType"
@@ -4576,11 +4191,10 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "MapA<u32>": {
           "additionalProperties": {
+            "format": "int64",
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
-          },
-          "propertyNames": {
-            "type": "string"
           },
           "type": "object"
         },
@@ -4593,9 +4207,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "MapC<u32>": {
           "additionalProperties": {
             "$ref": "#/$defs/AGenericStruct_u32"
-          },
-          "propertyNames": {
-            "type": "string"
           },
           "type": "object"
         },
@@ -4645,6 +4256,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
                     {
                       "anyOf": [
                         {
+                          "format": "int32",
+                          "maximum": 2147483647,
+                          "minimum": -2147483648,
                           "type": "integer"
                         },
                         {
@@ -4712,6 +4326,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "anyOf": [
             {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -4725,6 +4342,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "anyOf": [
             {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -4737,6 +4357,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "Option<i32>": {
           "anyOf": [
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4973,6 +4596,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "items": {
             "anyOf": [
               {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               {
@@ -4990,6 +4616,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "Vec<i32>": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -5006,6 +4635,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "items": {
             "anyOf": [
               {
+                "format": "int32",
                 "maximum": 255,
                 "minimum": 0,
                 "type": "integer"
@@ -5032,6 +4662,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         },
         "[i32; 3]": {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 3,
@@ -5047,20 +4680,27 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "string"
         },
         "f32": {
+          "format": "float",
           "type": "number"
         },
         "f64": {
+          "format": "double",
           "type": "number"
         },
         "i16": {
+          "format": "int32",
           "maximum": 32767,
           "minimum": -32768,
           "type": "integer"
         },
         "i32": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "i8": {
+          "format": "int32",
           "maximum": 127,
           "minimum": -128,
           "type": "integer"
@@ -5069,15 +4709,19 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/Type"
         },
         "u16": {
+          "format": "int32",
           "maximum": 65535,
           "minimum": 0,
           "type": "integer"
         },
         "u32": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
         "u8": {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -5339,39 +4983,19 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "Primitives",
       "type": "object"
     },
-    "Range": {
-      "additionalProperties": false,
-      "properties": {
-        "end": {},
-        "start": {}
-      },
-      "required": [
-        "start",
-        "end"
-      ],
-      "title": "Range",
-      "type": "object"
-    },
-    "RangeInclusive": {
-      "additionalProperties": false,
-      "properties": {
-        "end": {},
-        "start": {}
-      },
-      "required": [
-        "start",
-        "end"
-      ],
-      "title": "RangeInclusive",
-      "type": "object"
-    },
     "RangeInclusive_i32": {
       "additionalProperties": false,
       "properties": {
         "end": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "start": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5386,9 +5010,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "end": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "start": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5450,9 +5080,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": {
             "$ref": "#/$defs/RecursiveMapValue"
           },
-          "propertyNames": {
-            "type": "string"
-          },
           "type": "object"
         }
       },
@@ -5463,46 +5090,19 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "RecursiveTransparent": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/RecursiveInline"
-        }
-      ],
-      "title": "RecursiveTransparent",
-      "type": "array"
+      "$ref": "#/$defs/RecursiveInline",
+      "title": "RecursiveTransparent"
     },
     "RefStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/TestEnum"
-        }
-      ],
-      "title": "RefStruct",
-      "type": "array"
+      "$ref": "#/$defs/TestEnum",
+      "title": "RefStruct"
     },
     "Regular": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "type": "string"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "Regular",
-      "type": "array"
+      "type": "object"
     },
     "Rename": {
       "oneOf": [
@@ -5519,6 +5119,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a/b": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5591,23 +5194,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "const": "a-b",
       "title": "RenamedVariantWithSkippedPayload"
     },
-    "Result": {
-      "additionalProperties": false,
-      "properties": {
-        "err": {},
-        "ok": {}
-      },
-      "required": [
-        "ok",
-        "err"
-      ],
-      "title": "Result",
-      "type": "object"
-    },
     "Result_i32_String": {
       "additionalProperties": false,
       "properties": {
         "err": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "ok": {
@@ -5625,6 +5218,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5655,6 +5251,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
@@ -5666,12 +5265,18 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "minItems": 3,
           "prefixItems": [
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
               "type": "string"
             },
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
@@ -5712,6 +5317,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "description": " Some single-line comment",
           "properties": {
             "A": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -5729,6 +5337,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "properties": {
                 "a": {
                   "description": " Some single-line comment",
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -5767,6 +5378,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "b": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5799,6 +5413,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "additionalProperties": false,
               "properties": {
                 "b": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -5826,6 +5443,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5849,6 +5469,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "minItems": 1,
               "prefixItems": [
                 {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -5920,6 +5543,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "additionalProperties": false,
           "properties": {
+            "data": {
+              "type": "null"
+            },
             "type": {
               "const": "A"
             }
@@ -5952,6 +5578,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "a": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5979,12 +5608,17 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "type": "string"
             },
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
           "type": "array"
         },
         "u32_ident": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -6032,9 +5666,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "A": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "B": {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6076,7 +5716,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "Tenth": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
@@ -6111,6 +5751,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "additionalProperties": false,
           "properties": {
             "Single": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -6128,9 +5771,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "minItems": 2,
               "prefixItems": [
                 {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -6149,6 +5798,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
               "additionalProperties": false,
               "properties": {
                 "a": {
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -6172,9 +5824,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "properties": {
             "b": {
               "additionalProperties": {
-                "type": "string"
-              },
-              "propertyNames": {
                 "type": "string"
               },
               "type": "object"
@@ -6218,40 +5867,16 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "TransparentStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentStruct",
-      "type": "array"
+      "type": "string"
     },
     "TransparentType": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/TransparentTypeInner"
-        }
-      ],
-      "title": "TransparentType",
-      "type": "array"
+      "$ref": "#/$defs/TransparentTypeInner",
+      "title": "TransparentType"
     },
     "TransparentType2": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "TransparentType2",
-      "type": "array"
+      "type": "null"
     },
     "TransparentTypeInner": {
       "additionalProperties": false,
@@ -6267,52 +5892,20 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "TransparentTypeWithOverride": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentTypeWithOverride",
-      "type": "array"
+      "type": "string"
     },
     "TransparentWithSkip": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "TransparentWithSkip",
-      "type": "array"
+      "type": "null"
     },
     "TransparentWithSkip2": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentWithSkip2",
-      "type": "array"
+      "type": "string"
     },
     "TransparentWithSkip3": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentWithSkip3",
-      "type": "array"
+      "type": "string"
     },
     "TupleNested": {
       "items": false,
@@ -6321,6 +5914,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "prefixItems": [
         {
           "items": {
+            "format": "int32",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -6332,12 +5928,18 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "prefixItems": [
             {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
             },
             {
               "items": {
+                "format": "int32",
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -6348,6 +5950,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "items": {
             "items": {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "type": "array"
@@ -6361,28 +5966,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "array"
     },
     "TupleStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TupleStruct",
-      "type": "array"
+      "type": "string"
     },
     "TupleStruct1": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "integer"
-        }
-      ],
+      "format": "int32",
+      "maximum": 2147483647,
+      "minimum": -2147483648,
       "title": "TupleStruct1",
-      "type": "array"
+      "type": "integer"
     },
     "TupleStruct3": {
       "items": false,
@@ -6390,6 +5982,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "minItems": 3,
       "prefixItems": [
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -6403,16 +5998,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "array"
     },
     "TupleStructWithRep": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TupleStructWithRep",
-      "type": "array"
+      "type": "string"
     },
     "Type": false,
     "Unit1": {
@@ -6434,16 +6021,8 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "array"
     },
     "Unit4": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "Unit4",
-      "type": "array"
+      "type": "null"
     },
     "Unit5": {
       "const": "A",
@@ -6453,7 +6032,11 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "A": {
-          "type": "null"
+          "items": false,
+          "maxItems": 0,
+          "minItems": 0,
+          "prefixItems": [],
+          "type": "array"
         }
       },
       "required": [
@@ -6492,14 +6075,18 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "UnitVariants"
     },
     "UntaggedVariants": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -6534,14 +6121,18 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "UntaggedVariants"
     },
     "UntaggedVariantsKey": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -6550,11 +6141,14 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "UntaggedVariantsKey"
     },
     "UntaggedVariantsWithDuplicateBranches": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
         {
+          "format": "int32",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -6564,7 +6158,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "UntaggedVariantsWithDuplicateBranches"
     },
     "UntaggedVariantsWithoutValue": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
@@ -6574,6 +6168,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "minItems": 2,
           "prefixItems": [
             {
+              "format": "int32",
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -6583,6 +6180,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "array"
         },
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -6591,40 +6189,18 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "UntaggedVariantsWithoutValue"
     },
     "ValidMaybeValidKey": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/MaybeValidKey_String"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "ValidMaybeValidKey",
-      "type": "array"
+      "type": "object"
     },
     "ValidMaybeValidKeyNested": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/MaybeValidKey_MaybeValidKey_String"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "ValidMaybeValidKeyNested",
-      "type": "array"
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema"
