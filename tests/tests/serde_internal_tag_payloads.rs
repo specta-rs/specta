@@ -73,6 +73,23 @@ enum GenericPayload<T> {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
+enum SerializeOnlyGenericPayload<T> {
+    #[serde(skip_deserializing)]
+    Value(T),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum GenericPayloadWithSkippedScalar<T> {
+    #[serde(skip)]
+    Dead(T),
+    Live,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
 enum WrappedGenericPayload<T> {
     Value(GenericNewtype<T>),
 }
@@ -508,6 +525,14 @@ fn format_accepts_newtype_unit_and_generic_payloads() {
     specta_serde::Format
         .map_types(&Types::default().register::<GenericPayload<ExternalWithUntaggedEmptyStruct>>())
         .expect("an untagged empty object already merges with an internal tag correctly");
+    specta_serde::PhasesFormat
+        .map_types(
+            &Types::default().register::<SerializeOnlyGenericPayload<DirectionalExternalUnit>>(),
+        )
+        .expect("contextual generic checks must ignore a phase where the outer variant is skipped");
+    specta_serde::Format
+        .map_types(&Types::default().register::<GenericPayloadWithSkippedScalar<i32>>())
+        .expect("fully skipped variants must not validate their dead scalar payload");
 
     let err = specta_serde::Format
         .map_types(&Types::default().register::<GenericPayload<i32>>())

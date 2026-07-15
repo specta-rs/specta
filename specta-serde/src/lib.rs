@@ -3086,9 +3086,10 @@ fn internal_tag_payload_compatibility(
     }
 }
 
-pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
+pub(crate) fn internal_tag_payload_requires_contextual_rewrite_for_mode(
     ty: &DataType,
     types: &Types,
+    mode: PhaseRewrite,
 ) -> Result<bool, Error> {
     enum TransparentPayload<'a> {
         NotTransparent,
@@ -3420,10 +3421,7 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite(
         }
     }
 
-    if inner(ty, types, &mut HashSet::new(), PhaseRewrite::Serialize)? {
-        return Ok(true);
-    }
-    inner(ty, types, &mut HashSet::new(), PhaseRewrite::Deserialize)
+    inner(ty, types, &mut HashSet::new(), mode)
 }
 
 fn contextualize_rewritten_external_units(
