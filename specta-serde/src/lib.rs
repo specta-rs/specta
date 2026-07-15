@@ -3527,6 +3527,10 @@ fn external_enum_tagged_payload_datatype(
 
         let rename_rule =
             enum_variant_field_rename_rule(&container_attrs, &variant, mode, variant_name)?;
+        let conditional_omission_applies = !matches!(
+            &variant.fields,
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1
+        );
         rewrite_fields_for_phase(
             &mut variant.fields,
             mode,
@@ -3536,19 +3540,20 @@ fn external_enum_tagged_payload_datatype(
             rename_rule,
             false,
             true,
+            conditional_omission_applies,
         )?;
 
-        if let Some(aliases) = lower_field_aliases_for_phase(&mut variant.fields, mode)? {
-            variant.fields =
-                clone_variant_with_unnamed_fields(&variant, vec![Field::new(aliases)]).fields;
-        } else if matches!(
+        let lowered = if matches!(
             &variant.fields,
             Fields::Named(fields) if fields.fields.iter().any(|(_, field)| field_is_flattened(field))
         ) {
             let mut payload = Struct::unit();
-            payload.fields = variant.fields.clone();
-            let payload = lower_flattened_struct(&mut payload)?
-                .expect("a named payload containing flatten must be lowered");
+            std::mem::swap(&mut payload.fields, &mut variant.fields);
+            lower_flattened_struct(&mut payload, mode)?
+        } else {
+            lower_field_aliases_for_phase(&mut variant.fields, mode)?
+        };
+        if let Some(payload) = lowered {
             variant.fields =
                 clone_variant_with_unnamed_fields(&variant, vec![Field::new(payload)]).fields;
         }
