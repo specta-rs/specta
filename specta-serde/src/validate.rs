@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, NamedReferenceType, Reference, Variant},
+    datatype::{
+        DataType, Enum, Field, Fields, NamedReference, NamedReferenceType, Reference, Variant,
+    },
 };
 
 use crate::{
@@ -153,11 +155,19 @@ fn inner(
             match &strct.fields {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
+                    for (idx, (field, _)) in unnamed
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, field)| field.ty.as_ref().map(|ty| (idx, (field, ty))))
+                    {
+                        validate_field_attributes(field, format!("{path}[{idx}]"), mode)?;
+                    }
                     for (idx, (_, ty)) in unnamed
                         .fields
                         .iter()
-                        .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                         .enumerate()
+                        .filter_map(|(idx, field)| field.ty.as_ref().map(|ty| (idx, (field, ty))))
                     {
                         inner(
                             ty,
@@ -170,12 +180,13 @@ fn inner(
                     }
                 }
                 Fields::Named(named) => {
-                    for (name, (field, _)) in named
+                    for (name, (field, ty)) in named
                         .fields
                         .iter()
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
                         validate_field_attributes(field, format!("{path}.{name}"), mode)?;
+                        validate_flatten_field(field, ty, types, &format!("{path}.{name}"))?;
                     }
                     for (name, (_, ty)) in named
                         .fields
@@ -212,14 +223,14 @@ fn inner(
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
-                        for (name, (field, _)) in named.fields.iter().filter_map(|(name, field)| {
-                            field.ty.as_ref().map(|ty| (name, (field, ty)))
-                        }) {
-                            validate_field_attributes(
-                                field,
-                                format!("{path}::{variant_name}.{name}"),
-                                mode,
-                            )?;
+                        for (name, (field, ty)) in
+                            named.fields.iter().filter_map(|(name, field)| {
+                                field.ty.as_ref().map(|ty| (name, (field, ty)))
+                            })
+                        {
+                            let path = format!("{path}::{variant_name}.{name}");
+                            validate_field_attributes(field, path.clone(), mode)?;
+                            validate_flatten_field(field, ty, types, &path)?;
                         }
                         for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
                             field.ty.as_ref().map(|ty| (name, (field, ty)))
@@ -235,11 +246,14 @@ fn inner(
                         }
                     }
                     Fields::Unnamed(unnamed) => {
-                        for (idx, (field, _)) in unnamed
-                            .fields
-                            .iter()
-                            .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
-                            .enumerate()
+                        for (idx, (field, _)) in
+                            unnamed
+                                .fields
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(idx, field)| {
+                                    field.ty.as_ref().map(|ty| (idx, (field, ty)))
+                                })
                         {
                             validate_field_attributes(
                                 field,
@@ -247,11 +261,14 @@ fn inner(
                                 mode,
                             )?;
                         }
-                        for (idx, (_, ty)) in unnamed
-                            .fields
-                            .iter()
-                            .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
-                            .enumerate()
+                        for (idx, (_, ty)) in
+                            unnamed
+                                .fields
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(idx, field)| {
+                                    field.ty.as_ref().map(|ty| (idx, (field, ty)))
+                                })
                         {
                             inner(
                                 ty,
@@ -551,6 +568,114 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     Ok(())
 }
 
+/// Validates a `#[serde(flatten)]`-ed field's own type, independent of the
+/// caller's usual traversal. Serde only lets a flattened field serialize as a
+/// struct or map (or an `Option`/reference resolving to one); anything else
+/// is a runtime `"can only flatten structs and maps"` error from serde_json,
+/// so we surface it at export time instead.
+fn validate_flatten_field(
+    field: &Field,
+    ty: &DataType,
+    types: &Types,
+    path: &str,
+) -> Result<(), Error> {
+    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+        return Ok(());
+    };
+
+    if !serde_attrs.flatten {
+        return Ok(());
+    }
+
+    validate_flatten_target(ty, types, path, &mut HashSet::new())
+}
+
+/// `seen` tracks named references currently being resolved on this flatten
+/// check so a cyclic type graph terminates instead of recursing forever. This
+/// mirrors the `seen`/`checked_references` discipline used elsewhere in this
+/// module, but is scoped to a single field's flatten check rather than shared
+/// with the outer traversal, since a reference already validated elsewhere
+/// still needs its shape checked here.
+fn validate_flatten_target(
+    ty: &DataType,
+    types: &Types,
+    path: &str,
+    seen: &mut HashSet<Reference>,
+) -> Result<(), Error> {
+    match ty {
+        // Maps merge directly. Every serde enum representation (untagged,
+        // external, internal, adjacent) also flattens fine - verified against
+        // serde_json 1.x, which merges the tag/content fields straight into
+        // the surrounding map for all four representations.
+        DataType::Map(_) | DataType::Enum(_) => Ok(()),
+        // A flattened `Option<T>` (including nested `Option<Option<T>>`)
+        // contributes nothing when absent and validates as `T` when present.
+        DataType::Nullable(inner) => validate_flatten_target(inner, types, path, seen),
+        // `()` and other zero-element tuples serialize as nothing, so
+        // flattening one is a harmless no-op (verified against serde_json).
+        DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
+        DataType::Struct(strct) => {
+            // `#[serde(transparent)]` structs delegate (de)serialization
+            // straight to their single non-skipped field, so serde sees that
+            // field's shape - not a struct/tuple wrapper - when flattened.
+            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
+                .is_some_and(|attrs| attrs.transparent)
+            {
+                let inner_fields = match &strct.fields {
+                    Fields::Unit => return Ok(()),
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields
+                        .iter()
+                        .filter_map(|f| f.ty.as_ref())
+                        .collect::<Vec<_>>(),
+                    Fields::Named(named) => named
+                        .fields
+                        .iter()
+                        .filter_map(|(_, f)| f.ty.as_ref())
+                        .collect::<Vec<_>>(),
+                };
+
+                return match inner_fields.as_slice() {
+                    // Not exactly one live field: leave it be rather than
+                    // false-positive on a shape we can't confidently resolve.
+                    [only] => validate_flatten_target(only, types, path, seen),
+                    _ => Ok(()),
+                };
+            }
+
+            match &strct.fields {
+                Fields::Unit | Fields::Named(_) => Ok(()),
+                Fields::Unnamed(_) => Err(Error::invalid_flatten_target(
+                    path.to_string(),
+                    "tuple structs serialize as a sequence; serde can only flatten structs and maps",
+                )),
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            let key = Reference::Named(reference.clone());
+            if !seen.insert(key.clone()) {
+                return Ok(());
+            }
+
+            let result = named_reference_ty(reference, types)
+                .map_or(Ok(()), |ty| validate_flatten_target(ty, types, path, seen));
+            seen.remove(&key);
+
+            result
+        }
+        // Can't inspect the shape behind an opaque reference or a generic
+        // parameter here; don't false-positive on it.
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => Ok(()),
+        DataType::List(_)
+        | DataType::Tuple(_)
+        | DataType::Primitive(_)
+        | DataType::Intersection(_) => Err(Error::invalid_flatten_target(
+            path.to_string(),
+            "serde can only flatten structs and maps, but this field's type serializes as a sequence, tuple, or scalar value",
+        )),
+    }
+}
+
 fn ensure_codec_override(
     has_type_override: bool,
     path: &str,
@@ -734,7 +859,8 @@ fn validate_internally_tag_enum_datatype(
             if matches!(reference.inner, NamedReferenceType::Inline { .. }) =>
         {
             if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+                let path = inner_reference_path(path, reference, types);
+                validate_internally_tag_enum_datatype(ty, types, &path, variant_name)?;
             }
 
             Ok(())
@@ -746,7 +872,8 @@ fn validate_internally_tag_enum_datatype(
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+                let path = inner_reference_path(path, reference, types);
+                validate_internally_tag_enum_datatype(ty, types, &path, variant_name)?;
             }
 
             Ok(())
@@ -765,10 +892,20 @@ fn validate_internally_tag_enum_datatype(
     }
 }
 
-fn named_reference_ty<'a>(
-    reference: &'a specta::datatype::NamedReference,
-    types: &'a Types,
-) -> Option<&'a DataType> {
+/// Extends `path` with the name of the type behind a named reference, so an
+/// error surfaced while validating what that reference resolves to (for
+/// example an untagged enum nested inside an internally tagged variant's
+/// payload) names the actual inner type instead of repeating the outer
+/// container's path, which would misattribute the error (e.g. blaming a
+/// variant that doesn't exist on the outer enum).
+fn inner_reference_path(path: &str, reference: &NamedReference, types: &Types) -> String {
+    match types.get(reference) {
+        Some(ndt) => format!("{path} -> {}", ndt.name),
+        None => path.to_string(),
+    }
+}
+
+fn named_reference_ty<'a>(reference: &'a NamedReference, types: &'a Types) -> Option<&'a DataType> {
     match &reference.inner {
         NamedReferenceType::Inline { dt, .. } => Some(dt),
         NamedReferenceType::Reference { .. } => types.get(reference)?.ty.as_ref(),

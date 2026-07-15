@@ -50,6 +50,10 @@ enum ErrorKind {
         path: String,
         attribute: Cow<'static, str>,
     },
+    InvalidFlattenTarget {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     InvalidPhasedTypeUsage {
         path: String,
         reason: Cow<'static, str>,
@@ -179,6 +183,18 @@ impl Error {
         }
     }
 
+    pub(crate) fn invalid_flatten_target(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidFlattenTarget {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     pub(crate) fn invalid_phased_type_usage(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
@@ -260,6 +276,10 @@ impl fmt::Display for Error {
             ErrorKind::UnsupportedSerdeCustomCodec { path, attribute } => write!(
                 f,
                 "Unsupported serde attribute at '{path}': #[serde({attribute})] changes the wire type. Add #[specta(type = ...)] (or #[specta(type = specta_serde::Phased<Serialize, Deserialize>)])"
+            ),
+            ErrorKind::InvalidFlattenTarget { path, reason } => write!(
+                f,
+                "Invalid `#[serde(flatten)]` target at '{path}': {reason}"
             ),
             ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
                 write!(f, "Invalid phased type usage at '{path}': {reason}")
