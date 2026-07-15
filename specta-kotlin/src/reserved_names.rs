@@ -28,3 +28,5 @@ pub(crate) const RESERVED: &[&str] = &[
     "when",
     "while",
 ];
+
+pub(crate) const GENERIC_MODIFIERS: &[&str] = &["out", "reified"];

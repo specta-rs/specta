@@ -9,7 +9,8 @@ use specta::{
 };
 
 use crate::{
-    Error, Kotlin, Layout, NamingConvention, Serialization, UnknownType, reserved_names::RESERVED,
+    Error, Kotlin, Layout, NamingConvention, Serialization, UnknownType,
+    reserved_names::{GENERIC_MODIFIERS, RESERVED},
 };
 
 pub(crate) enum Selection<'a> {
@@ -97,7 +98,7 @@ fn render_named(
     let generics = ndt
         .generics
         .iter()
-        .map(|generic| identifier(&generic.name, &ndt.name))
+        .map(|generic| generic_identifier(&generic.name, &ndt.name))
         .collect::<Result<Vec<_>, _>>()?;
     ensure_unique(ndt.name.as_ref(), generics.iter().map(String::as_str))?;
     let generic_scope = ndt
@@ -790,6 +791,9 @@ fn datatype(
                 reason: "wide number has no built-in Kotlinx serializer",
             });
         }
+        DataType::Primitive(Primitive::char) if kotlin.serialization == Serialization::Kotlinx => {
+            "String".to_owned()
+        }
         DataType::Primitive(primitive) => primitive_name(primitive).to_owned(),
         DataType::List(list) => format!(
             "List<{}>",
@@ -867,7 +871,7 @@ fn datatype(
         DataType::Generic(generic) => generic_scope
             .iter()
             .find(|candidate| *candidate == generic)
-            .map(|generic| identifier(generic.name(), path))
+            .map(|generic| generic_identifier(generic.name(), path))
             .transpose()?
             .ok_or_else(|| Error::UnsupportedType {
                 path: path.into(),
@@ -1297,6 +1301,15 @@ fn identifier(name: &str, path: &str) -> Result<String, Error> {
         Ok(name.to_owned())
     } else {
         Ok(format!("`{name}`"))
+    }
+}
+
+fn generic_identifier(name: &str, path: &str) -> Result<String, Error> {
+    let identifier = identifier(name, path)?;
+    if GENERIC_MODIFIERS.contains(&name) && !identifier.starts_with('`') {
+        Ok(format!("`{identifier}`"))
+    } else {
+        Ok(identifier)
     }
 }
 

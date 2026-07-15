@@ -59,6 +59,12 @@ struct KotlinxRecord {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct KotlinxChar {
+    value: char,
+}
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -336,6 +342,37 @@ fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
 }
 
 #[test]
+fn kotlin_escapes_generic_modifier_keywords() {
+    use specta::datatype::{Field, Generic, GenericDefinition, NamedDataType, Struct};
+
+    let out = Generic::new(Cow::Borrowed("out"));
+    let reified = Generic::new(Cow::Borrowed("reified"));
+    let mut types = Types::default();
+    NamedDataType::new("ContextualGenerics", &mut types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![
+            GenericDefinition::new(Cow::Borrowed("out"), None),
+            GenericDefinition::new(Cow::Borrowed("reified"), None),
+        ]);
+        datatype.ty = Some(
+            Struct::named()
+                .field("first", Field::new(DataType::Generic(out)))
+                .field("second", Field::new(DataType::Generic(reified)))
+                .build(),
+        );
+    });
+
+    let output = Kotlin::default()
+        .export(&types, IdentityFormat)
+        .expect("contextual generic modifiers should be escaped");
+    assert!(
+        output.contains("ContextualGenerics<`out`, `reified`>"),
+        "{output}"
+    );
+    assert!(output.contains("val first: `out`"), "{output}");
+    assert!(output.contains("val second: `reified`"), "{output}");
+}
+
+#[test]
 fn kotlin_export_serde() {
     insta::assert_snapshot!(
         "kotlin-export-serde",
@@ -381,6 +418,12 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
     assert!(supported.contains("@Serializable"));
     assert!(supported.contains("@EncodeDefault"));
     assert!(supported.contains("val maybe: String? = null"));
+
+    let supported = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(&Types::default().register::<KotlinxChar>(), IdentityFormat)
+        .expect("Rust char should use the wire-compatible Kotlinx string representation");
+    assert!(supported.contains("val value: String"));
 
     let error = Kotlin::default()
         .serialization(Serialization::Kotlinx)
