@@ -4,7 +4,7 @@ use specta::{Format as FormatTrait, Types};
 
 use crate::{
     error::{Error, Result},
-    primitives::{export_type, type_name},
+    primitives::{export_type, is_valid_type_name, type_name},
     toposort::topological_sort,
 };
 
@@ -120,6 +120,9 @@ fn validate_type_names(types: &Types) -> Result<()> {
     let mut names = HashMap::new();
     for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
         let name = type_name(&ty.name);
+        if !is_valid_type_name(&name) {
+            return Err(Error::InvalidTypeName(name));
+        }
         if let Some(first) = names.insert(name.clone(), ty) {
             return Err(Error::DuplicateTypeName {
                 name,

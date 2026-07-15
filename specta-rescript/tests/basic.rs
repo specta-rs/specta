@@ -184,6 +184,54 @@ fn test_serde_record_label_is_validated() {
 }
 
 #[test]
+fn test_serde_type_name_is_validated() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename = "api-response")]
+    struct RenamedType {
+        value: String,
+    }
+
+    let error = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<RenamedType>())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_rescript::Error::InvalidTypeName(name) if name == "api-response"
+    ));
+}
+
+#[test]
+fn test_serde_data_variant_constructor_is_validated() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    enum RenamedVariant {
+        FooBar(String),
+    }
+
+    let error = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<RenamedVariant>())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_rescript::Error::InvalidVariantConstructor(name) if name == "fooBar"
+    ));
+}
+
+#[test]
+fn test_standard_result_uses_builtin_without_alias() {
+    #[derive(Type)]
+    struct WithResult {
+        value: Result<String, i32>,
+    }
+
+    let out = export::<WithResult>();
+    assert!(out.contains("value: result<string, int>"), "output: {out}");
+    assert!(!out.contains("type result"), "output: {out}");
+}
+
+#[test]
 fn test_named_variant_with_only_skipped_fields_is_unit() {
     #[derive(Type)]
     enum SkippedFields {

@@ -15,6 +15,14 @@ pub enum Error {
     #[error("Invalid ReScript record label: {0}")]
     InvalidRecordLabel(String),
 
+    /// A type name cannot be represented in ReScript source.
+    #[error("Invalid ReScript type name: {0}")]
+    InvalidTypeName(String),
+
+    /// A variant constructor cannot be represented in ReScript source.
+    #[error("Invalid ReScript variant constructor: {0}")]
+    InvalidVariantConstructor(String),
+
     /// Multiple Rust types map to the same ReScript type name.
     #[error("Duplicate ReScript type name '{name}' for '{first}' and '{second}'")]
     DuplicateTypeName {

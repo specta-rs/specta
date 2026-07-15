@@ -26,6 +26,20 @@ pub(crate) fn type_name(name: &str) -> String {
     }
 }
 
+pub(crate) fn is_valid_type_name(name: &str) -> bool {
+    is_valid_identifier(name, |ch| matches!(ch, 'a'..='z' | '_'))
+}
+
+fn is_valid_variant_constructor(name: &str) -> bool {
+    is_valid_identifier(name, |ch| ch.is_ascii_uppercase())
+}
+
+fn is_valid_identifier(name: &str, valid_start: impl FnOnce(char) -> bool) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(valid_start)
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '\''))
+}
+
 /// Convert a Rust generic parameter name to ReScript style.
 /// ReScript generic type parameters use an apostrophe prefix.
 /// e.g. "T" -> "'t", "A" -> "'a"
@@ -329,9 +343,7 @@ fn render_named_fields(
 }
 
 fn is_valid_record_label(name: &str) -> bool {
-    let mut chars = name.chars();
-    matches!(chars.next(), Some('a'..='z' | '_'))
-        && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '\''))
+    is_valid_type_name(name)
 }
 
 /// Format a `Deprecated` into a human-readable note string.
@@ -386,6 +398,9 @@ fn render_enum_variants(
     for (variant_name, variant) in &e.variants {
         if variant.skip {
             continue;
+        }
+        if !is_valid_variant_constructor(variant_name) {
+            return Err(Error::InvalidVariantConstructor(variant_name.to_string()));
         }
 
         let mut prefix = render_docs(&variant.docs, "  ");
@@ -470,6 +485,9 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
         DataType::Enum(e) => {
             // Result detection runs first
             if is_result_enum(e) {
+                if rescript_name == "result" {
+                    return Ok(String::new());
+                }
                 let body = datatype_to_rescript(types, &scope, ty)?;
                 out.push_str(&format!(
                     "type {}{} = {}\n",
