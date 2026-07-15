@@ -564,3 +564,166 @@ fn deferred_recursive_branches_survive_the_collapse() {
         "{ts}"
     );
 }
+
+/// A cycle through a *concrete* generic instantiation
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584578201):
+/// `ConcreteRoot -> GenNode<String> -> ConcreteRoot`. `GenNode`'s `T`
+/// positions must merge into `ConcreteRoot` as `string`, and `GenNode<T>`'s
+/// own export must union its own `T` branch with everything reachable
+/// through `ConcreteRoot` - including its *own* terminals re-instantiated
+/// at `T = String`.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum ConcreteRoot {
+    A(Box<GenNode<String>>),
+    B(u32),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum GenNode<T> {
+    A(Box<ConcreteRoot>),
+    B(T),
+}
+
+#[test]
+fn cycle_through_concrete_generic_instantiation_collapses() {
+    // serde ground truth: a `ConcreteRoot` value's wire form can be a bare
+    // string (through `GenNode<String>::B`), and a `GenNode<T>` value's wire
+    // form can be a bare number (through `ConcreteRoot::B`).
+    let json =
+        serde_json::to_string(&ConcreteRoot::A(Box::new(GenNode::B("x".to_string())))).unwrap();
+    assert_eq!(json, "\"x\"");
+    let json = serde_json::to_string(&GenNode::<bool>::A(Box::new(ConcreteRoot::B(42)))).unwrap();
+    assert_eq!(json, "42");
+
+    let ts = export::<ConcreteRoot>();
+    assert!(
+        ts.contains("export type ConcreteRoot = number | string;"),
+        "ConcreteRoot must union its own terminal with GenNode<String>'s: {ts}"
+    );
+    assert!(
+        ts.contains("export type GenNode<T> = T | string | number;"),
+        "GenNode<T> must union its own branch with the cycle's terminals: {ts}"
+    );
+    assert!(
+        !ts.contains("= GenNode") && !ts.contains("= ConcreteRoot"),
+        "no alias in the cycle may reference another member: {ts}"
+    );
+}
+
+use specta_typescript::branded;
+branded!(
+    #[derive(Serialize)]
+    pub struct BrandId<T>(T) as "BrandId"
+);
+
+/// A generic cycle whose terminal branch wraps the parameter in a *branded*
+/// opaque payload
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584578203):
+/// merging `BrandP<T>::Y(BrandId<T>)` into `BrandQ<U>`'s body must rewrite
+/// the `T` *inside* the branded payload to `U`, not leak a dangling `T`.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum BrandP<T> {
+    X(Box<BrandQ<T>>),
+    Y(BrandId<T>),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum BrandQ<U> {
+    X(Box<BrandP<U>>),
+    Z(String),
+}
+
+#[test]
+fn generic_cycle_with_branded_payload_rewrites_the_payload_parameter() {
+    // serde ground truth: a `BrandQ<bool>` value's wire form can be a bare
+    // boolean, through `BrandP<bool>::Y(BrandId(true))`.
+    let json =
+        serde_json::to_string(&BrandQ::<bool>::X(Box::new(BrandP::Y(BrandId(true))))).unwrap();
+    assert_eq!(json, "true");
+
+    let ts = export::<BrandP<bool>>();
+    assert!(
+        ts.contains("export type BrandP<T> = T & { readonly __brand: \"BrandId\" } | string;")
+            || ts.contains(
+                "export type BrandP<T> = (T & { readonly __brand: \"BrandId\" }) | string;"
+            ),
+        "BrandP must keep its own branded branch in terms of T: {ts}"
+    );
+    assert!(
+        ts.contains("U & { readonly __brand: \"BrandId\" }"),
+        "BrandQ's merged branded branch must use U, not T: {ts}"
+    );
+    let brand_q_line = ts
+        .lines()
+        .find(|line| line.starts_with("export type BrandQ"))
+        .expect("BrandQ must be exported");
+    assert!(
+        !brand_q_line.contains('T'),
+        "BrandQ's body must not leak BrandP's parameter name: {brand_q_line}"
+    );
+}
+
+/// An opaque reference the exporter cannot see into (only this crate's
+/// `Branded`/`define` payloads can be inspected), sitting in a generic
+/// cycle member whose parameters must be rewritten. The payload *might*
+/// mention the member's parameter, so the collapse cannot prove the merge
+/// sound - and falling back to the naive rendering would emit the illegal
+/// TS2456 alias cycle. The export must fail with an honest error instead.
+struct CustomOpaque;
+
+#[derive(PartialEq, Eq, Hash)]
+struct CustomOpaqueState;
+
+impl Type for CustomOpaque {
+    fn definition(_: &mut Types) -> specta::datatype::DataType {
+        specta::datatype::DataType::Reference(specta::datatype::Reference::opaque(
+            CustomOpaqueState,
+        ))
+    }
+}
+
+impl Serialize for CustomOpaque {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_unit()
+    }
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum OpaqueP<T> {
+    X(Box<OpaqueQ<T>>),
+    Y(T),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum OpaqueQ<U> {
+    X(Box<OpaqueP<U>>),
+    Z(CustomOpaque),
+}
+
+#[test]
+fn generic_cycle_with_uninspectable_opaque_payload_fails_honestly() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<OpaqueP<u32>>(),
+            specta_serde::Format,
+        )
+        .expect_err("collapse cannot prove the opaque payload safe, so the export must error");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("recursive type-alias cycle") && message.contains("opaque"),
+        "error should explain the unrepresentable cycle: {message}"
+    );
+}

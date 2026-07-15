@@ -182,6 +182,14 @@ enum ErrorKind {
     /// file paths, and module boundaries can be coordinated correctly.
     ExportRequiresExportTo(Layout),
     JsdocNamespacesUnsupported,
+    /// The type is part of a recursive type-alias cycle (e.g. through
+    /// `#[serde(untagged)]` newtype variants) that TypeScript rejects
+    /// (TS2456) and that the exporter could not collapse into an
+    /// equivalent non-recursive alias.
+    UnrepresentableAliasCycle {
+        path: String,
+        reason: Cow<'static, str>,
+    },
 }
 
 impl Error {
@@ -363,6 +371,16 @@ impl Error {
     pub(crate) fn jsdoc_namespaces_unsupported() -> Self {
         Self::new(ErrorKind::JsdocNamespacesUnsupported)
     }
+
+    pub(crate) fn unrepresentable_alias_cycle(
+        path: String,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::new(ErrorKind::UnrepresentableAliasCycle {
+            path,
+            reason: reason.into(),
+        })
+    }
 }
 
 impl From<io::Error> for Error {
@@ -512,6 +530,11 @@ impl fmt::Display for Error {
             ErrorKind::JsdocNamespacesUnsupported => write!(
                 f,
                 "Unable to export JSDoc with the Namespaces layout. Disable JSDoc or use FlatFile, ModulePrefixedName, or Files layout."
+            ),
+            ErrorKind::UnrepresentableAliasCycle { path, reason } => write!(
+                f,
+                "Attempted to export {} but it is part of a recursive type-alias cycle that cannot be collapsed into valid TypeScript: {reason}. TypeScript rejects self-referential type aliases (TS2456); restructure the type so the recursion passes through an object, array, or tuple instead of a bare (untagged/transparent) reference.",
+                display_path(path)
             ),
         }?;
 
