@@ -138,6 +138,126 @@ fn adjacent_tagged_newtype_skip_phases() {
     );
 }
 
+// A skipped sole field of type `Option<T>` is the exception to the
+// `content: null` deserialize requirement above: serde's `missing_field`
+// helper special-cases `Option` (a missing `c` deserializes as `None`), so
+// both `{"t":"V"}` and `{"t":"V","c":null}` are accepted. `c` must therefore
+// stay *optional* in every phase, and no per-phase split is needed --
+// `{ t: "V"; c?: null }` describes both directions exactly.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjOptionSkip {
+    V(#[serde(skip)] Option<u8>),
+    W(String),
+}
+
+#[test]
+fn adjacent_tagged_option_skip_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjOptionSkip::V(Some(1))).unwrap(),
+        r#"{"t":"V"}"#
+    );
+
+    // Unlike the non-`Option` `NewtypeSkip` case above, a missing `c` is
+    // accepted (deserialized as `None`), and `c: null` is too.
+    assert!(serde_json::from_str::<AdjOptionSkip>(r#"{"t":"V"}"#).is_ok());
+    assert!(serde_json::from_str::<AdjOptionSkip>(r#"{"t":"V","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjOptionSkip>(r#"{"t":"V","c":1}"#).is_err());
+}
+
+#[test]
+fn adjacent_tagged_option_skip_typescript() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjOptionSkip>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains(r#"{ t: "V"; c?: null }"#),
+        "skipped `Option` sole field must render an optional `c?: null`:\n{ts}"
+    );
+}
+
+#[test]
+fn adjacent_tagged_option_skip_phases() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjOptionSkip>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        !ts.contains("AdjOptionSkip_Serialize") && !ts.contains("AdjOptionSkip_Deserialize"),
+        "`c?: null` is exact for both phases, so the enum must not split:\n{ts}"
+    );
+    assert!(
+        ts.contains(r#"{ t: "V"; c?: null }"#),
+        "deserialize must not require `c` for a skipped `Option` sole field:\n{ts}"
+    );
+    assert!(
+        !ts.contains(r#"{ t: "V"; c: null }"#),
+        "deserialize must not require `c` for a skipped `Option` sole field:\n{ts}"
+    );
+}
+
+// One-sided `skip_deserializing` on an `Option` sole field: the serializer
+// still emits the live payload, while the deserializer accepts a missing or
+// `null` `c` (serde's `missing_field` `Option` special case again).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjOptionSkipDe {
+    V(#[serde(skip_deserializing)] Option<u8>),
+}
+
+#[test]
+fn adjacent_tagged_option_skip_deserializing_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjOptionSkipDe::V(Some(1))).unwrap(),
+        r#"{"t":"V","c":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&AdjOptionSkipDe::V(None)).unwrap(),
+        r#"{"t":"V","c":null}"#
+    );
+
+    assert!(serde_json::from_str::<AdjOptionSkipDe>(r#"{"t":"V"}"#).is_ok());
+    assert!(serde_json::from_str::<AdjOptionSkipDe>(r#"{"t":"V","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjOptionSkipDe>(r#"{"t":"V","c":1}"#).is_err());
+}
+
+#[test]
+fn adjacent_tagged_option_skip_deserializing_phases() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjOptionSkipDe>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    let serialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjOptionSkipDe_Serialize ="))
+        .expect("serialize type must be exported");
+    assert!(
+        serialize_ty.contains(r#"{ t: "V"; c: number | null }"#),
+        "serialize phase keeps the live payload:\n{ts}"
+    );
+
+    let deserialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjOptionSkipDe_Deserialize ="))
+        .expect("deserialize type must be exported");
+    assert!(
+        deserialize_ty.contains(r#"{ t: "V"; c?: null }"#),
+        "deserialize phase must keep `c` optional for a skipped `Option` sole field:\n{ts}"
+    );
+}
+
 // --- Bug B: externally tagged multi-field tuple variants with all fields
 // skipped must stay `{ A: [] }`, not collapse to a bare string literal. ---
 

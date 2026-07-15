@@ -63,6 +63,14 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
+    // A skipped field's type never enters the datatype graph (it does not
+    // even need to implement `Type`), but whether it was declared as
+    // `Option<T>` still matters to consumers: e.g. serde deserializes a
+    // missing value into a skipped `Option` field as `None` while other
+    // skipped types have stricter requirements. Record it syntactically.
+    let skipped_nullable_attribute = (attrs.skip && is_option_type(&field_ty))
+        .then(|| quote!(field.attributes.insert("specta:skipped_nullable", true);));
+
     let field_ty = if attrs.skip || variant_skip {
         quote!()
     } else if attrs.inline {
@@ -78,7 +86,24 @@ pub fn construct_field_with_variant_skip(
         #field_docs
         #runtime_attrs
         #type_overridden_attribute
+        #skipped_nullable_attribute
         #field_ty
         field
     }))
+}
+
+/// Whether a type is syntactically `Option<T>` (including `std::option::Option`
+/// and `core::option::Option` paths). Aliases of `Option` are not detectable
+/// and conservatively treated as non-`Option`.
+fn is_option_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "Option"),
+        Type::Group(group) => is_option_type(&group.elem),
+        Type::Paren(paren) => is_option_type(&paren.elem),
+        _ => false,
+    }
 }
