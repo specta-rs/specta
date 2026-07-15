@@ -1999,6 +1999,27 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
         .into_sorted_iter()
         .filter(|ndt| is_emitted_named(ndt))
         .collect::<Vec<_>>();
+    if matches!(
+        exporter.layout,
+        Layout::FlatFile | Layout::ModulePrefixedName
+    ) {
+        let top_level_names = ndts
+            .iter()
+            .map(|ndt| (exported_name(exporter, ndt), rust_path(ndt)))
+            .collect::<HashMap<_, _>>();
+        for ndt in &ndts {
+            for generic in ndt.generics.iter() {
+                let generic_name = identifier(&generic.name, &rust_path(ndt))?;
+                if let Some(first) = top_level_names.get(&generic_name) {
+                    return Err(Error::DuplicateTypeName {
+                        name: generic_name,
+                        first: first.clone(),
+                        second: format!("generic parameter on {}", rust_path(ndt)),
+                    });
+                }
+            }
+        }
+    }
     if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
         let mut namespaces = HashSet::new();
         for ndt in &ndts {

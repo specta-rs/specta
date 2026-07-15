@@ -181,6 +181,19 @@ struct GenericType<T> {
     value: T,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct ShadowedUser {
+    value: bool,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericNameShadow<ShadowedUser> {
+    generic: ShadowedUser,
+    top_level: self::ShadowedUser,
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Type)]
 #[specta(collect = false)]
@@ -418,6 +431,15 @@ fn duplicate_generic_parameters_are_rejected() {
     assert!(matches!(
         CSharp::new().export(&types, IdentityFormat),
         Err(Error::InvalidName { .. })
+    ));
+}
+
+#[test]
+fn flat_generic_parameters_cannot_shadow_top_level_types() {
+    let types = Types::default().register::<GenericNameShadow<String>>();
+    assert!(matches!(
+        CSharp::new().export(&types, IdentityFormat),
+        Err(Error::DuplicateTypeName { .. })
     ));
 }
 
