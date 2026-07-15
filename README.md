@@ -28,7 +28,7 @@
 | **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Basic types work, structs/enums in progress       |
 | **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | Primitives work, complex types in progress        |
 | **Go**          | 🚧 **Planned** | [`specta-go`](https://crates.io/crates/specta-go)                 | Go structs and interfaces                         |
-| **Kotlin**      | 🚧 **Planned** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Kotlin data classes and sealed classes            |
+| **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
 | **JSON Schema** | 🚧 **Planned** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | JSON Schema generation                            |
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
 | **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (2)**: Rust and OpenAPI exporters have basic functionality working, with complex types in progress
-- **Planned (7)**: Go, Kotlin, JSON Schema, Zod, Python, C#, and Java exporters are in development
+- **Partially Implemented (3)**: Rust, OpenAPI, and Kotlin exporters have working implementations with further compatibility work in progress
+- **Planned (6)**: Go, JSON Schema, Zod, Python, C#, and Java exporters are in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -73,7 +73,7 @@ cargo add specta_swift       # Swift (stable)
 cargo add specta_rust        # Rust (partial - basic types)
 cargo add specta_openapi     # OpenAPI/Swagger (partial - primitives)
 # cargo add specta_go          # Go (planned)
-# cargo add specta_kotlin      # Kotlin (planned)
+cargo add specta_kotlin       # Kotlin (partial)
 # cargo add specta_jsonschema  # JSON Schema (planned)
 # cargo add specta_zod         # Zod schemas (planned)
 ```

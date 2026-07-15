@@ -2122,6 +2122,7 @@ name = "specta-kotlin"
 version = "0.0.4"
 dependencies = [
  "specta",
+ "specta-serde",
 ]
 
 [[package]]
@@ -2187,6 +2188,7 @@ dependencies = [
  "smol_str 0.3.6",
  "specta",
  "specta-jsonschema",
+ "specta-kotlin",
  "specta-serde",
  "specta-swift",
  "specta-typescript",
