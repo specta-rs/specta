@@ -143,8 +143,8 @@ Unit5: /**
 	*/
 
 Unit6: /**
-	* @typedef {{ A: null }} Unit6
-	* @property {{ A: null }} A
+	* @typedef {{ A: [] }} Unit6
+	* @property {{ A: [] }} A
 	*/
 
 Unit7: /**
@@ -353,8 +353,8 @@ InlineTuple2: /**
 Box<str>: 
 Box<String>: 
 SkippedFieldWithinVariant: /**
-	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A"; data?: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data?: null }} A
 	* @property {{ type: "B"; data: string }} B
 	*/
 
