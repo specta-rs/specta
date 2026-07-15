@@ -667,8 +667,10 @@ impl<'a> Renderer<'a> {
                 self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        if fields.len() == 1 {
-            return Ok(items.into_iter().next().unwrap_or(Value::Bool(false)));
+        if fields.len() == 1
+            && let Some(item) = items.first()
+        {
+            return Ok(item.clone());
         }
         // serde accepts sequences truncated anywhere inside the trailing run
         // of defaulted (`optional`) elements, so those don't count toward
@@ -713,7 +715,9 @@ impl<'a> Renderer<'a> {
     fn tuple_schema(&self, items: Vec<Value>, min_items: usize) -> Value {
         let mut schema = Map::new();
         schema.insert("type".to_string(), string("array"));
-        if self.schema_version.uses_prefix_items() {
+        if items.is_empty() {
+            schema.insert("items".to_string(), Value::Bool(false));
+        } else if self.schema_version.uses_prefix_items() {
             schema.insert("prefixItems".to_string(), Value::Array(items.clone()));
             schema.insert("items".to_string(), Value::Bool(false));
         } else {
@@ -734,7 +738,7 @@ impl<'a> Renderer<'a> {
     ) -> Result<Value, Error> {
         let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
         let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
-        let variants = enm
+        let mut variants = enm
             .variants
             .iter()
             .filter(|(_, variant)| !variant.skip)
@@ -750,6 +754,10 @@ impl<'a> Renderer<'a> {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
+
+        if rewritten {
+            exclude_known_discriminants(&mut variants);
+        }
 
         let rewritten_may_overlap = rewritten
             && enm
@@ -1389,6 +1397,97 @@ fn schema_has_const(schema: &Value, value: &str) -> bool {
         Value::Array(values) => values.iter().any(|value_| schema_has_const(value_, value)),
         _ => false,
     }
+}
+
+fn exclude_known_discriminants(variants: &mut [Value]) {
+    let mut properties = BTreeMap::<Option<String>, BTreeSet<String>>::new();
+    for variant in variants.iter() {
+        collect_fixed_discriminants(variant, &mut properties);
+    }
+    for variant in variants
+        .iter_mut()
+        .filter(|variant| !schema_contains_const(variant))
+    {
+        exclude_discriminants(variant, &properties);
+    }
+}
+
+fn collect_fixed_discriminants(
+    schema: &Value,
+    discriminants: &mut BTreeMap<Option<String>, BTreeSet<String>>,
+) {
+    let Some(schema) = schema.as_object() else {
+        return;
+    };
+    if let Some(value) = schema.get("const").and_then(Value::as_str) {
+        discriminants.entry(None).or_default().insert(value.into());
+    }
+    if let Some(properties) = schema.get("properties").and_then(Value::as_object) {
+        for (name, property) in properties {
+            if let Some(value) = property.get("const").and_then(Value::as_str) {
+                discriminants
+                    .entry(Some(name.clone()))
+                    .or_default()
+                    .insert(value.into());
+            }
+        }
+    }
+    for schemas in ["allOf", "anyOf", "oneOf"]
+        .into_iter()
+        .filter_map(|keyword| schema.get(keyword).and_then(Value::as_array))
+    {
+        for schema in schemas {
+            collect_fixed_discriminants(schema, discriminants);
+        }
+    }
+}
+
+fn schema_contains_const(schema: &Value) -> bool {
+    match schema {
+        Value::Object(schema) => {
+            schema.contains_key("const") || schema.values().any(schema_contains_const)
+        }
+        Value::Array(values) => values.iter().any(schema_contains_const),
+        _ => false,
+    }
+}
+
+fn exclude_discriminants(
+    schema: &mut Value,
+    discriminants: &BTreeMap<Option<String>, BTreeSet<String>>,
+) {
+    let Some(schema) = schema.as_object_mut() else {
+        return;
+    };
+    if schema.get("type").and_then(Value::as_str) == Some("string")
+        && let Some(values) = discriminants.get(&None)
+    {
+        schema.insert("not".into(), enum_schema(values));
+    }
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        for (name, property) in properties {
+            let Some(values) = discriminants.get(&Some(name.clone())) else {
+                continue;
+            };
+            let Some(property) = property.as_object_mut() else {
+                continue;
+            };
+            if property.get("type").and_then(Value::as_str) == Some("string") {
+                property.insert("not".into(), enum_schema(values));
+            }
+        }
+    }
+    for keyword in ["allOf", "anyOf", "oneOf"] {
+        if let Some(schemas) = schema.get_mut(keyword).and_then(Value::as_array_mut) {
+            for schema in schemas {
+                exclude_discriminants(schema, discriminants);
+            }
+        }
+    }
+}
+
+fn enum_schema(values: &BTreeSet<String>) -> Value {
+    object([("enum", Value::Array(values.iter().map(string).collect()))])
 }
 
 fn schema_is_const(schema: &Value, value: &str) -> bool {

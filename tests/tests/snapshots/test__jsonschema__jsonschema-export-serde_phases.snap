@@ -7382,7 +7382,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "items": false,
       "maxItems": 0,
       "minItems": 0,
-      "prefixItems": [],
       "title": "Unit3",
       "type": "array"
     },
@@ -7401,7 +7400,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "items": false,
           "maxItems": 0,
           "minItems": 0,
-          "prefixItems": [],
           "type": "array"
         }
       },

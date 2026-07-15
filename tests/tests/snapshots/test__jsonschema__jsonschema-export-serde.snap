@@ -6422,7 +6422,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "items": false,
       "maxItems": 0,
       "minItems": 0,
-      "prefixItems": [],
       "title": "Unit3",
       "type": "array"
     },
@@ -6441,7 +6440,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "items": false,
           "maxItems": 0,
           "minItems": 0,
-          "prefixItems": [],
           "type": "array"
         }
       },

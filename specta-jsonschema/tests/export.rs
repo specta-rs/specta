@@ -170,7 +170,7 @@ enum RawNewtypeEnum {
 #[serde(tag = "kind")]
 enum InternalOther {
     #[serde(rename = "known")]
-    Known,
+    Known { value: u32 },
     #[serde(other)]
     Other,
 }
@@ -648,11 +648,28 @@ fn rewritten_other_variants_keep_their_wire_shape() {
         .unwrap();
     let validator = jsonschema::validator_for(&schema).unwrap();
 
-    assert!(validator.is_valid(&serde_json::json!({ "kind": "known" })));
+    assert!(validator.is_valid(&serde_json::json!({ "kind": "known", "value": 1 })));
+    assert!(!validator.is_valid(&serde_json::json!({ "kind": "known" })));
     assert!(validator.is_valid(&serde_json::json!({ "kind": "unknown" })));
     assert!(!validator.is_valid(&serde_json::json!({
         "Other": { "kind": "unknown" }
     })));
+}
+
+#[test]
+fn skipped_single_field_tuple_struct_is_an_empty_sequence() {
+    let mut types = Types::default();
+    NamedDataType::new("SkippedSingleTuple", &mut types, |_, ndt| {
+        ndt.ty = Some(Struct::unnamed().field(Field::default()).build());
+    });
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, IdentityFormat, "SkippedSingleTuple")
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!([])));
+    assert!(!validator.is_valid(&serde_json::json!(null)));
+    assert!(!validator.is_valid(&serde_json::json!([1])));
 }
 
 #[test]
