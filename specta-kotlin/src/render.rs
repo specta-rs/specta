@@ -1,4 +1,7 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet},
+};
 
 use specta::{
     Format, Types,
@@ -469,14 +472,28 @@ fn render_enum(
         .attributes
         .contains_key("specta_serde:enum_repr_rewritten");
     let serde_untagged = enm.attributes.contains_key("serde:container:untagged");
-    ensure_unique(
-        path,
-        std::iter::once(name.to_owned())
-            .chain(generics.iter().cloned())
-            .chain(variants.iter().map(|(variant_name, _)| {
-                variant_declaration_name(kotlin, variant_name, name, generics)
-            })),
-    )?;
+    let mut used_names = std::iter::once(name.to_owned())
+        .chain(generics.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    let mut base_names = BTreeSet::new();
+    let variant_names = variants
+        .iter()
+        .map(|(original, _)| {
+            let base = safe_member_name(&convert_variant_name(kotlin.naming, original), "Variant");
+            if !base_names.insert(base.clone()) {
+                return Err(Error::DuplicateIdentifier {
+                    path: path.into(),
+                    name: base,
+                });
+            }
+            let mut resolved = base;
+            while used_names.contains(&resolved) || ROOT_NAMESPACES.contains(&resolved.as_str()) {
+                resolved.push_str("Variant");
+            }
+            used_names.insert(resolved.clone());
+            Ok(resolved)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let unit_only = generics.is_empty()
         && variants.iter().all(|(name, variant)| {
             is_unit_fields(&normalized_variant_fields(
@@ -499,19 +516,17 @@ fn render_enum(
         out.push_str("public enum class ");
         out.push_str(name);
         out.push_str(" {\n");
-        for (index, (variant_name, variant)) in variants.iter().enumerate() {
+        for (index, ((variant_name, variant), converted)) in
+            variants.iter().zip(&variant_names).enumerate()
+        {
             let indent = kotlin.indentation(1);
             render_kdoc(out, &indent, &variant.docs);
             render_deprecated(out, &indent, variant.deprecated.as_ref());
-            let converted = safe_member_name(
-                &convert_variant_name(kotlin.naming, variant_name),
-                "Variant",
-            );
             if converted != variant_name.as_ref() {
                 annotation(out, &indent, kotlin, "SerialName", Some(variant_name));
             }
             out.push_str(&indent);
-            out.push_str(&identifier(&converted, &format!("{path}.{variant_name}"))?);
+            out.push_str(&identifier(converted, &format!("{path}.{variant_name}"))?);
             if index + 1 != variants.len() {
                 out.push(',');
             }
@@ -525,7 +540,7 @@ fn render_enum(
     out.push_str(name);
     out.push_str(&generic_declaration(generics));
     out.push_str(" {\n");
-    for (variant_name, variant) in variants {
+    for ((variant_name, variant), converted) in variants.into_iter().zip(&variant_names) {
         render_variant(
             out,
             kotlin,
@@ -535,6 +550,7 @@ fn render_enum(
             generics,
             generic_scope,
             variant_name,
+            converted,
             variant,
             path,
             serde_rewritten,
@@ -556,6 +572,7 @@ fn render_variant(
     generics: &[String],
     generic_scope: &[Generic],
     original_name: &str,
+    converted: &str,
     variant: &Variant,
     path: &str,
     serde_rewritten: bool,
@@ -571,11 +588,10 @@ fn render_variant(
     render_kdoc(out, &indent, &variant.docs);
     render_deprecated(out, &indent, variant.deprecated.as_ref());
     annotation(out, &indent, kotlin, "Serializable", None);
-    let converted = variant_declaration_name(kotlin, original_name, parent, generics);
     if converted != original_name {
         annotation(out, &indent, kotlin, "SerialName", Some(original_name));
     }
-    let variant_name = identifier(&converted, &format!("{path}.{original_name}"))?;
+    let variant_name = identifier(converted, &format!("{path}.{original_name}"))?;
     out.push_str(&indent);
     let parent_type = format!("{parent}{}", generic_usage(generics));
 
@@ -1383,20 +1399,6 @@ fn convert_variant_name(convention: NamingConvention, name: &str) -> String {
     }
 }
 
-fn variant_declaration_name(
-    kotlin: &Kotlin,
-    original: &str,
-    parent: &str,
-    generics: &[String],
-) -> String {
-    let converted = safe_member_name(&convert_variant_name(kotlin.naming, original), "Variant");
-    if converted == parent || generics.iter().any(|generic| generic == &converted) {
-        format!("{converted}Variant")
-    } else {
-        converted
-    }
-}
-
 fn identifier(name: &str, path: &str) -> Result<String, Error> {
     validate_identifier(name, path)?;
     let plain = name
@@ -1411,6 +1413,12 @@ fn identifier(name: &str, path: &str) -> Result<String, Error> {
 }
 
 fn generic_identifier(name: &str, path: &str) -> Result<String, Error> {
+    if ROOT_NAMESPACES.contains(&name) {
+        return Err(Error::ReservedNamespace {
+            path: path.into(),
+            name: name.into(),
+        });
+    }
     let identifier = identifier(name, path)?;
     if GENERIC_MODIFIERS.contains(&name) && !identifier.starts_with('`') {
         Ok(format!("`{identifier}`"))

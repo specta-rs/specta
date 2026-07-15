@@ -355,21 +355,58 @@ fn kotlin_rejects_generics_that_shadow_their_declaration() {
 fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
     use specta::datatype::{Enum, GenericDefinition, NamedDataType, Variant};
 
-    for variant in ["Collision", "T"] {
-        let mut types = Types::default();
-        NamedDataType::new("Collision", &mut types, |_, datatype| {
-            datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
-            let mut enm = Enum::default();
+    let mut types = Types::default();
+    NamedDataType::new("Collision", &mut types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
+        let mut enm = Enum::default();
+        for variant in ["Collision", "T", "TVariant"] {
             enm.variants
                 .push((Cow::Owned(variant.to_owned()), Variant::unit()));
-            datatype.ty = Some(DataType::Enum(enm));
-        });
+        }
+        datatype.ty = Some(DataType::Enum(enm));
+    });
 
-        let output = Kotlin::default()
-            .export(&types, IdentityFormat)
-            .expect("variant collisions should be renamed without shadowing parent scope");
-        assert!(output.contains(&format!("class {variant}Variant<T>")));
-    }
+    let output = Kotlin::default()
+        .export(&types, IdentityFormat)
+        .expect("variant collisions should be renamed without shadowing parent scope");
+    assert!(output.contains("class CollisionVariant<T>"));
+    assert!(output.contains("class TVariant<T>"));
+    assert!(output.contains("class TVariantVariant<T>"));
+
+    let mut root_types = Types::default();
+    NamedDataType::new("RootVariants", &mut root_types, |_, datatype| {
+        let mut enm = Enum::default();
+        enm.variants.push((
+            Cow::Borrowed("Kotlin"),
+            Variant::unnamed()
+                .field(specta::datatype::Field::new(DataType::Primitive(
+                    specta::datatype::Primitive::str,
+                )))
+                .build(),
+        ));
+        datatype.ty = Some(DataType::Enum(enm));
+    });
+    let output = Kotlin::default()
+        .naming(NamingConvention::SnakeCase)
+        .export(&root_types, IdentityFormat)
+        .expect("root namespace variant names should be renamed");
+    assert!(output.contains("class kotlinVariant"));
+}
+
+#[test]
+fn kotlin_rejects_generics_that_shadow_root_namespaces() {
+    use specta::datatype::{GenericDefinition, NamedDataType, Struct};
+
+    let mut types = Types::default();
+    NamedDataType::new("GenericRoot", &mut types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("kotlin"), None)]);
+        datatype.ty = Some(DataType::Struct(Struct::unit()));
+    });
+
+    assert!(matches!(
+        Kotlin::default().export(&types, IdentityFormat),
+        Err(Error::ReservedNamespace { name, .. }) if name == "kotlin"
+    ));
 }
 
 #[test]
