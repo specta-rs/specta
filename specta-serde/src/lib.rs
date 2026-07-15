@@ -867,6 +867,7 @@ fn rewrite_datatype_for_phase(
                 false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
+            normalize_container_attrs_for_phase(&mut s.attributes, mode)?;
             if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
                 *ty = intersection;
                 return Ok(());
@@ -1216,6 +1217,23 @@ fn rewrite_field_for_phase(
         field.attributes.remove(parser::FIELD_SKIP_SERIALIZING_IF);
     }
 
+    if mode != PhaseRewrite::Unified {
+        // Directional attributes were consumed while producing this
+        // phase-specific shape: renames are already applied to the field name
+        // by the caller, and fields skipped in this phase were already
+        // dropped. Strip them for the same reason as `skip_serializing_if`
+        // above: unified-mode validation now rejects one-sided renames/skips,
+        // and it must keep accepting the already-split shapes.
+        for key in [
+            parser::FIELD_RENAME_SERIALIZE,
+            parser::FIELD_RENAME_DESERIALIZE,
+            parser::FIELD_SKIP_SERIALIZING,
+            parser::FIELD_SKIP_DESERIALIZING,
+        ] {
+            field.attributes.remove(key);
+        }
+    }
+
     if let Some(ty) = field.ty.clone()
         && let Some(resolved) = resolve_phased_type(&ty, mode, "field")?
     {
@@ -1224,6 +1242,51 @@ fn rewrite_field_for_phase(
 
     if let Some(ty) = field.ty.as_mut() {
         rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
+    }
+
+    Ok(())
+}
+
+/// Strips or normalizes directional container serde attrs that were consumed
+/// while producing a phase-specific shape, so that unified-mode validation
+/// (which rejects one-sided renames) keeps accepting the already-split shapes
+/// for downstream callers that validate the post-`apply_phases` graph.
+fn normalize_container_attrs_for_phase(
+    attrs: &mut specta::datatype::Attributes,
+    mode: PhaseRewrite,
+) -> Result<(), Error> {
+    if mode == PhaseRewrite::Unified {
+        return Ok(());
+    }
+
+    let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)? else {
+        return Ok(());
+    };
+
+    // `rename_all` / `rename_all_fields` have already been applied to the
+    // field names by `rewrite_fields_for_phase`.
+    for key in [
+        parser::CONTAINER_RENAME_ALL_SERIALIZE,
+        parser::CONTAINER_RENAME_ALL_DESERIALIZE,
+        parser::CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
+        parser::CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+    ] {
+        attrs.remove(key);
+    }
+
+    // The container rename is still needed by `rewrite_named_type_for_phase`
+    // (which runs after this rewrite) to name the exported type, so normalize
+    // it to the phase-selected value instead of dropping it.
+    let rename = match mode {
+        PhaseRewrite::Serialize => parsed.rename_serialize,
+        PhaseRewrite::Deserialize => parsed.rename_deserialize,
+        PhaseRewrite::Unified => unreachable!("handled above"),
+    };
+    attrs.remove(parser::CONTAINER_RENAME_SERIALIZE);
+    attrs.remove(parser::CONTAINER_RENAME_DESERIALIZE);
+    if let Some(rename) = rename {
+        attrs.insert(parser::CONTAINER_RENAME_SERIALIZE, rename.clone());
+        attrs.insert(parser::CONTAINER_RENAME_DESERIALIZE, rename);
     }
 
     Ok(())
@@ -2628,6 +2691,23 @@ mod tests {
         nickname: Option<String>,
     }
 
+    #[derive(Type, Serialize, Deserialize)]
+    struct WithDirectionalFieldAttrs {
+        #[serde(rename(serialize = "serName"))]
+        field_a: String,
+        #[serde(skip_serializing)]
+        field_b: String,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(
+        rename(serialize = "DirectionalContainerSer"),
+        rename_all(serialize = "camelCase")
+    )]
+    struct WithDirectionalContainerAttrs {
+        field_one: String,
+    }
+
     #[test]
     fn selects_split_named_reference_for_each_phase() {
         let mut types = specta::Types::default();
@@ -2742,6 +2822,35 @@ mod tests {
             .expect("Unified validation should accept phase-split _Serialize variant");
         validate_datatype_for_mode(&deserialize, &resolved, ApplyMode::Unified)
             .expect("Unified validation should accept phase-split _Deserialize variant");
+    }
+
+    #[test]
+    fn phase_split_directional_attrs_pass_unified_mode_validation() {
+        // Same downstream contract as above, but for the one-sided directional
+        // renames/skips that unified-mode validation rejects: once
+        // `PhasesFormat` has split a type, the phase-specific shapes must not
+        // keep carrying the consumed directional serde attrs, otherwise
+        // unified-mode validation on the post-`apply_phases` graph rejects the
+        // already-split types.
+        let mut types = specta::Types::default();
+        let field_dt = WithDirectionalFieldAttrs::definition(&mut types);
+        let container_dt = WithDirectionalContainerAttrs::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        for (name, dt) in [
+            ("field attrs", &field_dt),
+            ("container attrs", &container_dt),
+        ] {
+            for phase in [Phase::Serialize, Phase::Deserialize] {
+                let phased = select_phase_datatype(dt, &resolved, phase);
+                validate_datatype_for_mode(&phased, &resolved, ApplyMode::Unified)
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "Unified validation should accept phase-split {name} {phase:?} shape: {err}"
+                        )
+                    });
+            }
+        }
     }
 
     #[test]

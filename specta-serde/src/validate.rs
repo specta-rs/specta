@@ -430,11 +430,11 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? else {
+    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(());
     };
 
-    if conversions.from.is_some() && conversions.try_from.is_some() {
+    if container_attrs.from.is_some() && container_attrs.try_from.is_some() {
         return Err(Error::invalid_conversion_usage(
             path,
             "`from` and `try_from` cannot be used together",
@@ -442,9 +442,12 @@ fn validate_container_attributes(
     }
 
     for (suffix, target) in [
-        ("<serde_into>", conversions.resolved_into.as_ref()),
-        ("<serde_from>", conversions.resolved_from.as_ref()),
-        ("<serde_try_from>", conversions.resolved_try_from.as_ref()),
+        ("<serde_into>", container_attrs.resolved_into.as_ref()),
+        ("<serde_from>", container_attrs.resolved_from.as_ref()),
+        (
+            "<serde_try_from>",
+            container_attrs.resolved_try_from.as_ref(),
+        ),
     ] {
         if let Some(target) = target {
             inner(
@@ -459,36 +462,38 @@ fn validate_container_attributes(
     }
 
     if mode == ApplyMode::Unified {
-        if conversions.rename_serialize != conversions.rename_deserialize {
+        if container_attrs.rename_serialize != container_attrs.rename_deserialize {
             return Err(Error::incompatible_rename(
                 "container rename",
                 path.to_string(),
-                conversions.rename_serialize,
-                conversions.rename_deserialize,
+                container_attrs.rename_serialize,
+                container_attrs.rename_deserialize,
             ));
         }
 
-        if conversions.rename_all_serialize != conversions.rename_all_deserialize {
+        if container_attrs.rename_all_serialize != container_attrs.rename_all_deserialize {
             return Err(Error::incompatible_rename(
                 "container rename_all",
                 path.to_string(),
-                conversions
+                container_attrs
                     .rename_all_serialize
                     .map(|rule| format!("{rule:?}")),
-                conversions
+                container_attrs
                     .rename_all_deserialize
                     .map(|rule| format!("{rule:?}")),
             ));
         }
 
-        if conversions.rename_all_fields_serialize != conversions.rename_all_fields_deserialize {
+        if container_attrs.rename_all_fields_serialize
+            != container_attrs.rename_all_fields_deserialize
+        {
             return Err(Error::incompatible_rename(
                 "container rename_all_fields",
                 path.to_string(),
-                conversions
+                container_attrs
                     .rename_all_fields_serialize
                     .map(|rule| format!("{rule:?}")),
-                conversions
+                container_attrs
                     .rename_all_fields_deserialize
                     .map(|rule| format!("{rule:?}")),
             ));
