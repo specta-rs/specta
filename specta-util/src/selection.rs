@@ -35,7 +35,7 @@
 // TODO: better docs w/ example
 #[macro_export]
 macro_rules! selection {
-    ( $s:expr, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+    ( @define { $($n:ident),+ } as $name:ident ) => {
         #[allow(non_camel_case_types)]
         mod selection {
             mod deps {
@@ -52,31 +52,27 @@ macro_rules! selection {
             }
         }
         use selection::definition::$name;
+    };
+    ( $s:ident, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+        $crate::selection!(@define { $($n),+ } as $name);
+        #[allow(non_camel_case_types)]
+        $name { $($n: $s.$n,)* }
+    }};
+    ( $s:expr, { $($n:ident),+ $(,)? } as $name:ident ) => {{
+        $crate::selection!(@define { $($n),+ } as $name);
         #[allow(non_camel_case_types)]
         let value = $s;
         $name { $($n: value.$n,)* }
+    }};
+    ( $s:ident, { $($n:ident),+ $(,)? } ) => {{
+        $crate::selection!($s, { $($n),+ } as Selection)
     }};
     ( $s:expr, { $($n:ident),+ $(,)? } ) => {{
         $crate::selection!($s, { $($n),+ } as Selection)
     }};
 
     ( $s:expr, [{ $($n:ident),+ $(,)? }] as $name:ident ) => {{
-        #[allow(non_camel_case_types)]
-        mod selection {
-            mod deps {
-                pub use $crate::__private::{serde, specta};
-            }
-
-            pub mod definition {
-                #[derive(super::deps::serde::Serialize, super::deps::specta::Type)]
-                #[serde(crate = "super::deps::serde")]
-                #[specta(crate = super::deps::specta, inline)]
-                pub struct $name<$($n,)*> {
-                    $(pub $n: $n),*
-                }
-            }
-        }
-        use selection::definition::$name;
+        $crate::selection!(@define { $($n),+ } as $name);
         #[allow(non_camel_case_types)]
         $s.into_iter().map(|v| $name { $($n: v.$n,)* }).collect::<Vec<_>>()
     }};
@@ -92,6 +88,11 @@ mod tests {
     struct User {
         name: &'static str,
         age: u32,
+    }
+
+    struct Account {
+        name: String,
+        password: String,
     }
 
     #[test]
@@ -111,5 +112,17 @@ mod tests {
         assert_eq!(evaluations.get(), 1);
         assert_eq!(selection.name, "Ada");
         assert_eq!(selection.age, 37);
+    }
+
+    #[test]
+    fn struct_identifier_preserves_unselected_fields() {
+        let account = Account {
+            name: "Ada".to_owned(),
+            password: "correct horse".to_owned(),
+        };
+        let selection = crate::selection!(account, { name });
+
+        assert_eq!(selection.name, "Ada");
+        assert_eq!(account.password, "correct horse");
     }
 }
