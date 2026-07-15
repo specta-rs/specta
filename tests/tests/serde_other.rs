@@ -35,6 +35,23 @@ enum ExternalOther {
 
 #[derive(Type, Deserialize)]
 #[specta(collect = false)]
+enum ExternalPayloadOther {
+    Known(String),
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+enum ExternalSpectaSkippedPayloadOther {
+    #[specta(skip)]
+    Known(String),
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
 enum SkippedOther {
     Known,
     #[serde(other, skip)]
@@ -70,6 +87,42 @@ fn serde_other_requires_phases_format() {
             specta_serde::Format,
         )
         .expect_err("unified export cannot soundly exclude known tags");
+
+    assert!(err.to_string().contains("requires `PhasesFormat`"));
+}
+
+#[test]
+fn external_unit_serde_other_supports_unified_format() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<ExternalOther>(),
+            specta_serde::Format,
+        )
+        .expect("external unit enums can soundly widen their string representation");
+
+    insta::assert_snapshot!("serde-other-external-unit-unified-typescript", ts);
+}
+
+#[test]
+fn external_payload_serde_other_still_requires_phases_format() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<ExternalPayloadOther>(),
+            specta_serde::Format,
+        )
+        .expect_err("a catch-all string would accept known tags without their payloads");
+
+    assert!(err.to_string().contains("requires `PhasesFormat`"));
+}
+
+#[test]
+fn specta_skipped_external_payload_still_requires_phases_format() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<ExternalSpectaSkippedPayloadOther>(),
+            specta_serde::Format,
+        )
+        .expect_err("specta skipping does not remove the payload from Serde's wire format");
 
     assert!(err.to_string().contains("requires `PhasesFormat`"));
 }
