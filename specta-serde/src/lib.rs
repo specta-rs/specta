@@ -1539,6 +1539,12 @@ fn rewrite_struct_repr_for_phase(
 }
 
 fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool, Error> {
+    if field
+        .attributes
+        .contains_key("specta:serde_newtype_skip_ignored")
+    {
+        return Ok(false);
+    }
     let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(false);
     };

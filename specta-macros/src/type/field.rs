@@ -63,6 +63,10 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
+    let serde_newtype_skip_ignored = attrs
+        .serde_newtype_skip_ignored
+        .then(|| quote!(field.attributes.insert("specta:serde_newtype_skip_ignored", true);));
+
     let field_ty = if attrs.skip || variant_skip {
         quote!()
     } else if attrs.inline {
@@ -78,6 +82,7 @@ pub fn construct_field_with_variant_skip(
         #field_docs
         #runtime_attrs
         #type_overridden_attribute
+        #serde_newtype_skip_ignored
         #field_ty
         field
     }))

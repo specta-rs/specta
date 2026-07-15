@@ -59,6 +59,10 @@ struct StrictTuple((String, bool));
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct StrictHomogeneousTuple((u8, u8));
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct StrictMap(HashMap<char, String>);
 
 #[derive(Type)]
@@ -246,6 +250,18 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
         optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["value"]["nullable"],
         true
     );
+
+    let homogeneous = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictHomogeneousTuple>(),
+            specta_serde::Format,
+        )
+        .expect("strict mode should represent homogeneous fixed tuples exactly");
+    let homogeneous = serde_json::to_value(homogeneous).unwrap();
+    let homogeneous = &homogeneous["components"]["schemas"]["StrictHomogeneousTuple"];
+    assert_eq!(homogeneous["items"]["type"], "integer");
+    assert_eq!(homogeneous["minItems"], 2);
+    assert_eq!(homogeneous["maxItems"], 2);
 
     OpenApi::default()
         .export(

@@ -104,12 +104,19 @@ pub fn parse_struct(
             })
         }
         Fields::Unnamed(_) => {
+            let is_newtype = data.fields.len() == 1;
             let fields = data
                 .fields
                 .iter()
                 .map(|field| {
-                    let (field_attrs, raw_attrs) =
+                    let (mut field_attrs, raw_attrs) =
                         decode_field_attrs(field, &container_attrs.skip_attrs)?;
+                    if is_newtype && field_attrs.serde_skip {
+                        // Serde ignores `#[serde(skip)]` on the sole field of a
+                        // newtype struct and serializes the bare inner value.
+                        field_attrs.skip = false;
+                        field_attrs.serde_newtype_skip_ignored = true;
+                    }
                     construct_field(
                         crate_ref,
                         container_attrs,

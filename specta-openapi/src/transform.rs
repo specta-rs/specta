@@ -115,14 +115,17 @@ fn transform_object(
             .flatten()
     });
     if let Some(Value::Array(items)) = prefix_items {
-        if items.len() > 1 && mode == SchemaMode::Strict {
+        let heterogeneous = items
+            .first()
+            .is_some_and(|first| items.iter().skip(1).any(|item| item != first));
+        if heterogeneous && mode == SchemaMode::Strict {
             return Err(unsupported(component, "heterogeneous positional tuples"));
         }
         let mut items = items
             .into_iter()
             .map(|value| transform(value, component, mode))
             .collect::<Result<Vec<_>, _>>()?;
-        if items.len() > 1 {
+        if heterogeneous {
             schema.insert(
                 "x-specta-prefix-items".to_string(),
                 Value::Array(items.clone()),
@@ -131,7 +134,8 @@ fn transform_object(
         let item = match items.len() {
             0 => json!({}),
             1 => items.pop().unwrap_or_else(|| json!({})),
-            _ => json!({ "oneOf": items }),
+            _ if heterogeneous => json!({ "oneOf": items }),
+            _ => items.pop().unwrap_or_else(|| json!({})),
         };
         schema.insert("items".to_string(), item);
     }

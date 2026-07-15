@@ -133,6 +133,9 @@ struct DocumentedFields {
     name: String,
 }
 
+#[derive(Serialize, Deserialize, Type)]
+struct SkippedNewtype(#[serde(skip)] u8);
+
 #[test]
 fn exports_metadata_and_primitives() {
     let types = Types::default().register::<Primitives>();
@@ -154,6 +157,25 @@ fn exports_field_docs_as_descriptions() {
         .unwrap();
 
     insta::assert_json_snapshot!(schema);
+}
+
+#[test]
+fn serde_skip_on_newtype_preserves_bare_wire_shape() {
+    assert_eq!(
+        serde_json::to_value(SkippedNewtype(0)).unwrap(),
+        serde_json::json!(0)
+    );
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<SkippedNewtype>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let skipped = &schema["$defs"]["SkippedNewtype"];
+
+    assert_eq!(skipped["type"], "integer");
+    assert_eq!(skipped["minimum"], 0);
+    assert_eq!(skipped["maximum"], 255);
 }
 
 #[test]
