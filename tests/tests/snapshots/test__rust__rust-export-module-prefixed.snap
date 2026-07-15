@@ -39,6 +39,7 @@ pub enum test_rust_Event {
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_Keywords {
     pub r#type: String,
+    pub r#abstract: bool,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]

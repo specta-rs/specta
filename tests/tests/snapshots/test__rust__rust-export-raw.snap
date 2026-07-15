@@ -45,6 +45,7 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub struct Keywords {
     pub r#type: String,
+    pub r#abstract: bool,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]

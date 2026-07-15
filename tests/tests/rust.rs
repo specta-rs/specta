@@ -66,6 +66,7 @@ struct Marker;
 #[specta(collect = false)]
 struct Keywords {
     r#type: String,
+    r#abstract: bool,
 }
 
 #[derive(Type)]
@@ -489,7 +490,39 @@ fn formats_each_datatype_once() {
         .unwrap();
     assert!(output.contains("value: i16"), "{output}");
     assert!(!output.contains("value: i32"), "{output}");
-    assert_eq!(calls.load(Ordering::Relaxed), 1);
+    assert_eq!(calls.load(Ordering::Relaxed), 2);
+}
+
+#[test]
+fn formats_the_top_level_named_datatype() {
+    struct Promote;
+
+    impl Format for Promote {
+        fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+            Ok(Cow::Owned(types.clone()))
+        }
+
+        fn map_type(
+            &self,
+            _: &Types,
+            ty: &DataType,
+        ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+            Ok(Cow::Owned(match ty {
+                DataType::Primitive(specta::datatype::Primitive::i8) => {
+                    DataType::Primitive(specta::datatype::Primitive::i16)
+                }
+                ty => ty.clone(),
+            }))
+        }
+    }
+
+    let mut types = Types::default();
+    NamedDataType::new("Alias", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::i8));
+    });
+    let output = Rust::default().export(&types, Promote).unwrap();
+    assert!(output.contains("pub type Alias = i16;"), "{output}");
 }
 
 #[test]

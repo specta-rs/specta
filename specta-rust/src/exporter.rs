@@ -271,7 +271,7 @@ fn render_named(
     let Some(ty) = &ndt.ty else {
         return Ok(());
     };
-    let ty = map_datatype_children(format, types, ty.clone(), &rust_path(ndt))?;
+    let ty = map_datatype(format, types, ty, &rust_path(ndt))?;
     for generic in ndt.generics.iter() {
         if !datatype_uses_generic(&ty, &generic.name) {
             return Err(Error::UnusedGeneric {
@@ -918,7 +918,9 @@ fn identifier(name: &str, path: &str) -> Result<String, Error> {
 fn is_keyword(name: &str) -> bool {
     matches!(
         name,
-        "as" | "async"
+        "abstract"
+            | "as"
+            | "async"
             | "await"
             | "become"
             | "box"
