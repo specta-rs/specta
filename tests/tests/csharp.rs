@@ -361,8 +361,8 @@ fn flat_references_are_not_shadowed_by_inline_helpers() {
         )
         .unwrap();
 
-    assert!(output.contains("record FooValue"));
-    assert!(output.contains("global::FooValue TopLevel"));
+    assert!(output.contains("record FooValue2"));
+    assert!(output.contains("FooValue TopLevel"));
 }
 
 #[test]

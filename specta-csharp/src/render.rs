@@ -390,6 +390,13 @@ fn render_fields(
     containing_name: &str,
 ) -> Result<(), Error> {
     let indent = format!("{base}{}", exporter.indent);
+    let reserved_type_names = match exporter.layout {
+        Layout::FlatFile | Layout::ModulePrefixedName => types
+            .into_unsorted_iter()
+            .map(|ndt| exported_name(exporter, ndt))
+            .collect(),
+        Layout::Namespaces | Layout::Files => HashSet::new(),
+    };
     match fields {
         Fields::Unit => {}
         Fields::Named(fields) => {
@@ -410,7 +417,11 @@ fn render_fields(
                         suffix += 1;
                     }
                 }
-                let nested_name = unique_identifier(format!("{property}Value"), &mut used);
+                let nested_name = unique_type_identifier(
+                    format!("{property}Value"),
+                    &mut used,
+                    &reserved_type_names,
+                );
                 render_field_property(
                     out,
                     exporter,
@@ -423,6 +434,7 @@ fn render_fields(
                     ty,
                     path,
                     &mut used,
+                    &reserved_type_names,
                 )?;
             }
         }
@@ -433,7 +445,8 @@ fn render_fields(
                     continue;
                 };
                 let name = unique_identifier(format!("Item{}", index + 1), &mut used);
-                let nested_name = unique_identifier(format!("{name}Value"), &mut used);
+                let nested_name =
+                    unique_type_identifier(format!("{name}Value"), &mut used, &reserved_type_names);
                 render_field_property(
                     out,
                     exporter,
@@ -446,6 +459,7 @@ fn render_fields(
                     ty,
                     path,
                     &mut used,
+                    &reserved_type_names,
                 )?;
             }
         }
@@ -466,6 +480,7 @@ fn render_field_property(
     ty: &DataType,
     path: &str,
     used: &mut HashSet<String>,
+    reserved_type_names: &HashSet<String>,
 ) -> Result<(), Error> {
     if contains_recursive_inline(ty) {
         return Err(Error::RecursiveInline {
@@ -481,7 +496,11 @@ fn render_field_property(
             let name = if structural_types.is_empty() {
                 nested_name.to_string()
             } else {
-                unique_identifier(format!("{nested_name}{}", structural_types.len() + 1), used)
+                unique_type_identifier(
+                    format!("{nested_name}{}", structural_types.len() + 1),
+                    used,
+                    reserved_type_names,
+                )
             };
             structural_types.push((structural_ty, name));
         }
@@ -1457,7 +1476,6 @@ fn reference_name(out: &mut String, exporter: &CSharp, ndt: &NamedDataType) {
             out.push_str(&exported_name(exporter, ndt));
         }
         Layout::FlatFile | Layout::ModulePrefixedName => {
-            out.push_str("global::");
             out.push_str(&exported_name(exporter, ndt))
         }
     }
@@ -1753,6 +1771,26 @@ fn unique_identifier(mut name: String, used: &mut HashSet<String>) -> String {
     loop {
         name = format!("{base}{suffix}");
         if used.insert(name.clone()) {
+            return name;
+        }
+        suffix += 1;
+    }
+}
+
+fn unique_type_identifier(
+    mut name: String,
+    used: &mut HashSet<String>,
+    reserved: &HashSet<String>,
+) -> String {
+    if !reserved.contains(&name) && used.insert(name.clone()) {
+        return name;
+    }
+
+    let base = name.clone();
+    let mut suffix = 2;
+    loop {
+        name = format!("{base}{suffix}");
+        if !reserved.contains(&name) && used.insert(name.clone()) {
             return name;
         }
         suffix += 1;
