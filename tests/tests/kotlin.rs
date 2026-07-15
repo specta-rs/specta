@@ -391,6 +391,19 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
         .export(&root_types, IdentityFormat)
         .expect("root namespace variant names should be renamed");
     assert!(output.contains("class kotlinVariant"));
+
+    let mut keyword_types = Types::default();
+    NamedDataType::new("KeywordVariants", &mut keyword_types, |_, datatype| {
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("when"), None)]);
+        let mut enm = Enum::default();
+        enm.variants.push((Cow::Borrowed("When"), Variant::unit()));
+        datatype.ty = Some(DataType::Enum(enm));
+    });
+    let output = Kotlin::default()
+        .naming(NamingConvention::SnakeCase)
+        .export(&keyword_types, IdentityFormat)
+        .expect("escaped names should participate in variant collision allocation");
+    assert!(output.contains("class whenVariant<`when`>"));
 }
 
 #[test]

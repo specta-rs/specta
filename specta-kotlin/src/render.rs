@@ -480,17 +480,24 @@ fn render_enum(
         .iter()
         .map(|(original, _)| {
             let base = safe_member_name(&convert_variant_name(kotlin.naming, original), "Variant");
-            if !base_names.insert(base.clone()) {
+            let base_identifier = identifier(&base, &format!("{path}.{original}"))?;
+            if !base_names.insert(base_identifier) {
                 return Err(Error::DuplicateIdentifier {
                     path: path.into(),
                     name: base,
                 });
             }
             let mut resolved = base;
-            while used_names.contains(&resolved) || ROOT_NAMESPACES.contains(&resolved.as_str()) {
+            loop {
+                let identifier = identifier(&resolved, &format!("{path}.{original}"))?;
+                if !used_names.contains(&identifier)
+                    && !ROOT_NAMESPACES.contains(&resolved.as_str())
+                {
+                    used_names.insert(identifier);
+                    break;
+                }
                 resolved.push_str("Variant");
             }
-            used_names.insert(resolved.clone());
             Ok(resolved)
         })
         .collect::<Result<Vec<_>, _>>()?;
