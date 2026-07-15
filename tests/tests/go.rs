@@ -191,11 +191,47 @@ fn go_output_is_accepted_by_go_toolchain() {
         .export_to(&output, &types(), specta_serde::Format)
         .unwrap();
 
+    #[derive(Clone, Copy, Hash, PartialEq, Eq)]
+    struct ExternalDateTime;
+
+    impl Type for ExternalDateTime {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Reference(specta::datatype::Reference::opaque(Self))
+        }
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Stamp(ExternalDateTime);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct BigNumber(i128);
+
+    let newtypes = temp.path().join("newtypes.go");
+    Go::default()
+        .package_name("bindings")
+        .export_to(
+            &newtypes,
+            &Types::default().register::<Stamp>().register::<BigNumber>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
     let before = std::fs::read_to_string(&output).unwrap();
+    let newtypes_before = std::fs::read_to_string(&newtypes).unwrap();
+    assert!(
+        newtypes_before.contains("type Stamp = time.Time"),
+        "{newtypes_before}"
+    );
+    assert!(
+        newtypes_before.contains("type BigNumber = *big.Int"),
+        "{newtypes_before}"
+    );
 
     let gofmt = Command::new("gofmt")
         .arg("-w")
-        .arg(&output)
+        .arg(temp.path())
         .output()
         .unwrap();
     assert!(
@@ -204,6 +240,7 @@ fn go_output_is_accepted_by_go_toolchain() {
         String::from_utf8_lossy(&gofmt.stderr)
     );
     assert_eq!(before, std::fs::read_to_string(&output).unwrap());
+    assert_eq!(newtypes_before, std::fs::read_to_string(&newtypes).unwrap());
     std::fs::write(
         temp.path().join("bindings_test.go"),
         r#"package bindings
@@ -220,6 +257,24 @@ func TestSpectaWireNames(t *testing.T) {
 	}
 	if got, want := string(value), `{"content/type":"value","legacy_name":""}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)
+	}
+}
+
+func TestMethodBackedNewtypes(t *testing.T) {
+	var stamp Stamp
+	if err := json.Unmarshal([]byte(`"2024-01-02T03:04:05Z"`), &stamp); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := json.Marshal(stamp); err != nil || string(got) != `"2024-01-02T03:04:05Z"` {
+		t.Fatalf("stamp: %s, %v", got, err)
+	}
+
+	var number BigNumber
+	if err := json.Unmarshal([]byte(`12345678901234567890`), &number); err != nil {
+		t.Fatal(err)
+	}
+	if got := number.String(); got != "12345678901234567890" {
+		t.Fatalf("big number: %s", got)
 	}
 }
 "#,

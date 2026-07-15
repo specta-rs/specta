@@ -142,11 +142,7 @@ fn named_datatype(
         return Ok(out);
     }
 
-    out.push_str("type ");
-    out.push_str(&name);
-    write_generic_definitions(&mut out, &generics, &path)?;
-    out.push(' ');
-    out.push_str(&render_datatype(
+    let rendered = render_datatype(
         exporter,
         types,
         ty,
@@ -154,9 +150,35 @@ fn named_datatype(
         &mut path.clone(),
         false,
         ctx,
-    )?);
+    )?;
+    out.push_str("type ");
+    out.push_str(&name);
+    if is_method_backed_newtype(ty, &rendered) {
+        if !generics.is_empty() {
+            return Err(Error::UnsupportedType {
+                path: rust_type_path(ndt),
+                reason: "Go cannot preserve JSON methods through a generic type alias".into(),
+            });
+        }
+        out.push_str(" = ");
+    } else {
+        write_generic_definitions(&mut out, &generics, &path)?;
+        out.push(' ');
+    }
+    out.push_str(&rendered);
     out.push('\n');
     Ok(out)
+}
+
+fn is_method_backed_newtype(dt: &DataType, rendered: &str) -> bool {
+    let DataType::Struct(strct) = dt else {
+        return false;
+    };
+    let Fields::Unnamed(fields) = &strct.fields else {
+        return false;
+    };
+    matches!(fields.fields.as_slice(), [field] if field.ty.is_some())
+        && matches!(rendered, "time.Time" | "*big.Int")
 }
 
 fn render_string_enum(
