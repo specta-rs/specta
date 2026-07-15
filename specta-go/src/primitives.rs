@@ -15,6 +15,7 @@ use specta::{
         Reference, Struct,
     },
 };
+use unicode_general_category::{GeneralCategory, get_general_category};
 
 use crate::{Error, Go};
 
@@ -1037,16 +1038,14 @@ fn write_doc_comment(
         }
     }
     if let Some(deprecated) = deprecated {
-        out.push_str(indent);
-        out.push_str("// Deprecated:");
+        let mut message = String::new();
         if let Some(note) = deprecated
             .note
             .as_deref()
             .map(str::trim)
             .filter(|v| !v.is_empty())
         {
-            out.push(' ');
-            out.push_str(note);
+            message.push_str(note);
         }
         if let Some(since) = deprecated
             .since
@@ -1054,11 +1053,24 @@ fn write_doc_comment(
             .map(str::trim)
             .filter(|v| !v.is_empty())
         {
-            out.push_str(" (since ");
-            out.push_str(since);
-            out.push(')');
+            if !message.is_empty() {
+                message.push(' ');
+            }
+            message.push_str("(since ");
+            message.push_str(since);
+            message.push(')');
         }
-        out.push('\n');
+        if message.is_empty() {
+            out.push_str(indent);
+            out.push_str("// Deprecated:\n");
+        } else {
+            for (index, line) in message.lines().enumerate() {
+                out.push_str(indent);
+                out.push_str(if index == 0 { "// Deprecated: " } else { "// " });
+                out.push_str(line.trim());
+                out.push('\n');
+            }
+        }
     }
 }
 
@@ -1095,7 +1107,7 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
         if ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
             flush(&mut out, &mut segment);
             uppercase = true;
-        } else if ch.is_alphanumeric() {
+        } else if is_go_letter(ch) || is_go_decimal_digit(ch) {
             if uppercase {
                 flush(&mut out, &mut segment);
                 uppercase = false;
@@ -1114,7 +1126,7 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
         || out
             .chars()
             .next()
-            .is_some_and(|ch| ch.is_numeric() || !ch.is_uppercase())
+            .is_some_and(|ch| is_go_decimal_digit(ch) || !ch.is_uppercase())
         || crate::reserved_names::RESERVED_GO_NAMES.contains(&out.as_str())
     {
         return Err(Error::InvalidName {
@@ -1123,6 +1135,21 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
         });
     }
     Ok(out)
+}
+
+fn is_go_letter(ch: char) -> bool {
+    matches!(
+        get_general_category(ch),
+        GeneralCategory::UppercaseLetter
+            | GeneralCategory::LowercaseLetter
+            | GeneralCategory::TitlecaseLetter
+            | GeneralCategory::ModifierLetter
+            | GeneralCategory::OtherLetter
+    )
+}
+
+fn is_go_decimal_digit(ch: char) -> bool {
+    get_general_category(ch) == GeneralCategory::DecimalNumber
 }
 
 fn field_name(name: &str, index: usize, path: &str) -> Result<String, Error> {

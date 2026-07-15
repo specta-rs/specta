@@ -242,6 +242,20 @@ fn go_output_is_accepted_by_go_toolchain() {
         hyphen: String,
     }
 
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    enum NonGoNumericVariant {
+        #[serde(rename = "v²")]
+        Value,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MultilineDeprecated {
+        #[deprecated(note = "use replacement\nsecond line")]
+        value: String,
+    }
+
     let newtypes = temp.path().join("newtypes.go");
     Go::default()
         .package_name("bindings")
@@ -275,11 +289,31 @@ fn go_output_is_accepted_by_go_toolchain() {
             specta_serde::Format,
         )
         .unwrap();
+    let validity = temp.path().join("validity.go");
+    Go::default()
+        .package_name("bindings")
+        .export_to(
+            &validity,
+            &Types::default()
+                .register::<NonGoNumericVariant>()
+                .register::<MultilineDeprecated>(),
+            specta_serde::Format,
+        )
+        .unwrap();
 
     let before = std::fs::read_to_string(&output).unwrap();
     let newtypes_before = std::fs::read_to_string(&newtypes).unwrap();
     let optional_collections_before = std::fs::read_to_string(&optional_collections).unwrap();
     let localized_before = std::fs::read_to_string(&localized).unwrap();
+    let validity_before = std::fs::read_to_string(&validity).unwrap();
+    assert!(
+        validity_before.contains("NonGoNumericVariantValue1 NonGoNumericVariant = \"v²\""),
+        "{validity_before}"
+    );
+    assert!(
+        validity_before.contains("// Deprecated: use replacement\n\t// second line"),
+        "{validity_before}"
+    );
     assert!(
         localized_before.contains("Field1 string `json:\"名字\"`"),
         "{localized_before}"
@@ -333,6 +367,7 @@ fn go_output_is_accepted_by_go_toolchain() {
         localized_before,
         std::fs::read_to_string(&localized).unwrap()
     );
+    assert_eq!(validity_before, std::fs::read_to_string(&validity).unwrap());
     std::fs::write(
         temp.path().join("bindings_test.go"),
         r#"package bindings
@@ -632,6 +667,22 @@ fn go_reports_invalid_configuration_and_map_keys() {
         )
         .unwrap_err();
     assert!(err.to_string().contains("encoding/json"), "{err}");
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(rename = "Foo²")]
+    struct InvalidNumericIdentifier;
+
+    let err = Go::default()
+        .export(
+            &Types::default().register::<InvalidNumericIdentifier>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("Go identifier") && err.to_string().contains("Foo²"),
+        "{err}"
+    );
 
     #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
