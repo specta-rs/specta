@@ -34,6 +34,11 @@ pub fn construct_field_with_variant_skip(
     raw_attrs: &[syn::Attribute],
     variant_skip: bool,
 ) -> syn::Result<TokenStream> {
+    // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
+    // override below: serde only ever sees the real field type, so the
+    // override must not influence serde-behavioral markers.
+    let declared_ty_is_option = is_option_type(field_ty);
+
     let field_ty = type_with_inferred_lifetimes(attrs.r#type.as_ref().unwrap_or(field_ty));
 
     let runtime_attrs = build_runtime_attributes(
@@ -63,6 +68,17 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
+    // Whether a field was declared as `Option<T>` matters to consumers
+    // beyond the exported datatype: e.g. serde deserializes a missing value
+    // into an `Option` as `None` (both for skipped fields and for newtype
+    // enum payloads) while other types have stricter requirements. Record it
+    // syntactically -- for symmetric `#[serde(skip)]` the type never even
+    // enters the datatype graph, and elsewhere the exported datatype may be
+    // overridden (`#[specta(type = ...)]`), so the real syntax is the only
+    // reliable source.
+    let nullable_attribute =
+        declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
+
     let field_ty = if attrs.skip || variant_skip {
         quote!()
     } else if attrs.inline {
@@ -78,7 +94,37 @@ pub fn construct_field_with_variant_skip(
         #field_docs
         #runtime_attrs
         #type_overridden_attribute
+        #nullable_attribute
         #field_ty
         field
     }))
+}
+
+/// Whether a type is syntactically the standard `Option<T>`.
+///
+/// A bare single-segment `Option` is assumed to be the prelude's (a local
+/// type shadowing it is the accepted false-positive tradeoff of syntactic
+/// detection). Multi-segment paths only match the real
+/// `std::option::Option`/`core::option::Option` spellings -- a user-defined
+/// path that merely ends in `Option` (e.g. `wire::Option<T>`) gets none of
+/// serde's `Option` special-casing and must not match. Aliases of `Option`
+/// are not detectable and conservatively treated as non-`Option`.
+fn is_option_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => {
+            let segments = &path.path.segments;
+            match segments.len() {
+                1 => segments[0].ident == "Option",
+                3 => {
+                    (segments[0].ident == "std" || segments[0].ident == "core")
+                        && segments[1].ident == "option"
+                        && segments[2].ident == "Option"
+                }
+                _ => false,
+            }
+        }
+        Type::Group(group) => is_option_type(&group.elem),
+        Type::Paren(paren) => is_option_type(&paren.elem),
+        _ => false,
+    }
 }
