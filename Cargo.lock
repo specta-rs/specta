@@ -2106,6 +2106,7 @@ dependencies = [
 name = "specta-csharp"
 version = "0.0.4"
 dependencies = [
+ "rustix",
  "serde",
  "specta",
  "specta-serde",

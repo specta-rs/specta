@@ -123,10 +123,21 @@ struct InlinePair<A, B> {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct ObjectNewtype(AlwaysInlineA);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericObjectNewtype<T>(T);
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct MultiInlineFields {
     tuple: (AlwaysInlineA, AlwaysInlineB),
     map: std::collections::HashMap<AlwaysInlineA, AlwaysInlineB>,
     pair: InlinePair<AlwaysInlineA, AlwaysInlineB>,
+    mixed: (AlwaysInlineA, WireNewtype),
+    hidden: ObjectNewtype,
+    hidden_generic: GenericObjectNewtype<AlwaysInlineB>,
 }
 
 #[derive(Type)]
@@ -173,14 +184,50 @@ struct UnsupportedExport {
     value: UnsupportedOpaque,
 }
 
+#[derive(Default, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireUnit;
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireNewtype(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireTuple(String, u32);
+
+#[derive(Default, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireGeneric<T>(Option<T>);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NonObjectWireShapes {
+    unit: WireUnit,
+    id: WireNewtype,
+    tuple: WireTuple,
+    generic: WireGeneric<u8>,
+    nested_generic: WireGeneric<Option<u8>>,
+    #[serde(default)]
+    optional_unit: WireUnit,
+    #[serde(default)]
+    optional_generic: WireGeneric<u8>,
+    optional_non_object: Option<WireGeneric<u8>>,
+    optional_unit_reference: Option<WireUnit>,
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
-struct Foo;
+struct Foo {
+    value: bool,
+}
 
 mod foo {
     #[derive(specta::Type)]
     #[specta(collect = false)]
-    pub struct Bar;
+    pub struct Bar {
+        value: bool,
+    }
 }
 
 fn types() -> Types {
@@ -263,6 +310,11 @@ fn inline_fields_preserve_their_wrapper_properties() {
     assert!(output.contains("(TupleValue, TupleValue2) Tuple"));
     assert!(output.contains("IReadOnlyDictionary<MapValue, MapValue2> Map"));
     assert!(output.contains("InlinePair<PairValue, PairValue2> Pair"));
+    assert!(output.contains("(MixedValue, string) Mixed"));
+    assert!(output.contains("record HiddenValue"));
+    assert!(output.contains("HiddenValue Hidden"));
+    assert!(output.contains("record HiddenGenericValue"));
+    assert!(output.contains("HiddenGenericValue HiddenGeneric"));
 }
 
 #[test]
@@ -381,6 +433,45 @@ fn anonymous_structural_types_are_supported() {
 }
 
 #[test]
+fn serde_non_object_structs_render_as_their_wire_shapes() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<NonObjectWireShapes>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(output.contains("object? Unit"));
+    assert!(output.contains("string Id"));
+    assert!(output.contains("(string, uint) Tuple"));
+    assert!(output.contains("byte? Generic"));
+    assert!(output.contains("byte? NestedGeneric"));
+    assert!(output.contains("object? OptionalUnit"));
+    assert!(output.contains("byte? OptionalGeneric"));
+    assert!(output.contains("byte? OptionalNonObject"));
+    assert!(output.contains("object? OptionalUnitReference"));
+    assert!(!output.contains("??"));
+    assert!(!output.contains("record WireNewtype"));
+    assert!(!output.contains("record WireTuple"));
+
+    let root = workspace_scratch("non-object-files");
+    let _ = std::fs::remove_dir_all(&root);
+    CSharp::new()
+        .layout(Layout::Files)
+        .export_to(
+            &root,
+            &Types::default().register::<NonObjectWireShapes>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    assert!(root.join("Test/Csharp/NonObjectWireShapes.cs").exists());
+    assert!(!root.join("Test/Csharp/WireUnit.cs").exists());
+    assert!(!root.join("Test/Csharp/WireNewtype.cs").exists());
+    assert!(!root.join("Test/Csharp/WireTuple.cs").exists());
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn low_level_datatype_api_covers_composites() {
     use specta::datatype::{DataType, List, Map, Primitive};
 
@@ -484,6 +575,55 @@ fn files_cleanup_does_not_follow_directory_symlinks() {
     std::fs::remove_dir_all(outside).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn files_layout_rejects_symlinked_expected_paths() {
+    use std::os::unix::fs::symlink;
+
+    let root = workspace_scratch("symlink-expected-root");
+    let outside = workspace_scratch("symlink-expected-outside");
+    let _ = std::fs::remove_dir_all(&root);
+    let _ = std::fs::remove_dir_all(&outside);
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(outside.join("Csharp")).unwrap();
+    let outside_file = outside.join("Csharp/Status.cs");
+    std::fs::write(&outside_file, "user owned").unwrap();
+    symlink(&outside, root.join("Test")).unwrap();
+
+    assert!(matches!(
+        CSharp::new().layout(Layout::Files).export_to(
+            &root,
+            &Types::default().register::<Status>(),
+            IdentityFormat,
+        ),
+        Err(Error::Io { .. })
+    ));
+    assert_eq!(
+        std::fs::read_to_string(&outside_file).unwrap(),
+        "user owned"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+
+    let root = workspace_scratch("symlink-expected-file-root");
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(root.join("Test/Csharp")).unwrap();
+    symlink(&outside_file, root.join("Test/Csharp/Status.cs")).unwrap();
+    assert!(matches!(
+        CSharp::new().layout(Layout::Files).export_to(
+            &root,
+            &Types::default().register::<Status>(),
+            IdentityFormat,
+        ),
+        Err(Error::Io { .. })
+    ));
+    assert_eq!(
+        std::fs::read_to_string(&outside_file).unwrap(),
+        "user owned"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+    std::fs::remove_dir_all(outside).unwrap();
+}
+
 #[test]
 fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
     let Ok(version) = std::process::Command::new("dotnet")
@@ -505,6 +645,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<ContainingNameCollision>()
         .register::<VariantCollisions>()
         .register::<RecordVariantCollisions>();
+    let types = types.register::<NonObjectWireShapes>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();
     std::fs::write(root.join("Bindings.cs"), bindings).unwrap();
     std::fs::write(

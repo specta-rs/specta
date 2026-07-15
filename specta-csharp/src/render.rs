@@ -7,8 +7,8 @@ use std::{
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Deprecated, Field, Fields, NamedDataType, NamedReferenceType, Primitive,
-        Reference, Variant,
+        DataType, Deprecated, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
+        Primitive, Reference, Variant,
     },
 };
 
@@ -23,7 +23,7 @@ pub(crate) fn export(
     validate_names(exporter, &types)?;
     let ndts = types
         .into_sorted_iter()
-        .filter(|ndt| ndt.ty.is_some())
+        .filter(|ndt| is_emitted_named(ndt))
         .collect::<Vec<_>>();
 
     match exporter.layout {
@@ -53,7 +53,7 @@ pub(crate) fn export_to(
     validate_names(exporter, &types)?;
 
     let mut files = Vec::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.into_sorted_iter().filter(|ndt| is_emitted_named(ndt)) {
         let module = module_segments(&ndt.module_path);
         let mut file_path = module
             .iter()
@@ -69,15 +69,98 @@ pub(crate) fn export_to(
         files.push((file_path, output));
     }
 
+    reject_symlink_components(path)?;
+    for (file_path, _) in &files {
+        reject_symlink_components(file_path)?;
+    }
     std::fs::create_dir_all(path).map_err(|err| Error::io(path, err))?;
-    for (file_path, output) in &files {
+    write_generated_files(path, &files)?;
+    let expected = files.into_iter().map(|(path, _)| path).collect::<Vec<_>>();
+    remove_stale_generated_files(path, &expected)
+}
+
+#[cfg(unix)]
+fn write_generated_files(root: &Path, files: &[(PathBuf, String)]) -> Result<(), Error> {
+    use std::io::Write;
+
+    use rustix::fs::{Mode, OFlags, mkdirat, open, openat};
+
+    let directory_flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let root_fd =
+        open(root, directory_flags, Mode::empty()).map_err(|err| Error::io(root, err.into()))?;
+    for (file_path, output) in files {
+        let relative = file_path
+            .strip_prefix(root)
+            .expect("generated file paths are rooted in the output directory");
+        let mut components = relative.components().peekable();
+        let mut directory = root_fd.try_clone().map_err(|err| Error::io(root, err))?;
+        while let Some(component) = components.next() {
+            let std::path::Component::Normal(name) = component else {
+                unreachable!("generated file paths contain only validated normal components")
+            };
+            if components.peek().is_none() {
+                let fd = openat(
+                    &directory,
+                    name,
+                    OFlags::WRONLY
+                        | OFlags::CREATE
+                        | OFlags::TRUNC
+                        | OFlags::NOFOLLOW
+                        | OFlags::CLOEXEC,
+                    Mode::from_bits_truncate(0o666),
+                )
+                .map_err(|err| Error::io(file_path, err.into()))?;
+                let mut file = std::fs::File::from(fd);
+                file.write_all(output.as_bytes())
+                    .map_err(|err| Error::io(file_path, err))?;
+                continue;
+            }
+
+            directory = match openat(&directory, name, directory_flags, Mode::empty()) {
+                Ok(directory) => directory,
+                Err(rustix::io::Errno::NOENT) => {
+                    mkdirat(&directory, name, Mode::from_bits_truncate(0o777))
+                        .map_err(|err| Error::io(file_path, err.into()))?;
+                    openat(&directory, name, directory_flags, Mode::empty())
+                        .map_err(|err| Error::io(file_path, err.into()))?
+                }
+                Err(err) => return Err(Error::io(file_path, err.into())),
+            };
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn write_generated_files(_root: &Path, files: &[(PathBuf, String)]) -> Result<(), Error> {
+    for (file_path, output) in files {
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| Error::io(parent, err))?;
         }
+        reject_symlink_components(file_path)?;
         std::fs::write(file_path, output).map_err(|err| Error::io(file_path, err))?;
     }
-    let expected = files.into_iter().map(|(path, _)| path).collect::<Vec<_>>();
-    remove_stale_generated_files(path, &expected)
+    Ok(())
+}
+
+fn reject_symlink_components(path: &Path) -> Result<(), Error> {
+    for component in path.ancestors().collect::<Vec<_>>().into_iter().rev() {
+        match std::fs::symlink_metadata(component) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::io(
+                    component,
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "generated output path contains a symbolic link",
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(Error::io(component, err)),
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn render_datatype(
@@ -215,14 +298,17 @@ fn render_named(
     ndt: &NamedDataType,
     base: &str,
 ) -> Result<(), Error> {
+    let Some(ty) = ndt.ty.as_ref() else {
+        return Ok(());
+    };
+    if matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)) {
+        return Ok(());
+    }
     xml_docs(out, base, &ndt.docs);
     obsolete(out, base, ndt.deprecated.as_ref());
     let name = exported_name(exporter, ndt);
     let path = rust_path(ndt);
     let generics = generic_declarations(&ndt.generics, &name, &path)?;
-    let Some(ty) = ndt.ty.as_ref() else {
-        return Ok(());
-    };
     match ty {
         DataType::Struct(strct) => render_record(
             out,
@@ -387,7 +473,7 @@ fn render_field_property(
         });
     }
     let mut structural_types = Vec::new();
-    for structural_ty in collect_inline_structural_types(ty) {
+    for structural_ty in collect_inline_structural_types(types, ty) {
         if structural_types
             .iter()
             .all(|(existing, _)| *existing != structural_ty)
@@ -459,40 +545,90 @@ fn render_field_property(
     )
 }
 
-fn collect_inline_structural_types(ty: &DataType) -> Vec<&DataType> {
-    fn collect<'a>(ty: &'a DataType, found: &mut Vec<&'a DataType>) {
+fn collect_inline_structural_types<'a>(types: &'a Types, ty: &'a DataType) -> Vec<&'a DataType> {
+    fn collect<'a>(
+        types: &'a Types,
+        ty: &'a DataType,
+        generic_layers: &[GenericArguments<'a>],
+        visiting: &mut HashSet<NamedReference>,
+        found: &mut Vec<&'a DataType>,
+    ) {
         match ty {
+            DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
+                if let Fields::Unnamed(fields) = &strct.fields {
+                    for field in &fields.fields {
+                        if let Some(ty) = &field.ty {
+                            collect(types, ty, generic_layers, visiting, found);
+                        }
+                    }
+                }
+            }
             DataType::Struct(_) | DataType::Enum(_) | DataType::Intersection(_) => {
                 found.push(ty);
             }
-            DataType::List(list) => collect(&list.ty, found),
-            DataType::Map(map) => {
-                collect(map.key_ty(), found);
-                collect(map.value_ty(), found);
+            DataType::List(list) => {
+                collect(types, &list.ty, generic_layers, visiting, found);
             }
-            DataType::Nullable(inner) => collect(inner, found),
+            DataType::Map(map) => {
+                collect(types, map.key_ty(), generic_layers, visiting, found);
+                collect(types, map.value_ty(), generic_layers, visiting, found);
+            }
+            DataType::Nullable(inner) => collect(types, inner, generic_layers, visiting, found),
             DataType::Tuple(tuple) => {
                 for element in &tuple.elements {
-                    collect(element, found);
+                    collect(types, element, generic_layers, visiting, found);
                 }
             }
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-                NamedReferenceType::Inline { dt, .. } => collect(dt, found),
+                NamedReferenceType::Inline { dt, .. } => {
+                    collect(types, dt, generic_layers, visiting, found);
+                }
                 NamedReferenceType::Reference { generics, .. } => {
                     for (_, generic) in generics {
-                        collect(generic, found);
+                        collect(types, generic, generic_layers, visiting, found);
+                    }
+                    if visiting.insert(reference.clone()) {
+                        if let Some(DataType::Struct(strct)) =
+                            types.get(reference).and_then(|ndt| ndt.ty.as_ref())
+                            && is_non_object_struct(&strct.fields)
+                        {
+                            let mut layers = generic_layers.to_vec();
+                            layers.push(generics);
+                            if let Fields::Unnamed(fields) = &strct.fields {
+                                for field in &fields.fields {
+                                    if let Some(ty) = &field.ty {
+                                        collect(types, ty, &layers, visiting, found);
+                                    }
+                                }
+                            }
+                        }
+                        visiting.remove(reference);
                     }
                 }
                 NamedReferenceType::Recursive(_) => {}
             },
-            DataType::Primitive(_)
-            | DataType::Generic(_)
-            | DataType::Reference(Reference::Opaque(_)) => {}
+            DataType::Generic(generic) => {
+                for (layer_index, layer) in generic_layers.iter().enumerate().rev() {
+                    if let Some((_, value)) =
+                        layer.iter().find(|(candidate, _)| candidate == generic)
+                    {
+                        collect(
+                            types,
+                            value,
+                            &generic_layers[..layer_index],
+                            visiting,
+                            found,
+                        );
+                        break;
+                    }
+                }
+            }
+            DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
         }
     }
 
     let mut found = Vec::new();
-    collect(ty, &mut found);
+    collect(types, ty, &[], &mut HashSet::new(), &mut found);
     found
 }
 
@@ -510,8 +646,52 @@ fn render_datatype_with_inline_overrides(
         ty: &DataType,
         structural_types: &[(&DataType, String)],
         path: &str,
+        generic_layers: &[GenericArguments<'_>],
     ) -> Result<(), Error> {
         match ty {
+            DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
+                let fields = match &strct.fields {
+                    Fields::Unit => Vec::new(),
+                    Fields::Unnamed(fields) => fields
+                        .fields
+                        .iter()
+                        .filter_map(|field| field.ty.as_ref())
+                        .collect(),
+                    Fields::Named(_) => unreachable!(),
+                };
+                match fields.as_slice() {
+                    [] => out.push_str("object?"),
+                    [field] => {
+                        render(
+                            out,
+                            exporter,
+                            types,
+                            field,
+                            structural_types,
+                            path,
+                            generic_layers,
+                        )?;
+                    }
+                    fields => {
+                        out.push('(');
+                        for (index, field) in fields.iter().enumerate() {
+                            if index != 0 {
+                                out.push_str(", ");
+                            }
+                            render(
+                                out,
+                                exporter,
+                                types,
+                                field,
+                                structural_types,
+                                path,
+                                generic_layers,
+                            )?;
+                        }
+                        out.push(')');
+                    }
+                }
+            }
             DataType::Struct(_) | DataType::Enum(_) | DataType::Intersection(_) => {
                 let (_, name) = structural_types
                     .iter()
@@ -521,7 +701,15 @@ fn render_datatype_with_inline_overrides(
             }
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
                 NamedReferenceType::Inline { dt, .. } => {
-                    render(out, exporter, types, dt, structural_types, path)?;
+                    render(
+                        out,
+                        exporter,
+                        types,
+                        dt,
+                        structural_types,
+                        path,
+                        generic_layers,
+                    )?;
                 }
                 NamedReferenceType::Recursive(_) => {
                     return Err(Error::RecursiveInline { path: path.into() });
@@ -530,42 +718,138 @@ fn render_datatype_with_inline_overrides(
                     let ndt = types
                         .get(reference)
                         .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
-                    reference_name(out, exporter, ndt);
-                    if !generics.is_empty() {
-                        out.push('<');
-                        for (index, (_, generic)) in generics.iter().enumerate() {
-                            if index != 0 {
-                                out.push_str(", ");
+                    if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
+                        && is_non_object_struct(&strct.fields)
+                    {
+                        let mut layers = generic_layers.to_vec();
+                        layers.push(generics);
+                        let fields = match &strct.fields {
+                            Fields::Unit => Vec::new(),
+                            Fields::Unnamed(fields) => fields
+                                .fields
+                                .iter()
+                                .filter_map(|field| field.ty.as_ref())
+                                .collect(),
+                            Fields::Named(_) => unreachable!(),
+                        };
+                        match fields.as_slice() {
+                            [] => out.push_str("object?"),
+                            [field] => render(
+                                out,
+                                exporter,
+                                types,
+                                field,
+                                structural_types,
+                                path,
+                                &layers,
+                            )?,
+                            fields => {
+                                out.push('(');
+                                for (index, field) in fields.iter().enumerate() {
+                                    if index != 0 {
+                                        out.push_str(", ");
+                                    }
+                                    render(
+                                        out,
+                                        exporter,
+                                        types,
+                                        field,
+                                        structural_types,
+                                        path,
+                                        &layers,
+                                    )?;
+                                }
+                                out.push(')');
                             }
-                            render(out, exporter, types, generic, structural_types, path)?;
                         }
-                        out.push('>');
+                    } else {
+                        reference_name(out, exporter, ndt);
+                        if !generics.is_empty() {
+                            out.push('<');
+                            for (index, (_, generic)) in generics.iter().enumerate() {
+                                if index != 0 {
+                                    out.push_str(", ");
+                                }
+                                render(
+                                    out,
+                                    exporter,
+                                    types,
+                                    generic,
+                                    structural_types,
+                                    path,
+                                    generic_layers,
+                                )?;
+                            }
+                            out.push('>');
+                        }
                     }
                 }
             },
             DataType::Nullable(inner) => {
-                render(out, exporter, types, inner, structural_types, path)?;
-                if !is_nullable(inner) {
+                let mut rendered = String::new();
+                render(
+                    &mut rendered,
+                    exporter,
+                    types,
+                    inner,
+                    structural_types,
+                    path,
+                    generic_layers,
+                )?;
+                out.push_str(&rendered);
+                if !rendered.ends_with('?') {
                     out.push('?');
                 }
             }
             DataType::List(list) => {
                 out.push_str("global::System.Collections.Generic.IReadOnlyList<");
-                render(out, exporter, types, &list.ty, structural_types, path)?;
+                render(
+                    out,
+                    exporter,
+                    types,
+                    &list.ty,
+                    structural_types,
+                    path,
+                    generic_layers,
+                )?;
                 out.push('>');
             }
             DataType::Map(map) => {
                 out.push_str("global::System.Collections.Generic.IReadOnlyDictionary<");
-                render(out, exporter, types, map.key_ty(), structural_types, path)?;
+                render(
+                    out,
+                    exporter,
+                    types,
+                    map.key_ty(),
+                    structural_types,
+                    path,
+                    generic_layers,
+                )?;
                 out.push_str(", ");
-                render(out, exporter, types, map.value_ty(), structural_types, path)?;
+                render(
+                    out,
+                    exporter,
+                    types,
+                    map.value_ty(),
+                    structural_types,
+                    path,
+                    generic_layers,
+                )?;
                 out.push('>');
             }
             DataType::Tuple(tuple) => match tuple.elements.as_slice() {
                 [] => out.push_str("global::System.ValueTuple"),
                 [element] => {
                     out.push_str("global::System.ValueTuple<");
-                    render(out, exporter, types, element, structural_types, path)?;
+                    render(
+                        out,
+                        exporter,
+                        types,
+                        element,
+                        structural_types,
+                        path,
+                        generic_layers,
+                    )?;
                     out.push('>');
                 }
                 elements => {
@@ -574,18 +858,44 @@ fn render_datatype_with_inline_overrides(
                         if index != 0 {
                             out.push_str(", ");
                         }
-                        render(out, exporter, types, element, structural_types, path)?;
+                        render(
+                            out,
+                            exporter,
+                            types,
+                            element,
+                            structural_types,
+                            path,
+                            generic_layers,
+                        )?;
                     }
                     out.push(')');
                 }
             },
+            DataType::Generic(generic) => {
+                for (layer_index, layer) in generic_layers.iter().enumerate().rev() {
+                    if let Some((_, value)) =
+                        layer.iter().find(|(candidate, _)| candidate == generic)
+                    {
+                        return render(
+                            out,
+                            exporter,
+                            types,
+                            value,
+                            structural_types,
+                            path,
+                            &generic_layers[..layer_index],
+                        );
+                    }
+                }
+                datatype(out, exporter, types, ty, path)?;
+            }
             _ => datatype(out, exporter, types, ty, path)?,
         }
         Ok(())
     }
 
     let mut out = String::new();
-    render(&mut out, exporter, types, ty, structural_types, path)?;
+    render(&mut out, exporter, types, ty, structural_types, path, &[])?;
     Ok(out)
 }
 
@@ -615,12 +925,21 @@ fn render_property(
     if !field.optional {
         out.push_str("required ");
     }
-    if let Some(type_override) = type_override {
-        out.push_str(type_override);
+    let rendered_type = if let Some(type_override) = type_override {
+        type_override.to_string()
     } else {
-        datatype(out, exporter, types, ty, &format!("{path}.{wire_name}"))?;
-    }
-    if field.optional && !is_nullable(ty) {
+        let mut rendered = String::new();
+        datatype(
+            &mut rendered,
+            exporter,
+            types,
+            ty,
+            &format!("{path}.{wire_name}"),
+        )?;
+        rendered
+    };
+    out.push_str(&rendered_type);
+    if field.optional && !rendered_type.ends_with('?') {
         out.push('?');
     }
     out.push(' ');
@@ -781,8 +1100,10 @@ fn datatype(
             out.push('>');
         }
         DataType::Nullable(inner) => {
-            datatype(out, exporter, types, inner, path)?;
-            if !is_nullable(inner) {
+            let mut rendered = String::new();
+            datatype(&mut rendered, exporter, types, inner, path)?;
+            out.push_str(&rendered);
+            if !rendered.ends_with('?') {
                 out.push('?');
             }
         }
@@ -814,6 +1135,21 @@ fn datatype(
                 let ndt = types
                     .get(reference)
                     .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
+                    && is_non_object_struct(&strct.fields)
+                {
+                    let NamedReferenceType::Reference { generics, .. } = &reference.inner else {
+                        unreachable!()
+                    };
+                    return render_non_object_struct(
+                        out,
+                        exporter,
+                        types,
+                        &strct.fields,
+                        path,
+                        &[generics],
+                    );
+                }
                 reference_name(out, exporter, ndt);
                 if let NamedReferenceType::Reference { generics, .. } = &reference.inner
                     && !generics.is_empty()
@@ -840,6 +1176,9 @@ fn datatype(
                 })?);
             }
         }
+        DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
+            render_non_object_struct(out, exporter, types, &strct.fields, path, &[])?;
+        }
         DataType::Struct(_) => {
             return Err(Error::UnsupportedType {
                 path: path.into(),
@@ -858,6 +1197,157 @@ fn datatype(
                 kind: "intersection",
             });
         }
+    }
+    Ok(())
+}
+
+type GenericArguments<'a> = &'a [(specta::datatype::Generic, DataType)];
+
+fn is_non_object_struct(fields: &Fields) -> bool {
+    matches!(fields, Fields::Unit | Fields::Unnamed(_))
+}
+
+fn is_emitted_named(ndt: &NamedDataType) -> bool {
+    ndt.ty.as_ref().is_some_and(
+        |ty| !matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)),
+    )
+}
+
+fn render_non_object_struct(
+    out: &mut String,
+    exporter: &CSharp,
+    types: &Types,
+    fields: &Fields,
+    path: &str,
+    generic_layers: &[GenericArguments<'_>],
+) -> Result<(), Error> {
+    let fields = match fields {
+        Fields::Unit => Vec::new(),
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .collect(),
+        Fields::Named(_) => unreachable!("named fields have an object wire shape"),
+    };
+    match fields.as_slice() {
+        [] => out.push_str("object?"),
+        [field] => wire_datatype(out, exporter, types, field, path, generic_layers)?,
+        fields => {
+            out.push('(');
+            for (index, field) in fields.iter().enumerate() {
+                if index != 0 {
+                    out.push_str(", ");
+                }
+                wire_datatype(out, exporter, types, field, path, generic_layers)?;
+            }
+            out.push(')');
+        }
+    }
+    Ok(())
+}
+
+fn wire_datatype(
+    out: &mut String,
+    exporter: &CSharp,
+    types: &Types,
+    ty: &DataType,
+    path: &str,
+    generic_layers: &[GenericArguments<'_>],
+) -> Result<(), Error> {
+    if contains_recursive_inline(ty) {
+        return Err(Error::RecursiveInline { path: path.into() });
+    }
+    match ty {
+        DataType::Generic(generic) => {
+            for (layer_index, layer) in generic_layers.iter().enumerate().rev() {
+                if let Some((_, value)) = layer.iter().find(|(candidate, _)| candidate == generic) {
+                    return wire_datatype(
+                        out,
+                        exporter,
+                        types,
+                        value,
+                        path,
+                        &generic_layers[..layer_index],
+                    );
+                }
+            }
+            datatype(out, exporter, types, ty, path)?;
+        }
+        DataType::List(list) => {
+            out.push_str("global::System.Collections.Generic.IReadOnlyList<");
+            wire_datatype(out, exporter, types, &list.ty, path, generic_layers)?;
+            out.push('>');
+        }
+        DataType::Map(map) => {
+            out.push_str("global::System.Collections.Generic.IReadOnlyDictionary<");
+            wire_datatype(out, exporter, types, map.key_ty(), path, generic_layers)?;
+            out.push_str(", ");
+            wire_datatype(out, exporter, types, map.value_ty(), path, generic_layers)?;
+            out.push('>');
+        }
+        DataType::Nullable(inner) => {
+            let mut rendered = String::new();
+            wire_datatype(&mut rendered, exporter, types, inner, path, generic_layers)?;
+            out.push_str(&rendered);
+            if !rendered.ends_with('?') {
+                out.push('?');
+            }
+        }
+        DataType::Tuple(tuple) => match tuple.elements.as_slice() {
+            [] => out.push_str("global::System.ValueTuple"),
+            [element] => {
+                out.push_str("global::System.ValueTuple<");
+                wire_datatype(out, exporter, types, element, path, generic_layers)?;
+                out.push('>');
+            }
+            elements => {
+                out.push('(');
+                for (index, element) in elements.iter().enumerate() {
+                    if index != 0 {
+                        out.push_str(", ");
+                    }
+                    wire_datatype(out, exporter, types, element, path, generic_layers)?;
+                }
+                out.push(')');
+            }
+        },
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => {
+                wire_datatype(out, exporter, types, dt, path, generic_layers)?;
+            }
+            NamedReferenceType::Recursive(_) => {
+                return Err(Error::RecursiveInline { path: path.into() });
+            }
+            NamedReferenceType::Reference { generics, .. } => {
+                let ndt = types
+                    .get(reference)
+                    .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
+                    && is_non_object_struct(&strct.fields)
+                {
+                    let mut layers = generic_layers.to_vec();
+                    layers.push(generics);
+                    render_non_object_struct(out, exporter, types, &strct.fields, path, &layers)?;
+                } else {
+                    reference_name(out, exporter, ndt);
+                    if !generics.is_empty() {
+                        out.push('<');
+                        for (index, (_, generic)) in generics.iter().enumerate() {
+                            if index != 0 {
+                                out.push_str(", ");
+                            }
+                            wire_datatype(out, exporter, types, generic, path, generic_layers)?;
+                        }
+                        out.push('>');
+                    }
+                }
+            }
+        },
+        DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
+            render_non_object_struct(out, exporter, types, &strct.fields, path, generic_layers)?;
+        }
+        _ => datatype(out, exporter, types, ty, path)?,
     }
     Ok(())
 }
@@ -949,10 +1439,6 @@ fn opaque_name(name: &str) -> Option<&'static str> {
         "SystemTime" | "DateTime" | "NaiveDateTime" => "global::System.DateTimeOffset",
         _ => return None,
     })
-}
-
-fn is_nullable(ty: &DataType) -> bool {
-    matches!(ty, DataType::Nullable(_))
 }
 
 fn reference_name(out: &mut String, exporter: &CSharp, ndt: &NamedDataType) {
@@ -1107,7 +1593,7 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
     validate_namespace(exporter.namespace.as_ref())?;
     let ndts = types
         .into_sorted_iter()
-        .filter(|ndt| ndt.ty.is_some())
+        .filter(|ndt| is_emitted_named(ndt))
         .collect::<Vec<_>>();
     if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
         let mut namespaces = HashSet::new();

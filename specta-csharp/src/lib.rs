@@ -169,6 +169,11 @@ impl CSharp {
     }
 
     /// Export bindings to a file, or to a directory for [`Layout::Files`].
+    ///
+    /// The files layout rejects symbolic links in generated output paths. On Unix, descendant
+    /// directories and files are also opened relative to a held directory descriptor with
+    /// no-follow semantics. As with most path-based cleanup APIs, callers must prevent concurrent
+    /// hostile mutation or replacement of the output root while an export is running.
     pub fn export_to(
         &self,
         path: impl AsRef<Path>,
