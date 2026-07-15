@@ -38,11 +38,13 @@ test("generated schemas validate representative wire values", () => {
     booleans: { values: { true: "yes" } },
     integers: { values: { "-2": "value" } },
     finite: { values: { First: "value" } },
+    chained: { marker: true, values: { false: "value" } },
   }).success).toBe(true);
   expect(GenericMapHolderSchema.safeParse({
     booleans: { values: { invalid: "no" } },
     integers: { values: { nope: "no" } },
     finite: { values: { Third: "no" } },
+    chained: { marker: true, values: { invalid: "no" } },
   }).success).toBe(false);
 });
 

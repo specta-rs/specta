@@ -229,7 +229,7 @@ fn export_single_internal(
             return Ok(());
         }
 
-        let map_key_generics = generic_map_key_parameters(ty, types);
+        let map_key_generics = named_map_key_parameters(ndt, types);
         let mut generic_params = Vec::with_capacity(ndt.generics.len());
         let mut fn_params = Vec::with_capacity(ndt.generics.len());
         let mut overload_params = Vec::with_capacity(ndt.generics.len());
@@ -257,6 +257,11 @@ fn export_single_internal(
                 fn_group.push(format!("{name}: z.ZodType = {default_schema}"));
                 if map_key_generics.contains(name) {
                     let key_name = map_key_generic_name(name);
+                    map_keys::validate_map_key(
+                        default,
+                        types,
+                        format!("{name_path}.<generic {name} default key>"),
+                    )?;
                     let mut default_key_schema = String::new();
                     map_key_datatype(
                         &mut default_key_schema,
@@ -606,6 +611,78 @@ fn generic_map_key_parameters(dt: &DataType, types: &Types) -> HashSet<String> {
 
     let mut result = HashSet::new();
     collect(dt, types, false, &[], &mut Vec::new(), &mut result);
+    result
+}
+
+fn named_map_key_parameters(ndt: &NamedDataType, types: &Types) -> HashSet<String> {
+    fn collect_generic_references(dt: &DataType, result: &mut HashSet<String>) {
+        match dt {
+            DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+            DataType::Generic(generic) => {
+                result.insert(generic.name().to_string());
+            }
+            DataType::List(list) => collect_generic_references(&list.ty, result),
+            DataType::Map(map) => {
+                collect_generic_references(map.key_ty(), result);
+                collect_generic_references(map.value_ty(), result);
+            }
+            DataType::Nullable(inner) => collect_generic_references(inner, result),
+            DataType::Struct(strct) => collect_field_generic_references(&strct.fields, result),
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .for_each(|(_, variant)| collect_field_generic_references(&variant.fields, result)),
+            DataType::Tuple(tuple) => tuple
+                .elements
+                .iter()
+                .for_each(|dt| collect_generic_references(dt, result)),
+            DataType::Intersection(types) => types
+                .iter()
+                .for_each(|dt| collect_generic_references(dt, result)),
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => collect_generic_references(dt, result),
+                NamedReferenceType::Reference { generics, .. } => generics
+                    .iter()
+                    .for_each(|(_, dt)| collect_generic_references(dt, result)),
+                NamedReferenceType::Recursive(_) => {}
+            },
+        }
+    }
+
+    fn collect_field_generic_references(fields: &Fields, result: &mut HashSet<String>) {
+        match fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .for_each(|dt| collect_generic_references(dt, result)),
+            Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .for_each(|dt| collect_generic_references(dt, result)),
+        }
+    }
+
+    let mut result = ndt
+        .ty
+        .as_ref()
+        .map(|ty| generic_map_key_parameters(ty, types))
+        .unwrap_or_default();
+    loop {
+        let previous_len = result.len();
+        for generic in ndt.generics.iter() {
+            if result.contains(generic.name.as_ref())
+                && let Some(default) = &generic.default
+            {
+                collect_generic_references(default, &mut result);
+            }
+        }
+        if result.len() == previous_len {
+            break;
+        }
+    }
     result
 }
 
@@ -1744,11 +1821,7 @@ fn reference_named_dt(
             .cloned()
             .collect::<Vec<_>>();
 
-        let map_key_generics = ndt
-            .ty
-            .as_ref()
-            .map(|ty| generic_map_key_parameters(ty, types))
-            .unwrap_or_default();
+        let map_key_generics = named_map_key_parameters(ndt, types);
         let mut schema_arguments = Vec::new();
         for (generic, v) in reference_generics {
             let mut generic_schema = String::new();
@@ -1764,6 +1837,13 @@ fn reference_named_dt(
             )?;
             schema_arguments.push(generic_schema);
             if map_key_generics.contains(generic.name().as_ref()) {
+                let mut resolved_key = v.clone();
+                substitute_generics(&mut resolved_key, &scoped_generics);
+                map_keys::validate_map_key(
+                    &resolved_key,
+                    types,
+                    format!("{}.<generic {} key>", ndt.name, generic.name()),
+                )?;
                 let mut key_schema = String::new();
                 map_key_datatype(
                     &mut key_schema,

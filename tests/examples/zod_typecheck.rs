@@ -83,6 +83,16 @@ struct GenericMapHolder {
     booleans: GenericMap<bool>,
     integers: GenericMap<i32>,
     finite: GenericMap<FiniteKey>,
+    chained: ChainedDefaultMap,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct ChainedDefaultMap<T = bool, U = T>
+where
+    U: Eq + std::hash::Hash,
+{
+    marker: Option<T>,
+    values: HashMap<U, String>,
 }
 
 #[derive(Type)]

@@ -43,6 +43,13 @@ struct GenericMap<K = bool> {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct ChainedDefaultMap<T = bool, U = T> {
+    marker: Option<T>,
+    values: HashMap<U, String>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct StructWithStructWithBigInt {
     #[specta(inline)]
     abc: StructWithBigInt,
@@ -326,6 +333,7 @@ fn zod_generic_maps_receive_serialized_key_schemas() {
         booleans: GenericMap<bool>,
         integers: GenericMap<i32>,
         finite: GenericMap<FiniteKey>,
+        chained: ChainedDefaultMap,
     }
 
     let out = export_for::<UsesGenericMaps>().unwrap();
@@ -349,6 +357,37 @@ fn zod_generic_maps_receive_serialized_key_schemas() {
         out.contains("GenericMapSchema(z.lazy(() => FiniteKeySchema), z.union([z.literal(\"First\"), z.literal(\"Second\")]))"),
         "{out}"
     );
+    assert!(
+        out.contains("$key$U: z.ZodType<PropertyKey> = $key$T"),
+        "{out}"
+    );
+}
+
+#[test]
+fn zod_rejects_invalid_concrete_and_default_generic_map_keys() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InvalidConcreteKey {
+        value: GenericMap<Vec<String>>,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InvalidDefaultMap<K = Vec<String>> {
+        values: HashMap<K, String>,
+    }
+
+    for err in [
+        export_for::<InvalidConcreteKey>().unwrap_err(),
+        export_for::<InvalidDefaultMap>().unwrap_err(),
+    ] {
+        let err = err.to_string();
+        assert!(err.contains("Invalid map key"), "{err}");
+        assert!(
+            err.contains("collection, map, and nullable keys are not supported"),
+            "{err}"
+        );
+    }
 }
 
 #[test]
