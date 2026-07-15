@@ -145,6 +145,14 @@ enum VariantCollisions {
 
 #[derive(Type)]
 #[specta(collect = false)]
+enum RecordVariantCollisions {
+    Clone(String),
+    Equals { value: u32 },
+    ToString(bool),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct InlineNode {
     #[specta(inline)]
     next: Option<Box<InlineNode>>,
@@ -221,7 +229,8 @@ fn configuration_and_namespaces() {
 fn declaration_collisions_are_disambiguated() {
     let types = Types::default()
         .register::<ContainingNameCollision>()
-        .register::<VariantCollisions>();
+        .register::<VariantCollisions>()
+        .register::<RecordVariantCollisions>();
     let output = CSharp::new().export(&types, IdentityFormat).unwrap();
 
     assert!(output.contains("bool ContainingNameCollision2"));
@@ -230,6 +239,9 @@ fn declaration_collisions_are_disambiguated() {
     assert!(output.contains("bool PrintMembers2"));
     assert!(output.contains("FooBar,"));
     assert!(output.contains("FooBar2,"));
+    assert!(output.contains("record Clone2"));
+    assert!(output.contains("record Equals2"));
+    assert!(output.contains("record ToString2"));
 }
 
 #[test]
@@ -491,7 +503,8 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<InlineFields>()
         .register::<MultiInlineFields>()
         .register::<ContainingNameCollision>()
-        .register::<VariantCollisions>();
+        .register::<VariantCollisions>()
+        .register::<RecordVariantCollisions>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();
     std::fs::write(root.join("Bindings.cs"), bindings).unwrap();
     std::fs::write(

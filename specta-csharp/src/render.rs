@@ -691,7 +691,7 @@ fn render_union(
     out.push_str(base);
     out.push_str("{\n");
     let indent = format!("{base}{}", exporter.indent);
-    let mut used = HashSet::from([name.to_string()]);
+    let mut used = record_reserved_names(name);
     for (wire_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
         let variant_name = unique_identifier(property_name(wire_name), &mut used);
         render_variant(
