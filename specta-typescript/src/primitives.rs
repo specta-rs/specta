@@ -2162,8 +2162,10 @@ type GenericSubst = HashMap<Cow<'static, str>, DataType>;
 /// resolution.
 struct TransparentHop<'a> {
     target: &'a NamedDataType,
-    /// Generic arguments applied to `target` at the reference site.
-    args: &'a [(GenericReference, DataType)],
+    /// The reference itself, kept so the collapse can resolve the hop's
+    /// generic arguments (including omitted ones) with the same
+    /// [`resolved_reference_generics`] logic ordinary rendering uses.
+    reference: &'a NamedReference,
     /// Whether the hop passes through [`DataType::Nullable`], rendering as
     /// `Target | null`. A union member is still resolved eagerly, so this is
     /// just as much a cycle - but dropping such a back edge must keep the
@@ -2177,9 +2179,9 @@ struct TransparentHop<'a> {
 fn transparent_reference<'a>(types: &'a Types, dt: &'a DataType) -> Option<TransparentHop<'a>> {
     match dt {
         DataType::Reference(Reference::Named(r)) => match &r.inner {
-            NamedReferenceType::Reference { generics, .. } => Some(TransparentHop {
+            NamedReferenceType::Reference { .. } => Some(TransparentHop {
                 target: types.get(r)?,
-                args: generics,
+                reference: r,
                 nullable: false,
             }),
             _ => None,
@@ -2257,9 +2259,10 @@ struct AliasNode<'a> {
 
 struct AliasEdge<'a> {
     target: AliasId,
-    /// Generic arguments applied at the reference site, composed with the
-    /// source's substitutions when propagating instantiations.
-    args: &'a [(GenericReference, DataType)],
+    /// The reference at the hop site; its generic arguments (explicit,
+    /// defaulted, or omitted) are composed with the source's substitutions
+    /// when propagating instantiations.
+    reference: &'a NamedReference,
     nullable: bool,
 }
 
@@ -2280,6 +2283,34 @@ fn node_hops<'a>(types: &'a Types, ndt: &'a NamedDataType) -> Vec<TransparentHop
             .collect(),
         None => transparent_export_hop(types, ndt).into_iter().collect(),
     }
+}
+
+/// Resolves the full substitution an in-cycle hop applies to its target: one
+/// entry per *declared* parameter of the target, filled exactly the way
+/// ordinary reference rendering fills them via
+/// [`resolved_reference_generics`] - the explicit argument if present,
+/// otherwise the parameter's declared default, otherwise `unknown` - so the
+/// collapse and the renderer can never disagree about omitted parameters.
+/// Each resolved value is then rewritten from the source node's scope into
+/// the root's via `source_subst` (extended with the target's earlier
+/// parameters, which declared defaults may reference).
+fn edge_substitution(
+    source_subst: &GenericSubst,
+    target: &NamedDataType,
+    reference: &NamedReference,
+) -> Result<GenericSubst, Cow<'static, str>> {
+    let (resolved, _, _) = resolved_reference_generics(target, reference, &[]).ok_or(
+        Cow::Borrowed("the cycle contains a reference whose generic arguments cannot be resolved"),
+    )?;
+
+    let mut scope = source_subst.clone();
+    let mut target_subst = GenericSubst::with_capacity(resolved.len());
+    for (generic, mut value) in target.generics.iter().zip(resolved) {
+        substitute_generics(&mut value, &scope)?;
+        scope.insert(generic.name.clone(), value.clone());
+        target_subst.insert(generic.name.clone(), value);
+    }
+    Ok(target_subst)
 }
 
 /// Whether a substitution maps every parameter to itself, i.e. applying it
@@ -2556,7 +2587,7 @@ fn collapse_untagged_alias_cycle(
             let target_id = alias_id(hop.target);
             edges.push(AliasEdge {
                 target: target_id.clone(),
-                args: hop.args,
+                reference: hop.reference,
                 nullable: hop.nullable,
             });
 
@@ -2649,15 +2680,7 @@ fn collapse_untagged_alias_cycle(
                 continue;
             }
 
-            let target_subst = edge
-                .args
-                .iter()
-                .map(|(param, arg)| {
-                    let mut arg = arg.clone();
-                    substitute_generics(&mut arg, &subst)?;
-                    Ok((param.name().clone(), arg))
-                })
-                .collect::<Result<GenericSubst, Cow<'static, str>>>()?;
+            let target_subst = edge_substitution(&subst, &nodes[&edge.target].ndt, edge.reference)?;
 
             let target_substs = &nodes[&edge.target].substs;
             if !target_substs.contains(&target_subst)

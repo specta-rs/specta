@@ -978,3 +978,93 @@ fn define_in_a_non_generic_cycle_is_untouched() {
         "the raw terminal must survive the collapse verbatim: {ts}"
     );
 }
+
+/// Builds the cycle `OmitRoot -> OmitNode<T> -> OmitRoot` where *both*
+/// edges pass no explicit generic arguments, and `OmitNode`'s `T` has the
+/// given declared default. Normal reference rendering fills omitted
+/// parameters (declared default, then `unknown`); the collapse must
+/// resolve the edge's substitution identically.
+fn omitted_args_cycle(default: Option<specta::datatype::DataType>) -> Types {
+    use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
+
+    let mut types = Types::default();
+    NamedDataType::new("OmitRoot", &mut types, |types, root| {
+        let node = NamedDataType::new("OmitNode", types, |_, node| {
+            let t = GenericDefinition::new("T".into(), default);
+            node.generics = std::borrow::Cow::Owned(vec![t.clone()]);
+            let mut e = Enum::default();
+            e.variants.push((
+                "X".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Reference(root.reference(vec![]))))
+                    .build(),
+            ));
+            e.variants.push((
+                "Term".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Generic(t.reference())))
+                    .build(),
+            ));
+            node.ty = Some(DataType::Enum(e));
+        });
+
+        let mut e = Enum::default();
+        e.variants.push((
+            "X".into(),
+            // No explicit generic arguments: rendering would fill the
+            // declared default / `unknown` here.
+            Variant::unnamed()
+                .field(Field::new(DataType::Reference(node.reference(vec![]))))
+                .build(),
+        ));
+        e.variants.push((
+            "Y".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Primitive(
+                    specta::datatype::Primitive::u32,
+                )))
+                .build(),
+        ));
+        root.ty = Some(DataType::Enum(e));
+    });
+    types
+}
+
+/// A cycle edge that *omits* its generic arguments
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584769995):
+/// `OmitNode<T = string>`'s `T` must be filled with the declared default -
+/// exactly as `resolved_reference_generics` does for ordinary reference
+/// rendering - not reported as "no instantiation".
+#[test]
+fn omitted_generic_arguments_fall_back_to_the_declared_default() {
+    use specta::datatype::{DataType, Primitive};
+
+    let types = omitted_args_cycle(Some(DataType::Primitive(Primitive::str)));
+
+    let ts = Typescript::default()
+        .export(&types, RawFormat)
+        .expect("omitted arguments must resolve to the declared default");
+    assert!(
+        ts.contains("export type OmitRoot = number | string;"),
+        "OmitRoot must merge OmitNode's terminal at the default `string`: {ts}"
+    );
+    assert!(
+        ts.contains("OmitNode<T = string> = T | string | number;"),
+        "OmitNode must union its own branch, the cycle's terminals, and its defaulted instantiation: {ts}"
+    );
+}
+
+/// Without a declared default, normal rendering fills an omitted parameter
+/// with `unknown`; the collapse must produce the same instantiation.
+#[test]
+fn omitted_generic_arguments_without_a_default_fall_back_to_unknown() {
+    let types = omitted_args_cycle(None);
+
+    let ts = Typescript::default()
+        .export(&types, RawFormat)
+        .expect("omitted arguments without a default must resolve to `unknown`");
+    assert!(
+        ts.contains("export type OmitRoot = number | unknown;"),
+        "OmitRoot must merge OmitNode's terminal at `unknown`: {ts}"
+    );
+}
