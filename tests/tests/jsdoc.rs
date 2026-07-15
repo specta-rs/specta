@@ -160,8 +160,12 @@ fn primitives_reference() {
                 };
 
                 Some(
-                    primitives::reference(&JSDoc::default(), &types, &reference)
-                        .map(|ty| format!("{name}: {ty}")),
+                    primitives::reference(
+                        &JSDoc::default(),
+                        &types,
+                        &DataType::Reference(reference),
+                    )
+                    .map(|ty| format!("{name}: {ty}")),
                 )
             })
             .collect::<Result<Vec<_>, _>>()

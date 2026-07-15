@@ -135,7 +135,15 @@ const _: () = {
 
     struct SerdeNumber;
     impl Type for SerdeNumber {
+        /// `serde_json::Number` is finite and serializes as an untagged JSON number. Its
+        /// `i64`/`u64` variants remain visible so exporters can enforce precision guards
+        /// before the finite-number marker collapses the rendered shape without inheriting
+        /// the nullability of arbitrary `f64` values.
         fn definition(_: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+            attributes.insert("specta:finite_number", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
@@ -157,7 +165,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Attributes::default(),
+                attributes,
             })
         }
     }

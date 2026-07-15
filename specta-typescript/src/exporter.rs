@@ -844,18 +844,12 @@ impl BrandedTypeExporter<'_> {
         primitives::inline(self, self.types, &mapped)
     }
 
-    /// [primitives::reference]
-    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        let mapped = map_datatype_format(
-            self.format,
-            self.types,
-            &DataType::Reference(r.clone()),
-            &[],
-        )?;
-        match mapped {
-            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
-            dt => primitives::inline(self, self.types, &dt),
-        }
+    /// Render a datatype while recursively preserving ordinary named references.
+    ///
+    /// See [`primitives::reference`] for details.
+    pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::reference(self, self.types, &mapped)
     }
 }
 
@@ -914,18 +908,12 @@ impl FrameworkExporter<'_> {
         primitives::inline(self, self.types, &mapped)
     }
 
-    /// [primitives::reference]
-    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        let mapped = map_datatype_format(
-            self.format,
-            self.types,
-            &DataType::Reference(r.clone()),
-            &[],
-        )?;
-        match mapped {
-            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
-            dt => primitives::inline(self, self.types, &dt),
-        }
+    /// Render a datatype while recursively preserving ordinary named references.
+    ///
+    /// See [`primitives::reference`] for details.
+    pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::reference(self, self.types, &mapped)
     }
 
     /// [primitives::export]
