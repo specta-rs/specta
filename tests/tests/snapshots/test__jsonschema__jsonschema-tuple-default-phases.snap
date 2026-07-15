@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsonschema.rs
-assertion_line: 79
 expression: rendered
 ---
 {
@@ -24,11 +23,13 @@ expression: rendered
       "minItems": 1,
       "prefixItems": [
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
         },
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -44,11 +45,13 @@ expression: rendered
       "minItems": 2,
       "prefixItems": [
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
         },
         {
+          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"

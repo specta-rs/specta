@@ -9,6 +9,8 @@ pub struct FieldAttr {
     pub r#type: Option<Type>,
     pub inline: bool,
     pub skip: bool,
+    pub serde_skip: bool,
+    pub serde_newtype_skip_ignored: bool,
     pub optional: bool,
     pub common: RustCAttr,
 }
@@ -35,6 +37,13 @@ impl FieldAttr {
             // we make an exception for `#[serde(skip)]` because it's usually used on fields
             // that would fail a `T: Type` so handling it at runtime would prevent your code from compiling.
             result.skip = attr.parse_bool_or_true()?;
+            result.serde_skip = result.skip;
+        }
+
+        for attr in ["skip_serializing", "skip_deserializing"] {
+            if let Some(value) = attrs.extract("serde", attr) {
+                result.serde_skip |= value.parse_bool_or_true()?;
+            }
         }
 
         if let Some(attr) = attrs.extract("specta", "optional") {

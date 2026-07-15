@@ -4,17 +4,6 @@ expression: schema
 ---
 {
   "$defs": {
-    "Nested": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {}
-      },
-      "required": [
-        "value"
-      ],
-      "title": "Nested",
-      "type": "object"
-    },
     "Nested_String": {
       "additionalProperties": false,
       "properties": {
@@ -32,6 +21,8 @@ expression: schema
       "additionalProperties": false,
       "properties": {
         "value": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -56,6 +47,8 @@ expression: schema
           ]
         },
         "id": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
@@ -105,17 +98,6 @@ expression: schema
       "title": "UsesNestedGenerics",
       "type": "object"
     },
-    "Wrapper": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {}
-      },
-      "required": [
-        "value"
-      ],
-      "title": "Wrapper",
-      "type": "object"
-    },
     "Wrapper_Nested_String": {
       "additionalProperties": false,
       "properties": {
@@ -159,6 +141,8 @@ expression: schema
       "additionalProperties": false,
       "properties": {
         "value": {
+          "format": "int64",
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
