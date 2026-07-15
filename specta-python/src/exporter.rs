@@ -439,10 +439,18 @@ fn module_file(root: &Path, module: &str) -> PathBuf {
 }
 
 fn ensure_no_symlink_components(root: &Path, path: &Path) -> Result<(), Error> {
-    let mut current = root.to_path_buf();
-    if std::fs::symlink_metadata(&current).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-        return Err(Error::symlink_escape(current));
+    for ancestor in root.ancestors() {
+        match std::fs::symlink_metadata(ancestor) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::symlink_escape(ancestor.to_path_buf()));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => return Err(Error::create_dir(ancestor.to_path_buf(), source)),
+        }
     }
+
+    let mut current = root.to_path_buf();
     let relative = path.strip_prefix(root).unwrap_or(path);
     for component in relative.components() {
         current.push(component);

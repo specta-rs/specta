@@ -766,4 +766,14 @@ fn python_files_layout_refuses_symlink_traversal() {
         .unwrap_err();
     assert!(error.to_string().contains("refusing to traverse symlink"));
     assert!(!outside.path().join("python").exists());
+
+    let ancestor_link = temp.path().join("ancestor-link");
+    symlink(outside.path(), &ancestor_link).unwrap();
+    let escaped_package = ancestor_link.join("bindings");
+    let error = Python::default()
+        .layout(Layout::Files)
+        .export_to(&escaped_package, &types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("refusing to traverse symlink"));
+    assert!(!outside.path().join("bindings").exists());
 }
