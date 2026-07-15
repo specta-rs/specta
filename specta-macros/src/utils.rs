@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenTree};
 use quote::ToTokens;
 use syn::{
     Expr, Ident, Lit, Meta, Path, Result, Token, Type, TypePath,
@@ -218,18 +218,26 @@ impl AttrExtract for Vec<Attribute> {
 
 struct NestedAttributeList {
     attrs: Vec<Attribute>,
+    unstructured_argument: Option<Span>,
 }
 
 impl Parse for NestedAttributeList {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut attrs = Vec::new();
+        let mut unstructured_argument = None;
         while !input.is_empty() {
             if input.peek(Ident::peek_any) {
                 let fork = input.fork();
                 let _ = fork.call(Ident::parse_any)?;
 
-                if fork.peek(Token![::]) {
-                    let _ignored: syn::Expr = input.parse()?;
+                if fork.peek(Token![::])
+                    || !(fork.is_empty()
+                        || fork.peek(Paren)
+                        || fork.peek(Token![=])
+                        || fork.peek(Token![,]))
+                {
+                    unstructured_argument.get_or_insert(input.span());
+                    skip_unstructured_argument(input)?;
                 } else {
                     let key = input.call(Ident::parse_any)?;
                     let key_span = key.span();
@@ -241,9 +249,13 @@ impl Parse for NestedAttributeList {
                             _ if input.peek(Paren) => {
                                 let content;
                                 syn::parenthesized!(content in input);
+                                let nested = content.parse::<NestedAttributeList>()?;
+                                if unstructured_argument.is_none() {
+                                    unstructured_argument = nested.unstructured_argument;
+                                }
                                 Some(AttributeValue::Attribute {
                                     span: key_span,
-                                    attr: content.parse::<NestedAttributeList>()?.attrs,
+                                    attr: nested.attrs,
                                 })
                             }
                             _ if input.peek(Token![=]) => {
@@ -255,15 +267,26 @@ impl Parse for NestedAttributeList {
                     });
                 }
             } else {
-                let _ignored: syn::Expr = input.parse()?;
+                unstructured_argument.get_or_insert(input.span());
+                skip_unstructured_argument(input)?;
             }
 
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
             }
         }
-        Ok(NestedAttributeList { attrs })
+        Ok(NestedAttributeList {
+            attrs,
+            unstructured_argument,
+        })
     }
+}
+
+fn skip_unstructured_argument(input: ParseStream) -> Result<()> {
+    while !input.is_empty() && !input.peek(Token![,]) {
+        let _ = input.parse::<TokenTree>()?;
+    }
+    Ok(())
 }
 
 /// pass all of the attributes into a single structure.
@@ -306,9 +329,16 @@ pub fn parse_attrs_with_filter(
             }],
             Meta::List(meta) => {
                 let source = attr_name.clone();
-                let mut parsed: Vec<Attribute> =
-                    syn::parse2::<NestedAttributeList>(meta.tokens.clone())?.attrs;
-                for a in &mut parsed {
+                let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
+                if source == "specta"
+                    && let Some(span) = parsed.unstructured_argument
+                {
+                    return Err(syn::Error::new(
+                        span,
+                        "specta: unsupported attribute syntax",
+                    ));
+                }
+                for a in &mut parsed.attrs {
                     a.source = source.clone();
                 }
                 vec![Attribute {
@@ -316,7 +346,7 @@ pub fn parse_attrs_with_filter(
                     key: ident.clone(),
                     value: Some(AttributeValue::Attribute {
                         span: ident.span(),
-                        attr: parsed,
+                        attr: parsed.attrs,
                     }),
                 }]
             }
@@ -345,4 +375,63 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
 #[cfg(feature = "DO_NOT_USE_function")]
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
     quote::format_ident!("__specta__fn__{}", function)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignores_method_calls_in_unrelated_attributes() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[error("Circular dependency detected: {}", chain.join(" -> "))]
+                enum InheritanceError { CircularDependency { chain: Vec<String> } }
+            "#,
+        )
+        .expect("test input should parse");
+
+        let attrs = parse_attrs(&input.attrs).expect("unrelated attribute should remain parseable");
+        let argument_count = match attrs[0].value.as_ref() {
+            Some(AttributeValue::Attribute { attr, .. }) => attr.len(),
+            _ => usize::MAX,
+        };
+        assert_eq!(argument_count, 0);
+    }
+
+    #[test]
+    fn parses_structured_metadata_alongside_unstructured_arguments() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[error("Circular dependency detected: {}", chain.join(" -> "))]
+                #[serde(rename_all = "camelCase", untagged)]
+                enum InheritanceError { CircularDependency { chain: Vec<String> } }
+            "#,
+        )
+        .expect("test input should parse");
+
+        let mut attrs = parse_attrs(&input.attrs).expect("attributes should parse");
+        assert!(attrs.extract("serde", "untagged").is_some());
+        assert_eq!(
+            attrs
+                .extract("serde", "rename_all")
+                .expect("rename_all should be captured")
+                .parse_string()
+                .expect("rename_all should be a string"),
+            "camelCase"
+        );
+    }
+
+    #[test]
+    fn rejects_unstructured_specta_arguments() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[specta(collect = false, typo.missing)]
+                struct Invalid;
+            "#,
+        )
+        .expect("test input should parse");
+
+        assert!(parse_attrs(&input.attrs).is_err());
+    }
 }
