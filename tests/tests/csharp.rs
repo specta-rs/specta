@@ -215,6 +215,12 @@ struct GenericType<T> {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct GenericMemberCollision<T> {
+    t: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct ShadowedUser {
     value: bool,
 }
@@ -504,6 +510,19 @@ fn flat_generic_parameters_cannot_shadow_top_level_types() {
 }
 
 #[test]
+fn generic_parameters_do_not_collide_with_record_members() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<GenericMemberCollision<String>>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("record GenericMemberCollision<T>"));
+    assert!(output.contains("T T2 { get; init; }"));
+}
+
+#[test]
 fn invalid_namespace_and_module_paths_are_rejected_before_writes() {
     let types = Types::default().register::<Status>();
     assert!(matches!(
@@ -548,6 +567,33 @@ fn files_layout_rejects_case_insensitive_path_collisions() {
         Err(Error::DuplicateTypeName { .. })
     ));
     assert!(!root.exists());
+}
+
+#[test]
+fn files_layout_handles_case_only_renames() {
+    let mut types = Types::default().register::<FileCaseA>();
+    types.iter_mut(|ndt| ndt.name = "Url".into());
+    let root = workspace_scratch("case-only-file-rename");
+    let _ = std::fs::remove_dir_all(&root);
+    CSharp::new()
+        .layout(Layout::Files)
+        .export_to(&root, &types, IdentityFormat)
+        .unwrap();
+
+    types.iter_mut(|ndt| ndt.name = "URL".into());
+    CSharp::new()
+        .layout(Layout::Files)
+        .export_to(&root, &types, IdentityFormat)
+        .unwrap();
+
+    let generated_files = std::fs::read_dir(root.join("Test/Csharp"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "cs"))
+        .count();
+    assert_eq!(generated_files, 1);
+    assert!(root.join("Test/Csharp/URL.cs").exists());
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -998,6 +1044,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<ContainingNameCollision>()
         .register::<VariantCollisions>()
         .register::<RecordVariantCollisions>()
+        .register::<GenericMemberCollision<String>>()
         .register::<DefaultedNonNullableFields>();
     let types = types.register::<NonObjectWireShapes>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();

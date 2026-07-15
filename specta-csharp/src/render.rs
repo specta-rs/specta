@@ -65,7 +65,7 @@ pub(crate) fn export_to(
         let relative_path = file_path
             .strip_prefix(path)
             .expect("generated file paths are rooted in the output directory");
-        let path_key = relative_path.to_string_lossy().to_lowercase();
+        let path_key = folded_relative_path(relative_path);
         if let Some(first) = case_folded_paths.insert(path_key, rust_path(ndt)) {
             return Err(Error::DuplicateTypeName {
                 name: relative_path.display().to_string(),
@@ -382,7 +382,7 @@ fn render_record(
     out.push('\n');
     out.push_str(base);
     out.push_str("{\n");
-    render_fields(out, exporter, types, fields, base, path, name)?;
+    render_fields(out, exporter, types, fields, base, path, name, generics)?;
     out.push_str(base);
     out.push_str("}\n");
     Ok(())
@@ -396,6 +396,7 @@ fn render_fields(
     base: &str,
     path: &str,
     containing_name: &str,
+    generics: &str,
 ) -> Result<(), Error> {
     let indent = format!("{base}{}", exporter.indent);
     let reserved_type_names = match exporter.layout {
@@ -409,6 +410,15 @@ fn render_fields(
         Fields::Unit => {}
         Fields::Named(fields) => {
             let mut used = record_reserved_names(containing_name);
+            used.extend(
+                generics
+                    .trim_start_matches('<')
+                    .trim_end_matches('>')
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_string),
+            );
             for (wire_name, field) in &fields.fields {
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
@@ -1189,6 +1199,7 @@ fn render_variant(
         indent,
         &format!("{path}.{wire_name}"),
         variant_name,
+        generics,
     )?;
     out.push_str(indent);
     out.push_str("}\n");
@@ -2448,7 +2459,16 @@ fn is_keyword(name: &str) -> bool {
 }
 
 fn remove_stale_generated_files(root: &Path, expected: &[PathBuf]) -> Result<(), Error> {
-    let expected = expected.iter().collect::<std::collections::HashSet<_>>();
+    let expected = expected.iter().collect::<HashSet<_>>();
+    let expected_folded = expected
+        .iter()
+        .map(|path| {
+            let relative = path
+                .strip_prefix(root)
+                .expect("generated file paths are rooted in the output directory");
+            (folded_relative_path(relative), *path)
+        })
+        .collect::<HashMap<_, _>>();
     let mut dirs = vec![root.to_path_buf()];
     while let Some(dir) = dirs.pop() {
         for entry in std::fs::read_dir(&dir).map_err(|err| Error::io(&dir, err))? {
@@ -2462,8 +2482,17 @@ fn remove_stale_generated_files(root: &Path, expected: &[PathBuf]) -> Result<(),
                 dirs.push(path);
             } else if file_type.is_file()
                 && path.extension().is_some_and(|extension| extension == "cs")
-                && !expected.contains(&path)
             {
+                let relative = path
+                    .strip_prefix(root)
+                    .expect("discovered generated files are rooted in the output directory");
+                let is_expected = expected.contains(&path)
+                    || expected_folded
+                        .get(&folded_relative_path(relative))
+                        .is_some_and(|expected_path| same_existing_file(&path, expected_path));
+                if is_expected {
+                    continue;
+                }
                 let content =
                     std::fs::read_to_string(&path).map_err(|err| Error::io(&path, err))?;
                 if content
@@ -2477,4 +2506,15 @@ fn remove_stale_generated_files(root: &Path, expected: &[PathBuf]) -> Result<(),
         }
     }
     Ok(())
+}
+
+fn folded_relative_path(path: &Path) -> String {
+    path.to_string_lossy().to_lowercase()
+}
+
+fn same_existing_file(left: &Path, right: &Path) -> bool {
+    match (std::fs::canonicalize(left), std::fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
 }
