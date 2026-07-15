@@ -1,4 +1,33 @@
 /// Reserved keywords and common types in the Go programming language.
+pub(crate) const GO_KEYWORDS: &[&str] = &[
+    // Keywords
+    "break",
+    "default",
+    "func",
+    "interface",
+    "select",
+    "case",
+    "defer",
+    "go",
+    "map",
+    "struct",
+    "chan",
+    "else",
+    "goto",
+    "package",
+    "switch",
+    "const",
+    "fallthrough",
+    "if",
+    "range",
+    "type",
+    "continue",
+    "for",
+    "import",
+    "return",
+    "var",
+];
+
 pub(crate) const RESERVED_GO_NAMES: &[&str] = &[
     // Keywords
     "break",

@@ -2218,6 +2218,7 @@ dependencies = [
  "smol_str 0.3.6",
  "specta",
  "specta-java",
+ "specta-go",
  "specta-jsonschema",
  "specta-kotlin",
  "specta-openapi",
