@@ -361,14 +361,10 @@ class Issue281(_specta_typing.TypedDict):
 type Issue374 = Issue374_Deserialize | Issue374_Serialize
 
 #  https://github.com/specta-rs/specta/issues/374
-class Issue374_Deserialize(_specta_typing.TypedDict):
-    foo: _specta_typing.NotRequired[_specta_builtins.bool]
-    bar: _specta_typing.NotRequired[_specta_builtins.bool]
+type Issue374_Deserialize = _specta_typing.TypedDict("test__types__Issue374_Deserialize", {"foo": _specta_typing.NotRequired[_specta_builtins.bool], "bar": _specta_typing.NotRequired[_specta_builtins.bool]})
 
 #  https://github.com/specta-rs/specta/issues/374
-class Issue374_Serialize(_specta_typing.TypedDict):
-    foo: _specta_typing.NotRequired[_specta_builtins.bool]
-    bar: _specta_typing.NotRequired[_specta_builtins.bool]
+type Issue374_Serialize = _specta_typing.TypedDict("test__types__Issue374_Serialize", {"foo": _specta_typing.NotRequired[_specta_builtins.bool], "bar": _specta_typing.NotRequired[_specta_builtins.bool]})
 
 type KebabCase = _specta_typing.TypedDict("test__types__KebabCase", {"test-ing": _specta_builtins.str})
 
@@ -427,17 +423,9 @@ type OptionalOnNamedField = None | _specta_builtins.str
 class OptionalOnTransparentNamedField(_specta_typing.TypedDict):
     b: None | _specta_builtins.str
 
-class Optional_Deserialize(_specta_typing.TypedDict):
-    a: None | _specta_builtins.int
-    b: _specta_typing.NotRequired[None | _specta_builtins.int]
-    c: None | _specta_builtins.str
-    d: _specta_typing.NotRequired[_specta_builtins.bool]
+type Optional_Deserialize = _specta_typing.TypedDict("test__types__Optional_Deserialize", {"a": None | _specta_builtins.int, "b": _specta_typing.NotRequired[None | _specta_builtins.int], "c": None | _specta_builtins.str, "d": _specta_typing.NotRequired[_specta_builtins.bool]})
 
-class Optional_Serialize(_specta_typing.TypedDict):
-    a: None | _specta_builtins.int
-    b: _specta_typing.NotRequired[None | _specta_builtins.int]
-    c: _specta_typing.NotRequired[_specta_builtins.str]
-    d: _specta_builtins.bool
+type Optional_Serialize = _specta_typing.TypedDict("test__types__Optional_Serialize", {"a": None | _specta_builtins.int, "b": _specta_typing.NotRequired[None | _specta_builtins.int], "c": _specta_typing.NotRequired[_specta_builtins.str], "d": _specta_builtins.bool})
 
 class OverridenStruct(_specta_typing.TypedDict):
     overriden_field: _specta_builtins.str

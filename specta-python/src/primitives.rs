@@ -121,11 +121,12 @@ fn export_named_inner(
             .fields
             .iter()
             .filter(|(_, field)| field.ty.is_some())
-            .all(|(field_name, _)| {
+            .all(|(field_name, field)| {
                 is_identifier(field_name)
                     && !is_reserved(field_name)
                     && !field_name.starts_with("__")
                     && field_name.as_ref() == normalized_identifier(field_name)
+                    && !field.optional
             })
     {
         out.push_str(indent);

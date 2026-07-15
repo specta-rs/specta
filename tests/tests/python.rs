@@ -377,6 +377,27 @@ fn python_preserves_dunder_wire_keys() {
 }
 
 #[test]
+fn python_functional_typed_dict_preserves_optional_keys() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct OptionalKey {
+        #[serde(default)]
+        value: String,
+    }
+
+    let output = Python::default()
+        .export(
+            &Types::default().register::<OptionalKey>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    assert!(output.contains(
+        "type OptionalKey = _specta_typing.TypedDict(\"test__python__OptionalKey\", {\"value\": _specta_typing.NotRequired[_specta_builtins.str]})"
+    ));
+    assert!(!output.contains("class OptionalKey("));
+}
+
+#[test]
 fn python_export_to_file_and_files_layout() {
     let types = Types::default().register::<files_layout::Root>();
     let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
