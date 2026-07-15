@@ -59,6 +59,29 @@ struct KotlinxRecord {
 }
 
 #[derive(Type)]
+#[specta(inline, collect = false)]
+struct InlineUnit;
+
+#[derive(Type)]
+#[specta(inline, collect = false)]
+enum InlineUnitEnum {
+    First,
+    Second,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UsesInlineUnit {
+    unit: InlineUnit,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UsesInlineUnitEnum {
+    unit_enum: InlineUnitEnum,
+}
+
+#[derive(Type)]
 #[specta(collect = false)]
 struct InnerPayload {
     value: String,
@@ -192,6 +215,24 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .export(&Types::default().register::<NewType>(), IdentityFormat)
         .expect_err("mutable Kotlinx newtypes cannot preserve scalar encoding");
     assert!(error.to_string().contains("mutable Kotlinx newtypes"));
+
+    let error = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<UsesInlineUnit>(),
+            IdentityFormat,
+        )
+        .expect_err("inline unit structs must not bypass Kotlinx wire-shape validation");
+    assert!(error.to_string().contains("unit-struct null encoding"));
+
+    let error = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<UsesInlineUnitEnum>(),
+            IdentityFormat,
+        )
+        .expect_err("inline unit enums must not bypass Kotlinx wire-shape validation");
+    assert!(error.to_string().contains("structural union"));
 }
 
 #[test]

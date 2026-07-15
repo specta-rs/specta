@@ -709,7 +709,30 @@ fn datatype(
         // Kotlin has no structural type expressions. Preserve the useful outer shape for
         // inline containers while falling back to `Any?` for their heterogeneous values.
         DataType::Struct(strct) => match &strct.fields {
+            Fields::Unit if kotlin.serialization == Serialization::Kotlinx => {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "Kotlinx object serialization does not preserve unit-struct null encoding",
+                });
+            }
             Fields::Unit => "Unit".to_owned(),
+            Fields::Unnamed(fields)
+                if kotlin.serialization == Serialization::Kotlinx
+                    && (fields.fields.len() != 1 || fields.fields[0].ty.is_none()) =>
+            {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "Kotlinx data classes do not preserve tuple-struct array encoding",
+                });
+            }
+            Fields::Unnamed(_)
+                if kotlin.serialization == Serialization::Kotlinx && kotlin.mutable_properties =>
+            {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "mutable Kotlinx newtypes cannot preserve scalar encoding",
+                });
+            }
             Fields::Unnamed(fields) if fields.fields.len() == 1 => fields.fields[0]
                 .ty
                 .as_ref()
@@ -731,6 +754,12 @@ fn datatype(
             }
             Fields::Named(_) => "Map<String, Any?>".to_owned(),
         },
+        DataType::Enum(_) if kotlin.serialization == Serialization::Kotlinx => {
+            return Err(Error::UnsupportedType {
+                path: path.into(),
+                reason: "structural union has no inferred Kotlinx serializer",
+            });
+        }
         DataType::Enum(enm)
             if enm
                 .variants
@@ -739,9 +768,7 @@ fn datatype(
         {
             "String".to_owned()
         }
-        DataType::Enum(_) | DataType::Intersection(_)
-            if kotlin.serialization == Serialization::Kotlinx =>
-        {
+        DataType::Intersection(_) if kotlin.serialization == Serialization::Kotlinx => {
             return Err(Error::UnsupportedType {
                 path: path.into(),
                 reason: "structural union has no inferred Kotlinx serializer",
