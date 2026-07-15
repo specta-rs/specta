@@ -5,31 +5,39 @@ type appError = {
   message: string,
 }
 
-// Example showcasing ReScript's built-in `result<ok, err>` type.
-// 
-// This is a key advantage of ReScript over TypeScript: `result<ok, err>` is
-// a first-class built-in type. specta-rescript detects any enum with exactly
-// two variants named `Ok(T)` and `Err(E)` and emits `result<t, e>`.
-// 
-// This is especially useful for Tauri apps where commands return `Result<T, E>`.
-// Custom Result-shaped enum — detected and emitted as `result<t, e>`
+/**
+ * Example showcasing ReScript's built-in `result<ok, err>` type.
+ *
+ * This is a key advantage of ReScript over TypeScript: `result<ok, err>` is
+ * a first-class built-in type. specta-rescript detects any enum with exactly
+ * two variants named `Ok(T)` and `Err(E)` and emits `result<t, e>`.
+ *
+ * This is especially useful for Tauri apps where commands return `Result<T, E>`.
+ * Custom Result-shaped enum — detected and emitted as `result<t, e>`
+ */
 type myResult<'t, 'e> = result<'t, 'e>
 
-// Tauri-style command payload
+/**
+ * Tauri-style command payload
+ */
 type userData = {
   id: int,
   name: string,
   email: string,
 }
 
-// Result can appear in arrays (e.g. batch operations)
+/**
+ * Result can appear in arrays (e.g. batch operations)
+ */
 type batchResponse = {
   results: array<myResult<userData, appError>>,
   total: int,
   failed_count: int,
 }
 
-// Richer error type
+/**
+ * Richer error type
+ */
 type commandErrorValidationFields = {
   field: string,
   message: string,
@@ -40,7 +48,9 @@ type commandError =
   | Validation(commandErrorValidationFields)
   | Internal(string)
 
-// A struct whose field uses our Result type
+/**
+ * A struct whose field uses our Result type
+ */
 type commandResponse = {
   request_id: string,
   result: myResult<userData, appError>,
@@ -51,9 +61,17 @@ type fetchResult<'t> = {
   cached: bool,
 }
 
-// Option type — maps to ReScript's `option<t>`
+/**
+ * Option type — maps to ReScript's `option<t>`
+ */
 type searchResult = {
+  /**
+   * option<userData> — None means not found
+   */
   user: option<userData>,
+  /**
+   * option<string> — None means no next page
+   */
   next_cursor: option<string>,
   total_count: int,
 }

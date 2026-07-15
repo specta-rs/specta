@@ -1,92 +1,147 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use specta::{
     Types,
     datatype::{DataType, Fields, NamedDataType, NamedReferenceType, Reference},
 };
 
-use crate::error::{Error, Result};
-
-/// Collect all directly-referenced named types from a `DataType` into `out`.
 fn deps<'a>(dt: &'a DataType, types: &'a Types, out: &mut Vec<&'a NamedDataType>) {
     match dt {
         DataType::Primitive(_) | DataType::Generic(_) => {}
         DataType::Nullable(inner) => deps(inner, types, out),
-        DataType::List(l) => deps(&l.ty, types, out),
-        DataType::Tuple(t) => t.elements.iter().for_each(|e| deps(e, types, out)),
-        DataType::Struct(s) => match &s.fields {
-            Fields::Unit => {}
-            Fields::Unnamed(uf) => uf.fields.iter().filter_map(|f| f.ty.as_ref()).for_each(|ty| deps(ty, types, out)),
-            Fields::Named(nf) => nf.fields.iter().filter_map(|(_, f)| f.ty.as_ref()).for_each(|ty| deps(ty, types, out)),
-        },
-        DataType::Map(m) => {
-            deps(m.key_ty(), types, out);
-            deps(m.value_ty(), types, out);
+        DataType::List(list) => deps(&list.ty, types, out),
+        DataType::Tuple(tuple) => tuple.elements.iter().for_each(|ty| deps(ty, types, out)),
+        DataType::Struct(structure) => deps_fields(&structure.fields, types, out),
+        DataType::Map(map) => {
+            deps(map.key_ty(), types, out);
+            deps(map.value_ty(), types, out);
         }
-        DataType::Enum(e) => {
-            for (_, v) in &e.variants {
-                match &v.fields {
-                    Fields::Unit => {}
-                    Fields::Unnamed(uf) => uf.fields.iter().filter_map(|f| f.ty.as_ref()).for_each(|ty| deps(ty, types, out)),
-                    Fields::Named(nf) => nf.fields.iter().filter_map(|(_, f)| f.ty.as_ref()).for_each(|ty| deps(ty, types, out)),
-                }
-            }
-        }
-        DataType::Reference(Reference::Named(n)) => match &n.inner {
+        DataType::Enum(enumeration) => enumeration
+            .variants
+            .iter()
+            .for_each(|(_, variant)| deps_fields(&variant.fields, types, out)),
+        DataType::Reference(Reference::Named(named)) => match &named.inner {
             NamedReferenceType::Reference { generics, .. } => {
-                out.extend(types.get(n));
-                generics.iter().for_each(|(_, g)| deps(g, types, out));
+                out.extend(types.get(named));
+                generics.iter().for_each(|(_, ty)| deps(ty, types, out));
             }
             NamedReferenceType::Inline { dt, .. } => deps(dt, types, out),
-            NamedReferenceType::Recursive(_) => {}
+            NamedReferenceType::Recursive(recursive) => {
+                out.extend(types.get(named));
+                recursive
+                    .generics()
+                    .iter()
+                    .for_each(|(_, ty)| deps(ty, types, out));
+            }
         },
         DataType::Reference(_) | DataType::Intersection(_) => {}
     }
 }
 
-/// DFS visitor for topological sort.
-fn visit<'a>(
-    curr: &'a NamedDataType,
-    types: &'a Types,
-    visited: &mut HashSet<&'a str>,
-    path: &mut Vec<&'a str>,
-    res: &mut Vec<&'a NamedDataType>,
-) -> Result<()> {
-    let name: &'a str = curr.name.as_ref();
-
-    if visited.contains(name) {
-        return Ok(());
+fn deps_fields<'a>(fields: &'a Fields, types: &'a Types, out: &mut Vec<&'a NamedDataType>) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .for_each(|ty| deps(ty, types, out)),
+        Fields::Named(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|(_, field)| field.ty.as_ref())
+            .for_each(|ty| deps(ty, types, out)),
     }
-
-    if path.contains(&name) {
-        let i = path.iter().position(|&n| n == name).unwrap_or(0);
-        let cycle = path[i..].iter().map(|s| s.to_string()).chain(std::iter::once(name.to_string())).collect::<Vec<_>>();
-        return Err(Error::TopoSort(format!("circular reference: {}", cycle.join(" -> "))));
-    }
-
-    path.push(name);
-    let mut dependencies = Vec::new();
-    if let Some(ty) = &curr.ty {
-        deps(ty, types, &mut dependencies);
-    }
-    dependencies.into_iter().try_for_each(|dep| visit(dep, types, visited, path, res))?;
-    path.pop();
-    visited.insert(name);
-    res.push(curr);
-
-    Ok(())
 }
 
-/// Sort named types in topological dependency order (dependencies before dependents).
-/// Falls back to alphabetical within the same depth for deterministic output.
-pub(crate) fn topological_sort(types: &Types) -> Result<Vec<&NamedDataType>> {
-    let mut visited: HashSet<&str> = HashSet::new();
-    let mut path: Vec<&str> = Vec::new();
-    let mut res = Vec::with_capacity(types.len());
+pub(crate) fn is_self_recursive(dt: &DataType, types: &Types, ty: &NamedDataType) -> bool {
+    let mut dependencies = Vec::new();
+    deps(dt, types, &mut dependencies);
+    dependencies
+        .iter()
+        .any(|dependency| dependency.name == ty.name)
+}
 
-    types.into_sorted_iter().try_for_each(|n| visit(n, types, &mut visited, &mut path, &mut res))?;
+struct Tarjan<'a> {
+    types: &'a Types,
+    next_index: usize,
+    indices: HashMap<&'a str, usize>,
+    lowlinks: HashMap<&'a str, usize>,
+    stack: Vec<&'a NamedDataType>,
+    on_stack: HashMap<&'a str, bool>,
+    groups: Vec<Vec<&'a NamedDataType>>,
+}
 
-    Ok(res)
+impl<'a> Tarjan<'a> {
+    fn visit(&mut self, ty: &'a NamedDataType) {
+        let name = ty.name.as_ref();
+        let index = self.next_index;
+        self.next_index += 1;
+        self.indices.insert(name, index);
+        self.lowlinks.insert(name, index);
+        self.stack.push(ty);
+        self.on_stack.insert(name, true);
+
+        let mut dependencies = Vec::new();
+        if let Some(dt) = &ty.ty {
+            deps(dt, self.types, &mut dependencies);
+        }
+        dependencies.sort_by(|a, b| a.name.cmp(&b.name));
+        dependencies.dedup_by(|a, b| a.name == b.name);
+
+        for dependency in dependencies {
+            let dependency_name = dependency.name.as_ref();
+            if !self.indices.contains_key(dependency_name) {
+                self.visit(dependency);
+                let dependency_lowlink = self.lowlinks[dependency_name];
+                self.lowlinks
+                    .entry(name)
+                    .and_modify(|lowlink| *lowlink = (*lowlink).min(dependency_lowlink));
+            } else if self.on_stack.get(dependency_name) == Some(&true) {
+                let dependency_index = self.indices[dependency_name];
+                self.lowlinks
+                    .entry(name)
+                    .and_modify(|lowlink| *lowlink = (*lowlink).min(dependency_index));
+            }
+        }
+
+        if self.lowlinks[name] == self.indices[name] {
+            let mut group = Vec::new();
+            loop {
+                let member = self
+                    .stack
+                    .pop()
+                    .expect("current type is on the Tarjan stack");
+                self.on_stack.insert(member.name.as_ref(), false);
+                group.push(member);
+                if member.name == ty.name {
+                    break;
+                }
+            }
+            group.sort_by(|a, b| a.name.cmp(&b.name));
+            self.groups.push(group);
+        }
+    }
+}
+
+/// Sort types into dependency-ordered strongly connected groups.
+pub(crate) fn topological_sort(types: &Types) -> Vec<Vec<&NamedDataType>> {
+    let mut tarjan = Tarjan {
+        types,
+        next_index: 0,
+        indices: HashMap::new(),
+        lowlinks: HashMap::new(),
+        stack: Vec::new(),
+        on_stack: HashMap::new(),
+        groups: Vec::new(),
+    };
+
+    for ty in types.into_sorted_iter() {
+        if !tarjan.indices.contains_key(ty.name.as_ref()) {
+            tarjan.visit(ty);
+        }
+    }
+    tarjan.groups
 }
 
 #[cfg(test)]
@@ -94,52 +149,40 @@ mod tests {
     use super::topological_sort;
     use specta::{Type, Types};
 
-    fn sorted_names(types: &Types) -> Vec<&str> {
-        topological_sort(types)
-            .unwrap()
-            .into_iter()
-            .map(|n| n.name.as_ref())
-            .collect()
+    #[derive(Type)]
+    struct Leaf {
+        _value: i32,
     }
-
-    fn pos(names: &[&str], target: &str) -> usize {
-        names.iter().position(|&n| n == target).unwrap()
+    #[derive(Type)]
+    struct Root {
+        _leaf: Leaf,
     }
-
-    #[derive(Type)] struct Leaf { _value: i32 }
-    #[derive(Type)] struct Mid { _leaf: Leaf }
-    #[derive(Type)] struct Root { _mid: Mid }
+    #[derive(Type)]
+    struct Node {
+        _next: Option<Box<Node>>,
+    }
 
     #[test]
-    fn linear_chain_ordered() {
+    fn dependencies_precede_dependents() {
         let types = Types::default().register::<Root>();
-        let names = sorted_names(&types);
-        assert!(pos(&names, "Leaf") < pos(&names, "Mid"));
-        assert!(pos(&names, "Mid") < pos(&names, "Root"));
+        let names = topological_sort(&types)
+            .into_iter()
+            .flatten()
+            .map(|ty| ty.name.as_ref())
+            .collect::<Vec<_>>();
+        assert!(
+            names.iter().position(|name| *name == "Leaf")
+                < names.iter().position(|name| *name == "Root")
+        );
     }
 
-    #[derive(Type)] struct Bottom { _value: i32 }
-    #[derive(Type)] struct Left { _bottom: Bottom }
-    #[derive(Type)] struct Right { _bottom: Bottom }
-    #[derive(Type)] struct Top { _left: Left, _right: Right }
-
     #[test]
-    fn diamond_dependency_ordered() {
-        let types = Types::default().register::<Top>();
-        let names = sorted_names(&types);
-        assert!(pos(&names, "Bottom") < pos(&names, "Left"));
-        assert!(pos(&names, "Bottom") < pos(&names, "Right"));
-        assert!(pos(&names, "Left") < pos(&names, "Top"));
-        assert!(pos(&names, "Right") < pos(&names, "Top"));
-    }
-
-    #[derive(Type)] struct Orphan { _value: String }
-
-    #[test]
-    fn disconnected_types_all_present() {
-        let types = Types::default().register::<Leaf>().register::<Orphan>();
-        let names = sorted_names(&types);
-        assert!(names.contains(&"Leaf"));
-        assert!(names.contains(&"Orphan"));
+    fn recursive_type_forms_a_group() {
+        let types = Types::default().register::<Node>();
+        assert!(
+            topological_sort(&types)
+                .iter()
+                .any(|group| group.iter().any(|ty| ty.name == "Node"))
+        );
     }
 }

@@ -8,7 +8,10 @@ fn export<T: specta::Type>() -> String {
 
 fn export_err<T: specta::Type>() -> specta_rescript::Error {
     let types = Types::default().register::<T>();
-    ReScript::default().without_serde().export(&types).unwrap_err()
+    ReScript::default()
+        .without_serde()
+        .export(&types)
+        .unwrap_err()
 }
 
 #[derive(Type)]
@@ -50,7 +53,7 @@ fn test_basic_struct() {
 fn test_unit_enum_polymorphic_variants() {
     let out = export::<Status>();
     assert!(
-        out.contains("type status = [ #Active | #Inactive ]"),
+        out.contains("type status = [#Active | #Inactive]"),
         "output: {out}"
     );
 }
@@ -143,7 +146,11 @@ fn test_header() {
 #[test]
 fn test_empty_header() {
     let types = Types::default().register::<User>();
-    let out = ReScript::default().without_serde().header("").export(&types).unwrap();
+    let out = ReScript::default()
+        .without_serde()
+        .header("")
+        .export(&types)
+        .unwrap();
     assert!(!out.starts_with("//"), "output: {out}");
 }
 
@@ -206,7 +213,56 @@ fn test_deprecated_type() {
     }
     let types = Types::default().register::<OldType>();
     let out = ReScript::default().without_serde().export(&types).unwrap();
-    assert!(out.contains("// @deprecated"), "output: {out}");
+    assert!(out.contains("/** @deprecated"), "output: {out}");
     assert!(out.contains("use NewType instead"), "output: {out}");
 }
 
+#[test]
+fn test_recursive_types() {
+    #[derive(Type)]
+    struct Parent {
+        child: Option<Box<Child>>,
+    }
+    #[derive(Type)]
+    struct Child {
+        parent: Option<Box<Parent>>,
+    }
+
+    let out = export::<Parent>();
+    assert!(out.contains("type rec child"), "output: {out}");
+    assert!(out.contains("and parent"), "output: {out}");
+}
+
+#[test]
+fn test_field_and_variant_docs() {
+    /// Type docs cannot close */ the generated comment.
+    #[derive(Type)]
+    struct Documented {
+        /// A field cannot close */ the generated comment.
+        value: String,
+    }
+    #[derive(Type)]
+    enum DocumentedVariant {
+        /// A variant cannot close */ the generated comment.
+        Active,
+    }
+
+    let types = Types::default()
+        .register::<Documented>()
+        .register::<DocumentedVariant>();
+    let out = ReScript::default().without_serde().export(&types).unwrap();
+    assert!(out.contains("Type docs cannot close * /"), "output: {out}");
+    assert!(out.contains("A field cannot close * /"), "output: {out}");
+    assert!(out.contains("A variant cannot close * /"), "output: {out}");
+}
+
+#[test]
+#[allow(deprecated)]
+fn test_deprecated_comment_terminator_is_sanitized() {
+    #[derive(Type)]
+    #[deprecated = "cannot close */ the generated comment"]
+    struct Deprecated;
+
+    let out = export::<Deprecated>();
+    assert!(out.contains("cannot close * /"), "output: {out}");
+}

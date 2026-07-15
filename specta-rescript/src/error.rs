@@ -15,14 +15,12 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// Circular reference detected during topological sort.
-    #[error("Topological sort error: {0}")]
-    TopoSort(String),
-
     /// Format or serde error.
     #[error("Format error: {message}: {source}")]
     Format {
+        /// The exporter operation which failed.
         message: &'static str,
+        /// The underlying Specta formatting error.
         source: specta::FormatError,
     },
 

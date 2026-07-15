@@ -100,3 +100,19 @@ mod comprehensive_demo {
         assert_eq!(ReScript::default().export(&types()).unwrap(), golden);
     }
 }
+
+mod recursive {
+    include!("../examples/recursive.rs");
+
+    #[test]
+    fn export() {
+        let golden = include_str!("../examples/generated/Recursive.res");
+        assert_eq!(
+            ReScript::default()
+                .without_serde()
+                .export(&types())
+                .unwrap(),
+            golden
+        );
+    }
+}

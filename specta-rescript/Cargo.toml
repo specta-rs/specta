@@ -53,3 +53,7 @@ path = "examples/comments_example.rs"
 [[example]]
 name = "comprehensive_demo"
 path = "examples/comprehensive_demo.rs"
+
+[[example]]
+name = "recursive"
+path = "examples/recursive.rs"

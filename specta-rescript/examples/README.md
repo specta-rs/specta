@@ -111,8 +111,7 @@ The `lib/` directory produced by `rescript build` is gitignored.
 
 | Input (Rust) | Output (ReScript) | Description |
 |---|---|---|
-| `/// Type doc comment` | `// Type doc comment` | Type-level doc comment |
-| Multi-line `///` on a type | Multiple `//` lines before the type | Multi-line type doc comment |
-| `#[deprecated = "use Foo instead"]` on a type | `// @deprecated use Foo instead` | Type-level deprecated marker |
-
-> **Note:** Field-level and variant-level doc comments and `#[deprecated]` markers are not currently emitted.
+| `/// Type doc comment` | `/** Type doc comment */` | Type-level doc comment |
+| Multi-line `///` on a type | Multi-line `/** ... */` | Multi-line type doc comment |
+| `///` on a field or variant | `/** ... */` before that item | Field and variant docs |
+| `#[deprecated = "use Foo instead"]` | `/** @deprecated use Foo instead */` | Deprecated marker |

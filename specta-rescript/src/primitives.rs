@@ -150,19 +150,17 @@ fn primitive_to_rescript(p: &Primitive) -> Result<String> {
 
 /// Render a `DataType` as an inline ReScript type expression.
 /// Used for field types, generic arguments, and type alias bodies.
-pub fn datatype_to_rescript(
-    types: &Types,
-    scope: Scope<'_>,
-    dt: &DataType,
-) -> Result<String> {
+pub fn datatype_to_rescript(types: &Types, scope: Scope<'_>, dt: &DataType) -> Result<String> {
     match dt {
         DataType::Primitive(p) => primitive_to_rescript(p),
-        DataType::Nullable(inner) => {
-            Ok(format!("option<{}>", datatype_to_rescript(types, scope, inner)?))
-        }
-        DataType::List(l) => {
-            Ok(format!("array<{}>", datatype_to_rescript(types, scope, &l.ty)?))
-        }
+        DataType::Nullable(inner) => Ok(format!(
+            "option<{}>",
+            datatype_to_rescript(types, scope, inner)?
+        )),
+        DataType::List(l) => Ok(format!(
+            "array<{}>",
+            datatype_to_rescript(types, scope, &l.ty)?
+        )),
         DataType::Struct(_) => Err(Error::UnsupportedType(
             "Inline anonymous structs are not supported; use a named type".to_string(),
         )),
@@ -205,7 +203,7 @@ pub fn datatype_to_rescript(
                     .filter(|(_, v)| !v.skip)
                     .map(|(name, _)| format!("#{}", name))
                     .collect();
-                return Ok(format!("[ {} ]", variants.join(" | ")));
+                return Ok(format!("[{}]", variants.join(" | ")));
             }
             Err(Error::UnsupportedType(
                 "Cannot inline a non-trivial enum; use a named type".to_string(),
@@ -237,41 +235,41 @@ fn render_unnamed_fields(
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<String> {
     match unnamed_field_types(types, scope, uf)? {
-        Some(parts) if parts.len() == 1 => Ok(parts.into_iter().next().unwrap()),
+        Some(parts) if parts.len() == 1 => Ok(parts
+            .into_iter()
+            .next()
+            .expect("one field was checked above")),
         Some(parts) => Ok(format!("({})", parts.join(", "))),
         _ => Ok("unit".to_string()),
     }
 }
 
-fn reference_to_rescript(
-    types: &Types,
-    scope: Scope<'_>,
-    r: &Reference,
-) -> Result<String> {
+fn reference_to_rescript(types: &Types, scope: Scope<'_>, r: &Reference) -> Result<String> {
     match r {
-        Reference::Named(n) => {
-            match &n.inner {
-                NamedReferenceType::Inline { dt, .. } => {
-                    datatype_to_rescript(types, scope, dt)
-                }
-                NamedReferenceType::Reference { generics, .. } => {
-                    let ndt = types
-                        .get(n)
-                        .ok_or_else(|| Error::InvalidType("Reference to unknown named type".to_string()))?;
-                    let base_name = type_name(&ndt.name);
-                    let rendered_generics = generics
-                        .iter()
-                        .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
-                        .collect::<Result<Vec<_>>>()?;
-                    Ok(format!("{}{}", base_name, wrap_generics(rendered_generics)))
-                }
-                NamedReferenceType::Recursive(_) => {
-                    let ndt = types.get(n);
-                    let name = ndt.map(|n| n.name.as_ref()).unwrap_or("unknown");
-                    Ok(type_name(name))
-                }
+        Reference::Named(n) => match &n.inner {
+            NamedReferenceType::Inline { dt, .. } => datatype_to_rescript(types, scope, dt),
+            NamedReferenceType::Reference { generics, .. } => {
+                let ndt = types.get(n).ok_or_else(|| {
+                    Error::InvalidType("Reference to unknown named type".to_string())
+                })?;
+                let base_name = type_name(&ndt.name);
+                let rendered_generics = generics
+                    .iter()
+                    .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("{}{}", base_name, wrap_generics(rendered_generics)))
             }
-        }
+            NamedReferenceType::Recursive(recursive) => {
+                let ndt = types.get(n);
+                let name = ndt.map(|n| n.name.as_ref()).unwrap_or("unknown");
+                let generics = recursive
+                    .generics()
+                    .iter()
+                    .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(format!("{}{}", type_name(name), wrap_generics(generics)))
+            }
+        },
         Reference::Opaque(o) => Err(Error::UnsupportedType(format!(
             "Opaque reference '{}' is not supported by the ReScript exporter",
             o.type_name()
@@ -317,7 +315,12 @@ fn render_named_fields(
             } else {
                 ty_str
             };
-            Ok(format!("  {}: {}", name, final_ty))
+            let mut out = render_docs(&field.docs, "  ");
+            if let Some(dep) = &field.deprecated {
+                out.push_str(&render_deprecated(dep, "  "));
+            }
+            out.push_str(&format!("  {}: {}", name, final_ty));
+            Ok(out)
         })
         .collect()
 }
@@ -325,6 +328,31 @@ fn render_named_fields(
 /// Format a `Deprecated` into a human-readable note string.
 fn deprecated_msg(dep: &Deprecated) -> &str {
     dep.note.as_deref().unwrap_or("deprecated")
+}
+
+fn render_docs(docs: &str, indent: &str) -> String {
+    if docs.is_empty() {
+        return String::new();
+    }
+
+    let mut out = format!("{indent}/**\n");
+    for line in docs.lines() {
+        let line = line.trim().replace("*/", "* /");
+        if line.is_empty() {
+            out.push_str(&format!("{indent} *\n"));
+        } else {
+            out.push_str(&format!("{indent} * {line}\n"));
+        }
+    }
+    out.push_str(&format!("{indent} */\n"));
+    out
+}
+
+fn render_deprecated(deprecated: &Deprecated, indent: &str) -> String {
+    format!(
+        "{indent}/** @deprecated {} */\n",
+        deprecated_msg(deprecated).replace("*/", "* /")
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -351,22 +379,20 @@ fn render_enum_variants(
             continue;
         }
 
-        match &variant.fields {
-            Fields::Unit => {
-                variant_lines.push(variant_name.to_string());
-            }
+        let mut prefix = render_docs(&variant.docs, "  ");
+        if let Some(dep) = &variant.deprecated {
+            prefix.push_str(&render_deprecated(dep, "  "));
+        }
 
-            Fields::Unnamed(uf) => {
-                let line = match unnamed_field_types(types, scope, uf)? {
-                    Some(parts) => format!("{}({})", variant_name, parts.join(", ")),
-                    _ => variant_name.to_string(),
-                };
-                variant_lines.push(line);
-            }
+        let line = match &variant.fields {
+            Fields::Unit => variant_name.to_string(),
 
-            Fields::Named(nf) if nf.fields.is_empty() => {
-                variant_lines.push(variant_name.to_string());
-            }
+            Fields::Unnamed(uf) => match unnamed_field_types(types, scope, uf)? {
+                Some(parts) => format!("{}({})", variant_name, parts.join(", ")),
+                _ => variant_name.to_string(),
+            },
+
+            Fields::Named(nf) if nf.fields.is_empty() => variant_name.to_string(),
 
             Fields::Named(nf) => {
                 // Generate an auxiliary record type: `{enumName}{VariantName}Fields`
@@ -384,9 +410,10 @@ fn render_enum_variants(
                 auxiliary.push(aux_decl);
 
                 // Reference the aux type in the variant (with generics if present)
-                variant_lines.push(format!("{}({}{})", variant_name, aux_name, generics_decl));
+                format!("{}({}{})", variant_name, aux_name, generics_decl)
             }
-        }
+        };
+        variant_lines.push(format!("{}{}", prefix, line));
     }
 
     Ok((auxiliary, variant_lines))
@@ -407,16 +434,11 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
 
     let mut out = String::new();
 
-    // Doc comment
-    out.extend(
-        dt.docs
-            .lines()
-            .map(|l| format!("// {}\n", l.trim_start())),
-    );
+    out.push_str(&render_docs(&dt.docs, ""));
 
     // Deprecated comment
     if let Some(dep) = &dt.deprecated {
-        out.push_str(&format!("// @deprecated {}\n", deprecated_msg(dep)));
+        out.push_str(&render_deprecated(dep, ""));
     }
 
     let rescript_name = type_name(&dt.name);
@@ -425,12 +447,7 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
     let scope = build_scope(dt);
 
     // Generic parameter list: e.g. `<'a, 'b>`
-    let generics_decl = wrap_generics(
-        scope
-            .iter()
-            .map(|(_, name)| generic_param(name))
-            .collect(),
-    );
+    let generics_decl = wrap_generics(scope.iter().map(|(_, name)| generic_param(name)).collect());
 
     match ty {
         DataType::Struct(s) => out.push_str(&format!(
@@ -458,18 +475,33 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 .all(|(_, v)| matches!(v.fields, Fields::Unit));
 
             if all_unit {
-                let variants: Vec<String> = e
-                    .variants
-                    .iter()
-                    .filter(|(_, v)| !v.skip)
-                    .map(|(name, _)| format!("#{}", name))
-                    .collect();
-                out.push_str(&format!(
-                    "type {}{} = [ {} ]\n",
-                    rescript_name,
-                    generics_decl,
-                    variants.join(" | ")
-                ));
+                let has_metadata = e.variants.iter().any(|(_, variant)| {
+                    !variant.skip && (!variant.docs.is_empty() || variant.deprecated.is_some())
+                });
+                if has_metadata {
+                    out.push_str(&format!("type {}{} = [\n", rescript_name, generics_decl));
+                    for (name, variant) in e.variants.iter().filter(|(_, variant)| !variant.skip) {
+                        out.push_str(&render_docs(&variant.docs, "  "));
+                        if let Some(dep) = &variant.deprecated {
+                            out.push_str(&render_deprecated(dep, "  "));
+                        }
+                        out.push_str(&format!("  | #{}\n", name));
+                    }
+                    out.push_str("]\n");
+                } else {
+                    let variants = e
+                        .variants
+                        .iter()
+                        .filter(|(_, variant)| !variant.skip)
+                        .map(|(name, _)| format!("#{}", name))
+                        .collect::<Vec<_>>();
+                    out.push_str(&format!(
+                        "type {}{} = [{}]\n",
+                        rescript_name,
+                        generics_decl,
+                        variants.join(" | ")
+                    ));
+                }
             } else {
                 // Data variants — may need auxiliary record types
                 let (auxiliary, variant_lines) =
@@ -477,7 +509,17 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
 
                 out.extend(auxiliary.iter().map(|aux| format!("{}\n", aux)));
                 out.push_str(&format!("type {}{} =\n", rescript_name, generics_decl));
-                out.extend(variant_lines.iter().map(|l| format!("  | {}\n", l)));
+                out.extend(variant_lines.iter().map(|l| {
+                    if l.starts_with("  /**") {
+                        format!(
+                            "{}\n  | {}\n",
+                            l.rsplit_once('\n').map_or("", |v| v.0),
+                            l.rsplit_once('\n').map_or(l.as_str(), |v| v.1)
+                        )
+                    } else {
+                        format!("  | {}\n", l)
+                    }
+                }));
             }
         }
 

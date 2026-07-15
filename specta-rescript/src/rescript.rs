@@ -67,11 +67,36 @@ impl ReScript {
             out.push('\n');
         }
 
-        for ndt in topological_sort(processed.as_ref())? {
-            let rendered = export_type(&processed, ndt)?;
-            if !rendered.is_empty() {
-                out.push('\n');
-                out.push_str(&rendered);
+        for group in topological_sort(processed.as_ref()) {
+            let recursive = group.len() > 1
+                || group.iter().any(|ty| {
+                    ty.ty
+                        .as_ref()
+                        .is_some_and(|dt| crate::toposort::is_self_recursive(dt, &processed, ty))
+                });
+            let mut first_declaration = true;
+            for ndt in group {
+                let mut rendered = export_type(&processed, ndt)?;
+                if recursive {
+                    rendered = rendered
+                        .split_inclusive('\n')
+                        .map(|line| {
+                            let Some(declaration) = line.strip_prefix("type ") else {
+                                return line.to_string();
+                            };
+                            let keyword = if std::mem::take(&mut first_declaration) {
+                                "type rec "
+                            } else {
+                                "and "
+                            };
+                            format!("{keyword}{declaration}")
+                        })
+                        .collect();
+                }
+                if !rendered.is_empty() {
+                    out.push('\n');
+                    out.push_str(&rendered);
+                }
             }
         }
 
@@ -88,4 +113,3 @@ impl ReScript {
         Ok(())
     }
 }
-

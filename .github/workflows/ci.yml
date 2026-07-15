@@ -73,3 +73,15 @@ jobs:
       - name: Typecheck and run generated Zod schemas
         working-directory: tests/zod-typecheck
         run: bun run test
+
+  rescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Install ReScript test dependencies
+        working-directory: specta-rescript/examples/generated
+        run: bun install --frozen-lockfile
+      - name: Format-check and compile generated ReScript
+        working-directory: specta-rescript/examples/generated
+        run: bun run check

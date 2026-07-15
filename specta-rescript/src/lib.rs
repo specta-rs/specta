@@ -6,9 +6,9 @@
 //! # Usage
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.23 --features derive
+//! cargo add specta@2.0.0-rc.26 --features derive
 //! cargo add specta-rescript@0.0.1
-//! cargo add specta-serde@0.0.10
+//! cargo add specta-serde@0.0.13
 //! ```
 //!
 //! ```rust
@@ -21,7 +21,8 @@
 //! }
 //!
 //! let types = Types::default().register::<MyType>();
-//! ReScript::default().export_to("./Types.res", &types).unwrap();
+//! let output = ReScript::default().export(&types).unwrap();
+//! assert!(output.contains("type myType"));
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -30,6 +31,7 @@
 )]
 
 mod error;
+/// Low-level rendering helpers.
 pub mod primitives;
 mod rescript;
 mod toposort;

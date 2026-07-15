@@ -2,7 +2,7 @@
 
 type apiResponse<'t> = result<'t, string>
 
-type userRole = [ #Guest | #Moderator | #Admin ]
+type userRole = [#Guest | #Moderator | #Admin]
 
 type createUserRequest = {
   name: string,
