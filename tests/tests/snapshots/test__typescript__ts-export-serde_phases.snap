@@ -975,10 +975,7 @@ export type RenamedFieldKeys = {
 
 export type RenamedVariantWithSkippedPayload = "a-b";
 
-export type Result<T, E> = {
-	ok: T,
-	err: E,
-};
+export type Result<T, E> = ({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never };
 
 export type Second = {
 	a: number,

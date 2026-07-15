@@ -33,16 +33,16 @@ impl_ndt!(
 const _: () = {
     impl_ndt!(
         // Sequential containers
-        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = passthrough;
-        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
-        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
-        heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = passthrough;
+        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T] = passthrough;
+        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T] = passthrough;
+        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T] = passthrough;
+        heapless::BinaryHeap<T> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T] = passthrough;
 
         // Sets
-        heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = passthrough;
+        heapless::IndexSet<T> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = passthrough;
 
         // Maps
-        heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = passthrough;
+        heapless::IndexMap<K, V> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = passthrough;
         heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = passthrough;
 
         // String container
@@ -66,12 +66,20 @@ impl_ndt!(smol_str::SmolStr as str = inline);
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
 impl_ndt!(
     arrayvec::ArrayString <const N: usize> as str = inline;
-    arrayvec::ArrayVec<T> <T, const N: usize> as [T; N] = passthrough;
+    arrayvec::ArrayVec<T> <T, const N: usize> as [T] = passthrough;
 );
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as [T] = passthrough);
+impl<T> Type for smallvec::SmallVec<T>
+where
+    T: smallvec::Array,
+    T::Item: Type,
+{
+    fn definition(types: &mut Types) -> DataType {
+        <[T::Item]>::definition(types)
+    }
+}
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -94,6 +102,9 @@ const _: () = {
     struct SerdeValue;
     impl Type for SerdeValue {
         fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     ("Null".into(), Variant::unit()),
@@ -128,7 +139,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Default::default(),
+                attributes,
             })
         }
     }
@@ -186,6 +197,9 @@ const _: () = {
     struct SerdeYamlValue;
     impl Type for SerdeYamlValue {
         fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     ("Null".into(), Variant::unit()),
@@ -226,7 +240,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Attributes::default(),
+                attributes,
             })
         }
     }
@@ -234,6 +248,9 @@ const _: () = {
     struct SerdeYamlNumber;
     impl Type for SerdeYamlNumber {
         fn definition(_: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
@@ -255,7 +272,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Attributes::default(),
+                attributes,
             })
         }
     }
@@ -293,6 +310,9 @@ const _: () = {
     struct TomlValue;
     impl Type for TomlValue {
         fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
@@ -340,7 +360,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Attributes::default(),
+                attributes,
             })
         }
     }
@@ -556,6 +576,9 @@ const _: () = {
     struct Bson;
     impl Type for Bson {
         fn definition(types: &mut Types) -> DataType {
+            let mut attributes = Attributes::default();
+            attributes.insert("serde:container:untagged", true);
+
             DataType::Enum(Enum {
                 variants: vec![
                     (
@@ -696,7 +719,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: Attributes::default(),
+                attributes,
             })
         }
     }
@@ -713,9 +736,18 @@ impl_ndt!(bytesize::ByteSize as String = inline);
 const _: () = {
     impl_ndt!(
         uhlc::NTP64 as u64 = inline;
-        uhlc::ID as std::num::NonZeroU128 = inline;
+        uhlc::ID as UhlcId = inline;
         uhlc::Timestamp as UhlcTimestamp = inline;
     );
+
+    struct UhlcId;
+    impl Type for UhlcId {
+        fn definition(types: &mut Types) -> DataType {
+            let mut list = List::new(u8::definition(types));
+            list.length = Some(16);
+            DataType::List(list)
+        }
+    }
 
     struct UhlcTimestamp;
     impl Type for UhlcTimestamp {

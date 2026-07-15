@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsdoc.rs
-assertion_line: 114
 expression: output
 ---
 Range<i32>: /**
@@ -34,12 +33,9 @@ Cow<'static, i32>:
 Vec<i32>: 
 Vec<MyEnum>: 
 Result<String, i32>: /**
-	* @typedef {{
-	*		ok: T,
-	*		err: E,
-	*	}} Result<T, E>
-	* @property {T} ok
-	* @property {E} err
+	* @typedef {({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never }} Result<T, E>
+	* @property {{ Ok: T }} Ok
+	* @property {{ Err: E }} Err
 	*/
 
 Vec<Option<Cow<'static, i32>>>: 

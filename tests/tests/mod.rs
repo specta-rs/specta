@@ -13,6 +13,7 @@ macro_rules! register {
 }
 
 mod bound;
+mod core_type_impls;
 mod errors;
 mod functions;
 mod go;

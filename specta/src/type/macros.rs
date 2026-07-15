@@ -366,10 +366,11 @@ macro_rules! _impl_ndt {
                     $(
                         (
                             datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
-                            impl_ndt!(@generic_dt $typed_generics $generic types),
+                            impl_ndt!(@generic_dt $typed_generics $inline $generic types),
                         ),
                     )*
                 ],
+                &[$(::std::any::type_name::<$generic>()),*],
                 $has_const_param,
                 $container,
                 types,
@@ -402,11 +403,12 @@ macro_rules! _impl_ndt {
             definition($types)
         }
     }};
-    (@generic_dt true $generic:ident $types:ident) => {
-        <$generic as Type>::definition($types)
-    };
-    (@generic_dt false $generic:ident $types:ident) => {
-        datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
+    (@generic_dt $typed_generics:tt $inline:literal $generic:ident $types:ident) => {
+        if $inline && !$typed_generics {
+            datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
+        } else {
+            <$generic as Type>::definition($types)
+        }
     };
 
     // Helpers for determining NDT name
@@ -434,3 +436,82 @@ macro_rules! _impl_ndt {
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;
+
+#[cfg(test)]
+mod tests {
+    use super::impl_ndt;
+    use crate::{
+        Type, Types,
+        datatype::{DataType, NamedReferenceType, Primitive, Reference},
+    };
+
+    struct NamedWrapper<T>(T);
+    struct InlineWrapper<T>(T);
+    struct StringAlias<T>(T);
+    struct Unused;
+
+    impl_ndt!(
+        "specta::type::macros::tests" NamedWrapper<T> where { T: Type } as T = named;
+        "specta::type::macros::tests" InlineWrapper<T> where { T: Type } as T = inline;
+        "specta::type::macros::tests" StringAlias<T> where { T: Type } as str = inline;
+    );
+
+    impl Type for Unused {
+        fn definition(_: &mut Types) -> DataType {
+            panic!("unused inline generic should not be resolved");
+        }
+    }
+
+    #[test]
+    fn named_where_clause_impl_uses_concrete_reference_generics() {
+        let mut types = Types::default();
+        let data_type = NamedWrapper::<u32>::definition(&mut types);
+        assert!(matches!(
+            data_type,
+            DataType::Reference(Reference::Named(_))
+        ));
+        let DataType::Reference(Reference::Named(reference)) = data_type else {
+            return;
+        };
+        assert!(matches!(
+            reference.inner,
+            NamedReferenceType::Reference { .. }
+        ));
+        let NamedReferenceType::Reference { generics, .. } = reference.inner else {
+            return;
+        };
+
+        assert_eq!(generics.len(), 1);
+        assert_eq!(generics[0].1, DataType::Primitive(Primitive::u32));
+    }
+
+    #[test]
+    fn inline_where_clause_impl_only_resolves_generics_used_by_the_alias() {
+        fn inline_data_type(data_type: DataType) -> DataType {
+            let DataType::Reference(Reference::Named(reference)) = data_type else {
+                panic!("expected a named inline reference");
+            };
+            let NamedReferenceType::Inline { dt, .. } = reference.inner else {
+                panic!("expected an inline reference");
+            };
+            *dt
+        }
+
+        let mut types = Types::default();
+
+        assert_eq!(
+            inline_data_type(InlineWrapper::<u32>::definition(&mut types)),
+            DataType::Primitive(Primitive::u32)
+        );
+        assert_eq!(
+            inline_data_type(inline_data_type(
+                InlineWrapper::<InlineWrapper<u32>>::definition(&mut types),
+            )),
+            DataType::Primitive(Primitive::u32)
+        );
+        assert_eq!(
+            inline_data_type(StringAlias::<Unused>::definition(&mut types)),
+            DataType::Primitive(Primitive::str)
+        );
+    }
+}

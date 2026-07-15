@@ -5747,23 +5747,35 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "RenamedVariantWithSkippedPayload"
     },
     "Result<String, i32>": {
-      "additionalProperties": false,
-      "properties": {
-        "err": {
-          "maximum": 2147483647,
-          "minimum": -2147483648,
-          "type": "integer"
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Ok": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Ok"
+          ],
+          "type": "object"
         },
-        "ok": {
-          "type": "string"
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Err": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Err"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "ok",
-        "err"
       ],
-      "title": "Result",
-      "type": "object"
+      "title": "Result"
     },
     "Second": {
       "additionalProperties": false,

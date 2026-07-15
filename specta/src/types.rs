@@ -277,7 +277,9 @@ impl<'a> Iterator for UnsortedIter<'a> {
     type Item = &'a NamedDataType;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.find_map(|(_, ndt)| ndt.as_ref())
+        self.iter.find_map(|(_, ndt)| ndt.as_ref()).inspect(|_| {
+            self.count -= 1;
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
