@@ -309,6 +309,14 @@ fn render_unit_enum(
             .map(|(variant, _)| value_identifier(variant, path)),
         path,
     )?;
+    let mut backing_name = "value".to_string();
+    let variant_names = variants
+        .iter()
+        .map(|(variant, _)| value_identifier(variant, path))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    while variant_names.contains(&backing_name) {
+        backing_name.push('_');
+    }
     for (index, (variant_name, variant)) in variants.iter().enumerate() {
         javadoc(out, &variant.docs, variant.deprecated.as_ref(), 1);
         if variant.deprecated.is_some() {
@@ -329,11 +337,20 @@ fn render_unit_enum(
         out.push('\n');
     }
     if raw_values.is_some() {
-        out.push_str("\n    private final java.lang.String value;\n\n");
+        writeln!(
+            out,
+            "\n    private final java.lang.String {backing_name};\n"
+        )
+        .expect("writing to String cannot fail");
         writeln!(out, "    {name}(java.lang.String value) {{")
             .expect("writing to String cannot fail");
-        out.push_str("        this.value = value;\n    }\n\n");
-        out.push_str("    public java.lang.String value() {\n        return value;\n    }\n");
+        writeln!(out, "        this.{backing_name} = value;\n    }}\n")
+            .expect("writing to String cannot fail");
+        writeln!(
+            out,
+            "    public java.lang.String value() {{\n        return {backing_name};\n    }}"
+        )
+        .expect("writing to String cannot fail");
     }
     out.push('}');
     Ok(())
@@ -705,6 +722,11 @@ fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Erro
                         );
                         if let Some(package) = package {
                             name = format!("{package}.{name}");
+                        } else if !ctx.current_module.is_empty() {
+                            return Err(Error::unsupported(
+                                path,
+                                "Java types in named packages cannot reference a type in the default package; configure a base package",
+                            ));
                         }
                     }
                     if !generics.is_empty() {

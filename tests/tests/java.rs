@@ -411,6 +411,55 @@ fn empty_generic_enums_return_an_export_error() {
 }
 
 #[test]
+fn string_enum_backing_fields_do_not_collide_with_constants() {
+    #[derive(Type, Serialize)]
+    #[specta(collect = false)]
+    enum ValueEnum {
+        #[serde(rename = "value")]
+        Value,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<ValueEnum>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("private final java.lang.String value_"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn files_layout_rejects_default_package_references_from_named_packages() {
+    let mut types = Types::default();
+    let root = specta::datatype::NamedDataType::new("Root", &mut types, |_, datatype| {
+        datatype.module_path = "".into();
+        datatype.ty = Some(specta::datatype::Struct::unit().into());
+    });
+    specta::datatype::NamedDataType::new("Nested", &mut types, |_, datatype| {
+        datatype.module_path = "nested".into();
+        datatype.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "root",
+                    specta::datatype::Field::new(root.reference(Vec::new()).into()),
+                )
+                .build(),
+        );
+    });
+
+    let error = Java::default()
+        .layout(Layout::Files)
+        .export_to(temp_dir().path(), &types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("configure a base package"));
+}
+
+#[test]
 fn rejects_wrapper_and_nested_declaration_collisions() {
     #[derive(Type)]
     #[specta(collect = false)]
