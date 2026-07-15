@@ -430,32 +430,68 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    if let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)?
-        && parsed.from.is_some()
-        && parsed.try_from.is_some()
-    {
+    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? else {
+        return Ok(());
+    };
+
+    if conversions.from.is_some() && conversions.try_from.is_some() {
         return Err(Error::invalid_conversion_usage(
             path,
             "`from` and `try_from` cannot be used together",
         ));
     }
 
-    if let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? {
-        for (suffix, target) in [
-            ("<serde_into>", conversions.resolved_into.as_ref()),
-            ("<serde_from>", conversions.resolved_from.as_ref()),
-            ("<serde_try_from>", conversions.resolved_try_from.as_ref()),
-        ] {
-            if let Some(target) = target {
-                inner(
-                    target,
-                    types,
-                    checked_references,
-                    format!("{path}.{suffix}"),
-                    mode,
-                    true,
-                )?;
-            }
+    for (suffix, target) in [
+        ("<serde_into>", conversions.resolved_into.as_ref()),
+        ("<serde_from>", conversions.resolved_from.as_ref()),
+        ("<serde_try_from>", conversions.resolved_try_from.as_ref()),
+    ] {
+        if let Some(target) = target {
+            inner(
+                target,
+                types,
+                checked_references,
+                format!("{path}.{suffix}"),
+                mode,
+                true,
+            )?;
+        }
+    }
+
+    if mode == ApplyMode::Unified {
+        if conversions.rename_serialize != conversions.rename_deserialize {
+            return Err(Error::incompatible_rename(
+                "container rename",
+                path.to_string(),
+                conversions.rename_serialize,
+                conversions.rename_deserialize,
+            ));
+        }
+
+        if conversions.rename_all_serialize != conversions.rename_all_deserialize {
+            return Err(Error::incompatible_rename(
+                "container rename_all",
+                path.to_string(),
+                conversions
+                    .rename_all_serialize
+                    .map(|rule| format!("{rule:?}")),
+                conversions
+                    .rename_all_deserialize
+                    .map(|rule| format!("{rule:?}")),
+            ));
+        }
+
+        if conversions.rename_all_fields_serialize != conversions.rename_all_fields_deserialize {
+            return Err(Error::incompatible_rename(
+                "container rename_all_fields",
+                path.to_string(),
+                conversions
+                    .rename_all_fields_serialize
+                    .map(|rule| format!("{rule:?}")),
+                conversions
+                    .rename_all_fields_deserialize
+                    .map(|rule| format!("{rule:?}")),
+            ));
         }
     }
 
@@ -490,12 +526,42 @@ fn validate_variant_attributes(
     }
 
     if mode == ApplyMode::Unified
-        && serde_attrs.untagged
-        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+        && serde_attrs.rename_serialize.as_deref() != serde_attrs.rename_deserialize.as_deref()
     {
-        return Err(Error::invalid_phased_type_usage(
+        return Err(Error::incompatible_rename(
+            "variant rename",
             path,
-            "phase-specific `#[serde(untagged)]` variants require `PhasesFormat` because unified mode would drop one branch",
+            serde_attrs.rename_serialize.clone(),
+            serde_attrs.rename_deserialize.clone(),
+        ));
+    }
+
+    if mode == ApplyMode::Unified
+        && serde_attrs.rename_all_serialize != serde_attrs.rename_all_deserialize
+    {
+        return Err(Error::incompatible_rename(
+            "variant rename_all",
+            path,
+            serde_attrs
+                .rename_all_serialize
+                .map(|rule| format!("{rule:?}")),
+            serde_attrs
+                .rename_all_deserialize
+                .map(|rule| format!("{rule:?}")),
+        ));
+    }
+
+    if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+    {
+        // Applies regardless of `untagged`: a mismatched skip means serde
+        // constructs/emits this variant on one side but not the other
+        // (`variant_is_skipped_for_mode` would otherwise drop it from the
+        // unified type entirely, even for the side that still uses it).
+        return Err(Error::incompatible_skip(
+            "variant skip",
+            path,
+            serde_attrs.skip_serializing,
+            serde_attrs.skip_deserializing,
         ));
     }
 
@@ -508,17 +574,32 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     };
 
     if mode == ApplyMode::Unified
-        && let (Some(serialize), Some(deserialize)) = (
-            serde_attrs.rename_serialize.as_deref(),
-            serde_attrs.rename_deserialize.as_deref(),
-        )
-        && serialize != deserialize
+        && serde_attrs.rename_serialize.as_deref() != serde_attrs.rename_deserialize.as_deref()
     {
+        // A one-sided `rename(serialize = ...)` / `rename(deserialize = ...)`
+        // is just as incompatible as two differing renames: the missing side
+        // means "no rename", which differs from the side that is set, so a
+        // single unified name can't represent both directions correctly.
         return Err(Error::incompatible_rename(
             "field rename",
             path,
-            Some(serialize.to_string()),
-            Some(deserialize.to_string()),
+            serde_attrs.rename_serialize.clone(),
+            serde_attrs.rename_deserialize.clone(),
+        ));
+    }
+
+    if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+    {
+        // Plain `#[serde(skip)]` sets both flags and never reaches here.
+        // A one-sided skip means serde requires/emits the field on one side
+        // but not the other, which a unified shape can't represent: it would
+        // either wrongly drop a field one side needs, or wrongly keep a field
+        // the other side never sees.
+        return Err(Error::incompatible_skip(
+            "field skip",
+            path,
+            serde_attrs.skip_serializing,
+            serde_attrs.skip_deserializing,
         ));
     }
 

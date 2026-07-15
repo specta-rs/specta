@@ -25,6 +25,7 @@ mod semantic;
 mod serde_conversions;
 mod serde_identifiers;
 mod serde_other;
+mod serde_unified_asymmetry;
 mod swift;
 mod types;
 mod typescript;
