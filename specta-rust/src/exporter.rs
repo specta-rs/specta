@@ -29,7 +29,7 @@ pub enum Layout {
     Modules,
     /// Recreate source module paths as nested `pub mod` blocks.
     ///
-    /// This spelling mirrors [`specta_typescript::Layout::Namespaces`].
+    /// This spelling mirrors `specta_typescript::Layout::Namespaces`.
     Namespaces,
     /// Prefix each type name with its source module path and keep one flat module.
     ModulePrefixedName,
@@ -226,7 +226,7 @@ impl Rust {
 }
 
 fn render_header(exporter: &Rust) -> String {
-    let mut out = format!("{GENERATED_MARKER}\n#![allow(non_camel_case_types, non_snake_case)]\n");
+    let mut out = format!("{GENERATED_MARKER}\n");
     if !exporter.header.is_empty() {
         out.push_str(exporter.header.trim_end());
         out.push('\n');
@@ -282,6 +282,7 @@ fn render_named(
     }
     render_docs(out, &ndt.docs, depth);
     render_deprecated(out, ndt.deprecated.as_ref(), depth);
+    render_name_allow(out, depth);
     for attribute in &exporter.attributes {
         line(out, depth, attribute);
     }
@@ -696,7 +697,7 @@ fn render_reference(
                 reference: format!("{reference:?} (referenced type has no definition)"),
             });
         }
-        let mut name = reference_name(exporter, ndt)?;
+        let mut name = reference_name(exporter, types, ndt, path)?;
         if let NamedReferenceType::Reference { generics, .. } = &reference.inner
             && !generics.is_empty()
         {
@@ -762,6 +763,10 @@ fn render_derives(out: &mut String, exporter: &Rust, depth: usize) {
             &format!("#[derive({})]", exporter.derives.join(", ")),
         );
     }
+}
+
+fn render_name_allow(out: &mut String, depth: usize) {
+    line(out, depth, "#[allow(non_camel_case_types, non_snake_case)]");
 }
 
 fn render_docs(out: &mut String, docs: &str, depth: usize) {
@@ -960,19 +965,46 @@ fn exported_name(exporter: &Rust, ndt: &NamedDataType) -> Result<String, Error> 
     }
 }
 
-fn reference_name(exporter: &Rust, ndt: &NamedDataType) -> Result<String, Error> {
+fn reference_name(
+    exporter: &Rust,
+    types: &Types,
+    ndt: &NamedDataType,
+    path: &str,
+) -> Result<String, Error> {
     match exporter.layout {
         Layout::FlatFile => exported_name(exporter, ndt),
         Layout::ModulePrefixedName => exported_name(exporter, ndt),
         Layout::Modules | Layout::Namespaces | Layout::Files => {
-            let mut segments = module_segments(ndt)
+            let target_segments = module_segments(ndt)
                 .into_iter()
                 .map(|segment| identifier(segment, &rust_path(ndt)))
                 .collect::<Result<Vec<_>, _>>()?;
+            let mut segments = owner_module_depth(types, path).map_or_else(
+                || vec!["crate".to_string()],
+                |depth| {
+                    if depth == 0 {
+                        vec!["self".to_string()]
+                    } else {
+                        vec!["super".to_string(); depth]
+                    }
+                },
+            );
+            segments.extend(target_segments);
             segments.push(identifier(&ndt.name, &rust_path(ndt))?);
-            Ok(format!("crate::{}", segments.join("::")))
+            Ok(segments.join("::"))
         }
     }
+}
+
+fn owner_module_depth(types: &Types, path: &str) -> Option<usize> {
+    types
+        .into_sorted_iter()
+        .filter(|ndt| {
+            let candidate = rust_path(ndt);
+            path == candidate || path.starts_with(&format!("{candidate}."))
+        })
+        .max_by_key(|ndt| rust_path(ndt).len())
+        .map(|ndt| module_segments(ndt).len())
 }
 
 fn validate_names(exporter: &Rust, types: &Types) -> Result<(), Error> {
@@ -1059,6 +1091,7 @@ fn render_modules(
         }
         for (name, child) in &module.children {
             let name = identifier(name, name)?;
+            render_name_allow(out, depth);
             line(out, depth, &format!("pub mod {name} {{"));
             render(out, exporter, format, types, child, depth + 1)?;
             line(out, depth, "}");
@@ -1092,6 +1125,7 @@ fn export_files(
         };
         let mut out = render_header(exporter);
         for child in module.children.keys() {
+            render_name_allow(&mut out, 0);
             line(
                 &mut out,
                 0,

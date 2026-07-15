@@ -242,6 +242,21 @@ fn export_to_creates_parent_and_writes_compileable_source() {
 }
 
 #[test]
+fn generated_single_file_layouts_compile_when_included() {
+    for layout in [
+        Layout::FlatFile,
+        Layout::Modules,
+        Layout::ModulePrefixedName,
+    ] {
+        let source = Rust::default()
+            .layout(layout)
+            .export(&types(), Identity)
+            .unwrap();
+        compile_included_source(&format!("included-{layout}"), &source);
+    }
+}
+
+#[test]
 fn files_layout_writes_module_tree() {
     let root = test_output_dir("files");
     let _ = fs::remove_dir_all(&root);
@@ -639,6 +654,20 @@ fn compile_source(name: &str, source: &str) {
     fs::create_dir_all(&root).unwrap();
     let path = root.join("generated.rs");
     fs::write(&path, source).unwrap();
+    compile_file(&path, &root);
+}
+
+fn compile_included_source(name: &str, source: &str) {
+    let root = test_output_dir(name);
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("generated.rs"), source).unwrap();
+    let path = root.join("lib.rs");
+    fs::write(
+        &path,
+        "pub mod bindings {\n    include!(\"generated.rs\");\n}\n",
+    )
+    .unwrap();
     compile_file(&path, &root);
 }
 
