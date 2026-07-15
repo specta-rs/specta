@@ -172,3 +172,73 @@ fn all_unit_untagged_variants_dedup_to_a_single_null() {
 
     insta::assert_snapshot!("serde-untagged-unit-all-unit", ts);
 }
+
+/// A container-untagged enum with a `#[serde(skip)]`ped unit variant. Skipped
+/// variants are filtered out (`filter_enum_variants_for_phase` runs before
+/// `rewrite_enum_repr_for_phase`) so the skipped unit variant must be dropped
+/// entirely -- not rendered as `null`.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithSkippedUnit {
+    A(String),
+    #[serde(skip)]
+    B,
+}
+
+#[test]
+fn skipped_unit_variant_of_untagged_enum_stays_dropped() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedWithSkippedUnit>(),
+            Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains("export type UntaggedWithSkippedUnit = string;"),
+        "skipped unit variant must not surface as `null`: {ts}"
+    );
+}
+
+/// A container-untagged enum with a unit variant serializes to `null`, which
+/// serde_json rejects as a map key at runtime (`"key must be a string"`).
+/// Before this fix the unit variant survived as `Fields::Unit`, which map-key
+/// validation accepts (it is a valid string key for *tagged* enums), so specta
+/// exported a `"A" | "B"` key type that serde could never produce. Now that
+/// the variant is rewritten to its real `null` wire shape, export fails
+/// loudly instead of emitting unsound bindings.
+#[derive(Type, Serialize, PartialEq, Eq, Hash)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum AllUnitUntaggedKey {
+    A,
+    B,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct UntaggedUnitMapKey {
+    map: std::collections::HashMap<AllUnitUntaggedKey, String>,
+}
+
+#[test]
+fn untagged_unit_enum_as_map_key_fails_export_like_serde_fails_at_runtime() {
+    // Ground truth: serde_json cannot serialize this map at all.
+    let mut map = std::collections::HashMap::new();
+    map.insert(AllUnitUntaggedKey::A, "x".to_string());
+    let runtime = serde_json::to_string(&map).unwrap_err();
+    assert!(
+        runtime.to_string().contains("key must be a string"),
+        "unexpected serde_json error: {runtime}"
+    );
+
+    let err = Typescript::default()
+        .export(&Types::default().register::<UntaggedUnitMapKey>(), Format)
+        .expect_err("a null-serializing map key must be rejected at export time");
+
+    assert!(
+        err.to_string().contains("Invalid map key"),
+        "unexpected export error: {err}"
+    );
+}
