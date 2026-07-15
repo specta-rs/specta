@@ -36,6 +36,13 @@ pub enum Error {
         /// Export location where the reference occurred.
         path: String,
     },
+    /// A named reference resolves to a type that is intentionally not emitted.
+    HiddenReference {
+        /// Export location where the reference occurred.
+        path: String,
+        /// Rust path of the hidden named type.
+        name: String,
+    },
     /// An anonymous structural type cannot be declared at this C# use site.
     UnsupportedType {
         /// Export location of the unsupported type.
@@ -121,6 +128,12 @@ impl fmt::Display for Error {
                 write!(
                     f,
                     "named reference at {path} is missing from the type collection"
+                )
+            }
+            Self::HiddenReference { path, name } => {
+                write!(
+                    f,
+                    "named type '{name}' referenced at {path} is not exported"
                 )
             }
             Self::UnsupportedType { path, kind } => {

@@ -61,7 +61,9 @@ namespace Company.Api.Test.Csharp
 
   internal enum Status
   {
+    [global::System.Runtime.Serialization.EnumMember(Value = "in_progress")]
     InProgress,
+    [global::System.Runtime.Serialization.EnumMember(Value = "complete")]
     Complete,
   }
 }

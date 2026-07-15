@@ -990,6 +990,12 @@ fn render_simple_enum(
         xml_docs(out, &indent, &variant.docs);
         obsolete(out, &indent, variant.deprecated.as_ref());
         let member = unique_identifier(property_name(wire_name), &mut used);
+        if member.trim_start_matches('@') != wire_name {
+            out.push_str(&indent);
+            out.push_str("[global::System.Runtime.Serialization.EnumMember(Value = \"");
+            out.push_str(&escape_csharp_string(wire_name));
+            out.push_str("\")]\n");
+        }
         out.push_str(&indent);
         out.push_str(&member);
         out.push_str(",\n");
@@ -1143,6 +1149,12 @@ fn datatype(
                 let ndt = types
                     .get(reference)
                     .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if ndt.ty.is_none() {
+                    return Err(Error::HiddenReference {
+                        path: path.into(),
+                        name: rust_path(ndt),
+                    });
+                }
                 if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                     && is_non_object_struct(&strct.fields)
                 {
@@ -1462,6 +1474,12 @@ fn wire_datatype(
                 let ndt = types
                     .get(reference)
                     .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if ndt.ty.is_none() {
+                    return Err(Error::HiddenReference {
+                        path: path.into(),
+                        name: rust_path(ndt),
+                    });
+                }
                 if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                     && is_non_object_struct(&strct.fields)
                 {

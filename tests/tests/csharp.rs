@@ -553,8 +553,25 @@ fn serde_unit_enums_keep_their_string_wire_shape() {
     assert!(output.contains("enum Status"));
     assert!(output.contains("InProgress,"));
     assert!(output.contains("Complete,"));
+    assert!(output.contains("EnumMember(Value = \"in_progress\")"));
+    assert!(output.contains("EnumMember(Value = \"complete\")"));
     assert!(!output.contains("abstract record Status"));
     assert!(!output.contains("Item1"));
+}
+
+#[test]
+fn references_to_non_emitted_named_types_are_rejected() {
+    let mut types = Types::default().register::<InlineNameShadowing>();
+    types.iter_mut(|ndt| {
+        if ndt.name == "FooValue" {
+            ndt.ty = None;
+        }
+    });
+
+    assert!(matches!(
+        CSharp::new().export(&types, IdentityFormat),
+        Err(Error::HiddenReference { .. })
+    ));
 }
 
 #[test]

@@ -91,7 +91,9 @@ public sealed record ResponseSerialize<T>
 
 public enum Status
 {
+    [global::System.Runtime.Serialization.EnumMember(Value = "in_progress")]
     InProgress,
+    [global::System.Runtime.Serialization.EnumMember(Value = "complete")]
     Complete,
 }
 
