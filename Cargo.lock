@@ -2108,6 +2108,7 @@ version = "0.0.4"
 dependencies = [
  "specta",
  "specta-serde",
+ "unicode-general-category",
 ]
 
 [[package]]
@@ -2217,6 +2218,7 @@ dependencies = [
  "smallvec",
  "smol_str 0.3.6",
  "specta",
+ "specta-go",
  "specta-java",
  "specta-jsonschema",
  "specta-kotlin",
