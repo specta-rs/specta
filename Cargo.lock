@@ -2104,6 +2104,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-java"
+version = "0.0.1"
+dependencies = [
+ "specta",
+ "specta-serde",
+]
+
+[[package]]
 name = "specta-jsonschema"
 version = "0.0.4"
 dependencies = [
@@ -2186,6 +2194,7 @@ dependencies = [
  "smallvec",
  "smol_str 0.3.6",
  "specta",
+ "specta-java",
  "specta-jsonschema",
  "specta-serde",
  "specta-swift",

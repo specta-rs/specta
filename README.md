@@ -33,7 +33,7 @@
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
 | **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
 | **C#**          | 🚧 **Planned** | `specta-csharp`                                                   | C# classes and enums                              |
-| **Java**        | 🚧 **Planned** | `specta-java`                                                     | Java POJOs and enums                              |
+| **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
 
 ### Legend
 
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (2)**: Rust and OpenAPI exporters have basic functionality working, with complex types in progress
-- **Planned (7)**: Go, Kotlin, JSON Schema, Zod, Python, C#, and Java exporters are in development
+- **Partially Implemented (3)**: Rust, OpenAPI, and Java exporters have basic functionality working, with complex types in progress
+- **Planned (6)**: Go, Kotlin, JSON Schema, Zod, Python, and C# exporters are in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -72,6 +72,7 @@ cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
 cargo add specta_rust        # Rust (partial - basic types)
 cargo add specta_openapi     # OpenAPI/Swagger (partial - primitives)
+cargo add specta_java        # Java 17 (partial)
 # cargo add specta_go          # Go (planned)
 # cargo add specta_kotlin      # Kotlin (planned)
 # cargo add specta_jsonschema  # JSON Schema (planned)
