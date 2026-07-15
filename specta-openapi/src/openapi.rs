@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use openapiv3::{Components, Info, OpenAPI, Paths};
 use specta::{Format, Types};
 
-use crate::{Error, transform::components};
+use crate::{Error, operation::Operation, resolve::resolve, transform::components};
 
 /// How shapes unsupported by OpenAPI 3.0's schema dialect are handled.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -35,6 +35,7 @@ pub struct OpenApi {
     description: Option<Cow<'static, str>>,
     output_format: OutputFormat,
     schema_mode: SchemaMode,
+    operations: Vec<Operation>,
 }
 
 impl Default for OpenApi {
@@ -45,6 +46,7 @@ impl Default for OpenApi {
             description: None,
             output_format: OutputFormat::Json,
             schema_mode: SchemaMode::Strict,
+            operations: Vec::new(),
         }
     }
 }
@@ -86,8 +88,51 @@ impl OpenApi {
         self
     }
 
+    /// Describe an endpoint, which is exported into the document's `paths` object.
+    ///
+    /// Bodies are declared as types and resolved to their exported components, so the document and
+    /// the schemas cannot disagree. A handler that returns more than one status has no single Rust
+    /// return type to infer from, so each response is stated:
+    ///
+    /// ```rust
+    /// # use specta::{Type, Types};
+    /// # use specta_openapi::{OpenApi, Operation};
+    /// # #[derive(Type)]
+    /// # struct Recipe { name: String }
+    /// # #[derive(Type)]
+    /// # struct ApiError { message: String }
+    /// let types = Types::default().register::<Recipe>().register::<ApiError>();
+    /// let document = OpenApi::default()
+    ///     .operation(
+    ///         Operation::get("/recipes/{slug}")
+    ///             .path_param("slug")
+    ///             .response::<Recipe>(200, "The recipe")
+    ///             .response::<ApiError>(404, "No such recipe"),
+    ///     )
+    ///     .export(&types, specta_serde::Format)
+    ///     .unwrap();
+    /// assert!(document.contains("/recipes/{slug}"));
+    /// ```
+    pub fn operation(mut self, operation: Operation) -> Self {
+        self.operations.push(operation);
+        self
+    }
+
+    /// Describe several endpoints at once.
+    pub fn operations(mut self, operations: impl IntoIterator<Item = Operation>) -> Self {
+        self.operations.extend(operations);
+        self
+    }
+
     /// Export the supplied types as a complete OpenAPI 3.0 document.
     pub fn export_document(&self, types: &Types, format: impl Format) -> Result<OpenAPI, Error> {
+        let (components, resolved) = resolve(types, &self.operations, format, self.schema_mode)?;
+        let paths = if self.operations.is_empty() {
+            Paths::default()
+        } else {
+            crate::paths::paths(&self.operations, &resolved)?
+        };
+
         Ok(OpenAPI {
             openapi: "3.0.3".to_string(),
             info: Info {
@@ -96,8 +141,8 @@ impl OpenApi {
                 version: self.version.to_string(),
                 ..Default::default()
             },
-            paths: Paths::default(),
-            components: Some(self.export_components(types, format)?),
+            paths,
+            components: Some(components),
             ..Default::default()
         })
     }

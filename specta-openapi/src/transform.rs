@@ -52,7 +52,7 @@ pub(crate) fn components(
     Ok(components)
 }
 
-fn component_name(name: &str) -> String {
+pub(crate) fn component_name(name: &str) -> String {
     let mut output = String::with_capacity(name.len());
     let mut separator = false;
     for character in name.chars() {
