@@ -1541,13 +1541,8 @@ fn reference_named_dt(
             name.push_str("Schema");
             name
         }
-        Layout::FlatFile => format!("{}Schema", ndt.name),
-        Layout::ModulePrefixedName => {
-            let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            name.push('_');
-            name.push_str(&ndt.name);
-            name.push_str("Schema");
-            name
+        Layout::FlatFile | Layout::ModulePrefixedName => {
+            format!("{}Schema", exported_type_name(exporter, ndt))
         }
         Layout::Files => {
             let current_module_path = crate::references::current_module_path().unwrap_or_default();

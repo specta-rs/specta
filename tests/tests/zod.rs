@@ -342,6 +342,22 @@ fn zod_module_prefixed_duplicate_checks_use_rendered_names() {
     assert!(out.contains("export type Bar = string"));
     assert!(out.contains("export type foo_Bar = string"));
 
+    let mut references = Types::default();
+    let root = NamedDataType::new("RootReference", &mut references, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesRoot", &mut references, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(DataType::Reference(root.reference(vec![])));
+    });
+    let references = Zod::default()
+        .layout(Layout::ModulePrefixedName)
+        .export(&references, specta_serde::Format)
+        .unwrap();
+    assert!(references.contains("z.lazy(() => RootReferenceSchema)"));
+    assert!(!references.contains("_RootReferenceSchema"));
+
     let mut colliding = Types::default();
     add_type(&mut colliding, "foo_Bar", "");
     add_type(&mut colliding, "Bar", "foo");

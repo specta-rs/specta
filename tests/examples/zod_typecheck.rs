@@ -178,9 +178,16 @@ fn main() {
         .export_to(out.join("namespaces.ts"), &types, specta_serde::Format)
         .unwrap();
     let mut module_prefixed_types = Types::default();
-    NamedDataType::new("RootType", &mut module_prefixed_types, |_, ndt| {
+    let module_prefixed_root =
+        NamedDataType::new("RootType", &mut module_prefixed_types, |_, ndt| {
+            ndt.module_path = "".into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    NamedDataType::new("UsesRootType", &mut module_prefixed_types, |_, ndt| {
         ndt.module_path = "".into();
-        ndt.ty = Some(Primitive::str.into());
+        ndt.ty = Some(specta::datatype::DataType::Reference(
+            module_prefixed_root.reference(vec![]),
+        ));
     });
     Zod::default()
         .layout(Layout::ModulePrefixedName)
