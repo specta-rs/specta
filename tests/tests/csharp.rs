@@ -796,15 +796,17 @@ fn module_prefixed_names_are_flat() {
 
 #[test]
 fn anonymous_structural_types_are_supported() {
-    let (types, _) = crate::types();
+    let types = Types::default()
+        .register::<InlineFields>()
+        .register::<MultiInlineFields>();
     let output = CSharp::new()
         .layout(Layout::ModulePrefixedName)
         .export(&types, IdentityFormat)
         .unwrap();
 
-    assert!(output.contains("record Test_Types_BoxInline"));
-    assert!(output.contains("record CValue"));
-    assert!(output.contains("CValue C"));
+    assert!(output.contains("record InnerValue"));
+    assert!(output.contains("record TupleValue"));
+    assert!(output.contains("record MapValue"));
 }
 
 #[test]
@@ -861,6 +863,27 @@ fn directly_registered_non_object_roots_are_rejected() {
         CSharp::new()
             .layout(Layout::Files)
             .export_to(&root, &types, specta_serde::Format),
+        Err(Error::UnsupportedRoot { .. })
+    ));
+    assert!(!root.exists());
+
+    assert!(matches!(
+        CSharp::new().export(&Types::default().register::<String>(), IdentityFormat),
+        Err(Error::UnsupportedRoot { .. })
+    ));
+    assert!(matches!(
+        CSharp::new().export(&Types::default().register::<(String, u8)>(), IdentityFormat,),
+        Err(Error::UnsupportedRoot { .. })
+    ));
+
+    let root = workspace_scratch("anonymous-root-files");
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(matches!(
+        CSharp::new().layout(Layout::Files).export_to(
+            &root,
+            &Types::default().register::<String>(),
+            IdentityFormat,
+        ),
         Err(Error::UnsupportedRoot { .. })
     ));
     assert!(!root.exists());

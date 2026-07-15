@@ -1420,44 +1420,24 @@ fn is_emitted_named(ndt: &NamedDataType) -> bool {
 }
 
 fn validate_non_object_roots(types: &Types) -> Result<(), Error> {
-    fn non_object_root_path(types: &Types, ty: &DataType) -> Option<String> {
-        match ty {
-            DataType::List(list) => non_object_root_path(types, &list.ty),
-            DataType::Map(map) => non_object_root_path(types, map.key_ty())
-                .or_else(|| non_object_root_path(types, map.value_ty())),
-            DataType::Nullable(inner) => non_object_root_path(types, inner),
-            DataType::Tuple(tuple) => tuple
-                .elements
-                .iter()
-                .find_map(|element| non_object_root_path(types, element)),
-            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-                NamedReferenceType::Inline { dt, .. } => non_object_root_path(types, dt),
-                NamedReferenceType::Reference { .. } => types.get(reference).and_then(|ndt| {
-                    if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
-                        && is_non_object_struct(&strct.fields)
-                    {
-                        Some(rust_path(ndt))
-                    } else {
-                        None
-                    }
-                }),
-                NamedReferenceType::Recursive(_) => None,
-            },
-            DataType::Intersection(items) => items
-                .iter()
-                .find_map(|item| non_object_root_path(types, item)),
-            DataType::Primitive(_)
-            | DataType::Generic(_)
-            | DataType::Reference(Reference::Opaque(_))
-            | DataType::Struct(_)
-            | DataType::Enum(_) => None,
-        }
-    }
-
     for root in types.roots() {
-        if let Some(path) = non_object_root_path(types, root) {
-            return Err(Error::UnsupportedRoot { path });
+        if let DataType::Reference(Reference::Named(reference)) = root {
+            if matches!(&reference.inner, NamedReferenceType::Reference { .. })
+                && let Some(ndt) = types.get(reference)
+                && is_emitted_named(ndt)
+            {
+                continue;
+            }
+            return Err(Error::UnsupportedRoot {
+                path: types
+                    .get(reference)
+                    .map(rust_path)
+                    .unwrap_or_else(|| "<unnamed root>".into()),
+            });
         }
+        return Err(Error::UnsupportedRoot {
+            path: "<anonymous root>".into(),
+        });
     }
     Ok(())
 }
