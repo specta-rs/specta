@@ -2252,7 +2252,19 @@ fn internal_tag_variant_payload_compatibility(
 
 fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     match dt {
+        // `#[serde(default)]` on a struct container widens every named field
+        // to optional on deserialize while serialize still always emits
+        // them, so it forces a phase split just like a field-level default.
+        // serde only supports this attribute on structs (not enums), so it
+        // is checked here rather than inside `container_has_local_difference`,
+        // which is shared with `DataType::Enum` below. A struct with no named
+        // fields has nothing for `default` to make optional, so splitting it
+        // would only add a redundant identical type pair (and force every
+        // dependent to split too) for no representational benefit.
         DataType::Struct(s) => Ok(container_has_local_difference(&s.attributes)?
+            || (struct_has_named_fields(&s.fields)
+                && SerdeContainerAttrs::from_attributes(&s.attributes)?
+                    .is_some_and(|attrs| attrs.default))
             || fields_have_local_difference(&s.fields)?),
         DataType::Enum(e) => Ok(container_has_local_difference(&e.attributes)?
             || e.variants
@@ -2290,6 +2302,10 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
         | DataType::Reference(Reference::Named(_))
         | DataType::Generic(_) => Ok(false),
     }
+}
+
+fn struct_has_named_fields(fields: &Fields) -> bool {
+    matches!(fields, Fields::Named(named) if !named.fields.is_empty())
 }
 
 fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> Result<bool, Error> {
@@ -2352,6 +2368,10 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || !attrs.aliases.is_empty()
+                // `#[serde(default)]` only widens the deserialize shape
+                // (absent fields fall back to `Default::default()`); serde
+                // always emits the field on serialize.
+                || attrs.default
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with

@@ -23,6 +23,7 @@ mod maybe_undefined;
 mod references;
 mod semantic;
 mod serde_conversions;
+mod serde_default_phases;
 mod serde_identifiers;
 mod serde_other;
 mod serde_validate_recursion;
