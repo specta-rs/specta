@@ -127,6 +127,7 @@ mod r#type {
         value: String,
     }
 
+    #[allow(clippy::module_inception)]
     pub mod r#type {
         use super::*;
 

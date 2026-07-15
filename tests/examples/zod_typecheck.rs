@@ -105,6 +105,7 @@ mod r#type {
         value: KeywordModule,
     }
 
+    #[allow(clippy::module_inception)]
     pub mod r#type {
         use super::*;
 
