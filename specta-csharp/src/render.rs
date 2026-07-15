@@ -401,13 +401,7 @@ fn render_fields(
     generics: &str,
 ) -> Result<(), Error> {
     let indent = format!("{base}{}", exporter.indent);
-    let reserved_type_names = match exporter.layout {
-        Layout::FlatFile | Layout::ModulePrefixedName => types
-            .into_unsorted_iter()
-            .map(|ndt| exported_name(exporter, ndt))
-            .collect(),
-        Layout::Namespaces | Layout::Files => HashSet::new(),
-    };
+    let reserved_type_names = reserved_type_names(exporter, types);
     match fields {
         Fields::Unit => {}
         Fields::Named(fields) => {
@@ -1193,13 +1187,7 @@ fn render_union(
             .filter(|name| !name.is_empty())
             .map(str::to_string),
     );
-    let reserved_type_names = match exporter.layout {
-        Layout::FlatFile | Layout::ModulePrefixedName => types
-            .into_unsorted_iter()
-            .map(|ndt| exported_name(exporter, ndt))
-            .collect(),
-        Layout::Namespaces | Layout::Files => HashSet::new(),
-    };
+    let reserved_type_names = reserved_type_names(exporter, types);
     for (wire_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
         let variant_name =
             unique_type_identifier(property_name(wire_name), &mut used, &reserved_type_names);
@@ -1810,20 +1798,7 @@ fn wire_datatype(
                     });
                 }
                 if let Some(ty) = ndt.ty.as_ref()
-                    && matches!(ty, DataType::Tuple(_))
-                {
-                    return wire_datatype(
-                        out,
-                        exporter,
-                        types,
-                        ty,
-                        path,
-                        generic_layers,
-                        visited_non_objects,
-                    );
-                }
-                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
-                    && is_non_object_struct(&strct.fields)
+                    && is_non_object_datatype(ty)
                 {
                     let key = format!("{}::{generics:?}", rust_path(ndt));
                     if visited_non_objects.len() >= 128 || !visited_non_objects.insert(key.clone())
@@ -1832,15 +1807,27 @@ fn wire_datatype(
                     }
                     let mut layers = generic_layers.to_vec();
                     layers.push(generics);
-                    let result = render_non_object_struct_inner(
-                        out,
-                        exporter,
-                        types,
-                        &strct.fields,
-                        path,
-                        &layers,
-                        visited_non_objects,
-                    );
+                    let result = match ty {
+                        DataType::Struct(strct) => render_non_object_struct_inner(
+                            out,
+                            exporter,
+                            types,
+                            &strct.fields,
+                            path,
+                            &layers,
+                            visited_non_objects,
+                        ),
+                        DataType::Tuple(_) => wire_datatype(
+                            out,
+                            exporter,
+                            types,
+                            ty,
+                            path,
+                            &layers,
+                            visited_non_objects,
+                        ),
+                        _ => unreachable!(),
+                    };
                     visited_non_objects.remove(&key);
                     result?;
                 } else {
@@ -2348,6 +2335,19 @@ fn unique_type_identifier(
         }
         suffix += 1;
     }
+}
+
+fn reserved_type_names(exporter: &CSharp, types: &Types) -> HashSet<String> {
+    types
+        .into_unsorted_iter()
+        .filter(|ndt| match exporter.layout {
+            Layout::FlatFile | Layout::ModulePrefixedName => true,
+            Layout::Namespaces | Layout::Files => {
+                joined_namespace(exporter.namespace.as_ref(), &module_segments(ndt)).is_empty()
+            }
+        })
+        .map(|ndt| exported_name(exporter, ndt))
+        .collect()
 }
 
 fn record_reserved_names(containing_name: &str) -> HashSet<String> {

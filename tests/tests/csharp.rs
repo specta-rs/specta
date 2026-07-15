@@ -336,6 +336,20 @@ struct WireTuple(String, u32);
 #[specta(collect = false)]
 struct WireSkippedTuple(#[serde(skip)] (), String);
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireSkippedGenericTuple<T>(#[serde(skip)] (), T);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RecursiveSkippedWireTuple(#[serde(skip)] (), Box<RecursiveSkippedWireTuple>);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RecursiveSkippedWireTupleOwner {
+    value: RecursiveSkippedWireTuple,
+}
+
 #[derive(Default, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct WireGeneric<T>(Option<T>);
@@ -348,6 +362,7 @@ struct NonObjectWireShapes {
     id: WireNewtype,
     tuple: WireTuple,
     skipped_tuple: WireSkippedTuple,
+    skipped_generic_tuple: WireSkippedGenericTuple<u8>,
     generic: WireGeneric<u8>,
     nested_generic: WireGeneric<Option<u8>>,
     #[serde(default)]
@@ -505,6 +520,20 @@ fn flat_references_are_not_shadowed_by_inline_helpers() {
             &Types::default().register::<InlineNameShadowing>(),
             IdentityFormat,
         )
+        .unwrap();
+
+    assert!(output.contains("record FooValue2"));
+    assert!(output.contains("FooValue TopLevel"));
+}
+
+#[test]
+fn global_namespace_references_are_not_shadowed_by_inline_helpers() {
+    let mut types = Types::default().register::<InlineNameShadowing>();
+    types.iter_mut(|ndt| ndt.module_path = "".into());
+    let output = CSharp::new()
+        .namespace("")
+        .layout(Layout::Namespaces)
+        .export(&types, IdentityFormat)
         .unwrap();
 
     assert!(output.contains("record FooValue2"));
@@ -858,6 +887,7 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
         output.contains("global::System.ValueTuple<string> SkippedTuple"),
         "{output}"
     );
+    assert!(output.contains("global::System.ValueTuple<byte> SkippedGenericTuple"));
     assert!(output.contains("byte? Generic"));
     assert!(output.contains("byte? NestedGeneric"));
     assert!(output.contains("object? OptionalUnit"));
@@ -883,6 +913,17 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
     assert!(!root.join("Test/Csharp/WireNewtype.cs").exists());
     assert!(!root.join("Test/Csharp/WireTuple.cs").exists());
     std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn recursive_skipped_tuple_structs_return_an_error() {
+    assert!(matches!(
+        CSharp::new().export(
+            &Types::default().register::<RecursiveSkippedWireTupleOwner>(),
+            specta_serde::Format,
+        ),
+        Err(Error::RecursiveInline { .. })
+    ));
 }
 
 #[test]
