@@ -28,7 +28,7 @@
 | **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Rust source, modules, generics; structural wire-only shapes error |
 | **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | OpenAPI 3.0 schemas, generics, JSON and YAML       |
 | **Go**          | 🚧 **Planned** | [`specta-go`](https://crates.io/crates/specta-go)                 | Go structs and interfaces                         |
-| **Kotlin**      | 🚧 **Planned** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Kotlin data classes and sealed classes            |
+| **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
 | **JSON Schema** | 🚧 **Partial** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
 | **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (4)**: Rust, OpenAPI, JSON Schema, and Java have broad type support but are still stabilizing
-- **Planned (5)**: Go, Kotlin, Zod, Python, and C# exporters are in development
+- **Partially Implemented (5)**: Rust, OpenAPI, Java, Kotlin, and JSON Schema have broad type support but are still stabilizing
+- **Planned (4)**: Go, Zod, Python, and C# exporters are in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -74,8 +74,8 @@ cargo add specta_rust        # Rust (partial)
 cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
 cargo add specta_java        # Java 17 (partial)
 # cargo add specta_go          # Go (planned)
-# cargo add specta_kotlin      # Kotlin (planned)
-cargo add specta_jsonschema  # JSON Schema (partial)
+cargo add specta_kotlin       # Kotlin (partial)
+cargo add specta_jsonschema   # JSON Schema (partial)
 # cargo add specta_zod         # Zod schemas (planned)
 ```
 
