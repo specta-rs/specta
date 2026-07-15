@@ -753,6 +753,27 @@ fn files_are_rendered_before_the_output_directory_is_created() {
 }
 
 #[test]
+fn export_to_accepts_a_bare_filename() {
+    let path = PathBuf::from(".specta-csharp-bare-export-test.cs");
+    let _ = std::fs::remove_file(&path);
+
+    CSharp::new()
+        .export_to(
+            &path,
+            &Types::default().register::<KeywordFields>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(
+        std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("record KeywordFields")
+    );
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
 fn recursive_inline_structures_fall_back_to_named_references() {
     let output = CSharp::new()
         .export(&Types::default().register::<InlineNode>(), IdentityFormat)

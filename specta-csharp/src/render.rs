@@ -44,7 +44,10 @@ pub(crate) fn export_to(
 ) -> Result<(), Error> {
     if exporter.layout != Layout::Files {
         let output = export(exporter, types, format)?;
-        if let Some(parent) = path.parent() {
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             std::fs::create_dir_all(parent).map_err(|err| Error::io(parent, err))?;
         }
         return std::fs::write(path, output).map_err(|err| Error::io(path, err));
