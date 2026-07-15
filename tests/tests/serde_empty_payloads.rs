@@ -284,6 +284,99 @@ fn adjacent_tagged_option_skip_deserializing_phases() {
     );
 }
 
+// A user-defined type whose path merely ENDS in `Option` must not be
+// mistaken for the std `Option`: serde's `missing_field` special case only
+// applies to the real `std`/`core` `Option`, so a skipped `wire::Option<u8>`
+// sole field behaves exactly like the non-`Option` case (serialize omits
+// `c`, deserialize requires `c: null`).
+mod wire {
+    #[derive(serde::Serialize, serde::Deserialize, Default)]
+    pub struct Option<T>(pub T);
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjCustomOptionSkip {
+    V(#[serde(skip)] wire::Option<u8>),
+    Live(String),
+}
+
+#[test]
+fn adjacent_tagged_custom_option_skip_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjCustomOptionSkip::V(wire::Option(7))).unwrap(),
+        r#"{"t":"V"}"#
+    );
+
+    // Unlike the real `Option`, a missing `c` is rejected; only `c: null`
+    // is accepted.
+    assert!(serde_json::from_str::<AdjCustomOptionSkip>(r#"{"t":"V"}"#).is_err());
+    assert!(serde_json::from_str::<AdjCustomOptionSkip>(r#"{"t":"V","c":null}"#).is_ok());
+}
+
+#[test]
+fn adjacent_tagged_custom_option_skip_unified_errors() {
+    // The asymmetric non-`Option` rejection must apply: `wire::Option` gets
+    // no `missing_field` special case from serde.
+    let result = Typescript::default().export(
+        &Types::default().register::<AdjCustomOptionSkip>(),
+        specta_serde::Format,
+    );
+
+    let err = result.expect_err("unified export must reject the asymmetric shape");
+    assert!(
+        err.to_string().contains("PhasesFormat"),
+        "error must point at `PhasesFormat`:\n{err}"
+    );
+}
+
+#[test]
+fn adjacent_tagged_custom_option_skip_phases() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjCustomOptionSkip>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    let deserialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjCustomOptionSkip_Deserialize ="))
+        .expect("deserialize type must be exported (the enum must split)");
+    assert!(
+        deserialize_ty.contains(r#"{ t: "V"; c: null }"#),
+        "a custom `*::Option` skipped sole field must keep `c` required:\n{ts}"
+    );
+}
+
+// Fully-qualified spellings of the real `Option` must still be recognized.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjQualifiedOptionSkip {
+    A(#[serde(skip)] std::option::Option<u8>),
+    B(#[serde(skip)] ::core::option::Option<u8>),
+}
+
+#[test]
+fn adjacent_tagged_qualified_option_skip_unified() {
+    assert!(serde_json::from_str::<AdjQualifiedOptionSkip>(r#"{"t":"A"}"#).is_ok());
+    assert!(serde_json::from_str::<AdjQualifiedOptionSkip>(r#"{"t":"B"}"#).is_ok());
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjQualifiedOptionSkip>(),
+            specta_serde::Format,
+        )
+        .expect("qualified std/core Option must still be recognized as Option");
+
+    assert!(
+        ts.contains(r#"{ t: "A"; c?: null }"#) && ts.contains(r#"{ t: "B"; c?: null }"#),
+        "qualified Option spellings must keep `c` optional:\n{ts}"
+    );
+}
+
 // A `#[specta(type = Option<u8>)]` override must NOT be mistaken for a real
 // `Option` field: serde only sees the actual Rust type (`u8`), so its
 // deserializer still requires `c` to be present. `Option`-ness must be

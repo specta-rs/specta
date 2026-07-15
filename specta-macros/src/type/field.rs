@@ -102,16 +102,29 @@ pub fn construct_field_with_variant_skip(
     }))
 }
 
-/// Whether a type is syntactically `Option<T>` (including `std::option::Option`
-/// and `core::option::Option` paths). Aliases of `Option` are not detectable
-/// and conservatively treated as non-`Option`.
+/// Whether a type is syntactically the standard `Option<T>`.
+///
+/// A bare single-segment `Option` is assumed to be the prelude's (a local
+/// type shadowing it is the accepted false-positive tradeoff of syntactic
+/// detection). Multi-segment paths only match the real
+/// `std::option::Option`/`core::option::Option` spellings -- a user-defined
+/// path that merely ends in `Option` (e.g. `wire::Option<T>`) gets none of
+/// serde's `Option` special-casing and must not match. Aliases of `Option`
+/// are not detectable and conservatively treated as non-`Option`.
 fn is_option_type(ty: &Type) -> bool {
     match ty {
-        Type::Path(path) => path
-            .path
-            .segments
-            .last()
-            .is_some_and(|segment| segment.ident == "Option"),
+        Type::Path(path) => {
+            let segments = &path.path.segments;
+            match segments.len() {
+                1 => segments[0].ident == "Option",
+                3 => {
+                    (segments[0].ident == "std" || segments[0].ident == "core")
+                        && segments[1].ident == "option"
+                        && segments[2].ident == "Option"
+                }
+                _ => false,
+            }
+        }
         Type::Group(group) => is_option_type(&group.elem),
         Type::Paren(paren) => is_option_type(&paren.elem),
         _ => false,
