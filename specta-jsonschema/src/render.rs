@@ -205,6 +205,13 @@ impl<'a> Renderer<'a> {
             Reference::Named(reference) => {
                 self.render_named_reference(reference, generics, path, depth)
             }
+            Reference::Opaque(reference)
+                if reference
+                    .downcast_ref::<specta::internal::UnknownPrecisionNumber>()
+                    .is_some() =>
+            {
+                Ok(number_schema(None))
+            }
             Reference::Opaque(reference) => Err(Error::UnsupportedOpaqueReference {
                 path: path.into(),
                 reference: reference.clone(),
@@ -748,9 +755,7 @@ fn primitive_schema(primitive: &Primitive) -> Value {
         Primitive::u32 => integer(Some(0), None, None),
         Primitive::u64 => integer(Some(0), None, None),
         Primitive::u128 | Primitive::usize => integer(Some(0), None, None),
-        Primitive::number | Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => {
-            number_schema(None)
-        }
+        Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => number_schema(None),
     }
 }
 

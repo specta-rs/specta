@@ -270,10 +270,6 @@ fn datatype(
 ) -> Result<(), Error> {
     match dt {
         DataType::Primitive(p) => match p {
-            Primitive::number => {
-                ctx.add_import("encoding/json");
-                s.push_str("json.Number");
-            }
             Primitive::i8 => s.push_str("int8"),
             Primitive::i16 => s.push_str("int16"),
             Primitive::i32 => s.push_str("int32"),
@@ -364,6 +360,13 @@ fn datatype(
                     }
                     s.push(']');
                 }
+            }
+            Reference::Opaque(o)
+                if o.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
+                    .is_some() =>
+            {
+                ctx.add_import("encoding/json");
+                s.push_str("json.Number");
             }
             Reference::Opaque(o) => match o.type_name() {
                 "String" | "char" => s.push_str("string"),

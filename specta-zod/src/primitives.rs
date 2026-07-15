@@ -343,7 +343,6 @@ fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'sta
     use Primitive::*;
 
     Ok(match p {
-        number => return Err(Error::unsafe_number_forbidden(location.join("."))),
         i8 | i16 | i32 | u8 | u16 | u32 => "z.int()",
         f16 | f32 | f64 | f128 => "z.number()",
         usize | isize | i64 | u64 | i128 | u128 => {
@@ -756,7 +755,7 @@ fn reference_dt(
         Reference::Named(r) => {
             reference_named_dt(s, exporter, types, r, location, generics, type_render_stack)
         }
-        Reference::Opaque(r) => reference_opaque_dt(s, r),
+        Reference::Opaque(r) => reference_opaque_dt(s, r, location),
     }
 }
 
@@ -764,7 +763,17 @@ fn generic_dt(s: &mut String, g: &GenericReference) {
     s.push_str(g.name());
 }
 
-fn reference_opaque_dt(s: &mut String, r: &OpaqueReference) -> Result<(), Error> {
+fn reference_opaque_dt(
+    s: &mut String,
+    r: &OpaqueReference,
+    location: Vec<Cow<'static, str>>,
+) -> Result<(), Error> {
+    if r.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
+        .is_some()
+    {
+        return Err(Error::unsafe_number_forbidden(location.join(".")));
+    }
+
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
         return Ok(());

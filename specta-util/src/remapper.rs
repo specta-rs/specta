@@ -100,7 +100,10 @@ impl Remapper {
     ///
     /// </div>
     pub fn dangerous_bigints_as_number(mut self) -> Self {
-        self = self.rule(Primitive::number.into(), Primitive::i32.into());
+        self = self.rule(
+            Reference::opaque(specta::internal::UnknownPrecisionNumber).into(),
+            Primitive::i32.into(),
+        );
         for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
             self = self.rule(
                 DataType::Primitive(signed),
@@ -217,7 +220,7 @@ impl Remapper {
 mod tests {
     use specta::{
         Types,
-        datatype::{DataType, Field, List, NamedDataType, Primitive, Struct, Tuple},
+        datatype::{DataType, Field, List, NamedDataType, Primitive, Reference, Struct, Tuple},
     };
 
     use super::Remapper;
@@ -293,7 +296,7 @@ mod tests {
         let remapper = Remapper::new().dangerous_bigints_as_number();
 
         assert_eq!(
-            remapper.remap_dt(Primitive::number.into()),
+            remapper.remap_dt(Reference::opaque(specta::internal::UnknownPrecisionNumber).into()),
             Primitive::i32.into(),
         );
 

@@ -140,7 +140,7 @@ const _: () = {
         /// `arbitrary_precision`, values wider than `u64`). Keep that uncertainty in the
         /// datatype so exporters can require an explicit lossy conversion where needed.
         fn definition(_: &mut Types) -> DataType {
-            DataType::Primitive(Primitive::number)
+            Reference::opaque(crate::internal::UnknownPrecisionNumber).into()
         }
     }
 };

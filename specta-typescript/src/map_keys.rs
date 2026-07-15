@@ -180,7 +180,10 @@ fn validate_map_key_inner(
             // like taurpc (which converts `i64` -> `define("number")` to
             // satisfy the BigInt-forbidden filter). Other opaque flavors --
             // Tauri channels, branded types -- still fail loudly.
-            if r.downcast_ref::<crate::opaque::Define>().is_some() {
+            if r.downcast_ref::<crate::opaque::Define>().is_some()
+                || r.downcast_ref::<specta::internal::UnknownPrecisionNumber>()
+                    .is_some()
+            {
                 Ok(())
             } else {
                 Err(Error::invalid_map_key(
@@ -270,8 +273,7 @@ fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType
 fn primitive_is_valid_key(primitive: Primitive) -> bool {
     matches!(
         primitive,
-        Primitive::number
-            | Primitive::bool
+        Primitive::bool
             | Primitive::i8
             | Primitive::i16
             | Primitive::i32

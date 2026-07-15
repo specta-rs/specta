@@ -641,11 +641,6 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 /// Convert primitive types to Swift.
 fn primitive_to_swift(primitive: &Primitive) -> Result<String, Error> {
     Ok(match primitive {
-        Primitive::number => {
-            return Err(Error::UnsupportedType(
-                "Swift cannot represent a number with unknown range and precision".to_string(),
-            ));
-        }
         Primitive::i8 => "Int8".to_string(),
         Primitive::i16 => "Int16".to_string(),
         Primitive::i32 => "Int32".to_string(),
@@ -1082,6 +1077,15 @@ fn reference_to_swift(
                     .join(", ");
                 Ok(format!("{}<{}>", name, generics))
             }
+        }
+        Reference::Opaque(reference)
+            if reference
+                .downcast_ref::<specta::internal::UnknownPrecisionNumber>()
+                .is_some() =>
+        {
+            Err(Error::UnsupportedType(
+                "Swift cannot represent a number with unknown range and precision".to_string(),
+            ))
         }
         Reference::Opaque(_) => Err(Error::UnsupportedType(
             "Opaque references are not supported by Swift exporter".to_string(),
