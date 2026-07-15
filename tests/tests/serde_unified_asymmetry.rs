@@ -152,6 +152,39 @@ enum UntaggedOneSidedVariantSkip {
     B(u32),
 }
 
+// --- Enums without named-field variants: `rename_all_fields` / variant
+// `rename_all` have nothing to rename ---
+//
+// These rules only apply to named fields (`rewrite_fields_for_phase` ignores
+// them for unit/newtype/tuple variants), so a directional value produces
+// identical serialize and deserialize shapes and must keep working under
+// `Format`. The named-field controls are covered by
+// `EnumRenameAllFieldsOneSided` and `UntaggedVariantOneSidedRenameAll` above.
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all_fields(serialize = "camelCase"))]
+enum TupleOnlyOneSidedRenameAllFields {
+    A(String),
+    B(u32, bool),
+    C,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all_fields(serialize = "camelCase"))]
+enum MixedNamedOneSidedRenameAllFields {
+    A(String),
+    B { field_one: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum TupleVariantOneSidedRenameAll {
+    #[serde(rename_all(serialize = "camelCase"))]
+    A(String, u32),
+}
+
 // --- Controls: these must keep working unchanged under `Format` ---
 
 #[derive(Type, Serialize, Deserialize)]
@@ -561,6 +594,57 @@ fn untagged_variant_skip_asymmetry_still_requires_phases_format() {
     assert!(
         msg.contains("skip") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn rename_all_fields_without_named_field_variants_is_not_direction_dependent() {
+    // No variant has named fields, so there is nothing for
+    // `rename_all_fields` to rename in either direction.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TupleOnlyOneSidedRenameAllFields>(),
+            specta_serde::Format,
+        )
+        .expect(
+            "one-sided rename_all_fields on an enum without named-field variants should export under Format",
+        );
+    assert!(
+        rendered.contains("{ A: string }") && rendered.contains("\"C\""),
+        "got: {rendered}"
+    );
+
+    // But one named-field variant anywhere in the enum makes it
+    // direction-dependent again.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<MixedNamedOneSidedRenameAllFields>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "one-sided rename_all_fields should still error when any variant has named fields",
+        );
+    let msg = err.to_string();
+    assert!(
+        msg.contains("rename_all_fields") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn variant_rename_all_on_tuple_variant_is_not_direction_dependent() {
+    // Variant-level `rename_all` renames the variant's named fields; a tuple
+    // variant has none, so both directions are the same payload shape. The
+    // named-field control is `untagged_field_name_renames_still_require_phases_format`.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TupleVariantOneSidedRenameAll>(),
+            specta_serde::Format,
+        )
+        .expect("one-sided variant rename_all on a tuple variant should export under Format");
+    assert!(
+        rendered.contains("{ A: [string, number] }"),
+        "got: {rendered}"
     );
 }
 

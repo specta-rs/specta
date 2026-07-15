@@ -120,7 +120,9 @@ fn inner(
                 &path,
                 mode,
                 // Struct `rename_all` renames field names, which are always
-                // part of the wire shape.
+                // part of the wire shape. `rename_all_fields` is enum-only in
+                // serde, so stay conservative for structs.
+                true,
                 true,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
@@ -202,6 +204,14 @@ fn inner(
             // rename variant labels are not part of the wire shape for them.
             let variant_names_emitted =
                 !matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged);
+            // `rename_all_fields` only renames named-field variants
+            // (`rewrite_fields_for_phase` ignores the rule for unit/tuple
+            // variants), so it only affects the wire when such a variant
+            // exists.
+            let has_named_field_variants = enm
+                .variants
+                .iter()
+                .any(|(_, variant)| !variant.skip && variant_has_live_named_fields(variant));
             validate_container_attributes(
                 &enm.attributes,
                 types,
@@ -209,6 +219,7 @@ fn inner(
                 &path,
                 mode,
                 variant_names_emitted,
+                has_named_field_variants,
             )?;
             if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
@@ -446,6 +457,10 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 /// `rename_all` renames variant labels that serde never emits; everywhere else
 /// (struct field names, tagged enum variant names) `rename_all` changes the
 /// wire shape and a directional mismatch must be rejected in unified mode.
+///
+/// `rename_all_fields_affects_wire` is false for enums without any named-field
+/// variant, where `rename_all_fields` has nothing to rename in either
+/// direction.
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
@@ -453,6 +468,7 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
     rename_all_affects_wire: bool,
+    rename_all_fields_affects_wire: bool,
 ) -> Result<(), Error> {
     let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(());
@@ -510,8 +526,9 @@ fn validate_container_attributes(
             ));
         }
 
-        if container_attrs.rename_all_fields_serialize
-            != container_attrs.rename_all_fields_deserialize
+        if rename_all_fields_affects_wire
+            && container_attrs.rename_all_fields_serialize
+                != container_attrs.rename_all_fields_deserialize
         {
             return Err(Error::incompatible_rename(
                 "container rename_all_fields",
@@ -578,11 +595,14 @@ fn validate_variant_attributes(
     }
 
     if mode == ApplyMode::Unified
+        && variant_has_live_named_fields(variant)
         && serde_attrs.rename_all_serialize != serde_attrs.rename_all_deserialize
     {
         // Not gated on `variant_names_emitted`: variant-level `rename_all`
         // renames the variant's *field* names, which appear in the payload
-        // for every representation, untagged included.
+        // for every representation, untagged included. It is gated on the
+        // variant actually having named fields, since unit/tuple variants
+        // give the rule nothing to rename in either direction.
         return Err(Error::incompatible_rename(
             "variant rename_all",
             path,
@@ -610,6 +630,16 @@ fn validate_variant_attributes(
     }
 
     Ok(())
+}
+
+/// Whether a variant has any named field that is actually part of the wire
+/// shape (skipped fields have their type erased and are never rendered).
+/// Mirrors the fields `rewrite_fields_for_phase` can apply rename rules to.
+fn variant_has_live_named_fields(variant: &Variant) -> bool {
+    matches!(
+        &variant.fields,
+        Fields::Named(named) if named.fields.iter().any(|(_, field)| field.ty.is_some())
+    )
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
