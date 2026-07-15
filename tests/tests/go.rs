@@ -152,6 +152,10 @@ fn types() -> Types {
         .register::<Node>()
 }
 
+fn has_tool(name: &str) -> bool {
+    Command::new(name).arg("version").output().is_ok()
+}
+
 #[test]
 fn go_export_raw_and_serde() {
     insta::assert_snapshot!(
@@ -174,6 +178,10 @@ fn go_export_raw_and_serde() {
 
 #[test]
 fn go_output_is_accepted_by_go_toolchain() {
+    if !has_tool("go") || !has_tool("gofmt") {
+        return;
+    }
+
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&root).unwrap();
     let temp = TempDir::new_in(root).unwrap();
@@ -257,6 +265,10 @@ fn go_files_layout_and_raw_code() {
                 .unwrap()
                 .contains("SpectaGenerated")
         );
+    }
+
+    if !has_tool("gofmt") {
+        return;
     }
 
     let gofmt = Command::new("gofmt")
@@ -516,6 +528,10 @@ fn go_only_pointers_recursive_required_references() {
             IdentityFormat,
         )
         .unwrap();
+    if !has_tool("go") {
+        return;
+    }
+
     let test = Command::new("go")
         .args(["test", "./..."])
         .env("GO111MODULE", "off")
