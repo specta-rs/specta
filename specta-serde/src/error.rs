@@ -36,6 +36,12 @@ enum ErrorKind {
         serialize: Option<String>,
         deserialize: Option<String>,
     },
+    IncompatibleSkip {
+        context: Cow<'static, str>,
+        name: String,
+        skip_serializing: bool,
+        skip_deserializing: bool,
+    },
     IncompatibleConversion {
         context: Cow<'static, str>,
         name: String,
@@ -49,6 +55,10 @@ enum ErrorKind {
     UnsupportedSerdeCustomCodec {
         path: String,
         attribute: Cow<'static, str>,
+    },
+    InvalidFlattenTarget {
+        path: String,
+        reason: Cow<'static, str>,
     },
     InvalidPhasedTypeUsage {
         path: String,
@@ -139,6 +149,22 @@ impl Error {
         }
     }
 
+    pub(crate) fn incompatible_skip(
+        context: impl Into<Cow<'static, str>>,
+        name: impl Into<String>,
+        skip_serializing: bool,
+        skip_deserializing: bool,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::IncompatibleSkip {
+                context: context.into(),
+                name: name.into(),
+                skip_serializing,
+                skip_deserializing,
+            },
+        }
+    }
+
     pub(crate) fn incompatible_conversion(
         context: impl Into<Cow<'static, str>>,
         name: impl Into<String>,
@@ -175,6 +201,18 @@ impl Error {
             kind: ErrorKind::UnsupportedSerdeCustomCodec {
                 path: path.into(),
                 attribute: attribute.into(),
+            },
+        }
+    }
+
+    pub(crate) fn invalid_flatten_target(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidFlattenTarget {
+                path: path.into(),
+                reason: reason.into(),
             },
         }
     }
@@ -240,7 +278,16 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use PhasesFormat for one-sided or asymmetric serde renames"
+            ),
+            ErrorKind::IncompatibleSkip {
+                context,
+                name,
+                skip_serializing,
+                skip_deserializing,
+            } => write!(
+                f,
+                "Incompatible {context} for '{name}' in unified mode: skip_serializing={skip_serializing}, skip_deserializing={skip_deserializing}. Use PhasesFormat for one-sided serde skips"
             ),
             ErrorKind::IncompatibleConversion {
                 context,
@@ -260,6 +307,10 @@ impl fmt::Display for Error {
             ErrorKind::UnsupportedSerdeCustomCodec { path, attribute } => write!(
                 f,
                 "Unsupported serde attribute at '{path}': #[serde({attribute})] changes the wire type. Add #[specta(type = ...)] (or #[specta(type = specta_serde::Phased<Serialize, Deserialize>)])"
+            ),
+            ErrorKind::InvalidFlattenTarget { path, reason } => write!(
+                f,
+                "Invalid `#[serde(flatten)]` target at '{path}': {reason}"
             ),
             ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
                 write!(f, "Invalid phased type usage at '{path}': {reason}")

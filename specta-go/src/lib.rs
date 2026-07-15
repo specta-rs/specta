@@ -4,6 +4,11 @@
 //! This crate is still in active development and is not yet ready for general purpose use!
 //! </div>
 //!
+//! Rust structs, aliases, generics, maps, lists, tuples, comments, and string
+//! enums are represented with native Go types. Data-carrying Rust enums and
+//! intersections are emitted as `any`, because Go has no structural union type
+//! capable of accepting every Serde representation without custom runtime code.
+//!
 //! # Usage
 //!
 //! ```rust
@@ -30,7 +35,7 @@
 
 mod error;
 mod go;
-mod primitives;
+pub mod primitives;
 mod reserved_names;
 
 pub use error::Error;

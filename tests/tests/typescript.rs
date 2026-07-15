@@ -8,9 +8,9 @@ use std::{
 
 use specta::{
     Format, Type, Types,
-    datatype::{DataType, Reference},
+    datatype::{DataType, NamedDataType, Primitive, Reference},
 };
-use specta_typescript::{ErrorTraceFrame, Layout, Typescript, primitives};
+use specta_typescript::{ErrorTraceFrame, Exporter, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -97,6 +97,185 @@ fn typescript_export() {
             Typescript::default().export(&types, format).unwrap()
         );
     }
+}
+
+#[test]
+fn typescript_with_raw_exports_runtime() {
+    let exported = Typescript::default()
+        .with_raw("export const queryClient = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};"));
+}
+
+#[test]
+fn typescript_with_raw_exports_multiple_runtime_snippets() {
+    let exported = Typescript::default()
+        .with_raw("export const queryClient = {};")
+        .with_raw("export const queryOptions = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};\nexport const queryOptions = {};"));
+}
+
+#[test]
+fn typescript_with_raw_exports_with_framework_runtime() {
+    let exported = Exporter::from(Typescript::default().with_raw("export const queryClient = {};"))
+        .framework_runtime(|_| Ok(Cow::Borrowed("export const invoke = {};")))
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const invoke = {};\nexport const queryClient = {};"));
+}
+
+#[test]
+fn framework_runtime_can_reference_composites_without_inlining() {
+    // https://github.com/specta-rs/tauri-specta/issues/228
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Thing {
+        value: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Wrapper<T> {
+        value: T,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct ExplicitlyInline {
+        #[specta(inline)]
+        thing: Thing,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Recursive {
+        child: Option<Box<Recursive>>,
+    }
+
+    let mut types = Types::default();
+    let thing = Thing::definition(&mut types);
+    let optional = Option::<Thing>::definition(&mut types);
+    let list = Vec::<Thing>::definition(&mut types);
+    let map = HashMap::<String, Thing>::definition(&mut types);
+    let tuple = <(Thing, Thing)>::definition(&mut types);
+    let intersection = DataType::Intersection(vec![thing.clone(), thing.clone()]);
+    let generic = Wrapper::<Thing>::definition(&mut types);
+    let recursive = Option::<Recursive>::definition(&mut types);
+    let explicitly_inline = ExplicitlyInline::definition(&mut types);
+    let explicitly_inline = match explicitly_inline {
+        DataType::Reference(Reference::Named(reference)) => {
+            types.get(&reference).unwrap().ty.clone().unwrap()
+        }
+        _ => panic!("expected named reference"),
+    };
+    let legacy_inline_optional =
+        primitives::inline(&Typescript::default(), &types, &optional).unwrap();
+
+    let output = Exporter::from(Typescript::default())
+        .framework_runtime(move |ctx| {
+            Ok(Cow::Owned(
+                [
+                    ("thing", &thing),
+                    ("optional", &optional),
+                    ("list", &list),
+                    ("map", &map),
+                    ("tuple", &tuple),
+                    ("intersection", &intersection),
+                    ("generic", &generic),
+                    ("recursive", &recursive),
+                    ("explicitly_inline", &explicitly_inline),
+                ]
+                .into_iter()
+                .map(|(name, dt)| Ok(format!("{name}: {}", ctx.reference(dt)?)))
+                .collect::<Result<Vec<_>, specta_typescript::Error>>()?
+                .join("\n"),
+            ))
+        })
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(output.contains("thing: Thing"));
+    assert!(output.contains("optional: Thing | null"));
+    assert!(output.contains("list: Thing[]"));
+    assert!(output.contains("map: { [key in string]: Thing }"));
+    assert!(output.contains("tuple: [Thing, Thing]"));
+    assert!(output.contains("intersection: Thing & Thing"));
+    assert!(output.contains("generic: Wrapper<Thing>"));
+    assert!(output.contains("recursive: Recursive | null"));
+    assert!(
+        output.contains("explicitly_inline: {\n\tthing: {\n\t\tvalue: string,\n\t},\n}"),
+        "{output}"
+    );
+
+    assert_eq!(legacy_inline_optional, "{\n\tvalue: string,\n} | null");
+}
+
+#[test]
+fn framework_runtime_reference_tracks_nested_references_for_files_layout() {
+    // https://github.com/specta-rs/tauri-specta/issues/228
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Thing {
+        value: String,
+    }
+
+    let mut types = Types::default();
+    let optional = Option::<Thing>::definition(&mut types);
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    Exporter::from(Typescript::default().layout(Layout::Files))
+        .framework_runtime(move |ctx| {
+            Ok(Cow::Owned(format!(
+                "export type Runtime = {};",
+                ctx.reference(&optional)?
+            )))
+        })
+        .export_to(temp.path(), &types, specta_serde::Format)
+        .unwrap();
+
+    let output = fs_to_string(temp.path()).unwrap();
+    assert!(
+        output.contains("import type * as test$typescript"),
+        "{output}"
+    );
+    assert!(
+        output.contains("export type Runtime = test$typescript.Thing | null;"),
+        "{output}"
+    );
+}
+
+#[test]
+fn typescript_with_raw_exports_to_files_layout() {
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    Typescript::default()
+        .layout(Layout::Files)
+        .with_raw("export const queryClient = {};")
+        .export_to(temp.path(), &Types::default(), IdentityFormat)
+        .unwrap();
+
+    let exported = std::fs::read_to_string(temp.path().join("index.ts")).unwrap();
+    assert!(exported.contains("export const queryClient = {};"));
+}
+
+#[test]
+fn jsdoc_with_raw_exports_runtime() {
+    let exported = specta_typescript::JSDoc::default()
+        .with_raw("export const queryClient = {};")
+        .export(&Types::default(), IdentityFormat)
+        .unwrap();
+
+    assert!(exported.contains("export const queryClient = {};"));
 }
 
 #[test]
@@ -954,6 +1133,22 @@ fn typescript_export_to() {
 }
 
 #[test]
+fn typescript_module_prefixed_root_has_no_empty_prefix() {
+    let mut types = Types::default();
+    NamedDataType::new("RootType", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let rendered = Typescript::default()
+        .layout(Layout::ModulePrefixedName)
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(rendered.contains("export type RootType = string"));
+    assert!(!rendered.contains("export type _RootType"));
+}
+
+#[test]
 fn primitives_export() {
     for (mode, format, dts, types) in phase_collections() {
         let types = format.map_types(&types).unwrap().into_owned();
@@ -1028,8 +1223,12 @@ fn primitives_reference() {
                 };
 
                 Some(
-                    primitives::reference(&Typescript::default(), &types, &reference)
-                        .map(|ty| format!("{name}: {ty}")),
+                    primitives::reference(
+                        &Typescript::default(),
+                        &types,
+                        &DataType::Reference(reference),
+                    )
+                    .map(|ty| format!("{name}: {ty}")),
                 )
             })
             .collect::<Result<Vec<_>, _>>()

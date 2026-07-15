@@ -5,9 +5,9 @@
 //! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.25 --features derive,collect
-//! cargo add specta-serde@0.0.12
-//! cargo add specta-typescript@0.0.12
+//! cargo add specta@2.0.0-rc.26 --features derive,collect
+//! cargo add specta-serde@0.0.13
+//! cargo add specta-typescript@0.0.13
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
@@ -67,6 +67,6 @@ pub use error::{Error, ErrorTraceFrame};
 pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
-pub use references::collect_references;
+pub use references::{collect_references, with_module_path};
 pub use types::{Any, BigInt, Never, Number, Unknown};
 pub use typescript::Typescript;

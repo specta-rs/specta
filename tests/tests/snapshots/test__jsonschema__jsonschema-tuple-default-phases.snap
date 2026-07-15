@@ -1,0 +1,79 @@
+---
+source: tests/tests/jsonschema.rs
+expression: rendered
+---
+{
+  "$defs": {
+    "JsonTupleDefault": {
+      "description": " A trailing `#[serde(default)]` tuple element is optional on deserialize\n (serde accepts `[1]`): the deserialize half's array schema must lower\n `minItems` below the full arity while serialize keeps it exact.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/JsonTupleDefault_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/JsonTupleDefault_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "JsonTupleDefault"
+    },
+    "JsonTupleDefault_Deserialize": {
+      "description": " A trailing `#[serde(default)]` tuple element is optional on deserialize\n (serde accepts `[1]`): the deserialize half's array schema must lower\n `minItems` below the full arity while serialize keeps it exact.",
+      "items": false,
+      "maxItems": 2,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "JsonTupleDefault_Deserialize",
+      "type": "array"
+    },
+    "JsonTupleDefault_Serialize": {
+      "description": " A trailing `#[serde(default)]` tuple element is optional on deserialize\n (serde accepts `[1]`): the deserialize half's array schema must lower\n `minItems` below the full arity while serialize keeps it exact.",
+      "items": false,
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "JsonTupleDefault_Serialize",
+      "type": "array"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

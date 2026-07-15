@@ -14,6 +14,10 @@ type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     BigIntForbidden {
         path: String,
     },
@@ -30,6 +34,7 @@ enum ErrorKind {
         first: String,
         second: String,
     },
+    DuplicateExportName(String),
     Io(io::Error),
     ReadDir {
         path: PathBuf,
@@ -78,6 +83,18 @@ impl Error {
         }
     }
 
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     pub(crate) fn invalid_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             kind: ErrorKind::InvalidName {
@@ -107,6 +124,12 @@ impl Error {
                 first: format_location(first),
                 second: format_location(second),
             },
+        }
+    }
+
+    pub(crate) fn duplicate_export_name(name: String) -> Self {
+        Self {
+            kind: ErrorKind::DuplicateExportName(name),
         }
     }
 
@@ -187,9 +210,12 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because serializer compatibility is unknown. Configure `BigIntExportBehavior` to allow this."
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128, f128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,
@@ -206,6 +232,10 @@ impl fmt::Display for Error {
             } => write!(
                 f,
                 "Detected multiple types with the same name: {name:?} at {first} and {second}"
+            ),
+            ErrorKind::DuplicateExportName(name) => write!(
+                f,
+                "Detected multiple namespace exports with the name {name:?}"
             ),
             ErrorKind::Io(err) => write!(f, "IO error: {err}"),
             ErrorKind::ReadDir { path, source } => {

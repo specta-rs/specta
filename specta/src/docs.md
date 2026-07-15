@@ -31,8 +31,9 @@ Specta is designed to be able to export from Rust to any other language.
 | [specta-swift](https://docs.rs/specta-swift)           | alpha         |
 | [specta-openapi](https://docs.rs/specta-openapi)       | wip           |
 | [specta-jsonschema](https://docs.rs/specta-jsonschema) | wip           |
+| [specta-java](https://docs.rs/specta-java)             | alpha         |
 | [specta-zod](https://docs.rs/specta-zod)               | wip           |
-| [specta-kotlin](https://docs.rs/specta-kotlin)         | _coming soon_ |
+| [specta-kotlin](https://docs.rs/specta-kotlin)         | alpha         |
 | specta-jsdoc                                           | _coming soon_ |
 | specta-rust                                            | _coming soon_ |
 | specta-valibot                                         | _coming soon_ |

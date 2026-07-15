@@ -25,15 +25,15 @@
 | --------------- | -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | **TypeScript**  | ✅ **Stable**  | [`specta-typescript`](https://crates.io/crates/specta-typescript) | Full type support, generics, unions               |
 | **Swift**       | ✅ **Stable**  | [`specta-swift`](https://crates.io/crates/specta-swift)           | Idiomatic Swift, custom Codable, Duration support |
-| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Basic types work, structs/enums in progress       |
-| **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | Primitives work, complex types in progress        |
-| **Go**          | 🚧 **Planned** | [`specta-go`](https://crates.io/crates/specta-go)                 | Go structs and interfaces                         |
-| **Kotlin**      | 🚧 **Planned** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Kotlin data classes and sealed classes            |
-| **JSON Schema** | 🚧 **Planned** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | JSON Schema generation                            |
-| **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
-| **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
-| **C#**          | 🚧 **Planned** | `specta-csharp`                                                   | C# classes and enums                              |
-| **Java**        | 🚧 **Planned** | `specta-java`                                                     | Java POJOs and enums                              |
+| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Rust source, modules, generics; structural wire-only shapes error |
+| **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | OpenAPI 3.0 schemas, generics, JSON and YAML       |
+| **Go**          | 🚧 **Partial** | [`specta-go`](https://crates.io/crates/specta-go)                 | Structs, generics, string enums, layouts, Serde   |
+| **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
+| **JSON Schema** | 🚧 **Partial** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
+| **Zod**         | 🚧 **Partial** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod 4 schemas, inferred types, generics, layouts  |
+| **Python**      | 🚧 **Partial** | [`specta-python`](./specta-python)                                | Python 3.13 TypedDicts and type hints             |
+| **C#**          | 🚧 **Partial** | `specta-csharp`                                                   | Records, enums, generics, namespaces, file layouts |
+| **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
 
 ### Legend
 
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (2)**: Rust and OpenAPI exporters have basic functionality working, with complex types in progress
-- **Planned (7)**: Go, Kotlin, JSON Schema, Zod, Python, C#, and Java exporters are in development
+- **Partially Implemented (9)**: Rust, OpenAPI, Go, C#, Java, Kotlin, JSON Schema, Zod, and Python have broad type support but are still stabilizing
+- **Planned (0)**: All currently listed exporters have an initial implementation
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -70,12 +70,15 @@ cargo add specta
 # Language exporters (choose one or more)
 cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
-cargo add specta_rust        # Rust (partial - basic types)
-cargo add specta_openapi     # OpenAPI/Swagger (partial - primitives)
-# cargo add specta_go          # Go (planned)
-# cargo add specta_kotlin      # Kotlin (planned)
-# cargo add specta_jsonschema  # JSON Schema (planned)
-# cargo add specta_zod         # Zod schemas (planned)
+cargo add specta_rust        # Rust (partial)
+cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
+cargo add specta_java        # Java 17 (partial)
+cargo add specta_go           # Go (partial)
+cargo add specta-python      # Python 3.13 type hints (partial)
+cargo add specta_kotlin       # Kotlin (partial)
+cargo add specta_jsonschema   # JSON Schema (partial)
+cargo add specta_zod          # Zod schemas (partial)
+cargo add specta-csharp       # C# (partial)
 ```
 
 Then you can use Specta like following:

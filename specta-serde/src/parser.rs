@@ -3,12 +3,13 @@
 use crate::{Error, inflection::RenameRule};
 use specta::datatype::{Attributes, DataType};
 
-const CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
-const CONTAINER_RENAME_DESERIALIZE: &str = "serde:container:rename_deserialize";
-const CONTAINER_RENAME_ALL_SERIALIZE: &str = "serde:container:rename_all_serialize";
-const CONTAINER_RENAME_ALL_DESERIALIZE: &str = "serde:container:rename_all_deserialize";
-const CONTAINER_RENAME_ALL_FIELDS_SERIALIZE: &str = "serde:container:rename_all_fields_serialize";
-const CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE: &str =
+pub(crate) const CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
+pub(crate) const CONTAINER_RENAME_DESERIALIZE: &str = "serde:container:rename_deserialize";
+pub(crate) const CONTAINER_RENAME_ALL_SERIALIZE: &str = "serde:container:rename_all_serialize";
+pub(crate) const CONTAINER_RENAME_ALL_DESERIALIZE: &str = "serde:container:rename_all_deserialize";
+pub(crate) const CONTAINER_RENAME_ALL_FIELDS_SERIALIZE: &str =
+    "serde:container:rename_all_fields_serialize";
+pub(crate) const CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE: &str =
     "serde:container:rename_all_fields_deserialize";
 const CONTAINER_TAG: &str = "serde:container:tag";
 const CONTAINER_CONTENT: &str = "serde:container:content";
@@ -16,34 +17,34 @@ const CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 const CONTAINER_DEFAULT: &str = "serde:container:default";
 const CONTAINER_TRANSPARENT: &str = "serde:container:transparent";
 const CONTAINER_FROM_TYPE_SRC: &str = "serde:container:from_type_src";
-const CONTAINER_FROM_RESOLVED: &str = "serde:container:from_resolved";
+pub(crate) const CONTAINER_FROM_RESOLVED: &str = "serde:container:from_resolved";
 const CONTAINER_TRY_FROM_TYPE_SRC: &str = "serde:container:try_from_type_src";
-const CONTAINER_TRY_FROM_RESOLVED: &str = "serde:container:try_from_resolved";
+pub(crate) const CONTAINER_TRY_FROM_RESOLVED: &str = "serde:container:try_from_resolved";
 const CONTAINER_INTO_TYPE_SRC: &str = "serde:container:into_type_src";
-const CONTAINER_INTO_RESOLVED: &str = "serde:container:into_resolved";
+pub(crate) const CONTAINER_INTO_RESOLVED: &str = "serde:container:into_resolved";
 const CONTAINER_VARIANT_IDENTIFIER: &str = "serde:container:variant_identifier";
 const CONTAINER_FIELD_IDENTIFIER: &str = "serde:container:field_identifier";
 
-const VARIANT_RENAME_SERIALIZE: &str = "serde:variant:rename_serialize";
-const VARIANT_RENAME_DESERIALIZE: &str = "serde:variant:rename_deserialize";
+pub(crate) const VARIANT_RENAME_SERIALIZE: &str = "serde:variant:rename_serialize";
+pub(crate) const VARIANT_RENAME_DESERIALIZE: &str = "serde:variant:rename_deserialize";
 const VARIANT_ALIASES: &str = "serde:variant:aliases";
-const VARIANT_RENAME_ALL_SERIALIZE: &str = "serde:variant:rename_all_serialize";
-const VARIANT_RENAME_ALL_DESERIALIZE: &str = "serde:variant:rename_all_deserialize";
-const VARIANT_SKIP_SERIALIZING: &str = "serde:variant:skip_serializing";
-const VARIANT_SKIP_DESERIALIZING: &str = "serde:variant:skip_deserializing";
+pub(crate) const VARIANT_RENAME_ALL_SERIALIZE: &str = "serde:variant:rename_all_serialize";
+pub(crate) const VARIANT_RENAME_ALL_DESERIALIZE: &str = "serde:variant:rename_all_deserialize";
+pub(crate) const VARIANT_SKIP_SERIALIZING: &str = "serde:variant:skip_serializing";
+pub(crate) const VARIANT_SKIP_DESERIALIZING: &str = "serde:variant:skip_deserializing";
 const VARIANT_HAS_SERIALIZE_WITH: &str = "serde:variant:has_serialize_with";
 const VARIANT_HAS_DESERIALIZE_WITH: &str = "serde:variant:has_deserialize_with";
 const VARIANT_HAS_WITH: &str = "serde:variant:has_with";
 const VARIANT_OTHER: &str = "serde:variant:other";
 const VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 
-const FIELD_RENAME_SERIALIZE: &str = "serde:field:rename_serialize";
-const FIELD_RENAME_DESERIALIZE: &str = "serde:field:rename_deserialize";
+pub(crate) const FIELD_RENAME_SERIALIZE: &str = "serde:field:rename_serialize";
+pub(crate) const FIELD_RENAME_DESERIALIZE: &str = "serde:field:rename_deserialize";
 pub(crate) const FIELD_ALIASES: &str = "serde:field:aliases";
 const FIELD_DEFAULT: &str = "serde:field:default";
 const FIELD_FLATTEN: &str = "serde:field:flatten";
-const FIELD_SKIP_SERIALIZING: &str = "serde:field:skip_serializing";
-const FIELD_SKIP_DESERIALIZING: &str = "serde:field:skip_deserializing";
+pub(crate) const FIELD_SKIP_SERIALIZING: &str = "serde:field:skip_serializing";
+pub(crate) const FIELD_SKIP_DESERIALIZING: &str = "serde:field:skip_deserializing";
 pub(crate) const FIELD_SKIP_SERIALIZING_IF: &str = "serde:field:skip_serializing_if";
 const FIELD_HAS_SERIALIZE_WITH: &str = "serde:field:has_serialize_with";
 const FIELD_HAS_DESERIALIZE_WITH: &str = "serde:field:has_deserialize_with";

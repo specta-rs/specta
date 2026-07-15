@@ -1,0 +1,32 @@
+---
+source: specta-jsonschema/tests/export.rs
+expression: schema
+---
+{
+  "$defs": {
+    "UntaggedValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "UntaggedValue"
+    }
+  },
+  "$ref": "#/$defs/UntaggedValue",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

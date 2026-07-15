@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "generate": "cargo run -p specta-tests --example zod_typecheck",
+    "typecheck": "bun run generate && tsc -p tsconfig.json",
+    "test": "bun run typecheck && bun test verify.test.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  }
+}

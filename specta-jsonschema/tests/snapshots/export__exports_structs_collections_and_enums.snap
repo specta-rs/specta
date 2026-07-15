@@ -1,0 +1,144 @@
+---
+source: specta-jsonschema/tests/export.rs
+expression: schema
+---
+{
+  "$defs": {
+    "Collections": {
+      "additionalProperties": false,
+      "properties": {
+        "map": {
+          "additionalProperties": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tuple": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        }
+      },
+      "required": [
+        "tags",
+        "tuple",
+        "map"
+      ],
+      "title": "Collections",
+      "type": "object"
+    },
+    "Message": {
+      "oneOf": [
+        {
+          "const": "Quit"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Move": {
+              "additionalProperties": false,
+              "properties": {
+                "x": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                },
+                "y": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Move"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Write": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "Write"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Message"
+    },
+    "Status": {
+      "oneOf": [
+        {
+          "const": "Active"
+        },
+        {
+          "const": "Inactive"
+        },
+        {
+          "const": "Pending"
+        }
+      ],
+      "title": "Status"
+    },
+    "User": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email"
+      ],
+      "title": "User",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

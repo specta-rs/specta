@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsdoc.rs
-assertion_line: 114
 expression: output
 ---
 Issue374: /**
@@ -108,12 +107,9 @@ Cow<'static, i32>:
 Vec<i32>: 
 Vec<MyEnum>: 
 Result<String, i32>: /**
-	* @typedef {{
-	*		ok: T,
-	*		err: E,
-	*	}} Result<T, E>
-	* @property {T} ok
-	* @property {E} err
+	* @typedef {({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never }} Result<T, E>
+	* @property {{ Ok: T }} Ok
+	* @property {{ Err: E }} Err
 	*/
 
 Vec<Option<Cow<'static, i32>>>: 
@@ -143,8 +139,8 @@ Unit5: /**
 	*/
 
 Unit6: /**
-	* @typedef {{ A: null }} Unit6
-	* @property {{ A: null }} A
+	* @typedef {{ A: [] }} Unit6
+	* @property {{ A: [] }} A
 	*/
 
 Unit7: /**
@@ -353,8 +349,8 @@ InlineTuple2: /**
 Box<str>: 
 Box<String>: 
 SkippedFieldWithinVariant: /**
-	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A"; data?: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data?: null }} A
 	* @property {{ type: "B"; data: string }} B
 	*/
 
@@ -513,20 +509,20 @@ Struct2: /**
 	*/
 
 Enum: /**
-	* @typedef {{ t: "A" } | { t: "B" }} Enum
+	* @typedef {{ t: "A" } | { t: "B" }} EnumNew
 	* @property {{ t: "A" }} A
 	* @property {{ t: "B" }} B
 	*/
 
 Enum2: /**
-	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2
+	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2New
 	* @property {{ t: "C" }} C
 	* @property {{ t: "B" }} B
 	* @property {{ t: "D"; enumField: null }} D
 	*/
 
 Enum3: /**
-	* @typedef {{ t: "A"; b: string }} Enum3
+	* @typedef {{ t: "A"; b: string }} Enum3New
 	* @property {{ t: "A"; b: string }} A
 	*/
 
@@ -1049,11 +1045,11 @@ Ninth: /**
 	*/
 
 Tenth: /**
-	* @typedef {string | "B" | {
+	* @typedef {string | null | {
 	* 	a: string,
 	* } | First} Tenth
 	* @property {string} A
-	* @property {"B"} B
+	* @property {null} B
 	* @property {{
 	* 	a: string,
 	* }} C

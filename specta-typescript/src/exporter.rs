@@ -76,6 +76,7 @@ impl fmt::Debug for BrandedTypeImpl {
 pub struct Exporter {
     /// Custom header prepended to exported files.
     pub header: Cow<'static, str>,
+    raw: Vec<Cow<'static, str>>,
     framework_runtime: Option<RuntimeFn>,
     pub(crate) branded_type_impl: Option<BrandedTypeImpl>,
     framework_prelude: Cow<'static, str>,
@@ -89,6 +90,7 @@ impl Exporter {
     pub(crate) fn default() -> Exporter {
         Exporter {
             header: Cow::Borrowed(""),
+            raw: Vec::new(),
             framework_runtime: None,
             branded_type_impl: None,
             framework_prelude: Cow::Borrowed(
@@ -115,6 +117,12 @@ impl Exporter {
         builder: impl Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
     ) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
+        self
+    }
+
+    /// Add raw Typescript or Javascript code that is exported as part of the bindings.
+    pub fn with_raw(mut self, raw: impl Into<Cow<'static, str>>) -> Self {
+        self.raw.push(raw.into());
         self
     }
 
@@ -212,7 +220,7 @@ impl Exporter {
                     types,
                 });
             }
-            let runtime = runtime?;
+            let runtime = render_runtime(&exporter, runtime?);
 
             // Framework runtime
             if !runtime.is_empty() {
@@ -268,7 +276,7 @@ impl Exporter {
                         types,
                     });
                 }
-                let runtime = runtime?;
+                let runtime = render_runtime(&exporter, runtime?);
 
                 if !runtime.is_empty() {
                     result.push('\n');
@@ -382,13 +390,13 @@ impl Exporter {
 
             {
                 let mut has_manually_exported_user_types = false;
-                let mut runtime = Cow::default();
+                let mut framework_runtime = Cow::default();
                 let mut runtime_references = HashSet::new();
-                if let Some(framework_runtime) = &exporter.framework_runtime {
+                if let Some(runtime_fn) = &exporter.framework_runtime {
                     let (runtime_result, referenced_types) =
                         references::with_module_path("", || {
                             references::collect_references(|| {
-                                (framework_runtime.0)(FrameworkExporter {
+                                (runtime_fn.0)(FrameworkExporter {
                                     exporter: &exporter,
                                     format: Some(&format),
                                     has_manually_exported_user_types:
@@ -398,9 +406,10 @@ impl Exporter {
                                 })
                             })
                         });
-                    runtime = runtime_result?;
+                    framework_runtime = runtime_result?;
                     runtime_references = referenced_types;
                 }
+                let runtime = render_runtime(&exporter, framework_runtime);
 
                 let should_export_user_types =
                     !has_manually_exported_user_types && !root_types.is_empty();
@@ -519,6 +528,23 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             Cow::Owned(types) => Cow::Owned(types),
         },
     )
+}
+
+fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {
+    let mut runtime = String::new();
+
+    if !framework_runtime.is_empty() {
+        runtime.push_str(&framework_runtime);
+    }
+
+    for raw in exporter.raw.iter().filter(|raw| !raw.is_empty()) {
+        if !runtime.is_empty() {
+            runtime.push('\n');
+        }
+        runtime.push_str(raw);
+    }
+
+    runtime
 }
 
 fn map_datatype_format(
@@ -818,18 +844,12 @@ impl BrandedTypeExporter<'_> {
         primitives::inline(self, self.types, &mapped)
     }
 
-    /// [primitives::reference]
-    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        let mapped = map_datatype_format(
-            self.format,
-            self.types,
-            &DataType::Reference(r.clone()),
-            &[],
-        )?;
-        match mapped {
-            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
-            dt => primitives::inline(self, self.types, &dt),
-        }
+    /// Render a datatype while recursively preserving ordinary named references.
+    ///
+    /// See [`primitives::reference`] for details.
+    pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::reference(self, self.types, &mapped)
     }
 }
 
@@ -888,18 +908,12 @@ impl FrameworkExporter<'_> {
         primitives::inline(self, self.types, &mapped)
     }
 
-    /// [primitives::reference]
-    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        let mapped = map_datatype_format(
-            self.format,
-            self.types,
-            &DataType::Reference(r.clone()),
-            &[],
-        )?;
-        match mapped {
-            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
-            dt => primitives::inline(self, self.types, &dt),
-        }
+    /// Render a datatype while recursively preserving ordinary named references.
+    ///
+    /// See [`primitives::reference`] for details.
+    pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
+        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        primitives::reference(self, self.types, &mapped)
     }
 
     /// [primitives::export]
@@ -1231,7 +1245,9 @@ fn exported_type_name(exporter: &Exporter, ndt: &NamedDataType) -> Cow<'static, 
     match exporter.layout {
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            s.push('_');
+            if !s.is_empty() {
+                s.push('_');
+            }
             s.push_str(&ndt.name);
             Cow::Owned(s)
         }

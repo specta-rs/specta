@@ -1,7 +1,7 @@
 [package]
 name = "specta"
 description = "Easily export your Rust types to other languages"
-version = "2.0.0-rc.25"
+version = "2.0.0-rc.26"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -109,7 +109,7 @@ geojson = ["dep:geojson", "serde_json"]
 workspace = true
 
 [dependencies]
-specta-macros = { version = "=2.0.0-rc.25", optional = true, path = "../specta-macros" }
+specta-macros = { version = "=2.0.0-rc.26", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 
 small_ctor = { version = "0.1.2", optional = true }
@@ -118,7 +118,7 @@ small_ctor = { version = "0.1.2", optional = true }
 serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9", optional = true, default-features = false, features = [] }
 toml = { version = "1.1", optional = true, default-features = false, features = ["serde"] }
-ulid = { version = "1", optional = true, default-features = false, features = [] }
+ulid = { version = "2", optional = true, default-features = false, features = [] }
 uuid = { version = "1", optional = true, default-features = false, features = [
 ] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
@@ -136,18 +136,18 @@ arrayvec = { version = ">=0.6, <0.8", optional = true, default-features = false,
 smallvec = { version = "1", optional = true, default-features = false, features = [] }
 ipnetwork = { version = "0.21", optional = true, default-features = false, features = [] }
 mac_address = { version = "1", optional = true, default-features = false, features = [] }
-bit-vec = { version = "0.9", optional = true, default-features = false, features = [] }
+bit-vec = { version = "0.10", optional = true, default-features = false, features = [] }
 bson = { version = "3", optional = true, default-features = false, features = ["compat-3-0-0"] }
 bytes = { version = "1", optional = true, default-features = false, features = [] }
 uhlc = { version = "0.9", optional = true, default-features = false, features = [] }
 bytesize = { version = "2", optional = true, default-features = false, features = [] }
-glam = { version = "0.32", optional = true, default-features = false, features = ["std"] }
+glam = { version = "0.33", optional = true, default-features = false, features = ["std", "all-types"] }
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 url = { version = "2", optional = true, default-features = false }
 either = { version = "1", optional = true, default-features = false }
-error-stack = { version = "0.7", optional = true, default-features = false }
-bevy_ecs = { version = "0.18", optional = true, default-features = false, features = ["std"] }
-bevy_input = { version = "0.18", optional = true, default-features = false, features = [
+error-stack = { version = "0.8", optional = true, default-features = false }
+bevy_ecs = { version = "0.19", optional = true, default-features = false, features = ["std"] }
+bevy_input = { version = "0.19", optional = true, default-features = false, features = [
   "std",
   "bevy_reflect",
   "keyboard",

@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsdoc.rs
-assertion_line: 143
 expression: output
 ---
 /**
@@ -18,12 +17,9 @@ expression: output
 	* @property {T} start
 	* @property {T} end
 	*
-	* @typedef {{
-	*		ok: T,
-	*		err: E,
-	*	}} Result<T, E>
-	* @property {T} ok
-	* @property {E} err
+	* @typedef {({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never }} Result<T, E>
+	* @property {{ Ok: T }} Ok
+	* @property {{ Err: E }} Err
 	*
 	* @typedef {null} Unit1
 	*
@@ -37,8 +33,8 @@ expression: output
 	* @typedef {"A"} Unit5
 	* @property {"A"} A
 	*
-	* @typedef {{ A: null }} Unit6
-	* @property {{ A: null }} A
+	* @typedef {{ A: [] }} Unit6
+	* @property {{ A: [] }} A
 	*
 	* @typedef {{ A: Record<string, never> }} Unit7
 	* @property {{ A: Record<string, never> }} A
@@ -186,8 +182,8 @@ expression: output
 	* 	demo: [string, boolean],
 	* }, boolean]} demo
 	*
-	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A"; data?: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data?: null }} A
 	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
@@ -296,16 +292,16 @@ expression: output
 	*	}} Struct2
 	* @property {string} b
 	*
-	* @typedef {{ t: "A" } | { t: "B" }} Enum
+	* @typedef {{ t: "A" } | { t: "B" }} EnumNew
 	* @property {{ t: "A" }} A
 	* @property {{ t: "B" }} B
 	*
-	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2
+	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2New
 	* @property {{ t: "C" }} C
 	* @property {{ t: "B" }} B
 	* @property {{ t: "D"; enumField: null }} D
 	*
-	* @typedef {{ t: "A"; b: string }} Enum3
+	* @typedef {{ t: "A"; b: string }} Enum3New
 	* @property {{ t: "A"; b: string }} A
 	*
 	* @typedef {{
@@ -720,11 +716,11 @@ expression: output
 	* } }} C
 	* @property {{ t: "D"; c: First }} D
 	*
-	* @typedef {string | "B" | {
+	* @typedef {string | null | {
 	* 	a: string,
 	* } | First} Tenth
 	* @property {string} A
-	* @property {"B"} B
+	* @property {null} B
 	* @property {{
 	* 	a: string,
 	* }} C

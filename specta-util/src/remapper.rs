@@ -1,6 +1,6 @@
 use specta::{
     Types,
-    datatype::{DataType, Fields, NamedReferenceType, Reference},
+    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
 };
 
 /// Recursively replaces [`DataType`]s within a [`DataType`] structure from a set of remap rules.
@@ -58,15 +58,87 @@ impl Remapper {
 
     /// Registers a rule that replaces exact matches of `from` with `to`.
     ///
-    /// Rules are checked in the order they are registered.
+    /// Rules are checked in the order they are registered. Replacements are
+    /// recursively crawled, but a rule is not reapplied within the replacement
+    /// subtree it created. This allows rules such as `T -> Vec<T>` to terminate.
     pub fn rule(mut self, from: DataType, to: DataType) -> Self {
         self.rules.push((from, to));
         self
     }
 
+    /// Remaps the BigInt-style integer primitives — `i64`, `u64`, `i128`, `u128`,
+    /// `isize` and `usize` — so they export as a plain `number` instead of
+    /// erroring or exporting as `bigint`. Signed types map to `i32` and unsigned
+    /// types to `u32` — a fixed-width integer, so the result is a clean `number`
+    /// rather than the `number | null` that `f64` would produce.
+    ///
+    /// This is a convenience for the common case of calling [`rule`](Self::rule)
+    /// once per integer type. `f128` is not included — it is not an integer;
+    /// remap it by hand if you need to.
+    ///
+    /// <div class="warning">
+    ///
+    /// **This is a deliberately lossy escape hatch — hence `dangerous`.**
+    ///
+    /// A JavaScript `number` is an IEEE-754 double, so any integer larger than
+    /// `Number.MAX_SAFE_INTEGER` (`2^53 - 1`) silently loses precision on the
+    /// wire. A `u64` id or timestamp that grows past that range arrives on the
+    /// frontend as the wrong value, with no error to warn you.
+    ///
+    /// Specta deliberately does not expose this as a global option. Calling this
+    /// is you explicitly asserting — in the spirit of an `unsafe` block — that
+    /// you accept that trade-off for these types, and only as a last resort.
+    /// Prefer:
+    ///
+    /// - leaving them as `bigint` (the default), which is lossless;
+    /// - a framework with lossless BigInt support, such as Tauri Specta or
+    ///   TauRPC, if you control the runtime;
+    /// - overriding a single type with `specta_typescript::Number`, rather than
+    ///   every integer at once.
+    ///
+    /// As with any [`rule`](Self::rule), you must ensure Serde applies the same
+    /// representation to the runtime data for the type contract to stay sound.
+    ///
+    /// </div>
+    ///
+    /// <div class="warning">
+    ///
+    /// **Remap for a TypeScript export, not for a schema export.**
+    ///
+    /// The narrowing is invisible in TypeScript, where `i32` and `i64` both
+    /// render as `number`. Schema exporters have no BigInt guard to escape and
+    /// model integer width natively, so they already export an `i64` correctly:
+    /// `specta-jsonschema` and `specta-openapi` give it the full `i64`
+    /// `minimum` and `maximum`. Remapping first narrows those to `i32`'s range,
+    /// leaving a `"maximum"` of `2147483647` that real data violates — a
+    /// millisecond timestamp is some 800× larger. The export still succeeds, so
+    /// nothing warns you.
+    ///
+    /// [`remap_types`](Self::remap_types) returns a new collection rather than
+    /// mutating in place, so remap a clone for TypeScript and export the
+    /// original everywhere else.
+    ///
+    /// </div>
+    pub fn dangerous_bigints_as_number(mut self) -> Self {
+        for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
+            self = self.rule(
+                DataType::Primitive(signed),
+                DataType::Primitive(Primitive::i32),
+            );
+        }
+        for unsigned in [Primitive::u64, Primitive::u128, Primitive::usize] {
+            self = self.rule(
+                DataType::Primitive(unsigned),
+                DataType::Primitive(Primitive::u32),
+            );
+        }
+        self
+    }
+
     /// Applies the remap operation to a datatype, returning the remapped datatype.
     pub fn remap_dt(&self, mut dt: DataType) -> DataType {
-        self.remap_internal(&mut dt);
+        let active_rules = vec![false; self.rules.len()];
+        self.remap_internal(&mut dt, &active_rules);
         dt
     }
 
@@ -75,86 +147,90 @@ impl Remapper {
         types.map(|mut ndt| {
             ndt.generics.to_mut().iter_mut().for_each(|generic| {
                 if let Some(dt) = &mut generic.default {
-                    self.remap_internal(dt);
+                    let active_rules = vec![false; self.rules.len()];
+                    self.remap_internal(dt, &active_rules);
                 }
             });
             if let Some(dt) = &mut ndt.ty {
-                self.remap_internal(dt);
+                let active_rules = vec![false; self.rules.len()];
+                self.remap_internal(dt, &active_rules);
             }
             ndt
         })
     }
 
-    fn remap_internal(&self, dt: &mut DataType) {
-        self.remap_rules(dt);
+    fn remap_internal(&self, dt: &mut DataType, active_rules: &[bool]) {
+        let mut active_rules = active_rules.to_vec();
+        self.remap_rules(dt, &mut active_rules);
 
         match dt {
             DataType::Primitive(_) | DataType::Generic(_) => {}
-            DataType::List(list) => self.remap_internal(&mut list.ty),
+            DataType::List(list) => self.remap_internal(&mut list.ty, &active_rules),
             DataType::Map(map) => {
-                self.remap_internal(map.key_ty_mut());
-                self.remap_internal(map.value_ty_mut());
+                self.remap_internal(map.key_ty_mut(), &active_rules);
+                self.remap_internal(map.value_ty_mut(), &active_rules);
             }
-            DataType::Struct(s) => self.remap_fields(&mut s.fields),
+            DataType::Struct(s) => self.remap_fields(&mut s.fields, &active_rules),
             DataType::Enum(e) => {
                 for (_, variant) in &mut e.variants {
-                    self.remap_fields(&mut variant.fields);
+                    self.remap_fields(&mut variant.fields, &active_rules);
                 }
             }
             DataType::Tuple(tuple) => {
                 for dt in &mut tuple.elements {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, &active_rules);
                 }
             }
-            DataType::Nullable(dt) => self.remap_internal(dt),
+            DataType::Nullable(dt) => self.remap_internal(dt, &active_rules),
             DataType::Intersection(dts) => {
                 for dt in dts {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, &active_rules);
                 }
             }
-            DataType::Reference(r) => self.remap_reference(r),
+            DataType::Reference(r) => self.remap_reference(r, &active_rules),
         }
     }
 
-    fn remap_rules(&self, dt: &mut DataType) {
-        for (from, to) in &self.rules {
-            if *dt == *from {
+    fn remap_rules(&self, dt: &mut DataType, active_rules: &mut [bool]) {
+        for (index, (from, to)) in self.rules.iter().enumerate() {
+            if !active_rules[index] && *dt == *from {
                 *dt = to.clone();
+                active_rules[index] = true;
             }
         }
     }
 
-    fn remap_fields(&self, fields: &mut Fields) {
+    fn remap_fields(&self, fields: &mut Fields, active_rules: &[bool]) {
         match fields {
             Fields::Unit => {}
             Fields::Unnamed(fields) => {
                 for field in &mut fields.fields {
                     if let Some(dt) = &mut field.ty {
-                        self.remap_internal(dt);
+                        self.remap_internal(dt, active_rules);
                     }
                 }
             }
             Fields::Named(fields) => {
                 for (_, field) in &mut fields.fields {
                     if let Some(dt) = &mut field.ty {
-                        self.remap_internal(dt);
+                        self.remap_internal(dt, active_rules);
                     }
                 }
             }
         }
     }
 
-    fn remap_reference(&self, reference: &mut Reference) {
+    fn remap_reference(&self, reference: &mut Reference, active_rules: &[bool]) {
         let Reference::Named(reference) = reference else {
             return;
         };
 
         match &mut reference.inner {
             NamedReferenceType::Recursive(_) => {}
-            NamedReferenceType::Inline { dt, .. } => self.remap_internal(dt),
+            NamedReferenceType::Inline { dt, .. } => self.remap_internal(dt, active_rules),
             NamedReferenceType::Reference { generics, .. } => {
                 for (_, dt) in generics {
-                    self.remap_internal(dt);
+                    self.remap_internal(dt, active_rules);
                 }
             }
         }
@@ -215,6 +291,18 @@ mod tests {
     }
 
     #[test]
+    fn replacement_does_not_recrawl_the_rule_that_created_it() {
+        let remapped = Remapper::new()
+            .rule(
+                Primitive::u32.into(),
+                DataType::List(List::new(Primitive::u32.into())),
+            )
+            .remap_dt(Primitive::u32.into());
+
+        assert_eq!(remapped, DataType::List(List::new(Primitive::u32.into())));
+    }
+
+    #[test]
     fn remaps_named_type_bodies() {
         let mut types = Types::default();
         NamedDataType::new("User", &mut types, |_, ty| {
@@ -234,5 +322,39 @@ mod tests {
         let debug = format!("{types:?}");
         assert!(debug.contains("Primitive(str)"));
         assert!(debug.contains("Primitive(bool)"));
+    }
+
+    #[test]
+    fn dangerous_bigints_as_number_remaps_every_integer() {
+        let remapper = Remapper::new().dangerous_bigints_as_number();
+
+        for p in [Primitive::i64, Primitive::i128, Primitive::isize] {
+            assert_eq!(
+                remapper.remap_dt(DataType::Primitive(p.clone())),
+                Primitive::i32.into(),
+                "{p:?} should remap to i32",
+            );
+        }
+        for p in [Primitive::u64, Primitive::u128, Primitive::usize] {
+            assert_eq!(
+                remapper.remap_dt(DataType::Primitive(p.clone())),
+                Primitive::u32.into(),
+                "{p:?} should remap to u32",
+            );
+        }
+
+        // Safe-width integers and the (non-integer) f128 are left untouched.
+        assert_eq!(
+            remapper.remap_dt(Primitive::i32.into()),
+            Primitive::i32.into()
+        );
+        assert_eq!(
+            remapper.remap_dt(Primitive::u32.into()),
+            Primitive::u32.into()
+        );
+        assert_eq!(
+            remapper.remap_dt(Primitive::f128.into()),
+            Primitive::f128.into()
+        );
     }
 }

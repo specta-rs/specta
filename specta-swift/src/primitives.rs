@@ -3,7 +3,8 @@
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Enum, Fields, Generic, NamedReferenceType, Primitive, Reference, Variant,
+        DataType, Enum, Field, Fields, Generic, NamedReferenceType, Primitive, Reference, Struct,
+        Variant,
     },
 };
 
@@ -221,7 +222,22 @@ pub fn export_type(
     types: &Types,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String, Error> {
-    if !matches!(&ndt.ty, Some(DataType::Struct(_) | DataType::Enum(_))) {
+    // A named tuple definition (e.g. produced by specta-serde when
+    // `#[serde(skip)]` reduces a tuple struct to one live field) renders
+    // exactly like a tuple struct with the same elements.
+    let tuple_as_struct = match &ndt.ty {
+        Some(DataType::Tuple(tuple)) => {
+            let mut builder = Struct::unnamed();
+            for element in &tuple.elements {
+                builder = builder.field(Field::new(element.clone()));
+            }
+            Some(builder.build())
+        }
+        _ => None,
+    };
+    let ndt_ty = tuple_as_struct.as_ref().or(ndt.ty.as_ref());
+
+    if !matches!(ndt_ty, Some(DataType::Struct(_) | DataType::Enum(_))) {
         return Ok(String::new());
     }
     let mut result = String::new();
@@ -259,7 +275,7 @@ pub fn export_type(
         .collect::<Vec<_>>();
 
     // Format based on type
-    match ndt.ty.as_ref().expect("checked above") {
+    match ndt_ty.expect("checked above") {
         DataType::Struct(s) => {
             let type_def = struct_to_swift(swift, format, types, s, generic_scope.clone())?;
             let name = swift.naming.convert(&ndt.name);
@@ -281,14 +297,11 @@ pub fn export_type(
             result.push('}');
         }
         DataType::Enum(e) => {
-            let formatted_enum = match apply_datatype_format(
-                None,
-                types,
-                ndt.ty.as_ref().expect("checked above"),
-            )? {
-                DataType::Enum(e) => Some(e),
-                _ => None,
-            };
+            let formatted_enum =
+                match apply_datatype_format(None, types, ndt_ty.expect("checked above"))? {
+                    DataType::Enum(e) => Some(e),
+                    _ => None,
+                };
             let e = formatted_enum
                 .as_ref()
                 .filter(|e| resolved_string_enum(e).is_some())
@@ -737,29 +750,32 @@ fn struct_to_swift(
                 Ok("Void".to_string())
             } else if fields.fields.len() == 1 {
                 // Single field tuple struct - convert to a proper struct with a 'value' field
-                let field_type = datatype_to_swift(
-                    swift,
-                    format,
-                    types,
-                    fields.fields[0]
-                        .ty
-                        .as_ref()
-                        .expect("tuple field should have a type"),
-                    generic_scope,
-                )?;
+                let Some(ty) = fields.fields[0].ty.as_ref() else {
+                    // The sole field is skipped (`ty: None`), so nothing
+                    // reaches the wire.
+                    return Ok("Void".to_string());
+                };
+                let field_type = datatype_to_swift(swift, format, types, ty, generic_scope)?;
                 Ok(format!("    let value: {}\n", field_type))
             } else {
                 // Multiple field tuple struct - convert to a proper struct with numbered fields
                 let mut result = String::new();
                 for (i, field) in fields.fields.iter().enumerate() {
-                    let field_type = datatype_to_swift(
-                        swift,
-                        format,
-                        types,
-                        field.ty.as_ref().expect("tuple field should have a type"),
-                        generic_scope.clone(),
-                    )?;
-                    result.push_str(&format!("    public let field{}: {}\n", i, field_type));
+                    // Skipped slots (`ty: None` markers preserving the
+                    // declared arity) never reach the wire.
+                    let Some(ty) = field.ty.as_ref() else {
+                        continue;
+                    };
+                    let field_type =
+                        datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
+                    // A `#[serde(default)]` trailing tuple element may be
+                    // absent on deserialize; Swift's closest representation
+                    // is an Optional property.
+                    let optional_marker = if field.optional { "?" } else { "" };
+                    result.push_str(&format!(
+                        "    public let field{}: {}{}\n",
+                        i, field_type, optional_marker
+                    ));
                 }
                 Ok(result)
             }

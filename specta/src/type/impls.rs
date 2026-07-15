@@ -154,11 +154,11 @@ const _: () = {
         fn definition(types: &mut Types) -> DataType {
             datatype::Struct::named()
                 .field(
-                    "duration_since_epoch",
-                    Field::new(<i64 as crate::Type>::definition(types)),
+                    "secs_since_epoch",
+                    Field::new(<u64 as crate::Type>::definition(types)),
                 )
                 .field(
-                    "duration_since_unix_epoch",
+                    "nanos_since_epoch",
                     Field::new(<u32 as crate::Type>::definition(types)),
                 )
                 .build()
@@ -189,10 +189,23 @@ const _: () = {
     struct BaseResult<T, E>(PhantomData<T>, PhantomData<E>);
     impl<T: Type, E: Type> Type for BaseResult<T, E> {
         fn definition(types: &mut Types) -> DataType {
-            datatype::Struct::named()
-                .field("ok", Field::new(<T as Type>::definition(types)))
-                .field("err", Field::new(<E as Type>::definition(types)))
-                .build()
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Ok".into(),
+                        datatype::Variant::unnamed()
+                            .field(Field::new(<T as Type>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Err".into(),
+                        datatype::Variant::unnamed()
+                            .field(Field::new(<E as Type>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Default::default(),
+            })
         }
     }
 };

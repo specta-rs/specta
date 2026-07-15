@@ -1,114 +1,19 @@
-//! [JSON Schema](https://json-schema.org) exporter and importer for [Specta](specta).
-//!
-//! This crate provides bidirectional conversion between Specta types and JSON Schema:
-//! - Export Specta types to JSON Schema (Draft 7, 2019-09, or 2020-12)
-//! - Import JSON Schema definitions as Specta DataTypes
-//!
-//! # Features
-//!
-//! - **Bidirectional conversion**: Export to JSON Schema and import from JSON Schema
-//! - **Multiple schema versions**: Support for Draft 7 (default), Draft 2019-09, and Draft 2020-12
-//! - **Serde integration**: Use `specta-serde` in userspace before export
-//! - **Flexible layouts**: Single file with `$defs` or separate files per type
-//! - **schemars ecosystem**: Compatible with the schemars crate for interoperability
+//! [JSON Schema](https://json-schema.org) exporter for [Specta](specta).
 //!
 //! # Usage
 //!
-//! ## Exporting to JSON Schema
-//!
-//! ```ignore
-//! use serde::{Deserialize, Serialize};
-//! use specta::{Type, Types};
-//! use specta_jsonschema::{JsonSchema, SchemaVersion};
-//!
-//! #[derive(Serialize, Deserialize, Type)]
-//! #[serde(rename_all = "camelCase")]
-//! pub struct User {
-//!     pub id: u32,
-//!     pub name: String,
-//!     pub email: Option<String>,
-//! }
-//!
-//! fn main() {
-//!     let types = Types::default()
-//!         .register::<User>();
-//!
-//!     // Export to JSON Schema
-//!     let schema = JsonSchema::default()
-//!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types, specta_serde::Format)
-//!         .unwrap();
-//!
-//!     println!("{}", schema);
-//! }
-//! ```
-//!
-//! ## With Serde Integration
-//!
-//! ```ignore
-//! use serde::{Deserialize, Serialize};
+//! ```rust
 //! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
-//! #[derive(Serialize, Deserialize, Type)]
-//! #[serde(rename_all = "camelCase")]
+//! #[derive(Type)]
 //! pub struct User {
-//!     pub user_id: u32,
-//!     #[serde(rename = "fullName")]
+//!     pub id: u32,
 //!     pub name: String,
 //! }
 //!
-//! fn main() {
-//!     let types = Types::default().register::<User>();
-//!
-//!     JsonSchema::default()
-//!         .export_to("./schema.json", &types, specta_serde::Format)
-//!         .unwrap();
-//! }
-//! ```
-//!
-//! ## Importing from JSON Schema
-//!
-//! ```ignore
-//! use schemars::Schema;
-//! use specta_jsonschema::import::from_schema;
-//!
-//! let schema: Schema = serde_json::from_str(r#"{
-//!     "type": "object",
-//!     "properties": {
-//!         "name": { "type": "string" },
-//!         "age": { "type": "integer" }
-//!     },
-//!     "required": ["name"]
-//! }"#).unwrap();
-//!
-//! let datatype = from_schema(&schema).unwrap();
-//! ```
-//!
-//! ## Multiple Output Layouts
-//!
-//! ```ignore
-//! use specta_jsonschema::{JsonSchema, Layout};
-//!
-//! // Single file with all types in $defs
-//! JsonSchema::default()
-//!     .layout(Layout::SingleFile)
-//!     .export_to(
-//!         "./schema.json",
-//!         &types,
-//!         specta_serde::Format,
-//!     )
-//!     .unwrap();
-//!
-//! // Separate file per type, organized by module
-//! JsonSchema::default()
-//!     .layout(Layout::Files)
-//!     .export_to(
-//!         "./schemas/",
-//!         &types,
-//!         specta_serde::Format,
-//!     )
-//!     .unwrap();
+//! let types = Types::default().register::<User>();
+//! let schema = JsonSchema::default().export(&types, specta_serde::Format).unwrap();
 //! ```
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -116,22 +21,12 @@
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
-#![allow(warnings)] // TODO: leaving this until it's implemented to avoid unnecessary warnings.
 
 mod error;
-pub mod import;
-mod json_schema;
-mod layout;
-mod primitives;
+mod jsonschema;
+mod render;
 mod schema_version;
 
 pub use error::Error;
-pub use json_schema::JsonSchema;
-pub use layout::Layout;
+pub use jsonschema::JsonSchema;
 pub use schema_version::SchemaVersion;
-
-// Legacy function - kept for backward compatibility
-#[deprecated(note = "Use import::from_schema instead")]
-pub fn to_ast(schema: &schemars::Schema) -> Result<specta::datatype::DataType, Error> {
-    import::from_schema(schema)
-}

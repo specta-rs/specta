@@ -1,0 +1,155 @@
+---
+source: specta-jsonschema/tests/export.rs
+expression: schema
+---
+{
+  "$defs": {
+    "Nested<String>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Nested",
+      "type": "object"
+    },
+    "Nested<u32>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Nested",
+      "type": "object"
+    },
+    "User": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email"
+      ],
+      "title": "User",
+      "type": "object"
+    },
+    "UsesGenerics": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "$ref": "#/$defs/Wrapper%3Cu32%3E"
+        },
+        "user": {
+          "$ref": "#/$defs/Wrapper%3CUser%3E"
+        }
+      },
+      "required": [
+        "user",
+        "count"
+      ],
+      "title": "UsesGenerics",
+      "type": "object"
+    },
+    "UsesNestedGenerics": {
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "$ref": "#/$defs/Wrapper%3CNested%3Cu32%3E%3E"
+        },
+        "string": {
+          "$ref": "#/$defs/Wrapper%3CNested%3CString%3E%3E"
+        }
+      },
+      "required": [
+        "string",
+        "number"
+      ],
+      "title": "UsesNestedGenerics",
+      "type": "object"
+    },
+    "Wrapper<Nested<String>>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Nested%3CString%3E"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    },
+    "Wrapper<Nested<u32>>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Nested%3Cu32%3E"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    },
+    "Wrapper<User>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/User"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    },
+    "Wrapper<u32>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Wrapper",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

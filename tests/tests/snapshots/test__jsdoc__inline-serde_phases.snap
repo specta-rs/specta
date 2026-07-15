@@ -28,7 +28,7 @@ StructWithAliasAndRename: {
 EnumWithVariantAlias: "Variant" | "Other"
 EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
-InternallyTaggedWithAlias: ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }
+InternallyTaggedWithAlias: { type: "A"; field: string } | { type: "B"; other: number }
 AdjacentlyTaggedWithAlias: { type: "A"; data: {
 	field: string,
 } } | { type: "B"; data: {
@@ -85,10 +85,7 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null
 Option<Vec<i32>>: number[] | null
-Result<String, i32>: {
-	ok: T,
-	err: E,
-}
+Result<String, i32>: ({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never }
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 Option<Vec<Cow<'static, i32>>>: number[] | null
 [Vec<String>; 3]: [string[], string[], string[]]
@@ -102,7 +99,7 @@ Unit2: Record<string, never>
 Unit3: []
 Unit4: null
 Unit5: "A"
-Unit6: { A: null }
+Unit6: { A: [] }
 Unit7: { A: Record<string, never> }
 SimpleStruct: {
 	a: number,
@@ -180,7 +177,7 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: { type: "A" } | { type: "B"; data: string }
+SkippedFieldWithinVariant: { type: "A"; data?: null } | { type: "B"; data: string }
 KebabCase: {
 	"test-ing": string,
 }
@@ -455,7 +452,7 @@ Eight: { A: string } | "B"
 Ninth: { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 	a: string,
 } } | { t: "D"; c: First }
-Tenth: string | "B" | {
+Tenth: string | null | {
 	a: string,
 } | First
 MyEnumTagged: {
