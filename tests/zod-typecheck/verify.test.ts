@@ -27,6 +27,7 @@ test("generated schemas validate representative wire values", () => {
   }).success).toBe(true);
   expect(ExternalEnumSchema.safeParse({ Newtype: "value", Tuple: [1, true] }).success).toBe(false);
   expect(UntaggedMatchingFieldSchema.safeParse({ Variant: "value", extra: true }).success).toBe(true);
+  expect(UntaggedMatchingFieldSchema.safeParse({ extra: true }).success).toBe(true);
 });
 
 test("generated schemas reject invalid primitive wire values", () => {

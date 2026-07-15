@@ -1333,7 +1333,14 @@ fn enum_variant_dt(
         Fields::Unit => Ok(Some(format!("z.literal(\"{}\")", escape_string(name)))),
         Fields::Named(named) => {
             if named.fields.iter().all(|(_, field)| field.ty.is_none()) {
-                return Ok(Some("z.strictObject({})".to_string()));
+                return Ok(Some(
+                    if strict_object {
+                        "z.strictObject({})"
+                    } else {
+                        "z.object({})"
+                    }
+                    .to_string(),
+                ));
             }
 
             let mut schema = if strict_object {

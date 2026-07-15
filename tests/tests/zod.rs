@@ -90,6 +90,7 @@ enum UntaggedMatchingField {
         #[serde(rename = "Variant")]
         value: String,
     },
+    Empty {},
 }
 
 #[derive(Type, Serialize)]
@@ -524,12 +525,26 @@ fn zod_empty_named_shapes_are_strict() {
 
 #[test]
 fn zod_untagged_matching_field_name_is_not_strict() {
-    let rendered = export_for::<UntaggedMatchingField>().unwrap();
-    assert!(rendered.contains("z.object({"));
-    assert!(!rendered.contains("z.strictObject({"));
+    for rendered in [
+        export_for::<UntaggedMatchingField>().unwrap(),
+        Zod::default()
+            .export(
+                &Types::default().register::<UntaggedMatchingField>(),
+                specta_serde::PhasesFormat,
+            )
+            .unwrap(),
+    ] {
+        assert!(rendered.contains("z.object({"));
+        assert!(rendered.contains("z.object({})"));
+        assert!(!rendered.contains("z.strictObject({"));
+    }
 
-    let value = serde_json::json!({ "Variant": "value", "extra": true });
-    assert!(serde_json::from_value::<UntaggedMatchingField>(value).is_ok());
+    for value in [
+        serde_json::json!({ "Variant": "value", "extra": true }),
+        serde_json::json!({ "extra": true }),
+    ] {
+        assert!(serde_json::from_value::<UntaggedMatchingField>(value).is_ok());
+    }
 }
 
 #[test]

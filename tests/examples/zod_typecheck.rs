@@ -77,6 +77,7 @@ enum UntaggedMatchingField {
         #[serde(rename = "Variant")]
         value: String,
     },
+    Empty {},
 }
 
 mod r#type {
