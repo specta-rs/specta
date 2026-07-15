@@ -100,6 +100,25 @@ impl Remapper {
     /// representation to the runtime data for the type contract to stay sound.
     ///
     /// </div>
+    ///
+    /// <div class="warning">
+    ///
+    /// **Remap for a TypeScript export, not for a schema export.**
+    ///
+    /// The narrowing is invisible in TypeScript, where `i32` and `i64` both
+    /// render as `number`. Schema exporters have no BigInt guard to escape and
+    /// model integer width natively, so they already export an `i64` correctly:
+    /// `specta-jsonschema` and `specta-openapi` give it the full `i64`
+    /// `minimum` and `maximum`. Remapping first narrows those to `i32`'s range,
+    /// leaving a `"maximum"` of `2147483647` that real data violates — a
+    /// millisecond timestamp is some 800× larger. The export still succeeds, so
+    /// nothing warns you.
+    ///
+    /// [`remap_types`](Self::remap_types) returns a new collection rather than
+    /// mutating in place, so remap a clone for TypeScript and export the
+    /// original everywhere else.
+    ///
+    /// </div>
     pub fn dangerous_bigints_as_number(mut self) -> Self {
         for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
             self = self.rule(
