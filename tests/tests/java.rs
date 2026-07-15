@@ -516,6 +516,26 @@ fn files_layout_rejects_default_package_references_from_named_packages() {
 }
 
 #[test]
+fn definition_less_named_references_return_an_export_error() {
+    let mut types = Types::default();
+    let missing = specta::datatype::NamedDataType::new("Missing", &mut types, |_, _datatype| {});
+    specta::datatype::NamedDataType::new("Container", &mut types, |_, datatype| {
+        datatype.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "missing",
+                    specta::datatype::Field::new(missing.reference(Vec::new()).into()),
+                )
+                .build(),
+        );
+    });
+
+    let error = Java::default().export(&types, IdentityFormat).unwrap_err();
+    assert!(error.to_string().contains("Missing"));
+    assert!(error.to_string().contains("has no definition to export"));
+}
+
+#[test]
 fn genuine_inline_single_variant_enums_remain_enums() {
     #[derive(Type)]
     #[specta(collect = false)]

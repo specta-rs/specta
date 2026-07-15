@@ -752,6 +752,15 @@ fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Erro
                     return Err(Error::recursive_inline(path, rust_path(ndt), cycle.clone()));
                 }
                 NamedReferenceType::Reference { generics, .. } => {
+                    if ndt.ty.is_none() {
+                        return Err(Error::unsupported(
+                            path,
+                            format!(
+                                "named type '{}' has no definition to export",
+                                rust_path(ndt)
+                            ),
+                        ));
+                    }
                     let mut name = rendered_type_name(ctx.java, ndt)?;
                     if ctx.qualified_references && ndt.module_path.as_ref() != ctx.current_module {
                         let package = join_package(
