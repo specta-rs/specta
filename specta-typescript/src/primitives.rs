@@ -2253,17 +2253,56 @@ struct AliasNode<'a> {
     /// `Gen<String>` through the cycle - and its variants merge into the
     /// root's body once per instantiation.
     substs: Vec<GenericSubst>,
-    /// Outgoing alias-transparent edges.
-    edges: Vec<AliasEdge<'a>>,
+    /// Targets of this node's outgoing alias-transparent hops, used to
+    /// compute cycle membership. The hops themselves are re-derived (and
+    /// re-classified post-substitution) during the merge walk.
+    edges: Vec<AliasId>,
 }
 
-struct AliasEdge<'a> {
-    target: AliasId,
-    /// The reference at the hop site; its generic arguments (explicit,
-    /// defaulted, or omitted) are composed with the source's substitutions
-    /// when propagating instantiations.
-    reference: &'a NamedReference,
-    nullable: bool,
+/// Divergence guards for [`collapse_untagged_alias_cycle`]'s instantiation
+/// walk (see [`enqueue_cycle_instantiation`]). The instantiation set is
+/// infinite only when the cycle grows its own type arguments
+/// (`Gen<T> -> Gen<Vec<T>>`) - a shape serde itself cannot serialize (it
+/// would need infinite monomorphization) but dynamically built [`Types`]
+/// can express - so two generous caps turn divergence into an error
+/// instead of a hang: one on *distinct* instantiations per node (breadth -
+/// many small instantiations), and a much smaller one on the structural
+/// size of a single instantiation (growth - it stops both linearly-growing
+/// arguments after a few hundred trips and exponentially-growing ones like
+/// `Gen<T> -> Gen<(T, T)>` long before they exhaust memory; no realistic
+/// single type argument is 256 nodes deep/wide).
+const MAX_SUBSTS_PER_NODE: usize = 1024;
+const MAX_SUBST_WEIGHT: usize = 256;
+
+/// Adds a (cycle member, instantiation) pair to the collapse's merge work
+/// list unless that exact pair was already processed, enforcing the
+/// divergence guards above. Only genuinely new pairs enter the list, which
+/// is what makes the walk a terminating fixed-point iteration.
+fn enqueue_cycle_instantiation(
+    nodes: &mut HashMap<AliasId, AliasNode<'_>>,
+    work: &mut Vec<(AliasId, GenericSubst)>,
+    target_id: AliasId,
+    subst: GenericSubst,
+) -> Result<(), Cow<'static, str>> {
+    let node = nodes
+        .get_mut(&target_id)
+        .expect("cycle members were discovered in phase 1");
+    if node.substs.contains(&subst) {
+        return Ok(());
+    }
+    if node.substs.len() >= MAX_SUBSTS_PER_NODE {
+        return Err(Cow::Borrowed(
+            "the cycle's generic parameter instantiations do not converge (a single type is instantiated with an unbounded number of distinct arguments)",
+        ));
+    }
+    if subst.values().map(datatype_weight).sum::<usize>() > MAX_SUBST_WEIGHT {
+        return Err(Cow::Borrowed(
+            "the cycle's generic parameter instantiations do not converge (a type argument keeps growing with every trip around the cycle)",
+        ));
+    }
+    node.substs.push(subst.clone());
+    work.push((target_id, subst));
+    Ok(())
 }
 
 fn node_enum(ndt: &NamedDataType) -> Option<&Enum> {
@@ -2585,11 +2624,7 @@ fn collapse_untagged_alias_cycle(
         let mut edges = Vec::new();
         for hop in node_hops(types, ndt) {
             let target_id = alias_id(hop.target);
-            edges.push(AliasEdge {
-                target: target_id.clone(),
-                reference: hop.reference,
-                nullable: hop.nullable,
-            });
+            edges.push(target_id.clone());
 
             if let Entry::Vacant(entry) = nodes.entry(target_id.clone()) {
                 entry.insert(AliasNode {
@@ -2613,8 +2648,8 @@ fn collapse_untagged_alias_cycle(
     // exists at all.
     let mut reverse: HashMap<&AliasId, Vec<&AliasId>> = HashMap::new();
     for (id, node) in &nodes {
-        for edge in &node.edges {
-            reverse.entry(&edge.target).or_default().push(id);
+        for target in &node.edges {
+            reverse.entry(target).or_default().push(id);
         }
     }
     let mut in_cycle: HashSet<AliasId> = HashSet::new();
@@ -2633,31 +2668,30 @@ fn collapse_untagged_alias_cycle(
     drop(reverse);
 
     // Phase 3: propagate generic instantiations around the cycle to a fixed
-    // point, starting from the root's identity. Every path from `root` to a
-    // cycle member stays inside the cycle (an intermediate node on such a
-    // path is mutually reachable with `root` by definition), so only
-    // cycle-internal edges need to carry substitutions. A member can be
-    // reached with several distinct instantiations (`Gen<T>` as the root
-    // *and* as `Gen<String>` through the cycle); each one contributes a
-    // copy of its variants during the merge.
+    // point, starting from the root's identity, merging each (member,
+    // instantiation) pair's non-back-edge variants as it is processed.
+    // Every path from `root` to a cycle member stays inside the cycle (an
+    // intermediate node on such a path is mutually reachable with `root` by
+    // definition), so only cycle-internal hops need to carry substitutions.
+    // A member can be reached with several distinct instantiations
+    // (`Gen<T>` as the root *and* as `Gen<String>` through the cycle); each
+    // one contributes a copy of its variants.
+    //
+    // Back edges are classified twice: on the raw variant (a reference's
+    // target never changes under substitution), and - for variants that
+    // aren't raw hops - on the *substituted* form, because substitution can
+    // reveal a back edge (`B(T)` with `T = Root`, or `T = Gen<String>` for
+    // a cycle member `Gen`). A revealed back edge is dropped like a raw one
+    // and its instantiation is fed through this same work list, so its
+    // terminals still merge; its reference's arguments are already in the
+    // root's scope, hence the identity substitution when resolving them.
     //
     // Termination: only genuinely new (node, substitution) pairs enter the
-    // work list, so the walk stops exactly when the instantiation set stops
-    // growing - a finite set of any size converges. The set is infinite
-    // only when the cycle grows its own type arguments
-    // (`Gen<T> -> Gen<Vec<T>>`) - a shape serde itself cannot serialize (it
-    // would need infinite monomorphization) but dynamically built [`Types`]
-    // can express - so two generous divergence guards turn that into an
-    // error instead of a hang: a cap on *distinct* instantiations per node
-    // (breadth - many small instantiations), and a much smaller cap on the
-    // structural size of a single instantiation (growth - it stops both
-    // linearly-growing arguments like `Gen<T> -> Gen<Vec<T>>` after a few
-    // hundred trips and exponentially-growing ones like
-    // `Gen<T> -> Gen<(T, T)>` long before they exhaust memory; no
-    // realistic single type argument is 256 nodes deep/wide).
-    const MAX_SUBSTS_PER_NODE: usize = 1024;
-    const MAX_SUBST_WEIGHT: usize = 256;
-
+    // work list (see `enqueue_cycle_instantiation`), so the walk stops
+    // exactly when the instantiation set stops growing - a finite set of
+    // any size converges. Variants are merged in work-list order (`root`'s
+    // own variants under the identity first), so the output is
+    // deterministic; `push_union` dedupes identical renderings.
     let identity: GenericSubst = root
         .generics
         .iter()
@@ -2668,85 +2702,76 @@ fn collapse_untagged_alias_cycle(
         .get_mut(&root_id)
         .expect("root node always exists")
         .substs
-        .push(identity);
+        .push(identity.clone());
+
+    let mut variants = Vec::new();
+    let mut needs_null = false;
     let mut cursor = 0;
     while cursor < work.len() {
         let (id, subst) = work[cursor].clone();
         cursor += 1;
 
-        let mut discovered = Vec::new();
-        for edge in &nodes[&id].edges {
-            if !in_cycle.contains(&edge.target) {
-                continue;
-            }
-
-            let target_subst = edge_substitution(&subst, &nodes[&edge.target].ndt, edge.reference)?;
-
-            let target_substs = &nodes[&edge.target].substs;
-            if !target_substs.contains(&target_subst)
-                && !discovered.contains(&(edge.target.clone(), target_subst.clone()))
-            {
-                if target_substs.len() >= MAX_SUBSTS_PER_NODE {
-                    return Err(Cow::Borrowed(
-                        "the cycle's generic parameter instantiations do not converge (a single type is instantiated with an unbounded number of distinct arguments)",
-                    ));
-                }
-                if target_subst.values().map(datatype_weight).sum::<usize>() > MAX_SUBST_WEIGHT {
-                    return Err(Cow::Borrowed(
-                        "the cycle's generic parameter instantiations do not converge (a type argument keeps growing with every trip around the cycle)",
-                    ));
-                }
-                discovered.push((edge.target.clone(), target_subst));
-            }
-        }
-        for (target_id, target_subst) in discovered {
-            nodes
-                .get_mut(&target_id)
-                .expect("cycle members were discovered in phase 1")
-                .substs
-                .push(target_subst.clone());
-            work.push((target_id, target_subst));
-        }
-    }
-
-    // Phase 4: merge. The collapsed union is every cycle member's
-    // non-back-edge variants under every instantiation it is reached with,
-    // in discovery order (`root`'s own variants under the identity first)
-    // so the output is deterministic; `push_union` dedupes identical
-    // renderings.
-    let mut variants = Vec::new();
-    let mut needs_null = false;
-    for id in &order {
-        if !in_cycle.contains(id) {
-            continue;
-        }
-        let node = &nodes[id];
-        let Some(enm) = node_enum(node.ndt) else {
+        let ndt = nodes[&id].ndt;
+        let Some(enm) = node_enum(ndt) else {
             // Passthrough member: its entire body is a back edge into the
             // cycle, contributing nothing but a possible `null` remnant.
-            needs_null |= node.edges.iter().any(|edge| edge.nullable);
+            if let Some(hop) = transparent_export_hop(types, ndt) {
+                needs_null |= hop.nullable;
+                let target_subst = edge_substitution(&subst, hop.target, hop.reference)?;
+                enqueue_cycle_instantiation(
+                    &mut nodes,
+                    &mut work,
+                    alias_id(hop.target),
+                    target_subst,
+                )?;
+            }
             continue;
         };
 
-        for subst in &node.substs {
-            for (name, variant) in &enm.variants {
-                if variant.skip {
-                    continue;
-                }
-                if let Some(hop) = transparent_variant_hop(types, variant)
-                    && in_cycle.contains(&alias_id(hop.target))
-                {
-                    // Back edge: dropping it is sound because it adds no
-                    // wire structure of its own - except a `Nullable` hop,
-                    // whose `None` case is a real `null` wire value to keep.
-                    needs_null |= hop.nullable;
-                    continue;
-                }
-
-                let mut variant = variant.clone();
-                substitute_fields_generics(&mut variant.fields, subst)?;
-                variants.push((name.clone(), variant));
+        for (name, variant) in &enm.variants {
+            if variant.skip {
+                continue;
             }
+
+            // Raw back edge: the referenced target is fixed regardless of
+            // substitution. Dropping it is sound because it adds no wire
+            // structure of its own - except a `Nullable` hop, whose `None`
+            // case is a real `null` wire value to keep.
+            if let Some(hop) = transparent_variant_hop(types, variant)
+                && in_cycle.contains(&alias_id(hop.target))
+            {
+                needs_null |= hop.nullable;
+                let target_subst = edge_substitution(&subst, hop.target, hop.reference)?;
+                enqueue_cycle_instantiation(
+                    &mut nodes,
+                    &mut work,
+                    alias_id(hop.target),
+                    target_subst,
+                )?;
+                continue;
+            }
+
+            let mut variant = variant.clone();
+            substitute_fields_generics(&mut variant.fields, &subst)?;
+
+            // Substitution-revealed back edge: `B(T)` whose `T` maps to a
+            // cycle member (bare or as a concrete instantiation). Its wire
+            // values are exactly that member's, so it merges the same way.
+            if let Some(hop) = transparent_variant_hop(types, &variant)
+                && in_cycle.contains(&alias_id(hop.target))
+            {
+                needs_null |= hop.nullable;
+                let target_subst = edge_substitution(&identity, hop.target, hop.reference)?;
+                enqueue_cycle_instantiation(
+                    &mut nodes,
+                    &mut work,
+                    alias_id(hop.target),
+                    target_subst,
+                )?;
+                continue;
+            }
+
+            variants.push((name.clone(), variant));
         }
     }
 

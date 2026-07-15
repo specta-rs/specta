@@ -605,7 +605,7 @@ fn cycle_through_concrete_generic_instantiation_collapses() {
         "ConcreteRoot must union its own terminal with GenNode<String>'s: {ts}"
     );
     assert!(
-        ts.contains("export type GenNode<T> = T | string | number;"),
+        ts.contains("export type GenNode<T> = T | number | string;"),
         "GenNode<T> must union its own branch with the cycle's terminals: {ts}"
     );
     assert!(
@@ -1049,7 +1049,7 @@ fn omitted_generic_arguments_fall_back_to_the_declared_default() {
         "OmitRoot must merge OmitNode's terminal at the default `string`: {ts}"
     );
     assert!(
-        ts.contains("OmitNode<T = string> = T | string | number;"),
+        ts.contains("OmitNode<T = string> = T | number | string;"),
         "OmitNode must union its own branch, the cycle's terminals, and its defaulted instantiation: {ts}"
     );
 }
@@ -1066,5 +1066,122 @@ fn omitted_generic_arguments_without_a_default_fall_back_to_unknown() {
     assert!(
         ts.contains("export type OmitRoot = number | unknown;"),
         "OmitRoot must merge OmitNode's terminal at `unknown`: {ts}"
+    );
+}
+
+/// Builds the cycle `RevRoot -> RevGen<arg> -> RevRoot` where `RevGen<T>`
+/// has the terminal branch `B(T)` - so the *substituted* form of `B(T)`
+/// can itself point back into the cycle, which only a post-substitution
+/// back-edge check can see.
+fn revealed_backedge_cycle(
+    arg: impl FnOnce(
+        &specta::datatype::NamedDataType,
+        &specta::datatype::NamedDataType,
+        &specta::datatype::GenericDefinition,
+    ) -> specta::datatype::DataType,
+) -> Types {
+    use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
+
+    let mut types = Types::default();
+    NamedDataType::new("RevRoot", &mut types, |types, root| {
+        let t = GenericDefinition::new("T".into(), None);
+        let node = NamedDataType::new("RevGen", types, |_, node| {
+            node.generics = std::borrow::Cow::Owned(vec![t.clone()]);
+            let mut e = Enum::default();
+            e.variants.push((
+                "X".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Reference(root.reference(vec![]))))
+                    .build(),
+            ));
+            e.variants.push((
+                "B".into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Generic(t.reference())))
+                    .build(),
+            ));
+            node.ty = Some(DataType::Enum(e));
+        });
+
+        let instantiation = arg(root, &node, &t);
+        let mut e = Enum::default();
+        e.variants.push((
+            "X".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Reference(
+                    node.reference(vec![(t.reference(), instantiation)]),
+                )))
+                .build(),
+        ));
+        e.variants.push((
+            "Y".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Primitive(
+                    specta::datatype::Primitive::u32,
+                )))
+                .build(),
+        ));
+        root.ty = Some(DataType::Enum(e));
+    });
+    types
+}
+
+/// `RevRoot -> RevGen<RevRoot> -> RevRoot`
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584833518):
+/// `RevGen`'s terminal `B(T)` substitutes to a bare `RevRoot` reference -
+/// a back edge only visible *after* substitution. Wire semantics:
+/// `RevGen::<RevRoot>::B(root_value)` serializes as the inner `RevRoot`
+/// value, so the branch is a self-reference contributing nothing; the old
+/// pre-substitution check kept it and emitted `RevRoot = number | RevRoot`
+/// (TS2456).
+#[test]
+fn substitution_revealed_back_edge_is_dropped() {
+    use specta::datatype::DataType;
+
+    let ts = Typescript::default()
+        .export(
+            &revealed_backedge_cycle(|root, _, _| DataType::Reference(root.reference(vec![]))),
+            RawFormat,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        ts.contains("export type RevRoot = number;"),
+        "the T = RevRoot branch is a self-reference and must be dropped: {ts}"
+    );
+    assert!(
+        ts.contains("export type RevGen<T> = T | number;"),
+        "RevGen must keep its own parameter branch and the cycle's terminal: {ts}"
+    );
+}
+
+/// Same, but `T` maps to a *concrete instantiation* of a cycle member:
+/// `RevRoot -> RevGen<RevGen<string>>`. The substituted `B(T)` branch is a
+/// back edge into `RevGen` at the new instantiation `T = string`, whose
+/// terminals must be merged (a value can bottom out at
+/// `RevGen::<String>::B("s")`, i.e. a bare string on the wire) - not
+/// dropped outright and not kept as an illegal alias.
+#[test]
+fn substitution_revealed_back_edge_propagates_its_instantiation() {
+    use specta::datatype::{DataType, Primitive};
+
+    let ts = Typescript::default()
+        .export(
+            &revealed_backedge_cycle(|_, node, t| {
+                DataType::Reference(
+                    node.reference(vec![(t.reference(), DataType::Primitive(Primitive::str))]),
+                )
+            }),
+            RawFormat,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        ts.contains("export type RevRoot = number | string;"),
+        "RevGen<string>'s terminal must merge into RevRoot: {ts}"
+    );
+    assert!(
+        ts.contains("export type RevGen<T> = T | number | string;"),
+        "RevGen must merge every instantiation reachable in the cycle: {ts}"
     );
 }
