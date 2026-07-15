@@ -67,6 +67,7 @@ pub(crate) fn inline(java: &Java, types: &Types, value: &DataType) -> Result<Str
             generic_scope: &generic_scope,
             current_module: "",
             qualified_references: false,
+            nested_type_scope: Vec::new(),
         },
         value,
         "inline",
@@ -224,6 +225,7 @@ fn declaration(
         generic_scope: &generic_scope,
         current_module: &ndt.module_path,
         qualified_references,
+        nested_type_scope: Vec::new(),
     };
 
     let mut out = String::new();
@@ -579,6 +581,7 @@ fn field_datatype(
         return field_datatype(ctx, dt, field_name, path);
     }
     let type_name = nested_type_identifier(ctx, field_name, path)?;
+    let nested_ctx = ctx.with_nested_type(type_name.clone());
     let generic_names = ctx
         .generic_scope
         .iter()
@@ -614,7 +617,7 @@ fn field_datatype(
             let mut tuple_fields = Vec::new();
             for (index, element) in tuple.elements.iter().enumerate() {
                 let name = format!("field{index}");
-                let (ty, nested) = field_datatype(ctx, element, &name, path)?;
+                let (ty, nested) = field_datatype(&nested_ctx, element, &name, path)?;
                 tuple_fields.push(RenderedField {
                     name,
                     ty,
@@ -639,7 +642,7 @@ fn field_datatype(
         DataType::Struct(value) => {
             render_record(
                 &mut nested,
-                ctx,
+                &nested_ctx,
                 "public ",
                 &type_name,
                 &generics,
@@ -654,7 +657,7 @@ fn field_datatype(
         DataType::Enum(value) => {
             render_tagged_enum(
                 &mut nested,
-                ctx,
+                &nested_ctx,
                 "public ",
                 &type_name,
                 &generics,
@@ -680,6 +683,7 @@ fn nested_type_identifier(ctx: &Context<'_>, name: &str, path: &str) -> Result<S
             .iter()
             .map(|generic| generic.identifier.clone()),
     );
+    occupied.extend(ctx.nested_type_scope.iter().cloned());
     occupied.insert(class_name(ctx.java)?);
     if !occupied.contains(&base) {
         return Ok(base);
@@ -700,6 +704,22 @@ struct Context<'a> {
     generic_scope: &'a [GenericBinding],
     current_module: &'a str,
     qualified_references: bool,
+    nested_type_scope: Vec<String>,
+}
+
+impl<'a> Context<'a> {
+    fn with_nested_type(&self, name: String) -> Context<'a> {
+        let mut nested_type_scope = self.nested_type_scope.clone();
+        nested_type_scope.push(name);
+        Context {
+            java: self.java,
+            types: self.types,
+            generic_scope: self.generic_scope,
+            current_module: self.current_module,
+            qualified_references: self.qualified_references,
+            nested_type_scope,
+        }
+    }
 }
 
 fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Error> {

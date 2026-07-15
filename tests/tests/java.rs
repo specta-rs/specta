@@ -619,6 +619,47 @@ fn equal_nested_names_are_allowed_in_separate_scopes() {
 }
 
 #[test]
+fn nested_names_do_not_redeclare_ancestor_types() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Leaf {
+        value: u8,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct B {
+        #[specta(inline)]
+        a: Leaf,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct A {
+        #[specta(inline)]
+        b: B,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Outer {
+        #[specta(inline)]
+        a: A,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(&path, &Types::default().register::<Outer>(), IdentityFormat)
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("public record A("));
+    assert!(source.contains("public record B("));
+    assert!(source.contains("public record AInline("));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
 fn rejects_wrapper_and_nested_declaration_collisions() {
     #[derive(Type)]
     #[specta(collect = false)]
