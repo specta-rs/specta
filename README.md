@@ -25,7 +25,7 @@
 | --------------- | -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | **TypeScript**  | ✅ **Stable**  | [`specta-typescript`](https://crates.io/crates/specta-typescript) | Full type support, generics, unions               |
 | **Swift**       | ✅ **Stable**  | [`specta-swift`](https://crates.io/crates/specta-swift)           | Idiomatic Swift, custom Codable, Duration support |
-| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Basic types work, structs/enums in progress       |
+| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Rust source, modules, generics; structural wire-only shapes error |
 | **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | Primitives work, complex types in progress        |
 | **Go**          | 🚧 **Planned** | [`specta-go`](https://crates.io/crates/specta-go)                 | Go structs and interfaces                         |
 | **Kotlin**      | 🚧 **Planned** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Kotlin data classes and sealed classes            |
@@ -70,7 +70,7 @@ cargo add specta
 # Language exporters (choose one or more)
 cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
-cargo add specta_rust        # Rust (partial - basic types)
+cargo add specta_rust        # Rust (partial)
 cargo add specta_openapi     # OpenAPI/Swagger (partial - primitives)
 # cargo add specta_go          # Go (planned)
 # cargo add specta_kotlin      # Kotlin (planned)
