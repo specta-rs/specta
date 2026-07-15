@@ -520,7 +520,7 @@ export type InternallyTaggedWithAlias_Deserialize = {
 	bruh: string,
 } | { type: "B"; other: number };
 
-export type InternallyTaggedWithAlias_Serialize = ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never };
+export type InternallyTaggedWithAlias_Serialize = { type: "A"; field: string } | { type: "B"; other: number };
 
 export type InvalidToValidType = {
 	cause: null,

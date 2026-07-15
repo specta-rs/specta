@@ -29,7 +29,7 @@ StructWithAliasAndRename: {
 EnumWithVariantAlias: "Variant" | "Other"
 EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
-InternallyTaggedWithAlias: ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }
+InternallyTaggedWithAlias: { type: "A"; field: string } | { type: "B"; other: number }
 AdjacentlyTaggedWithAlias: { type: "A"; data: {
 	field: string,
 } } | { type: "B"; data: {

@@ -1112,6 +1112,14 @@ fn flatten_intersection_with_optionals(
 
     let mut union = Enum::default();
     union.variants = variants;
+    // This synthetic present/absent union is already in its final exported
+    // shape; see `ENUM_REPR_REWRITTEN_MARKER`. Without this, a later rewrite
+    // pass (e.g. `PhasesFormat`'s second pass over split generated types, or
+    // simply walking into this enum while it's nested inside another
+    // variant's payload) would treat this union as an unrewritten
+    // user-authored enum and externally tag it, double-wrapping (or, for
+    // unnamed/empty variant names as here, erroring on export).
+    union.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
     DataType::Enum(union)
 }
 
@@ -1190,6 +1198,10 @@ fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
             ),
         ));
     }
+
+    // This synthetic union is already in its final exported shape; see
+    // `ENUM_REPR_REWRITTEN_MARKER`.
+    aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
 
     DataType::Enum(aliases)
 }
@@ -1418,18 +1430,47 @@ fn unnamed_fields_all_skipped(unnamed: &UnnamedFields) -> bool {
     !unnamed.fields.is_empty() && !unnamed_has_effective_payload(unnamed)
 }
 
+/// Marker attribute key recorded on an [`Enum`]'s
+/// [`Attributes`](specta::datatype::Attributes) once it is in its final
+/// serde representation, so a later rewrite pass (e.g. [`PhasesFormat`]'s
+/// second pass over split generated types) doesn't transform it again. It is
+/// set when [`rewrite_enum_repr_for_phase`] rewrites an enum, and at
+/// construction by the synthetic-enum builders ([`string_literal_datatype`],
+/// [`alias_field_union`], [`rewrite_identifier_enum_for_phase`]) whose output
+/// is already final.
+///
+/// This replaces a former shape-sniffing heuristic
+/// (`enum_repr_already_rewritten`) that tried to detect "already rewritten"
+/// enums by inspecting variant shapes. That heuristic was unsound: every
+/// shape the transform produces is also a valid shape a user can author
+/// directly (for example a single unnamed `&'static str` field lowers to
+/// exactly the `DataType::Primitive(Primitive::str)` that the transform
+/// emits for a widened tag), so it could both skip enums that had never been
+/// rewritten and re-transform enums that had. Tracking the rewrite
+/// explicitly makes the check exact.
+const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
+
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
     original_types: &Types,
 ) -> Result<(), Error> {
-    if enum_repr_already_rewritten(e) {
+    if e.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
         return Ok(());
     }
 
     let repr = EnumRepr::from_attrs(&e.attributes)?;
     if matches!(repr, EnumRepr::Untagged) {
         rewrite_container_untagged_unit_variants(e)?;
+        // Mark like every other branch so idempotency across passes comes
+        // from explicit tracking, never from shape reasoning (the unit
+        // rewrite happens to be shape-idempotent, but that's exactly the
+        // kind of invariant this marker exists to not rely on). Unlike the
+        // other branches we keep the remaining attributes: the untagged repr
+        // attribute must stay visible to later consumers (e.g.
+        // `internal_tag_payload_compatibility` unions an untagged payload's
+        // variants instead of rejecting it).
+        e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
         return Ok(());
     }
 
@@ -1450,10 +1491,12 @@ fn rewrite_enum_repr_for_phase(
         }
 
         if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
-            transformed.push((
-                Cow::Owned(variant_name.into_owned()),
-                transform_untagged_variant(&variant)?,
-            ));
+            let mut transformed_variant = transform_untagged_variant(&variant)?;
+            // Clear attributes like the other transformed variants below, so
+            // later passes (which still filter and walk variants before the
+            // marker check) see a plain, already-rewritten variant.
+            transformed_variant.attributes = Default::default();
+            transformed.push((Cow::Owned(variant_name.into_owned()), transformed_variant));
             continue;
         }
 
@@ -1505,66 +1548,9 @@ fn rewrite_enum_repr_for_phase(
 
     e.variants = transformed;
     e.attributes = Default::default();
+    e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
 
     Ok(())
-}
-
-fn enum_repr_already_rewritten(e: &Enum) -> bool {
-    e.attributes.is_empty()
-        && !e.variants.is_empty()
-        && e.variants.iter().all(|(name, variant)| {
-            variant.attributes.is_empty() && variant_repr_already_rewritten(name, variant)
-        })
-}
-
-fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
-    // `transform_internal_variant` produces a tag of type `Primitive::str` when
-    // `widen_tag` is set (the `#[serde(other)]` variant in deserialize phase),
-    // and produces a tuple-variant body of `Intersection<{tag-struct}, payload>`
-    // for non-empty unnamed variants. Without recognizing both shapes, the
-    // second-pass guard on internally-tagged enums containing such variants
-    // fails. The whole enum then gets re-transformed -- this time as
-    // `EnumRepr::External`, because the first pass cleared `e.attributes` --
-    // producing wrong externally-tagged TS bindings for what serde actually
-    // emits as internally-tagged JSON.
-    fn is_rewritten_tag_ty(ty: &DataType) -> bool {
-        is_generated_string_literal_datatype(ty)
-            || matches!(ty, DataType::Primitive(Primitive::str))
-    }
-
-    fn is_rewritten_internal_intersection(ty: &DataType) -> bool {
-        let DataType::Intersection(parts) = ty else {
-            return false;
-        };
-        let Some(DataType::Struct(s)) = parts.first() else {
-            return false;
-        };
-        let Fields::Named(named) = &s.fields else {
-            return false;
-        };
-        named
-            .fields
-            .iter()
-            .any(|(_, field)| field.ty.as_ref().is_some_and(is_rewritten_tag_ty))
-    }
-
-    match &variant.fields {
-        Fields::Unit => false,
-        Fields::Unnamed(fields) if name.is_empty() => unnamed_live_field_count(fields) == 1,
-        Fields::Unnamed(fields) if fields.fields.len() == 1 => fields
-            .fields
-            .first()
-            .and_then(|field| field.ty.as_ref())
-            .is_some_and(|ty| {
-                is_generated_string_literal_datatype(ty)
-                    || matches!(ty, DataType::Primitive(Primitive::str))
-                    || is_rewritten_internal_intersection(ty)
-            }),
-        Fields::Named(fields) => fields.fields.iter().any(|(field_name, field)| {
-            field_name == name || field.ty.as_ref().is_some_and(is_rewritten_tag_ty)
-        }),
-        _ => false,
-    }
 }
 
 fn rewrite_identifier_enum_for_phase(
@@ -1641,6 +1627,9 @@ fn rewrite_identifier_enum_for_phase(
     }
 
     e.attributes = Default::default();
+    // This synthetic identifier union is already in its final exported
+    // shape; see `ENUM_REPR_REWRITTEN_MARKER`.
+    e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
     e.variants = variants;
     Ok(true)
 }
@@ -1730,10 +1719,12 @@ fn transform_untagged_variant(variant: &Variant) -> Result<Variant, Error> {
 /// tuple variants (including zero-arg ones) already match serde's untagged
 /// wire shape under the exporter's defaults, so they're left untouched here.
 ///
-/// Re-running this over an already-rewritten enum is a no-op: a transformed
-/// unit variant becomes `Fields::Unnamed`, which no longer matches
-/// `Fields::Unit`, so a second pass (e.g. `PhasesFormat`'s cross-reference
-/// resolution pass) does not re-wrap it.
+/// A second pass (e.g. `PhasesFormat`'s cross-reference resolution pass)
+/// never reaches this rewrite again: the caller sets
+/// `ENUM_REPR_REWRITTEN_MARKER` after applying it. (It also happens to be
+/// shape-idempotent - a transformed unit variant becomes `Fields::Unnamed`,
+/// which no longer matches `Fields::Unit` - but the marker is the invariant
+/// idempotency relies on.)
 fn rewrite_container_untagged_unit_variants(e: &mut Enum) -> Result<(), Error> {
     for (_, variant) in &mut e.variants {
         if matches!(variant.fields, Fields::Unit) {
@@ -2143,6 +2134,11 @@ fn string_literal_datatype(value: String) -> DataType {
     value_enum
         .variants
         .push((Cow::Owned(value), Variant::unit()));
+    // This synthetic single-variant literal (e.g. a tag field's type) is
+    // already in its final exported shape; see `ENUM_REPR_REWRITTEN_MARKER`.
+    value_enum
+        .attributes
+        .insert(ENUM_REPR_REWRITTEN_MARKER, true);
     DataType::Enum(value_enum)
 }
 
