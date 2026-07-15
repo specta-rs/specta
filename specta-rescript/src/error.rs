@@ -23,6 +23,10 @@ pub enum Error {
     #[error("Invalid ReScript variant constructor: {0}")]
     InvalidVariantConstructor(String),
 
+    /// A polymorphic variant tag cannot be represented in ReScript source.
+    #[error("Invalid ReScript polymorphic variant tag: {0}")]
+    InvalidPolymorphicVariant(String),
+
     /// Multiple Rust types map to the same ReScript type name.
     #[error("Duplicate ReScript type name '{name}' for '{first}' and '{second}'")]
     DuplicateTypeName {

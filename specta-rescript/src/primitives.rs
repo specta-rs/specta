@@ -34,10 +34,25 @@ fn is_valid_variant_constructor(name: &str) -> bool {
     is_valid_identifier(name, |ch| ch.is_ascii_uppercase())
 }
 
+fn is_valid_polymorphic_variant(name: &str) -> bool {
+    is_valid_identifier(name, |ch| ch.is_ascii_alphabetic())
+}
+
 fn is_valid_identifier(name: &str, valid_start: impl FnOnce(char) -> bool) -> bool {
     let mut chars = name.chars();
     chars.next().is_some_and(valid_start)
         && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '\''))
+}
+
+fn is_string_map_key(dt: &DataType) -> bool {
+    match dt {
+        DataType::Primitive(Primitive::str) => true,
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => is_string_map_key(dt),
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 /// Convert a Rust generic parameter name to ReScript style.
@@ -188,9 +203,11 @@ pub fn datatype_to_rescript(types: &Types, scope: Scope<'_>, dt: &DataType) -> R
             Ok(generic_param(name))
         }
         DataType::Map(m) => {
-            // ReScript dict<v> only supports string keys. We can't enforce this at the
-            // generic template level (e.g. HashMap<K,V> always becomes dict<V>), so we
-            // emit dict regardless and trust the caller to use string-keyed maps.
+            if !is_string_map_key(m.key_ty()) {
+                return Err(Error::UnsupportedType(
+                    "ReScript dict keys must be strings".to_string(),
+                ));
+            }
             Ok(format!(
                 "dict<{}>",
                 datatype_to_rescript(types, scope, m.value_ty())?
@@ -215,8 +232,13 @@ pub fn datatype_to_rescript(types: &Types, scope: Scope<'_>, dt: &DataType) -> R
                     .variants
                     .iter()
                     .filter(|(_, v)| !v.skip)
-                    .map(|(name, _)| format!("#{}", name))
-                    .collect();
+                    .map(|(name, _)| {
+                        if !is_valid_polymorphic_variant(name) {
+                            return Err(Error::InvalidPolymorphicVariant(name.to_string()));
+                        }
+                        Ok(format!("#{}", name))
+                    })
+                    .collect::<Result<_>>()?;
                 return Ok(format!("[{}]", variants.join(" | ")));
             }
             Err(Error::UnsupportedType(
@@ -227,7 +249,9 @@ pub fn datatype_to_rescript(types: &Types, scope: Scope<'_>, dt: &DataType) -> R
             let elems = &t.elements;
             match elems.len() {
                 0 => Ok("unit".to_string()),
-                1 => datatype_to_rescript(types, scope, &elems[0]),
+                1 => Err(Error::UnsupportedType(
+                    "ReScript does not support one-element tuples".to_string(),
+                )),
                 _ => {
                     let parts = elems
                         .iter()
@@ -504,6 +528,11 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 .all(|(_, v)| matches!(v.fields, Fields::Unit));
 
             if all_unit {
+                for (name, _) in e.variants.iter().filter(|(_, variant)| !variant.skip) {
+                    if !is_valid_polymorphic_variant(name) {
+                        return Err(Error::InvalidPolymorphicVariant(name.to_string()));
+                    }
+                }
                 let has_metadata = e.variants.iter().any(|(_, variant)| {
                     !variant.skip && (!variant.docs.is_empty() || variant.deprecated.is_some())
                 });

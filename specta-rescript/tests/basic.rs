@@ -294,10 +294,42 @@ fn test_non_string_map_key_error() {
     struct WithBadMap {
         data: HashMap<i32, String>,
     }
-    // HashMap<K, V> is exported as a generic named type `dict<'v>` regardless of K.
-    // The non-string key check cannot be enforced at the generic template level.
-    let out = export::<WithBadMap>();
-    assert!(out.contains("dict<"), "output: {out}");
+    let error = export_err::<WithBadMap>();
+    assert!(matches!(error, specta_rescript::Error::UnsupportedType(_)));
+}
+
+#[test]
+fn test_one_element_tuple_error() {
+    #[derive(Type)]
+    struct WithUnaryTuple {
+        value: (String,),
+    }
+
+    let error = export_err::<WithUnaryTuple>();
+    assert!(matches!(error, specta_rescript::Error::UnsupportedType(_)));
+}
+
+#[test]
+fn test_serde_polymorphic_variant_is_validated() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename_all = "kebab-case")]
+    enum RenamedUnitVariant {
+        FooBar,
+    }
+
+    let error = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<RenamedUnitVariant>())
+        .unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            specta_rescript::Error::InvalidVariantConstructor(name)
+                | specta_rescript::Error::InvalidPolymorphicVariant(name)
+                if name == "foo-bar"
+        ),
+        "error: {error:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
