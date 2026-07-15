@@ -343,6 +343,26 @@ enum UntaggedMapPayloadWithSkippedScalar {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct AttributedMapInner {
+    extra: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedAttributedMapPayload {
+    Unit,
+    Live {
+        #[serde(rename = "wire_value", alias = "old_value")]
+        value: i32,
+        #[serde(flatten)]
+        #[specta(inline)]
+        inner: AttributedMapInner,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "kind")]
 enum UntaggedExternalPayloadWrapper {
     Value(UntaggedExternalPayload),
@@ -360,6 +380,13 @@ enum UntaggedExternalPayloadWithSkippedScalarWrapper {
 #[serde(tag = "kind")]
 enum UntaggedMapPayloadWithSkippedScalarWrapper {
     Value(UntaggedMapPayloadWithSkippedScalar),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum UntaggedAttributedMapPayloadWrapper {
+    Value(UntaggedAttributedMapPayload),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -912,6 +939,49 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         !contains_string_primitive(wrapper),
         "the skipped scalar branch must not leak into the replacement: {wrapper:#?}"
     );
+
+    assert_eq!(
+        serde_json::to_value(UntaggedAttributedMapPayloadWrapper::Value(
+            UntaggedAttributedMapPayload::Live {
+                value: 1,
+                inner: AttributedMapInner { extra: 2 },
+            }
+        ))
+        .unwrap(),
+        serde_json::json!({ "kind": "Value", "wire_value": 1, "extra": 2 })
+    );
+    let mapped = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<UntaggedAttributedMapPayloadWrapper>())
+        .expect("untagged contextual replacements must lower their surviving map fields")
+        .into_owned();
+    let mapped = mapped.into_unsorted_iter().collect::<Vec<_>>();
+    for (name, alias_expected) in [
+        ("UntaggedAttributedMapPayloadWrapper_Serialize", false),
+        ("UntaggedAttributedMapPayloadWrapper_Deserialize", true),
+    ] {
+        let wrapper = mapped
+            .iter()
+            .find(|ndt| ndt.name == name)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .unwrap_or_else(|| panic!("mapped attributed wrapper `{name}` should exist"));
+        assert!(contains_named_field(wrapper, "wire_value", |ty| matches!(
+            ty,
+            DataType::Primitive(specta::datatype::Primitive::i32)
+        )));
+        assert_eq!(
+            contains_named_field(wrapper, "old_value", |ty| matches!(
+                ty,
+                DataType::Primitive(specta::datatype::Primitive::i32)
+            )),
+            alias_expected
+        );
+        assert!(contains_named_field(wrapper, "extra", |ty| matches!(
+            ty,
+            DataType::Primitive(specta::datatype::Primitive::i32)
+        )));
+        assert!(!contains_named_field(wrapper, "value", |_| true));
+        assert!(!contains_named_field(wrapper, "inner", |_| true));
+    }
 }
 
 #[test]
@@ -1023,7 +1093,18 @@ fn contains_named_field(
             contains_named_field(map.key_ty(), expected_name, expected_ty)
                 || contains_named_field(map.value_ty(), expected_name, expected_ty)
         }
-        DataType::Primitive(_) | DataType::Reference(_) | DataType::Generic(_) => false,
+        DataType::Reference(specta::datatype::Reference::Named(reference)) => {
+            match &reference.inner {
+                specta::datatype::NamedReferenceType::Inline { dt, .. } => {
+                    contains_named_field(dt, expected_name, expected_ty)
+                }
+                specta::datatype::NamedReferenceType::Reference { .. }
+                | specta::datatype::NamedReferenceType::Recursive(_) => false,
+            }
+        }
+        DataType::Primitive(_)
+        | DataType::Reference(specta::datatype::Reference::Opaque(_))
+        | DataType::Generic(_) => false,
     }
 }
 

@@ -2986,7 +2986,50 @@ fn internal_tag_payload_compatibility(
                 let mut rewritten = enm.clone();
                 filter_enum_variants_for_phase(&mut rewritten, mode)?;
                 let mut changed = rewritten.variants.len() != enm.variants.len();
-                for (_, rewritten_variant) in &mut rewritten.variants {
+                let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
+                for (variant_name, rewritten_variant) in &mut rewritten.variants {
+                    let original_fields = rewritten_variant.fields.clone();
+                    let rename_rule = enum_variant_field_rename_rule(
+                        &container_attrs,
+                        rewritten_variant,
+                        mode,
+                        variant_name,
+                    )?;
+                    let conditional_omission_applies = !matches!(
+                        &rewritten_variant.fields,
+                        Fields::Unnamed(unnamed) if unnamed.fields.len() == 1
+                    );
+                    rewrite_fields_for_phase(
+                        &mut rewritten_variant.fields,
+                        mode,
+                        original_types,
+                        &HashMap::new(),
+                        &HashSet::new(),
+                        rename_rule,
+                        false,
+                        true,
+                        conditional_omission_applies,
+                    )?;
+
+                    let lowered = if matches!(
+                        &rewritten_variant.fields,
+                        Fields::Named(fields) if fields.fields.iter().any(|(_, field)| field_is_flattened(field))
+                    ) {
+                        let mut payload = Struct::unit();
+                        std::mem::swap(&mut payload.fields, &mut rewritten_variant.fields);
+                        lower_flattened_struct(&mut payload, mode)?
+                    } else {
+                        lower_field_aliases_for_phase(&mut rewritten_variant.fields, mode)?
+                    };
+                    if let Some(payload) = lowered {
+                        rewritten_variant.fields = clone_variant_with_unnamed_fields(
+                            rewritten_variant,
+                            vec![Field::new(payload)],
+                        )
+                        .fields;
+                    }
+                    changed |= rewritten_variant.fields != original_fields;
+
                     let variant = rewritten_variant.clone();
                     let Some(variant_payload) = internal_tag_variant_payload_compatibility(
                         &variant,
