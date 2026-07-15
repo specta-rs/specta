@@ -397,7 +397,7 @@ export type GenericTuple<T> = [T, T[], T[][]];
 
 export type GenericTupleStruct<T> = T;
 
-export type GenericType<T> = "Undefined" | T;
+export type GenericType<T> = null | T;
 
 export type HasGenericAlias = { [key in number]: string };
 
@@ -508,7 +508,7 @@ export type InternallyTaggedLInner = { type: "A" } | { type: "B" };
 
 export type InternallyTaggedM = { type: "A" };
 
-export type InternallyTaggedMInner = "A" | "B";
+export type InternallyTaggedMInner = null;
 
 export type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Serialize | InternallyTaggedWithAlias_Deserialize;
 
@@ -1122,7 +1122,7 @@ export type TagOnStructWithInline = {
 	},
 };
 
-export type Tenth = string | "B" | {
+export type Tenth = string | null | {
 	a: string,
 } | First;
 

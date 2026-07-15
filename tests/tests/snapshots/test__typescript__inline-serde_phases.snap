@@ -456,7 +456,7 @@ Eight: { A: string } | "B"
 Ninth: { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 	a: string,
 } } | { t: "D"; c: First }
-Tenth: string | "B" | {
+Tenth: string | null | {
 	a: string,
 } | First
 MyEnumTagged: {

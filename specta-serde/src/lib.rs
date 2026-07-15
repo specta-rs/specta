@@ -1461,6 +1461,16 @@ fn rewrite_enum_repr_for_phase(
 
     let repr = EnumRepr::from_attrs(&e.attributes)?;
     if matches!(repr, EnumRepr::Untagged) {
+        rewrite_container_untagged_unit_variants(e)?;
+        // Mark like every other branch so idempotency across passes comes
+        // from explicit tracking, never from shape reasoning (the unit
+        // rewrite happens to be shape-idempotent, but that's exactly the
+        // kind of invariant this marker exists to not rely on). Unlike the
+        // other branches we keep the remaining attributes: the untagged repr
+        // attribute must stay visible to later consumers (e.g.
+        // `internal_tag_payload_compatibility` unions an untagged payload's
+        // variants instead of rejecting it).
+        e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
         return Ok(());
     }
 
@@ -1692,6 +1702,37 @@ fn transform_untagged_variant(variant: &Variant) -> Result<Variant, Error> {
     let payload = variant_payload_field(variant)
         .ok_or_else(|| Error::invalid_external_tagged_variant("<untagged variant>"))?;
     Ok(clone_variant_with_unnamed_fields(variant, vec![payload]))
+}
+
+/// Serde serializes a unit variant of a container-level `#[serde(untagged)]`
+/// enum as `null` -- no discriminant is ever written for untagged enums --
+/// but the exporter's serde-agnostic default for a `Fields::Unit` variant is
+/// the variant's name as a string literal (e.g. `"A"`). Rewrite unit variants
+/// into the same `null`-rendering shape [`transform_untagged_variant`]
+/// already produces for skip-all-fields variants.
+///
+/// Only `Fields::Unit` variants are touched. [`transform_untagged_variant`]
+/// (by way of [`variant_payload_field`]) is *not* shape-preserving for a
+/// zero-arg tuple variant (`Variant()`): serde serializes that as `[]`, but
+/// `variant_payload_field` maps it to the same empty-tuple shape as a unit
+/// variant, which would wrongly turn `[]` into `null`. Struct, newtype, and
+/// tuple variants (including zero-arg ones) already match serde's untagged
+/// wire shape under the exporter's defaults, so they're left untouched here.
+///
+/// A second pass (e.g. `PhasesFormat`'s cross-reference resolution pass)
+/// never reaches this rewrite again: the caller sets
+/// `ENUM_REPR_REWRITTEN_MARKER` after applying it. (It also happens to be
+/// shape-idempotent - a transformed unit variant becomes `Fields::Unnamed`,
+/// which no longer matches `Fields::Unit` - but the marker is the invariant
+/// idempotency relies on.)
+fn rewrite_container_untagged_unit_variants(e: &mut Enum) -> Result<(), Error> {
+    for (_, variant) in &mut e.variants {
+        if matches!(variant.fields, Fields::Unit) {
+            *variant = transform_untagged_variant(variant)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<(), Error> {
