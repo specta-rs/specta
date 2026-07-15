@@ -1112,6 +1112,14 @@ fn flatten_intersection_with_optionals(
 
     let mut union = Enum::default();
     union.variants = variants;
+    // This synthetic present/absent union is already in its final exported
+    // shape; see `ENUM_REPR_REWRITTEN_MARKER`. Without this, a later rewrite
+    // pass (e.g. `PhasesFormat`'s second pass over split generated types, or
+    // simply walking into this enum while it's nested inside another
+    // variant's payload) would treat this union as an unrewritten
+    // user-authored enum and externally tag it, double-wrapping (or, for
+    // unnamed/empty variant names as here, erroring on export).
+    union.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
     DataType::Enum(union)
 }
 
