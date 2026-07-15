@@ -639,6 +639,16 @@ struct ExplicitOptionalField {
     count: i32,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct ExplicitOptionalTuple(#[specta(optional)] i32);
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum ExplicitOptionalTupleVariant {
+    Value(#[specta(optional)] i32),
+}
+
 #[test]
 fn normalized_generic_names_are_used_consistently() {
     let temp = temp_dir();
@@ -704,12 +714,22 @@ fn optional_fields_use_the_configured_optional_representation() {
         .optionals(OptionalStyle::Optional)
         .export_to(
             &path,
-            &Types::default().register::<ExplicitOptionalField>(),
+            &Types::default()
+                .register::<ExplicitOptionalField>()
+                .register::<ExplicitOptionalTuple>()
+                .register::<ExplicitOptionalTupleVariant>(),
             IdentityFormat,
         )
         .unwrap();
     let source = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(
+        source
+            .match_indices("java.util.Optional<java.lang.Integer>")
+            .count(),
+        3
+    );
     assert!(source.contains("java.util.Optional<java.lang.Integer> count"));
+    assert!(source.contains("java.util.Optional<java.lang.Integer> field0"));
     compile_java(temp.path(), &[&path]);
 }
 

@@ -494,7 +494,7 @@ fn fields<'a>(
                 let field_path = format!("{path}.{index}");
                 let (ty, nested) = field_datatype(ctx, ty, &name, &field_path)?;
                 Ok(RenderedField {
-                    ty,
+                    ty: optional_field_type(ctx.java, field, ty),
                     name,
                     docs: &field.docs,
                     deprecated: field.deprecated.as_ref(),
@@ -542,17 +542,22 @@ fn rendered_field<'a>(
 ) -> Result<RenderedField<'a>, Error> {
     let field_path = format!("{path}.{name}");
     let java_name = value_identifier(name, &field_path)?;
-    let (mut ty, nested) = field_datatype(ctx, ty, &java_name, &field_path)?;
-    if field.optional && !matches!(ty.as_str(), value if value.starts_with("java.util.Optional<")) {
-        ty = optional_type(ctx.java, ty);
-    }
+    let (ty, nested) = field_datatype(ctx, ty, &java_name, &field_path)?;
     Ok(RenderedField {
         name: java_name,
-        ty,
+        ty: optional_field_type(ctx.java, field, ty),
         docs: &field.docs,
         deprecated: field.deprecated.as_ref(),
         nested,
     })
+}
+
+fn optional_field_type(java: &Java, field: &Field, ty: String) -> String {
+    if field.optional && !ty.starts_with("java.util.Optional<") {
+        optional_type(java, ty)
+    } else {
+        ty
+    }
 }
 
 fn field_datatype(
