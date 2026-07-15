@@ -672,6 +672,12 @@ fn datatype(
                 let ndt = types
                     .get(reference)
                     .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if ndt.ty.is_none() {
+                    return Err(Error::UnsupportedType {
+                        path: path.into(),
+                        reason: "referenced named type does not have an exportable definition",
+                    });
+                }
                 let name = named_type_identifier(kotlin, ndt, path)?;
                 let generics = generics
                     .iter()

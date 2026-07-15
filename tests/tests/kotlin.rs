@@ -142,6 +142,31 @@ fn kotlin_raw_enum_keeps_self_named_field() {
 }
 
 #[test]
+fn kotlin_rejects_non_exportable_named_references() {
+    let mut types = Types::default();
+    let hidden = specta::datatype::NamedDataType::new("Hidden", &mut types, |_, _| {});
+    specta::datatype::NamedDataType::new("UsesHidden", &mut types, |_, datatype| {
+        datatype.ty = Some(
+            specta::datatype::Struct::named()
+                .field(
+                    "value",
+                    specta::datatype::Field::new(DataType::Reference(hidden.reference(vec![]))),
+                )
+                .build(),
+        );
+    });
+
+    let error = Kotlin::default()
+        .export(&types, IdentityFormat)
+        .expect_err("references without an exported declaration must be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("does not have an exportable definition")
+    );
+}
+
+#[test]
 fn kotlin_export_serde() {
     insta::assert_snapshot!(
         "kotlin-export-serde",
