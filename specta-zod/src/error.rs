@@ -14,6 +14,10 @@ type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     BigIntForbidden {
         path: String,
     },
@@ -76,6 +80,18 @@ impl Error {
     pub(crate) fn bigint_forbidden(path: String) -> Self {
         Self {
             kind: ErrorKind::BigIntForbidden { path },
+        }
+    }
+
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
         }
     }
 
@@ -194,6 +210,9 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
                 "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128, f128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."

@@ -292,6 +292,23 @@ fn zod_define_map_key_uses_a_valid_typescript_property_key() {
 }
 
 #[test]
+fn zod_rejects_non_json_map_keys() {
+    fn assert_invalid<K: Type>(reason: &str) {
+        let mut types = Types::default();
+        let dt = HashMap::<K, String>::definition(&mut types);
+        let err = primitives::inline(&Zod::default(), &types, &dt)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Invalid map key"), "{err}");
+        assert!(err.contains(reason), "{err}");
+    }
+
+    assert_invalid::<(String, String)>("tuple keys are not supported");
+    assert_invalid::<Option<String>>("nullable keys are not supported");
+    assert_invalid::<Vec<String>>("collection, map, and nullable keys are not supported");
+}
+
+#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     #[derive(Type)]
     #[specta(collect = false)]

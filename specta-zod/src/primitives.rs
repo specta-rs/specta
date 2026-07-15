@@ -11,7 +11,7 @@ use specta::{
 };
 use specta_typescript::{Layout as TypescriptLayout, Typescript};
 
-use crate::{Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES};
+use crate::{Error, Layout, Zod, map_keys, opaque, reserved_names::RESERVED_TYPE_NAMES};
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
@@ -805,6 +805,14 @@ fn map_dt(
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
+    let mut resolved_key = m.key_ty().clone();
+    substitute_generics(&mut resolved_key, generics);
+    map_keys::validate_map_key(
+        &resolved_key,
+        types,
+        child_location(&location, "<key>").join("."),
+    )?;
+
     let mut key = String::new();
     map_key_datatype(
         &mut key,

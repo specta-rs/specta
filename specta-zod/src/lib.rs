@@ -25,6 +25,7 @@
 )]
 
 mod error;
+mod map_keys;
 mod opaque;
 pub mod primitives;
 mod references;
