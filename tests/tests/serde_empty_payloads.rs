@@ -394,6 +394,39 @@ fn tuple_struct_skipped_field_swift() {
     );
 }
 
+// A container `#[serde(rename = "...")]` must survive the declared-arity
+// rewrite. The rewrite replaces the `DataType::Struct` (which carries the
+// container attributes) with a bare `DataType::Tuple` before
+// `rewrite_named_type_for_phase` reads the rename, so on this branch the
+// rename is lost. PR #525 (fix/serde-enum-container-rename) reorders both
+// `map_types` drivers to compute the container rename BEFORE
+// `rewrite_datatype_for_phase` runs, which fixes this for every
+// shape-changing rewrite (verified against a scratch merge of that branch).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "Wire")]
+struct RenamedTupleSkip(String, #[serde(skip)] String);
+
+#[test]
+#[ignore = "container rename for shape-rewritten types requires #525 (fix/serde-enum-container-rename)"]
+fn tuple_struct_skipped_field_container_rename() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<RenamedTupleSkip>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains("export type Wire = [string];"),
+        "container rename must survive the declared-arity tuple rewrite:\n{ts}"
+    );
+    assert!(
+        !ts.contains("RenamedTupleSkip"),
+        "the un-renamed Rust name must not leak into the export:\n{ts}"
+    );
+}
+
 // A serde-transparent tuple struct is the exception to the arity rule above:
 // serde serializes it as the bare inner value, so it must NOT be rewritten to
 // an array even though its declared arity is > 1. `#[specta(transparent =

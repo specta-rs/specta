@@ -1049,11 +1049,11 @@ Ninth: /**
 	*/
 
 Tenth: /**
-	* @typedef {string | "B" | {
+	* @typedef {string | null | {
 	* 	a: string,
 	* } | First} Tenth
 	* @property {string} A
-	* @property {"B"} B
+	* @property {null} B
 	* @property {{
 	* 	a: string,
 	* }} C
