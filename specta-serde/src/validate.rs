@@ -588,6 +588,16 @@ fn validate_flatten_field(
         return Ok(());
     }
 
+    // A field skipped in both directions never hits the wire, so its shape
+    // can't cause a flatten error however non-flattenable it is (verified
+    // against serde_json 1.x). Full `#[serde(skip)]` erases the field's type
+    // entirely and never reaches this check; the pair of one-sided skips is
+    // just as dead at runtime. A field skipped in only *one* direction still
+    // flattens in the other, so it must stay validated.
+    if serde_attrs.skip_serializing && serde_attrs.skip_deserializing {
+        return Ok(());
+    }
+
     validate_flatten_target(ty, types, path, &mut HashSet::new(), None)
 }
 

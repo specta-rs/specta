@@ -392,6 +392,128 @@ fn flatten_of_option_vec_is_rejected() {
     );
 }
 
+// A field that never hits the wire can't cause a flatten error, however
+// non-flattenable its type is. serde accepts `#[serde(flatten, skip)]` and
+// fully omits the field in both directions (ground-truthed: serializes as
+// `{"a":1}`, deserializes from it). Full `#[serde(skip)]` erases the field's
+// specta type entirely, so it never reaches flatten validation; the pair of
+// one-sided skips keeps the type but is just as dead at runtime.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenSkippedVec {
+    a: i32,
+    #[serde(flatten, skip)]
+    v: Vec<u8>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenBothSidedSkipsVec {
+    a: i32,
+    #[serde(flatten, skip_serializing, skip_deserializing, default)]
+    v: Vec<u8>,
+}
+
+#[test]
+fn serde_json_confirms_skipped_flatten_fields_are_dead() {
+    assert_eq!(
+        serde_json::to_string(&FlattenSkippedVec { a: 1, v: vec![1] }).unwrap(),
+        r#"{"a":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&FlattenBothSidedSkipsVec { a: 1, v: vec![1] }).unwrap(),
+        r#"{"a":1}"#
+    );
+    let _: FlattenSkippedVec = serde_json::from_str(r#"{"a":1}"#).unwrap();
+    let _: FlattenBothSidedSkipsVec = serde_json::from_str(r#"{"a":1}"#).unwrap();
+}
+
+#[test]
+fn flatten_of_fully_skipped_vec_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenSkippedVec>(),
+            specta_serde::Format,
+        )
+        .expect("a #[serde(flatten, skip)] field never hits the wire, so its shape is irrelevant");
+}
+
+#[test]
+fn flatten_of_both_sided_skipped_vec_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenBothSidedSkipsVec>(),
+            specta_serde::Format,
+        )
+        .expect(
+            "skip_serializing + skip_deserializing together omit the field in both directions, \
+             so its shape is irrelevant",
+        );
+}
+
+// A one-sided skip is different: the *other* direction still flattens, and
+// serde_json fails at runtime there (ground-truthed: deserializing
+// `{"a":1}` into a `#[serde(flatten, skip_serializing, default)] Vec<u8>`
+// errors with "can only flatten structs and maps").
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenSkipSerializingVecInvalid {
+    a: i32,
+    #[serde(flatten, skip_serializing, default)]
+    v: Vec<u8>,
+}
+
+#[test]
+fn flatten_of_one_side_skipped_vec_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenSkipSerializingVecInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the deserialize direction still flattens the Vec and fails at runtime");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// `#[serde(transparent)]` selects the single non-skipped field as the wire
+// shape, ignoring `#[serde(skip)]`-ed siblings (ground-truthed: the wrapper
+// below serializes as `[1,2]`, and flattening it fails at runtime with "can
+// only flatten structs and maps (got a sequence)"). Skipped fields carry no
+// specta type, so the transparent resolution's live-field collection already
+// matches serde's selection rule and must keep rejecting this. (A one-sided
+// skip on the extra field doesn't compile in serde: "#[serde(transparent)]
+// requires struct to have at most one transparent field".)
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentSkipVec(#[serde(skip)] u32, Vec<u8>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenTransparentSkipVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: TransparentSkipVec,
+}
+
+#[test]
+fn flatten_of_transparent_wrapper_with_skipped_sibling_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenTransparentSkipVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err("serde's wire shape is the non-skipped Vec, which can't be flattened");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 // A tuple struct with exactly one field is a newtype: serde delegates
 // (de)serialization straight to the inner value with no `#[serde(transparent)]`
 // required, so flattening one is exactly as valid as flattening its inner type
