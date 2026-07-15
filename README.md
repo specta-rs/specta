@@ -25,7 +25,7 @@
 | --------------- | -------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | **TypeScript**  | ✅ **Stable**  | [`specta-typescript`](https://crates.io/crates/specta-typescript) | Full type support, generics, unions               |
 | **Swift**       | ✅ **Stable**  | [`specta-swift`](https://crates.io/crates/specta-swift)           | Idiomatic Swift, custom Codable, Duration support |
-| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Basic types work, structs/enums in progress       |
+| **Rust**        | 🚧 **Partial** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Rust source, modules, generics; structural wire-only shapes error |
 | **OpenAPI**     | 🚧 **Partial** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | OpenAPI 3.0 schemas, generics, JSON and YAML       |
 | **Go**          | 🚧 **Planned** | [`specta-go`](https://crates.io/crates/specta-go)                 | Go structs and interfaces                         |
 | **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
@@ -71,7 +71,7 @@ cargo add specta-serde       # Apply Serde's wire-format attributes
 # Language exporters (choose one or more)
 cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
-cargo add specta_rust        # Rust (partial - basic types)
+cargo add specta_rust        # Rust (partial)
 cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
 # cargo add specta_go          # Go (planned)
 cargo add specta_kotlin       # Kotlin (partial)

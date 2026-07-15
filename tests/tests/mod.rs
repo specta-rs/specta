@@ -23,6 +23,7 @@ mod legacy_impls;
 mod maybe_undefined;
 mod openapi;
 mod references;
+mod rust;
 mod semantic;
 mod serde_container_rename;
 mod serde_conversions;

@@ -14,6 +14,7 @@ harness = true
 specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson"] }
 specta-jsonschema = { path = "../specta-jsonschema" }
 specta-kotlin = { path = "../specta-kotlin" }
+specta-rust = { path = "../specta-rust" }
 specta-openapi = { path = "../specta-openapi" }
 specta-serde = { path = "../specta-serde" }
 specta-swift = { path = "../specta-swift" }
