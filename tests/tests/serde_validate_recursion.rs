@@ -1185,3 +1185,103 @@ fn substitution_revealed_back_edge_propagates_its_instantiation() {
         "RevGen must merge every instantiation reachable in the cycle: {ts}"
     );
 }
+
+/// A generic passthrough: `PassGen<T>`'s only branch is the bare parameter,
+/// so `type PassGen<T> = T` and any eager use of `PassGen<X>` resolves
+/// straight to `X`.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum PassGen<T> {
+    B(T),
+}
+
+/// A cycle hidden entirely behind a generic argument
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584908691):
+/// `PassRoot -> PassGen<PassRoot>` where `PassGen` itself has *no*
+/// reference back - the edge to `PassRoot` is carried by the argument.
+/// Static discovery saw no cycle and emitted
+/// `PassRoot = PassGen<PassRoot> | number; PassGen<T> = T;`, which `tsc`
+/// rejects with TS2456.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum PassRoot {
+    X(PassGen<Box<PassRoot>>),
+    Y(u32),
+}
+
+#[test]
+fn cycle_hidden_behind_a_generic_passthrough_collapses() {
+    // serde ground truth: the passthrough branch serializes as the inner
+    // `PassRoot` value - a pure self-reference contributing nothing.
+    let json = serde_json::to_string(&PassRoot::X(PassGen::B(Box::new(PassRoot::Y(42))))).unwrap();
+    assert_eq!(json, "42");
+
+    let ts = export::<PassRoot>();
+    assert!(
+        ts.contains("export type PassRoot = number;"),
+        "the argument-carried self-reference must be dropped: {ts}"
+    );
+    assert!(
+        ts.contains("export type PassGen<T> = T;"),
+        "PassGen's standalone export is legal TypeScript and must stay as-is: {ts}"
+    );
+}
+
+/// Two levels of passthrough: `PassGen2<T> = PassGen<T>` and
+/// `PassGen<T> = T`, so `PassRoot2 -> PassGen2<PassRoot2>` resolves back to
+/// `PassRoot2` through both.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum PassGen2<T> {
+    B(PassGen<T>),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum PassRoot2 {
+    X(PassGen2<Box<PassRoot2>>),
+    Y(u32),
+}
+
+#[test]
+fn cycle_hidden_behind_two_generic_passthroughs_collapses() {
+    let json = serde_json::to_string(&PassRoot2::X(PassGen2::B(PassGen::B(Box::new(
+        PassRoot2::Y(7),
+    )))))
+    .unwrap();
+    assert_eq!(json, "7");
+
+    let ts = export::<PassRoot2>();
+    assert!(
+        ts.contains("export type PassRoot2 = number;"),
+        "the two-level argument-carried self-reference must be dropped: {ts}"
+    );
+    assert!(
+        ts.contains("export type PassGen2<T> = PassGen<T>;"),
+        "PassGen2's standalone export is legal and must stay as-is: {ts}"
+    );
+}
+
+/// Control: a passthrough whose argument is *not* cyclic creates no edge
+/// back and therefore no false SCC - the reference renders exactly as
+/// before.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum PassRootStr {
+    X(PassGen<String>),
+    Y(u32),
+}
+
+#[test]
+fn generic_passthrough_with_non_cyclic_argument_is_unaffected() {
+    let ts = export::<PassRootStr>();
+    assert!(
+        ts.contains("export type PassRootStr = PassGen<string> | number;"),
+        "no cycle exists, so nothing may be collapsed: {ts}"
+    );
+}

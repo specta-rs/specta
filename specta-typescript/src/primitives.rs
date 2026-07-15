@@ -2160,12 +2160,12 @@ type GenericSubst = HashMap<Cow<'static, str>, DataType>;
 /// `type X = X | ...` (TS2456), whereas a cycle through `{ field: X }`,
 /// `X[]`, or `[X]` does not, because object/array/tuple types defer
 /// resolution.
-struct TransparentHop<'a> {
-    target: &'a NamedDataType,
+struct TransparentHop<'t, 'r> {
+    target: &'t NamedDataType,
     /// The reference itself, kept so the collapse can resolve the hop's
     /// generic arguments (including omitted ones) with the same
     /// [`resolved_reference_generics`] logic ordinary rendering uses.
-    reference: &'a NamedReference,
+    reference: &'r NamedReference,
     /// Whether the hop passes through [`DataType::Nullable`], rendering as
     /// `Target | null`. A union member is still resolved eagerly, so this is
     /// just as much a cycle - but dropping such a back edge must keep the
@@ -2176,7 +2176,14 @@ struct TransparentHop<'a> {
 /// Returns the alias-transparent hop `dt` renders as, if any: a bare
 /// [`Reference::Named`], optionally wrapped in [`DataType::Nullable`]
 /// (which renders as `| null` - still an eagerly-resolved position).
-fn transparent_reference<'a>(types: &'a Types, dt: &'a DataType) -> Option<TransparentHop<'a>> {
+///
+/// The hop's target borrows from `types` while the reference borrows from
+/// `dt`, so a hop derived from a temporary (substituted) datatype still
+/// yields a long-lived target.
+fn transparent_reference<'t, 'r>(
+    types: &'t Types,
+    dt: &'r DataType,
+) -> Option<TransparentHop<'t, 'r>> {
     match dt {
         DataType::Reference(Reference::Named(r)) => match &r.inner {
             NamedReferenceType::Reference { .. } => Some(TransparentHop {
@@ -2203,10 +2210,10 @@ fn transparent_reference<'a>(types: &'a Types, dt: &'a DataType) -> Option<Trans
 /// a skipped extra field makes the renderer emit a `[T]` one-tuple
 /// (matching serde's one-element seq), which is a deferred position and
 /// therefore not transparent.
-fn transparent_variant_hop<'a>(
-    types: &'a Types,
-    variant: &'a Variant,
-) -> Option<TransparentHop<'a>> {
+fn transparent_variant_hop<'t, 'r>(
+    types: &'t Types,
+    variant: &'r Variant,
+) -> Option<TransparentHop<'t, 'r>> {
     let Fields::Unnamed(unnamed) = &variant.fields else {
         return None;
     };
@@ -2216,18 +2223,15 @@ fn transparent_variant_hop<'a>(
     transparent_reference(types, field.ty.as_ref()?)
 }
 
-/// Returns the transparent hop of a named export whose *own body* renders as
-/// a bare reference - a plain alias body (e.g. what `#[serde(transparent)]`
-/// rewrites to) or a newtype tuple struct, both exported as
-/// `export type W = Inner;`. Such exports continue an alias cycle without
-/// contributing union members of their own.
+/// Returns the alias-transparent *position* of a named export whose own
+/// body renders as a single bare datatype - a plain alias body (e.g. what
+/// `#[serde(transparent)]` rewrites to) or a newtype tuple struct, both
+/// exported as `export type W = <position>;`. Such exports continue an
+/// alias cycle without contributing union members of their own.
 ///
 /// Unlike enum variants, [`struct_dt`] pre-filters skipped fields, so a
 /// struct renders bare whenever exactly one *live* field remains.
-fn transparent_export_hop<'a>(
-    types: &'a Types,
-    ndt: &'a NamedDataType,
-) -> Option<TransparentHop<'a>> {
+fn transparent_export_position(ndt: &NamedDataType) -> Option<&DataType> {
     match ndt.ty.as_ref()? {
         DataType::Struct(s) => {
             let Fields::Unnamed(unnamed) = &s.fields else {
@@ -2238,10 +2242,21 @@ fn transparent_export_hop<'a>(
             if live.next().is_some() {
                 return None;
             }
-            transparent_reference(types, ty)
+            Some(ty)
         }
-        dt => transparent_reference(types, dt),
+        // An enum body contributes hops through its variants instead.
+        DataType::Enum(_) => None,
+        dt => Some(dt),
     }
+}
+
+/// The transparent hop of a passthrough export's body, if any (see
+/// [`transparent_export_position`]).
+fn transparent_export_hop<'t, 'r>(
+    types: &'t Types,
+    ndt: &'r NamedDataType,
+) -> Option<TransparentHop<'t, 'r>> {
+    transparent_reference(types, transparent_export_position(ndt)?)
 }
 
 /// A named export participating in the alias-transparent reference graph.
@@ -2312,16 +2327,95 @@ fn node_enum(ndt: &NamedDataType) -> Option<&Enum> {
     }
 }
 
-fn node_hops<'a>(types: &'a Types, ndt: &'a NamedDataType) -> Vec<TransparentHop<'a>> {
-    match node_enum(ndt) {
-        Some(enm) => enm
-            .variants
-            .iter()
-            .filter(|(_, variant)| !variant.skip)
-            .filter_map(|(_, variant)| transparent_variant_hop(types, variant))
-            .collect(),
-        None => transparent_export_hop(types, ndt).into_iter().collect(),
+/// The *effective* transparent hop of a position under an instantiation:
+/// where its rendering ends up once generic parameters are taken into
+/// account, which is how TypeScript's eager alias resolution sees it.
+struct EffectiveHop<'t> {
+    target: &'t NamedDataType,
+    /// The full substitution the hop applies to its target, resolved via
+    /// [`edge_substitution`].
+    target_subst: GenericSubst,
+    nullable: bool,
+}
+
+/// Computes the effective transparent hop of an enum variant under `subst`,
+/// along with the substituted variant to merge if the hop is not taken:
+///
+/// - A *raw* hop's target is fixed regardless of substitution; its
+///   arguments resolve under `subst`.
+/// - Otherwise the *substituted* form can reveal a hop that only exists
+///   under this instantiation - `B(T)` with `T = Root` (or
+///   `T = Gen<String>`). A revealed reference's arguments are already in
+///   the root's scope, so they resolve under `identity`.
+fn effective_variant_hop<'t>(
+    types: &'t Types,
+    variant: &Variant,
+    subst: &GenericSubst,
+    identity: &GenericSubst,
+) -> Result<(Variant, Option<EffectiveHop<'t>>), Cow<'static, str>> {
+    let raw_hop = transparent_variant_hop(types, variant);
+
+    let mut variant = variant.clone();
+    substitute_fields_generics(&mut variant.fields, subst)?;
+
+    if let Some(hop) = raw_hop {
+        let target_subst = edge_substitution(subst, hop.target, hop.reference)?;
+        let hop = EffectiveHop {
+            target: hop.target,
+            target_subst,
+            nullable: hop.nullable,
+        };
+        return Ok((variant, Some(hop)));
     }
+
+    let hop = match transparent_variant_hop(types, &variant) {
+        Some(hop) => Some(EffectiveHop {
+            target: hop.target,
+            target_subst: edge_substitution(identity, hop.target, hop.reference)?,
+            nullable: hop.nullable,
+        }),
+        None => None,
+    };
+    Ok((variant, hop))
+}
+
+/// The passthrough-export analogue of [`effective_variant_hop`]: the
+/// effective hop of the export's body position under `subst`, along with
+/// the substituted position itself (a passthrough member whose effective
+/// body is *not* a cycle hop contributes it as a terminal).
+fn effective_export_hop<'t>(
+    types: &'t Types,
+    ndt: &NamedDataType,
+    subst: &GenericSubst,
+    identity: &GenericSubst,
+) -> Result<Option<(DataType, Option<EffectiveHop<'t>>)>, Cow<'static, str>> {
+    let Some(position) = transparent_export_position(ndt) else {
+        return Ok(None);
+    };
+    let raw_hop = transparent_reference(types, position);
+
+    let mut position = position.clone();
+    substitute_generics(&mut position, subst)?;
+
+    if let Some(hop) = raw_hop {
+        let target_subst = edge_substitution(subst, hop.target, hop.reference)?;
+        let hop = EffectiveHop {
+            target: hop.target,
+            target_subst,
+            nullable: hop.nullable,
+        };
+        return Ok(Some((position, Some(hop))));
+    }
+
+    let hop = match transparent_reference(types, &position) {
+        Some(hop) => Some(EffectiveHop {
+            target: hop.target,
+            target_subst: edge_substitution(identity, hop.target, hop.reference)?,
+            nullable: hop.nullable,
+        }),
+        None => None,
+    };
+    Ok(Some((position, hop)))
 }
 
 /// Resolves the full substitution an in-cycle hop applies to its target: one
@@ -2599,46 +2693,104 @@ fn collapse_untagged_alias_cycle(
     }
     let root_id = alias_id(root);
 
-    // Phase 1: discover the shape of the alias-transparent reference graph
-    // reachable from `root`, in deterministic discovery order (`root`
-    // first). The discovered set is closed under the edge relation (descent
-    // only stops at nodes with no transparent continuation), so cycle
-    // membership never needs to look outside it.
-    let mut order: Vec<AliasId> = vec![root_id.clone()];
+    let identity: GenericSubst = root
+        .generics
+        .iter()
+        .map(|g| (g.name.clone(), DataType::Generic(g.reference())))
+        .collect();
+
+    // Phase 1: discover the *effective* alias-transparent reference graph
+    // reachable from `root`. Nodes are explored once per (node,
+    // instantiation) pair (same dedup and divergence guards as the merge
+    // walk), and hops are derived from each node's substituted form, so an
+    // edge carried entirely by a generic argument - `Gen<Root>` where
+    // `Gen<T>`'s only transparent branch is the bare parameter `T` - is
+    // discovered exactly like a raw reference edge. TypeScript's alias
+    // cycle check is declaration-level, so edges are recorded per node
+    // (not per instantiation) for the cycle test in phase 2.
+    //
+    // A substitution failure here (e.g. an opaque payload the walk refuses
+    // to touch) must not fail an export that may not be cyclic at all: the
+    // raw hop's target is still recorded (its identity doesn't depend on
+    // the substitution) and explored under its own identity, which keeps
+    // raw reachability complete. If such a node does end up in a cycle,
+    // the merge walk hits the same substitution error and fails honestly.
     let mut nodes: HashMap<AliasId, AliasNode<'_>> = HashMap::new();
     nodes.insert(
         root_id.clone(),
         AliasNode {
             ndt: root,
-            substs: Vec::new(),
+            substs: vec![identity.clone()],
             edges: Vec::new(),
         },
     );
 
+    let mut work: Vec<(AliasId, GenericSubst)> = vec![(root_id.clone(), identity.clone())];
     let mut cursor = 0;
-    while cursor < order.len() {
-        let id = order[cursor].clone();
+    while cursor < work.len() {
+        let (id, subst) = work[cursor].clone();
         cursor += 1;
 
         let ndt = nodes[&id].ndt;
-        let mut edges = Vec::new();
-        for hop in node_hops(types, ndt) {
-            let target_id = alias_id(hop.target);
-            edges.push(target_id.clone());
+        let mut hops: Vec<(&NamedDataType, Option<GenericSubst>)> = Vec::new();
+        match node_enum(ndt) {
+            Some(enm) => {
+                for (_, variant) in &enm.variants {
+                    if variant.skip {
+                        continue;
+                    }
+                    match effective_variant_hop(types, variant, &subst, &identity) {
+                        Ok((_, Some(hop))) => hops.push((hop.target, Some(hop.target_subst))),
+                        Ok((_, None)) => {}
+                        Err(_) => {
+                            if let Some(hop) = transparent_variant_hop(types, variant) {
+                                hops.push((hop.target, None));
+                            }
+                        }
+                    }
+                }
+            }
+            None => match effective_export_hop(types, ndt, &subst, &identity) {
+                Ok(Some((_, Some(hop)))) => hops.push((hop.target, Some(hop.target_subst))),
+                Ok(_) => {}
+                Err(_) => {
+                    if let Some(hop) = transparent_export_hop(types, ndt) {
+                        hops.push((hop.target, None));
+                    }
+                }
+            },
+        }
 
+        for (target, target_subst) in hops {
+            let target_id = alias_id(target);
             if let Entry::Vacant(entry) = nodes.entry(target_id.clone()) {
                 entry.insert(AliasNode {
-                    ndt: hop.target,
+                    ndt: target,
                     substs: Vec::new(),
                     edges: Vec::new(),
                 });
-                order.push(target_id);
             }
+
+            let source = nodes
+                .get_mut(&id)
+                .expect("node was inserted before being visited");
+            if !source.edges.contains(&target_id) {
+                source.edges.push(target_id.clone());
+            }
+
+            // Fall back to the target's own identity when the hop's
+            // instantiation couldn't be resolved, so its raw hops are
+            // still explored.
+            let target_subst = match target_subst {
+                Some(target_subst) => target_subst,
+                None => target
+                    .generics
+                    .iter()
+                    .map(|g| (g.name.clone(), DataType::Generic(g.reference())))
+                    .collect(),
+            };
+            enqueue_cycle_instantiation(&mut nodes, &mut work, target_id, target_subst)?;
         }
-        nodes
-            .get_mut(&id)
-            .expect("node was inserted before being visited")
-            .edges = edges;
     }
 
     // Phase 2: `root`'s strongly-connected component. Every discovered node
@@ -2669,34 +2821,31 @@ fn collapse_untagged_alias_cycle(
 
     // Phase 3: propagate generic instantiations around the cycle to a fixed
     // point, starting from the root's identity, merging each (member,
-    // instantiation) pair's non-back-edge variants as it is processed.
-    // Every path from `root` to a cycle member stays inside the cycle (an
-    // intermediate node on such a path is mutually reachable with `root` by
-    // definition), so only cycle-internal hops need to carry substitutions.
-    // A member can be reached with several distinct instantiations
-    // (`Gen<T>` as the root *and* as `Gen<String>` through the cycle); each
-    // one contributes a copy of its variants.
+    // instantiation) pair's non-back-edge branches as it is processed. A
+    // member can be reached with several distinct instantiations (`Gen<T>`
+    // as the root *and* as `Gen<String>` through the cycle); each one
+    // contributes a copy of its branches.
     //
-    // Back edges are classified twice: on the raw variant (a reference's
-    // target never changes under substitution), and - for variants that
-    // aren't raw hops - on the *substituted* form, because substitution can
-    // reveal a back edge (`B(T)` with `T = Root`, or `T = Gen<String>` for
-    // a cycle member `Gen`). A revealed back edge is dropped like a raw one
-    // and its instantiation is fed through this same work list, so its
-    // terminals still merge; its reference's arguments are already in the
-    // root's scope, hence the identity substitution when resolving them.
+    // Back edges are classified on each branch's *effective* hop (see
+    // `effective_variant_hop`): the raw hop when the branch is one, or the
+    // hop its substituted form reveals (`B(T)` with `T = Root`, or
+    // `T = Gen<String>` for a cycle member `Gen`). A back edge is dropped -
+    // it adds no wire structure of its own, except a `Nullable` hop whose
+    // `None` case is a real `null` wire value to keep - and its
+    // instantiation is fed through this same work list, so its terminals
+    // still merge. Discovery errors were tolerated in phase 1; here the
+    // cycle is confirmed, so substitution failures fail the export
+    // honestly.
     //
     // Termination: only genuinely new (node, substitution) pairs enter the
     // work list (see `enqueue_cycle_instantiation`), so the walk stops
     // exactly when the instantiation set stops growing - a finite set of
-    // any size converges. Variants are merged in work-list order (`root`'s
-    // own variants under the identity first), so the output is
+    // any size converges. Branches are merged in work-list order (`root`'s
+    // own branches under the identity first), so the output is
     // deterministic; `push_union` dedupes identical renderings.
-    let identity: GenericSubst = root
-        .generics
-        .iter()
-        .map(|g| (g.name.clone(), DataType::Generic(g.reference())))
-        .collect();
+    for node in nodes.values_mut() {
+        node.substs.clear();
+    }
     let mut work: Vec<(AliasId, GenericSubst)> = vec![(root_id.clone(), identity.clone())];
     nodes
         .get_mut(&root_id)
@@ -2713,17 +2862,29 @@ fn collapse_untagged_alias_cycle(
 
         let ndt = nodes[&id].ndt;
         let Some(enm) = node_enum(ndt) else {
-            // Passthrough member: its entire body is a back edge into the
-            // cycle, contributing nothing but a possible `null` remnant.
-            if let Some(hop) = transparent_export_hop(types, ndt) {
-                needs_null |= hop.nullable;
-                let target_subst = edge_substitution(&subst, hop.target, hop.reference)?;
-                enqueue_cycle_instantiation(
-                    &mut nodes,
-                    &mut work,
-                    alias_id(hop.target),
-                    target_subst,
-                )?;
+            // Passthrough member: its effective body is usually a back edge
+            // into the cycle (contributing nothing but a possible `null`
+            // remnant), but under some instantiations it can be a hop out
+            // of the cycle or no hop at all (`W<T>` reached at
+            // `T = string`), in which case the substituted body is a
+            // terminal to keep.
+            let Some((position, hop)) = effective_export_hop(types, ndt, &subst, &identity)? else {
+                continue;
+            };
+            match hop {
+                Some(hop) if in_cycle.contains(&alias_id(hop.target)) => {
+                    needs_null |= hop.nullable;
+                    enqueue_cycle_instantiation(
+                        &mut nodes,
+                        &mut work,
+                        alias_id(hop.target),
+                        hop.target_subst,
+                    )?;
+                }
+                _ => variants.push((
+                    Cow::Borrowed("passthrough"),
+                    Variant::unnamed().field(Field::new(position)).build(),
+                )),
             }
             continue;
         };
@@ -2733,40 +2894,16 @@ fn collapse_untagged_alias_cycle(
                 continue;
             }
 
-            // Raw back edge: the referenced target is fixed regardless of
-            // substitution. Dropping it is sound because it adds no wire
-            // structure of its own - except a `Nullable` hop, whose `None`
-            // case is a real `null` wire value to keep.
-            if let Some(hop) = transparent_variant_hop(types, variant)
+            let (variant, hop) = effective_variant_hop(types, variant, &subst, &identity)?;
+            if let Some(hop) = hop
                 && in_cycle.contains(&alias_id(hop.target))
             {
                 needs_null |= hop.nullable;
-                let target_subst = edge_substitution(&subst, hop.target, hop.reference)?;
                 enqueue_cycle_instantiation(
                     &mut nodes,
                     &mut work,
                     alias_id(hop.target),
-                    target_subst,
-                )?;
-                continue;
-            }
-
-            let mut variant = variant.clone();
-            substitute_fields_generics(&mut variant.fields, &subst)?;
-
-            // Substitution-revealed back edge: `B(T)` whose `T` maps to a
-            // cycle member (bare or as a concrete instantiation). Its wire
-            // values are exactly that member's, so it merges the same way.
-            if let Some(hop) = transparent_variant_hop(types, &variant)
-                && in_cycle.contains(&alias_id(hop.target))
-            {
-                needs_null |= hop.nullable;
-                let target_subst = edge_substitution(&identity, hop.target, hop.reference)?;
-                enqueue_cycle_instantiation(
-                    &mut nodes,
-                    &mut work,
-                    alias_id(hop.target),
-                    target_subst,
+                    hop.target_subst,
                 )?;
                 continue;
             }
