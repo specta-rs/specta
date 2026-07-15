@@ -187,7 +187,14 @@ fn inner(
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
                         validate_field_attributes(field, format!("{path}.{name}"), mode)?;
-                        validate_flatten_field(field, ty, types, &format!("{path}.{name}"), mode)?;
+                        validate_flatten_field(
+                            field,
+                            ty,
+                            types,
+                            &format!("{path}.{name}"),
+                            mode,
+                            FlattenDirections::LIVE,
+                        )?;
                     }
                     for (name, (_, ty)) in named
                         .fields
@@ -221,6 +228,7 @@ fn inner(
 
             for (variant_name, variant) in &enm.variants {
                 validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
+                let variant_directions = FlattenDirections::for_variant(variant)?;
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
@@ -231,7 +239,14 @@ fn inner(
                         {
                             let path = format!("{path}::{variant_name}.{name}");
                             validate_field_attributes(field, path.clone(), mode)?;
-                            validate_flatten_field(field, ty, types, &path, mode)?;
+                            validate_flatten_field(
+                                field,
+                                ty,
+                                types,
+                                &path,
+                                mode,
+                                variant_directions,
+                            )?;
                         }
                         for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
                             field.ty.as_ref().map(|ty| (name, (field, ty)))
@@ -580,6 +595,7 @@ fn validate_flatten_field(
     types: &Types,
     path: &str,
     mode: ApplyMode,
+    container: FlattenDirections,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(());
@@ -596,10 +612,13 @@ fn validate_flatten_field(
     // direction. Under `PhasesFormat` the skipped phase drops the field
     // before flatten lowering; unified mode drops the field for a skip in
     // *either* direction (see `should_skip_field_for_mode` in `lib.rs`), so
-    // any skip means nothing flattens there.
+    // any skip means nothing flattens there. The enclosing container's
+    // liveness (an enum variant's own one-sided skips - see
+    // `filter_enum_variants_for_phase`) ANDs in: a phase the variant doesn't
+    // exist in can't flatten any of its fields.
     let directions = FlattenDirections {
-        serialize: !serde_attrs.skip_serializing,
-        deserialize: !serde_attrs.skip_deserializing,
+        serialize: container.serialize && !serde_attrs.skip_serializing,
+        deserialize: container.deserialize && !serde_attrs.skip_deserializing,
     };
 
     let live = match mode {
@@ -621,6 +640,32 @@ fn validate_flatten_field(
 struct FlattenDirections {
     serialize: bool,
     deserialize: bool,
+}
+
+impl FlattenDirections {
+    /// Both directions hit the wire (a plain struct field's container).
+    const LIVE: Self = Self {
+        serialize: true,
+        deserialize: true,
+    };
+
+    /// The directions in which an enum variant exists on the wire: a fully
+    /// skipped variant exists in neither, and a one-sided variant skip drops
+    /// it from that phase (`filter_enum_variants_for_phase` in `lib.rs`).
+    fn for_variant(variant: &Variant) -> Result<Self, Error> {
+        if variant.skip {
+            return Ok(Self {
+                serialize: false,
+                deserialize: false,
+            });
+        }
+
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        Ok(Self {
+            serialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_serializing),
+            deserialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_deserializing),
+        })
+    }
 }
 
 /// Lexically scoped substitution environment for resolving

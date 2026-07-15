@@ -588,6 +588,122 @@ fn flatten_of_into_only_conversion_with_skipped_deserialize_is_accepted() {
         );
 }
 
+// Variant-level skips gate flattened fields the same way field-level skips
+// do: `PhasesFormat` drops a one-side-skipped variant from that phase
+// (`filter_enum_variants_for_phase`), so a phase in which the variant doesn't
+// exist can't flatten anything, and a `Phased` override's shape on that side
+// is unreachable.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantSkipSerializingEnum {
+    #[serde(skip_serializing)]
+    V {
+        #[serde(flatten)]
+        #[specta(type = specta_serde::Phased<Vec<String>, Inner>)]
+        v: HashMap<String, String>,
+    },
+    Other {
+        x: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantSkipDeserializingEnum {
+    #[serde(skip_deserializing)]
+    V {
+        #[serde(flatten)]
+        #[specta(type = specta_serde::Phased<Vec<String>, Inner>)]
+        v: HashMap<String, String>,
+    },
+    Other {
+        x: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantUnskippedEnum {
+    V {
+        #[serde(flatten)]
+        #[specta(type = specta_serde::Phased<Vec<String>, Inner>)]
+        v: HashMap<String, String>,
+    },
+    Other {
+        x: i32,
+    },
+}
+
+#[test]
+fn flatten_in_serialize_skipped_variant_only_validates_deserialize_shape() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<VariantSkipSerializingEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the Vec is the serialize shape, but the whole variant is dropped from the serialize \
+             phase, so only the struct-shaped deserialize side ever flattens",
+        );
+}
+
+#[test]
+fn flatten_in_deserialize_skipped_variant_still_validates_live_serialize_shape() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<VariantSkipDeserializingEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the live serialize side is the Vec, which still flattens and fails");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// Unified mode drops a variant skipped in *either* direction entirely
+// (`variant_is_skipped_for_mode`: `Unified => skip_serializing ||
+// skip_deserializing`), so nothing in it ever flattens there - even a plain
+// Vec target must be accepted.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantSkipUnifiedEnum {
+    #[serde(skip_serializing)]
+    V {
+        #[serde(flatten)]
+        v: Vec<u8>,
+    },
+    Other {
+        x: i32,
+    },
+}
+
+#[test]
+fn flatten_in_one_side_skipped_variant_is_accepted_under_unified_format() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<VariantSkipUnifiedEnum>(),
+            specta_serde::Format,
+        )
+        .expect("unified mode drops one-side-skipped variants entirely");
+}
+
+#[test]
+fn flatten_in_unskipped_variant_validates_both_shapes() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<VariantUnskippedEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("both phases are live, and the serialize side is a Vec");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 // The mirror case: a *deserialize-only* conversion to a non-flattenable wire
 // on a field whose deserialization is skipped. Serialization flattens the raw
 // named-field struct (fine); deserialization would use the Vec wire, but that
