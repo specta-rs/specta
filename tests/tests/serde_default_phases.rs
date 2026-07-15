@@ -904,3 +904,36 @@ fn trailing_tuple_default_renders_optional_element_per_phase() {
 
     insta::assert_snapshot!("serde-default-phases-tuple-default", rendered);
 }
+
+/// Non-trailing tuple defaults can't come from serde_derive (a required
+/// field after a defaulted one is the compile error "field must have
+/// #[serde(default)] because previous field 0 has #[serde(default)]"), but
+/// a hand-built datatype can still carry one. Sequence elements can only be
+/// omitted from the end, so such a default is inert and must not split —
+/// mirroring the renderer, which only honors trailing optional runs.
+#[test]
+fn non_trailing_hand_built_tuple_default_does_not_split() {
+    use specta::datatype::{Field, NamedDataType, Primitive, Struct};
+
+    let mut types = Types::default();
+    NamedDataType::new("HandBuilt", &mut types, |_, ndt| {
+        let mut s = Struct::unnamed();
+        let mut first = Field::new(DataType::Primitive(Primitive::u8));
+        first.attributes.insert("serde:field:default", true);
+        s.field_mut(first);
+        s.field_mut(Field::new(DataType::Primitive(Primitive::u8)));
+        ndt.ty = Some(s.build());
+    });
+
+    let rendered = Typescript::default()
+        .export(&types, PhasesFormat)
+        .expect("PhasesFormat should accept a non-trailing tuple default");
+
+    assert!(
+        !rendered.contains("HandBuilt_Serialize"),
+        "a non-trailing tuple default cannot be omitted from the sequence \
+         and must not cause a phase split: {rendered}"
+    );
+    // Trailing defaults still splitting is pinned by
+    // `trailing_tuple_default_renders_optional_element_per_phase`.
+}

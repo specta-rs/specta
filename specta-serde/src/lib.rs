@@ -2497,17 +2497,19 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
             // A single unnamed field is a newtype: serde represents it as
             // the bare inner value, leaving no container position to omit,
             // so `#[serde(default)]` on it is inert on the wire.
-            let default_is_inert = unnamed.fields.len() == 1;
+            let newtype = unnamed.fields.len() == 1;
+            let trailing_default_from = unnamed_trailing_default_run(unnamed)?;
 
             unnamed
                 .fields
                 .iter()
-                .try_fold(false, |has_difference, field| {
+                .enumerate()
+                .try_fold(false, |has_difference, (idx, field)| {
                     if has_difference {
                         return Ok(true);
                     }
 
-                    single_field_has_local_difference(field, default_is_inert)
+                    single_field_has_local_difference(field, newtype || idx < trailing_default_from)
                 })
         }
         Fields::Named(named) => {
@@ -2547,6 +2549,31 @@ fn single_field_has_local_difference(field: &Field, default_is_inert: bool) -> R
 /// neither contribute a phase difference nor tie its container to a
 /// dependency's split. A one-sided skip keeps the field in one phase and
 /// stays direction-relevant.
+/// The declared index from which every remaining live unnamed field carries
+/// `#[serde(default)]`. Sequence elements can only be omitted from the END,
+/// so only defaults in this trailing run are observable on the deserialize
+/// wire. serde_derive enforces the suffix rule at compile time ("field must
+/// have #[serde(default)] because previous field N has #[serde(default)]");
+/// this gates hand-built datatypes the same way, mirroring the renderer's
+/// trailing-only optional handling.
+fn unnamed_trailing_default_run(unnamed: &UnnamedFields) -> Result<usize, Error> {
+    let mut run_start = 0;
+    for (idx, field) in unnamed.fields.iter().enumerate() {
+        // Dead fields never reach the wire, so they neither extend nor
+        // break the trailing run.
+        if field_is_dead_in_both_phases(field)? {
+            continue;
+        }
+
+        if !SerdeFieldAttrs::from_attributes(&field.attributes)?.is_some_and(|attrs| attrs.default)
+        {
+            run_start = idx + 1;
+        }
+    }
+
+    Ok(run_start)
+}
+
 fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
     if field.ty.is_none() {
         return Ok(true);
