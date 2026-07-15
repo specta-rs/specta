@@ -151,7 +151,13 @@ fn remove_stale_generated_files(
     {
         let entry = entry.map_err(|source| Error::read_dir(directory.to_path_buf(), source))?;
         let path = entry.path();
-        if path.is_dir() {
+        let file_type = entry
+            .file_type()
+            .map_err(|source| Error::read_dir(directory.to_path_buf(), source))?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
             remove_stale_generated_files(&path, expected)?;
         } else if path
             .extension()
@@ -512,7 +518,7 @@ fn field_datatype(
     path: &str,
 ) -> Result<(String, Option<String>), Error> {
     if string_literal_raw_value(datatype_value).is_some() {
-        return Ok(("String".to_string(), None));
+        return Ok(("java.lang.String".to_string(), None));
     }
     if let DataType::Nullable(inner) = datatype_value {
         let (inner, nested) = field_datatype(ctx, inner, field_name, path)?;

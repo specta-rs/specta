@@ -10,16 +10,16 @@ public final class Bindings {
 
     public sealed interface Event<T> permits Event.Started, Event.Progress, Event.Finished {
         record Started<T>(
-            String kind
+            java.lang.String kind
         ) implements Event<T> {}
 
         record Progress<T>(
-            String kind,
+            java.lang.String kind,
             java.lang.Short payload
         ) implements Event<T> {}
 
         record Finished<T>(
-            String kind,
+            java.lang.String kind,
             Payload<T> payload
         ) implements Event<T> {
             public record Payload<T>(
