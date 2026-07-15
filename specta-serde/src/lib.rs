@@ -2443,6 +2443,12 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             let non_skipped = unnamed_live_fields(unnamed).collect::<Vec<_>>();
 
             match non_skipped.as_slice() {
+                // A newtype (declared arity 1) whose sole field is skipped
+                // collapses to serde's *unit* payload (`null`), unlike
+                // zero-arg / multi-field all-skipped tuples which stay `[]`.
+                [] if original_unnamed_len == 1 => {
+                    Some(Field::new(DataType::Tuple(Tuple::new(vec![]))))
+                }
                 [] => Some(Field::new(empty_array_datatype())),
                 [single] if original_unnamed_len == 1 => Some((*single).clone()),
                 _ => Some(Field::new(DataType::Tuple(Tuple::new(
@@ -2743,9 +2749,12 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
         return Ok(false);
     }
 
+    // `#[serde(untagged)]` variants bypass the tag/content representation
+    // entirely, so there is no `content` key to be asymmetric about.
     if let Some(attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)?
-        && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Serialize)
-        && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Deserialize)
+        && (attrs.untagged
+            || (variant_is_skipped_for_mode(&attrs, PhaseRewrite::Serialize)
+                && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Deserialize)))
     {
         return Ok(false);
     }

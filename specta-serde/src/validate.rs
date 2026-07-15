@@ -851,9 +851,12 @@ fn validate_adjacent_collapsed_newtype_variants(
         if variant.skip {
             continue;
         }
-        if SerdeVariantAttrs::from_attributes(&variant.attributes)?
-            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
-        {
+        // `#[serde(untagged)]` variants bypass the tag/content representation
+        // entirely (they serialize as their bare payload), so there is no
+        // `content` key to be asymmetric about.
+        if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| {
+            attrs.untagged || (attrs.skip_serializing && attrs.skip_deserializing)
+        }) {
             continue;
         }
 

@@ -284,6 +284,93 @@ fn adjacent_tagged_option_skip_deserializing_phases() {
     );
 }
 
+// Variant-level `#[serde(untagged)]` bypasses the tag/content representation
+// entirely: the variant serializes as its bare payload. A skipped newtype
+// payload collapses to serde's *unit* representation, which is `null` under
+// untagged -- NOT `[]` -- while zero-arg and multi-field all-skipped tuple
+// variants stay `[]`. The adjacent-collapse unified rejection must not fire
+// for untagged variants (there is no `c` key to require or split).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjWithUntaggedSkip {
+    Normal(String),
+    #[serde(untagged)]
+    U(#[serde(skip)] u8),
+    #[serde(untagged)]
+    M(#[serde(skip)] u8, #[serde(skip)] u8),
+}
+
+#[test]
+fn adjacent_tagged_untagged_skip_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjWithUntaggedSkip::U(7)).unwrap(),
+        "null"
+    );
+    assert_eq!(
+        serde_json::to_string(&AdjWithUntaggedSkip::M(1, 2)).unwrap(),
+        "[]"
+    );
+
+    assert!(matches!(
+        serde_json::from_str::<AdjWithUntaggedSkip>("null"),
+        Ok(AdjWithUntaggedSkip::U(_))
+    ));
+    assert!(matches!(
+        serde_json::from_str::<AdjWithUntaggedSkip>("[]"),
+        Ok(AdjWithUntaggedSkip::M(..))
+    ));
+    // The tag/content forms do not exist for untagged variants.
+    assert!(serde_json::from_str::<AdjWithUntaggedSkip>(r#"{"t":"U"}"#).is_err());
+    assert!(serde_json::from_str::<AdjWithUntaggedSkip>(r#"{"t":"U","c":null}"#).is_err());
+}
+
+#[test]
+fn adjacent_tagged_untagged_skip_unified() {
+    // The adjacent asymmetric-collapse rejection must NOT fire: the untagged
+    // variants never carry a `c` key.
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjWithUntaggedSkip>(),
+            specta_serde::Format,
+        )
+        .expect("untagged variants have no content key; unified export must succeed");
+
+    assert!(
+        ts.contains(r#"{ t: "Normal"; c: string }"#),
+        "tagged variant keeps its adjacent shape:\n{ts}"
+    );
+    assert!(
+        ts.contains("null"),
+        "untagged skipped newtype must render serde's unit payload (`null`):\n{ts}"
+    );
+    assert!(
+        ts.contains("[]"),
+        "untagged all-skipped multi-field tuple must stay `[]`:\n{ts}"
+    );
+    // The `null` must come from U, not from a `[]`-shaped U member.
+    assert!(
+        ts.contains("null") && ts.matches("[]").count() == 1,
+        "exactly one `[]` member (M); U must be `null`, not `[]`:\n{ts}"
+    );
+}
+
+#[test]
+fn adjacent_tagged_untagged_skip_phases_no_split() {
+    // Nothing here is phase-asymmetric: untagged variants have no `c` key.
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjWithUntaggedSkip>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        !ts.contains("AdjWithUntaggedSkip_Serialize"),
+        "no phase split is needed for untagged variants:\n{ts}"
+    );
+}
+
 // A user-defined type whose path merely ENDS in `Option` must not be
 // mistaken for the std `Option`: serde's `missing_field` special case only
 // applies to the real `std`/`core` `Option`, so a skipped `wire::Option<u8>`
