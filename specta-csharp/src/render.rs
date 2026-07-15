@@ -647,6 +647,8 @@ fn render_datatype_with_inline_overrides(
     structural_types: &[(&DataType, String)],
     path: &str,
 ) -> Result<String, Error> {
+    validate_non_object_recursion(types, ty, &[], &mut HashSet::new(), path)?;
+
     fn render(
         out: &mut String,
         exporter: &CSharp,
@@ -1025,8 +1027,16 @@ fn render_union(
     out.push_str("{\n");
     let indent = format!("{base}{}", exporter.indent);
     let mut used = record_reserved_names(name);
+    let reserved_type_names = match exporter.layout {
+        Layout::FlatFile | Layout::ModulePrefixedName => types
+            .into_unsorted_iter()
+            .map(|ndt| exported_name(exporter, ndt))
+            .collect(),
+        Layout::Namespaces | Layout::Files => HashSet::new(),
+    };
     for (wire_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
-        let variant_name = unique_identifier(property_name(wire_name), &mut used);
+        let variant_name =
+            unique_type_identifier(property_name(wire_name), &mut used, &reserved_type_names);
         render_variant(
             out,
             exporter,
@@ -1267,6 +1277,87 @@ fn is_emitted_named(ndt: &NamedDataType) -> bool {
     ndt.ty.as_ref().is_some_and(
         |ty| !matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)),
     )
+}
+
+fn validate_non_object_recursion(
+    types: &Types,
+    ty: &DataType,
+    generic_layers: &[GenericArguments<'_>],
+    visiting: &mut HashSet<String>,
+    path: &str,
+) -> Result<(), Error> {
+    match ty {
+        DataType::Generic(generic) => {
+            for (layer_index, layer) in generic_layers.iter().enumerate().rev() {
+                if let Some((_, value)) = layer.iter().find(|(candidate, _)| candidate == generic) {
+                    return validate_non_object_recursion(
+                        types,
+                        value,
+                        &generic_layers[..layer_index],
+                        visiting,
+                        path,
+                    );
+                }
+            }
+        }
+        DataType::List(list) => {
+            validate_non_object_recursion(types, &list.ty, generic_layers, visiting, path)?
+        }
+        DataType::Map(map) => {
+            validate_non_object_recursion(types, map.key_ty(), generic_layers, visiting, path)?;
+            validate_non_object_recursion(types, map.value_ty(), generic_layers, visiting, path)?;
+        }
+        DataType::Nullable(inner) => {
+            validate_non_object_recursion(types, inner, generic_layers, visiting, path)?;
+        }
+        DataType::Tuple(tuple) => {
+            for element in &tuple.elements {
+                validate_non_object_recursion(types, element, generic_layers, visiting, path)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => {
+                validate_non_object_recursion(types, dt, generic_layers, visiting, path)?;
+            }
+            NamedReferenceType::Recursive(_) => {
+                return Err(Error::RecursiveInline { path: path.into() });
+            }
+            NamedReferenceType::Reference { generics, .. } => {
+                let ndt = types
+                    .get(reference)
+                    .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
+                    && is_non_object_struct(&strct.fields)
+                {
+                    let key = format!("{}::{generics:?}", rust_path(ndt));
+                    if visiting.len() >= 128 || !visiting.insert(key.clone()) {
+                        return Err(Error::RecursiveInline { path: path.into() });
+                    }
+                    let mut layers = generic_layers.to_vec();
+                    layers.push(generics);
+                    if let Fields::Unnamed(fields) = &strct.fields {
+                        for field in fields.fields.iter().filter_map(|field| field.ty.as_ref()) {
+                            validate_non_object_recursion(types, field, &layers, visiting, path)?;
+                        }
+                    }
+                    visiting.remove(&key);
+                }
+            }
+        },
+        DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
+            if let Fields::Unnamed(fields) = &strct.fields {
+                for field in fields.fields.iter().filter_map(|field| field.ty.as_ref()) {
+                    validate_non_object_recursion(types, field, generic_layers, visiting, path)?;
+                }
+            }
+        }
+        DataType::Primitive(_)
+        | DataType::Struct(_)
+        | DataType::Enum(_)
+        | DataType::Intersection(_)
+        | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+    Ok(())
 }
 
 fn render_non_object_struct(

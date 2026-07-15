@@ -263,6 +263,18 @@ struct RecursiveWireOwner {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct RecursiveWireInlineOwner {
+    mixed: (AlwaysInlineA, RecursiveWireNode),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum UnionTypeShadowing {
+    Foo(Foo),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct Foo {
     value: bool,
 }
@@ -583,6 +595,30 @@ fn recursive_non_object_structs_return_an_error() {
         ),
         Err(Error::RecursiveInline { .. })
     ));
+}
+
+#[test]
+fn recursive_non_object_structs_inside_inline_overrides_return_an_error() {
+    assert!(matches!(
+        CSharp::new().export(
+            &Types::default().register::<RecursiveWireInlineOwner>(),
+            IdentityFormat,
+        ),
+        Err(Error::RecursiveInline { .. })
+    ));
+}
+
+#[test]
+fn flat_union_variants_do_not_shadow_top_level_types() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<UnionTypeShadowing>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("record Foo2"));
+    assert!(output.contains("Foo Item1"));
 }
 
 #[test]
