@@ -18,6 +18,7 @@ mod functions;
 mod java;
 mod jsdoc;
 mod jsonschema;
+mod kotlin;
 mod layouts;
 mod legacy_impls;
 mod maybe_undefined;
