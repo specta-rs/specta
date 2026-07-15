@@ -686,12 +686,10 @@ fn render_reference(
     reference: &NamedReference,
     path: &str,
 ) -> Result<String, Error> {
+    if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+        return render_datatype(exporter, format, types, dt, path);
+    }
     if let Some(ndt) = types.get(reference) {
-        if ndt.ty.is_none()
-            && let NamedReferenceType::Inline { dt, .. } = &reference.inner
-        {
-            return render_datatype(exporter, format, types, dt, path);
-        }
         if ndt.ty.is_none() {
             return Err(Error::DanglingReference {
                 path: path.into(),
@@ -716,7 +714,7 @@ fn render_reference(
     }
 
     match &reference.inner {
-        NamedReferenceType::Inline { dt, .. } => render_datatype(exporter, format, types, dt, path),
+        NamedReferenceType::Inline { .. } => unreachable!("inline references handled above"),
         NamedReferenceType::Recursive(cycle) => Err(Error::RecursiveInline {
             path: path.into(),
             cycle: format!("{cycle:?}"),

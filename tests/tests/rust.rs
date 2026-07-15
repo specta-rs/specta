@@ -188,6 +188,30 @@ fn structural_wire_shapes_return_honest_errors() {
 }
 
 #[test]
+fn collected_inline_references_are_not_rendered_as_names() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Child {
+        value: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Parent {
+        #[specta(inline)]
+        child: Child,
+    }
+
+    let error = Rust::default()
+        .export(&Types::default().register::<Parent>(), Identity)
+        .unwrap_err();
+    assert!(
+        matches!(&error, specta_rust::Error::InvalidIdentifier { path, .. } if path.ends_with("Parent.child")),
+        "unexpected inline error: {error}"
+    );
+}
+
+#[test]
 fn exports_module_layouts() {
     let modules = Rust::default()
         .layout(Layout::Modules)
