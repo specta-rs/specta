@@ -33,7 +33,7 @@
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
 | **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
 | **C#**          | 🚧 **Planned** | `specta-csharp`                                                   | C# classes and enums                              |
-| **Java**        | 🚧 **Planned** | `specta-java`                                                     | Java POJOs and enums                              |
+| **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
 
 ### Legend
 
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (3)**: Rust, OpenAPI, and Kotlin exporters have working implementations with further compatibility work in progress
-- **Planned (6)**: Go, JSON Schema, Zod, Python, C#, and Java exporters are in development
+- **Partially Implemented (4)**: Rust, OpenAPI, Java, and Kotlin have broad type support but are still stabilizing
+- **Planned (5)**: Go, JSON Schema, Zod, Python, and C# exporters are in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -73,6 +73,7 @@ cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
 cargo add specta_rust        # Rust (partial)
 cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
+cargo add specta_java        # Java 17 (partial)
 # cargo add specta_go          # Go (planned)
 cargo add specta_kotlin       # Kotlin (partial)
 # cargo add specta_jsonschema  # JSON Schema (planned)

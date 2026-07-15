@@ -15,6 +15,7 @@ macro_rules! register {
 mod bound;
 mod errors;
 mod functions;
+mod java;
 mod jsdoc;
 mod jsonschema;
 mod kotlin;
