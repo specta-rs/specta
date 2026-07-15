@@ -371,6 +371,49 @@ enum SymmetricRenameSplitTaggedEnum {
     B(String),
 }
 
+/// The phased *wrapper* type must also honor a symmetric container rename:
+/// the public name of a split type is the wrapper, and leaving it as the Rust
+/// name would mean `PhasesFormat` still ignores the rename in the split case.
+/// (Authored-distinct per-phase renames intentionally keep the Rust name for
+/// the wrapper: there is no single user-authored name to give it.)
+/// <https://github.com/specta-rs/specta/pull/525#discussion_r3584890853>
+#[test]
+fn symmetric_rename_applies_to_split_wrapper() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<SymmetricRenameSplitStruct>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("struct export should succeed");
+    assert!(
+        ts.contains(
+            "export type RenamedSymmetricSplitStruct = RenamedSymmetricSplitStruct_Serialize | RenamedSymmetricSplitStruct_Deserialize;"
+        ),
+        "expected the struct wrapper to use the symmetric rename, got:\n{ts}"
+    );
+    assert!(
+        !ts.contains("SymmetricRenameSplitStruct ="),
+        "the original (un-renamed) struct name should not be exported, got:\n{ts}"
+    );
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<SymmetricRenameSplitTaggedEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("enum export should succeed");
+    assert!(
+        ts.contains(
+            "export type RenamedSymmetricSplitTagged = RenamedSymmetricSplitTagged_Serialize | RenamedSymmetricSplitTagged_Deserialize;"
+        ),
+        "expected the enum wrapper to use the symmetric rename, got:\n{ts}"
+    );
+    assert!(
+        !ts.contains("SymmetricRenameSplitTaggedEnum ="),
+        "the original (un-renamed) enum name should not be exported, got:\n{ts}"
+    );
+}
+
 /// A symmetric container rename on a type that splits for an unrelated reason
 /// (here a directional skip) must keep the phase suffix on the *renamed* base
 /// name; the rename alone can't distinguish the two phases.

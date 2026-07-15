@@ -443,7 +443,12 @@ impl specta::Format for PhasesFormat {
             return Err(Box::new(err));
         }
 
+        let mut rewrite_err = None;
         out.iter_mut(|ndt| {
+            if rewrite_err.is_some() {
+                return;
+            }
+
             let key = TypeIdentity::from_ndt(ndt);
             if !split_types.contains(&key) {
                 return;
@@ -455,6 +460,19 @@ impl specta::Format for PhasesFormat {
             }) = generated.get(&key)
             else {
                 return;
+            };
+
+            // The wrapper is the split type's public name, so a *symmetric*
+            // (effective) container rename must apply to it too; `ndt.ty` is
+            // still the untouched original here, so the attrs are intact.
+            // Authored-distinct per-phase renames keep the Rust name: there
+            // is no single user-authored name to give the wrapper.
+            let wrapper_rename = match symmetric_container_rename(ndt) {
+                Ok(rename) => rename,
+                Err(err) => {
+                    rewrite_err = Some(err);
+                    return;
+                }
             };
 
             let generic_args = ndt
@@ -489,7 +507,15 @@ impl specta::Format for PhasesFormat {
                 .push((Cow::Borrowed("Deserialize"), deserialize_variant));
 
             ndt.ty = Some(DataType::Enum(wrapper));
+            if let Some(rename) = wrapper_rename {
+                ndt.name = Cow::Owned(rename);
+            }
         });
+
+        if let Some(err) = rewrite_err {
+            return Err(Box::new(err));
+        }
+
         Ok(Cow::Owned(out))
     }
 
@@ -2747,6 +2773,28 @@ fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> 
     }
 
     Ok(())
+}
+
+/// The single *effective* container rename of a type whose serialize and
+/// deserialize renames agree (defaulting a missing side to the type's own
+/// name), or `None` when the phases have distinct names or no rename at all.
+fn symmetric_container_rename(ndt: &NamedDataType) -> Result<Option<String>, Error> {
+    let Some(ty) = &ndt.ty else {
+        return Ok(None);
+    };
+
+    let original_name = ndt.name.as_ref();
+    let serialize_rename = renamed_type_name_for_phase(ty, PhaseRewrite::Serialize, original_name)?;
+    let deserialize_rename =
+        renamed_type_name_for_phase(ty, PhaseRewrite::Deserialize, original_name)?;
+
+    let effective_serialize = serialize_rename.as_deref().unwrap_or(original_name);
+    let effective_deserialize = deserialize_rename.as_deref().unwrap_or(original_name);
+
+    Ok(
+        (effective_serialize == effective_deserialize && effective_serialize != original_name)
+            .then(|| effective_serialize.to_string()),
+    )
 }
 
 fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<String, Error> {
