@@ -121,7 +121,11 @@ fn export_named_inner(
             .fields
             .iter()
             .filter(|(_, field)| field.ty.is_some())
-            .all(|(field_name, _)| is_identifier(field_name) && !is_reserved(field_name))
+            .all(|(field_name, _)| {
+                is_identifier(field_name)
+                    && !is_reserved(field_name)
+                    && !field_name.starts_with("__")
+            })
     {
         out.push_str(indent);
         out.push_str("class ");

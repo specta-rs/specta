@@ -426,6 +426,11 @@ fn module_imports(types: &Types, current: &str, ndts: &[&NamedDataType]) -> BTre
     let mut references = BTreeSet::<(String, String)>::new();
     let mut visiting = HashSet::new();
     for ndt in ndts {
+        for generic in ndt.generics.iter() {
+            if let Some(default) = &generic.default {
+                collect_referenced_types(types, default, &mut references, &mut visiting);
+            }
+        }
         if let Some(ty) = &ndt.ty {
             collect_referenced_types(types, ty, &mut references, &mut visiting);
         }

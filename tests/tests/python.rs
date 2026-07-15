@@ -147,6 +147,24 @@ mod namespace_binding_collision {
     }
 }
 
+mod generic_default_import {
+    pub mod target {
+        #[derive(specta::Type)]
+        #[specta(collect = false)]
+        pub struct Other {
+            pub value: String,
+        }
+    }
+
+    pub mod consumer {
+        #[derive(specta::Type)]
+        #[specta(collect = false)]
+        pub struct Box<T = super::target::Other> {
+            pub value: T,
+        }
+    }
+}
+
 impl Format for IdentityFormat {
     fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
         Ok(Cow::Owned(types.clone()))
@@ -285,6 +303,24 @@ fn python_inline_and_opaque_types() {
 }
 
 #[test]
+fn python_preserves_dunder_wire_keys() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Dunder {
+        #[serde(rename = "__private")]
+        private: String,
+    }
+
+    let output = Python::default()
+        .export(&Types::default().register::<Dunder>(), specta_serde::Format)
+        .unwrap();
+    assert!(output.contains(
+        "type Dunder = _specta_typing.TypedDict(\"test__python__Dunder\", {\"__private\": _specta_builtins.str})"
+    ));
+    assert!(!output.contains("class Dunder("));
+}
+
+#[test]
 fn python_export_to_file_and_files_layout() {
     let types = Types::default().register::<files_layout::Root>();
     let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
@@ -372,6 +408,26 @@ fn python_files_layout_uses_unambiguous_import_aliases() {
         aliases[0].split(" as ").nth(1),
         aliases[1].split(" as ").nth(1)
     );
+}
+
+#[test]
+fn python_files_layout_imports_generic_defaults() {
+    let types = Types::default().register::<generic_default_import::consumer::Box>();
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+    let package = temp.path().join("bindings");
+    Python::default()
+        .layout(Layout::Files)
+        .export_to(&package, &types, IdentityFormat)
+        .unwrap();
+
+    let consumer = std::fs::read_to_string(
+        package.join("test/python/generic_default_import/consumer/__init__.py"),
+    )
+    .unwrap();
+    assert!(consumer.contains("from ..target import Other as "));
+    assert!(consumer.contains("class Box[T = _specta_import_"));
 }
 
 #[test]
