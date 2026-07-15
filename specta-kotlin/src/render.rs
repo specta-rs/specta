@@ -797,6 +797,28 @@ fn resolved_reference_generics(
     explicit: &[(Generic, DataType)],
     path: &str,
 ) -> Result<Vec<DataType>, Error> {
+    for (index, (generic, _)) in explicit.iter().enumerate() {
+        if !ndt
+            .generics
+            .iter()
+            .any(|definition| definition.reference() == *generic)
+        {
+            return Err(Error::UnsupportedType {
+                path: path.into(),
+                reason: "named reference supplies an unknown generic argument",
+            });
+        }
+        if explicit[..index]
+            .iter()
+            .any(|(candidate, _)| candidate == generic)
+        {
+            return Err(Error::UnsupportedType {
+                path: path.into(),
+                reason: "named reference supplies a duplicate generic argument",
+            });
+        }
+    }
+
     let mut scoped = Vec::with_capacity(ndt.generics.len());
     let mut resolved = Vec::with_capacity(ndt.generics.len());
 

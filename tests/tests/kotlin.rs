@@ -221,6 +221,56 @@ fn kotlin_materializes_generic_defaults_and_keeps_empty_variants_generic() {
 }
 
 #[test]
+fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
+    use specta::datatype::{Field, Generic, GenericDefinition, NamedDataType, Primitive, Struct};
+
+    let generic = Generic::new(Cow::Borrowed("T"));
+    let cases = [
+        (
+            vec![(
+                Generic::new(Cow::Borrowed("Unknown")),
+                DataType::Primitive(Primitive::i32),
+            )],
+            "unknown generic argument",
+        ),
+        (
+            vec![
+                (generic.clone(), DataType::Primitive(Primitive::i32)),
+                (generic.clone(), DataType::Primitive(Primitive::str)),
+            ],
+            "duplicate generic argument",
+        ),
+    ];
+
+    for (arguments, expected) in cases {
+        let mut types = Types::default();
+        let target = NamedDataType::new("GenericTarget", &mut types, |_, datatype| {
+            datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
+            datatype.ty = Some(
+                Struct::named()
+                    .field("value", Field::new(DataType::Generic(generic.clone())))
+                    .build(),
+            );
+        });
+        NamedDataType::new("GenericUser", &mut types, |_, datatype| {
+            datatype.ty = Some(
+                Struct::named()
+                    .field(
+                        "value",
+                        Field::new(DataType::Reference(target.reference(arguments))),
+                    )
+                    .build(),
+            );
+        });
+
+        let error = Kotlin::default()
+            .export(&types, IdentityFormat)
+            .expect_err("malformed generic arguments must be rejected");
+        assert!(error.to_string().contains(expected), "{error}");
+    }
+}
+
+#[test]
 fn kotlin_export_serde() {
     insta::assert_snapshot!(
         "kotlin-export-serde",
