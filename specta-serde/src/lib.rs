@@ -1063,15 +1063,24 @@ fn strip_nullable(mut ty: DataType) -> (DataType, bool) {
 ///
 /// Instead, every optional part becomes a branch in a union: for each subset
 /// of the optional parts we emit `mandatory & <subset>` (an empty subset with
-/// no mandatory parts renders as `{}`), so the result is exactly the set of
-/// shapes serde can actually produce. With no optional parts this degrades to
-/// the plain intersection that existed before this function was introduced.
+/// no mandatory parts becomes an empty struct), so the result is exactly the
+/// set of shapes serde can actually produce. With no optional parts this
+/// degrades to the plain intersection that existed before this function was
+/// introduced.
 ///
 /// We deliberately build the union as the *outermost* type (`(Base & Inner) |
 /// Base` rather than `Base & (Inner | {})`): TypeScript's `&` binds tighter
 /// than `|`, so an intersection nested inside a union never needs parens,
 /// whereas `specta-typescript`'s `RenderMode::Normal` intersection renderer
 /// joins parts with `" & "` without wrapping union members in parens.
+///
+/// The branch without an optional part leans on TypeScript's structural
+/// typing when *deserializing*: a value carrying only a strict subset of a
+/// part's required fields still satisfies the part-less branch, even though
+/// serde would reject it. Guarding against that would need `field?: never`
+/// markers for each of the part's fields (like the untagged-enum lowering
+/// emits), but the part is usually an unresolved [`Reference`] whose fields
+/// aren't known here.
 fn flatten_intersection_with_optionals(
     mandatory: Vec<DataType>,
     optional: Vec<DataType>,

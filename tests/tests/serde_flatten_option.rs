@@ -75,6 +75,59 @@ struct FlatNestedOpt {
     inner: Option<Option<Inner1>>,
 }
 
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct Inner3 {
+    z: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlatThreeOpt {
+    a: i32,
+    #[serde(flatten)]
+    inner1: Option<Inner1>,
+    #[serde(flatten)]
+    inner2: Option<Inner2>,
+    #[serde(flatten)]
+    inner3: Option<Inner3>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct Req {
+    r: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlatMixed {
+    a: i32,
+    #[serde(flatten)]
+    req: Req,
+    #[serde(flatten)]
+    opt: Option<Inner1>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum TagWithFields {
+    A {
+        b: bool,
+        #[serde(flatten)]
+        inner: Option<Inner1>,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlatOptMap {
+    a: i32,
+    #[serde(flatten)]
+    rest: Option<std::collections::HashMap<String, i32>>,
+}
+
 // --- serde_json evidence, so the exported type can be checked against what
 // serde actually puts on the wire (rather than against assumptions). ---
 
@@ -190,6 +243,85 @@ fn flat_nested_opt_serde_evidence() {
         serde_json::to_string(&some_some).unwrap(),
         r#"{"a":1,"x":2}"#
     );
+
+    // Deserialization never distinguishes `Some(None)` from `None` on the
+    // wire either - both come from the same base-only shape.
+    let de_absent: FlatNestedOpt = serde_json::from_str(r#"{"a":1}"#).unwrap();
+    assert!(matches!(de_absent.inner, Some(None)));
+
+    let de_present: FlatNestedOpt = serde_json::from_str(r#"{"a":1,"x":2}"#).unwrap();
+    assert_eq!(de_present.inner.unwrap().unwrap().x, 2);
+}
+
+#[test]
+fn flat_mixed_serde_evidence() {
+    // A mandatory flattened struct always contributes its fields; the
+    // flattened `Option` still contributes only when `Some`.
+    let none = FlatMixed {
+        a: 1,
+        req: Req { r: "s".into() },
+        opt: None,
+    };
+    assert_eq!(serde_json::to_string(&none).unwrap(), r#"{"a":1,"r":"s"}"#);
+
+    let some = FlatMixed {
+        a: 1,
+        req: Req { r: "s".into() },
+        opt: Some(Inner1 { x: 2 }),
+    };
+    assert_eq!(
+        serde_json::to_string(&some).unwrap(),
+        r#"{"a":1,"r":"s","x":2}"#
+    );
+
+    let de: FlatMixed = serde_json::from_str(r#"{"a":1,"r":"s"}"#).unwrap();
+    assert!(de.opt.is_none());
+}
+
+#[test]
+fn tag_with_fields_serde_evidence() {
+    let none = TagWithFields::A {
+        b: true,
+        inner: None,
+    };
+    assert_eq!(
+        serde_json::to_string(&none).unwrap(),
+        r#"{"t":"A","b":true}"#
+    );
+
+    let some = TagWithFields::A {
+        b: true,
+        inner: Some(Inner1 { x: 2 }),
+    };
+    assert_eq!(
+        serde_json::to_string(&some).unwrap(),
+        r#"{"t":"A","b":true,"x":2}"#
+    );
+
+    let de: TagWithFields = serde_json::from_str(r#"{"t":"A","b":true}"#).unwrap();
+    match de {
+        TagWithFields::A { inner, .. } => assert!(inner.is_none()),
+    }
+}
+
+#[test]
+fn flat_opt_map_serde_evidence() {
+    // Serde also allows flattening a map (as a catch-all for leftover keys).
+    let none = FlatOptMap { a: 1, rest: None };
+    assert_eq!(serde_json::to_string(&none).unwrap(), r#"{"a":1}"#);
+
+    let some = FlatOptMap {
+        a: 1,
+        rest: Some([("k".to_string(), 9)].into_iter().collect()),
+    };
+    assert_eq!(serde_json::to_string(&some).unwrap(), r#"{"a":1,"k":9}"#);
+
+    // Deserialization of a flattened `Option<Map>` is always `Some` (possibly
+    // empty) because an empty leftover set is still a valid map - but the
+    // *wire shapes* are the same as any other flattened Option: base-only or
+    // base plus entries. The exported union covers exactly those.
+    let de: FlatOptMap = serde_json::from_str(r#"{"a":1}"#).unwrap();
+    assert_eq!(de.rest, Some(Default::default()));
 }
 
 // --- Exported TypeScript, checked against the serde evidence above. ---
@@ -293,6 +425,110 @@ fn flat_nested_opt_exports_same_shape_as_single_option() {
     );
 
     let expected = "export type FlatNestedOpt = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
+#[test]
+fn flat_three_opt_exports_deterministic_branch_order() {
+    // Pins the exact branch ordering of the 2^k expansion (all-present first,
+    // counting the subset bitmask down to the all-absent base) so refactors
+    // can't silently introduce nondeterminism - snapshot stability depends on
+    // this being reproducible.
+    let expected = "export type FlatThreeOpt = {\n\ta: number,\n} & Inner1 & Inner2 & Inner3 | {\n\ta: number,\n} & Inner2 & Inner3 | {\n\ta: number,\n} & Inner1 & Inner3 | {\n\ta: number,\n} & Inner3 | {\n\ta: number,\n} & Inner1 & Inner2 | {\n\ta: number,\n} & Inner2 | {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};";
+
+    for _ in 0..3 {
+        let rendered = Typescript::default()
+            .export(
+                &Types::default().register::<FlatThreeOpt>(),
+                specta_serde::Format,
+            )
+            .expect("export should succeed");
+        assert!(
+            rendered.contains(expected),
+            "expected:\n{expected}\n\ngot:\n{rendered}"
+        );
+    }
+}
+
+#[test]
+fn flat_mixed_exports_mandatory_part_in_every_branch() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FlatMixed>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    // `Req` is a non-Option flatten so it appears in both branches; only the
+    // flattened Option toggles.
+    let expected =
+        "export type FlatMixed = {\n\ta: number,\n} & Req & Inner1 | {\n\ta: number,\n} & Req;";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
+#[test]
+fn tag_with_fields_exports_union_with_leftover_fields() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TagWithFields>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    // The internally tagged variant's regular fields stay in every branch;
+    // only the flattened Option toggles.
+    let expected = "export type TagWithFields = {\n\tt: \"A\",\n} & {\n\tb: boolean,\n} & Inner1 | {\n\tt: \"A\",\n} & {\n\tb: boolean,\n};";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
+#[test]
+fn flat_opt_map_exports_union_with_index_signature() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FlatOptMap>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        !rendered.contains("| null"),
+        "flattened Option must not admit bare `null`:\n{rendered}"
+    );
+
+    let expected = "export type FlatOptMap = {\n\ta: number,\n} & { [key in string]: number } | {\n\ta: number,\n};";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
+#[test]
+fn flat_opt_phases_format_does_not_split() {
+    // A flattened Option on its own is phase-symmetric: serialization and
+    // deserialization see the same union, so `PhasesFormat` must not emit
+    // separate `_Serialize`/`_Deserialize` types for it.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FlatOpt>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        !rendered.contains("_Serialize") && !rendered.contains("_Deserialize"),
+        "flattened Option alone must not trigger a phase split:\n{rendered}"
+    );
+
+    let expected = "export type FlatOpt = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};";
     assert!(
         rendered.contains(expected),
         "expected:\n{expected}\n\ngot:\n{rendered}"
