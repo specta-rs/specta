@@ -1103,10 +1103,8 @@ fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
         ));
     }
 
-    // This synthetic union is already in its final exported shape (each
-    // variant is one accepted name for the field/alias); mark it so a later
-    // rewrite pass that recurses into it (e.g. through an `Intersection`)
-    // doesn't mistake it for an untransformed enum and tag it.
+    // This synthetic union is already in its final exported shape; see
+    // `ENUM_REPR_REWRITTEN_MARKER`.
     aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
 
     DataType::Enum(aliases)
@@ -1336,20 +1334,24 @@ fn unnamed_fields_all_skipped(unnamed: &UnnamedFields) -> bool {
     !unnamed.fields.is_empty() && !unnamed_has_effective_payload(unnamed)
 }
 
-/// Marker attribute key set on an [`Enum`]'s [`Attributes`](specta::datatype::Attributes)
-/// once [`rewrite_enum_repr_for_phase`] has rewritten it to its serde
-/// representation.
+/// Marker attribute key recorded on an [`Enum`]'s
+/// [`Attributes`](specta::datatype::Attributes) once it is in its final
+/// serde representation, so a later rewrite pass (e.g. [`PhasesFormat`]'s
+/// second pass over split generated types) doesn't transform it again. It is
+/// set when [`rewrite_enum_repr_for_phase`] rewrites an enum, and at
+/// construction by the synthetic-enum builders ([`string_literal_datatype`],
+/// [`alias_field_union`], [`rewrite_identifier_enum_for_phase`]) whose output
+/// is already final.
 ///
 /// This replaces a former shape-sniffing heuristic
-/// (`enum_repr_already_rewritten`/`variant_repr_already_rewritten`) that
-/// tried to detect "already rewritten" enums by inspecting variant shapes.
-/// That heuristic was fundamentally unsound: every shape the transform
-/// produces is also a valid shape a user can author directly (for example a
-/// single unnamed `&'static str` field lowers to exactly the same
-/// `DataType::Primitive(Primitive::str)` that the transform emits for a
-/// string-literal tag), so the heuristic could both skip enums that had
-/// never been rewritten and mistake untransformed enums for already-rewritten
-/// ones. Tracking the rewrite explicitly makes the check exact.
+/// (`enum_repr_already_rewritten`) that tried to detect "already rewritten"
+/// enums by inspecting variant shapes. That heuristic was unsound: every
+/// shape the transform produces is also a valid shape a user can author
+/// directly (for example a single unnamed `&'static str` field lowers to
+/// exactly the `DataType::Primitive(Primitive::str)` that the transform
+/// emits for a widened tag), so it could both skip enums that had never been
+/// rewritten and re-transform enums that had. Tracking the rewrite
+/// explicitly makes the check exact.
 const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
 
 fn rewrite_enum_repr_for_phase(
@@ -1384,13 +1386,9 @@ fn rewrite_enum_repr_for_phase(
 
         if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
             let mut transformed_variant = transform_untagged_variant(&variant)?;
-            // Clear attributes like the other transformed variants below do,
-            // so a later rewrite pass (e.g. `PhasesFormat`'s second pass over
-            // split generated types) sees a plain, already-rewritten variant
-            // instead of one still carrying `serde:variant:untagged` (which
-            // would otherwise be harmless here since the enum-level marker
-            // short-circuits the whole function, but keeping this consistent
-            // avoids relying on that).
+            // Clear attributes like the other transformed variants below, so
+            // later passes (which still filter and walk variants before the
+            // marker check) see a plain, already-rewritten variant.
             transformed_variant.attributes = Default::default();
             transformed.push((Cow::Owned(variant_name.into_owned()), transformed_variant));
             continue;
@@ -1524,9 +1522,7 @@ fn rewrite_identifier_enum_for_phase(
 
     e.attributes = Default::default();
     // This synthetic identifier union is already in its final exported
-    // shape; mark it so a later rewrite pass over the same enum (e.g.
-    // `PhasesFormat`'s second pass over split generated types) doesn't fall
-    // through to `rewrite_enum_repr_for_phase` and re-tag it.
+    // shape; see `ENUM_REPR_REWRITTEN_MARKER`.
     e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
     e.variants = variants;
     Ok(true)
@@ -1990,10 +1986,8 @@ fn string_literal_datatype(value: String) -> DataType {
     value_enum
         .variants
         .push((Cow::Owned(value), Variant::unit()));
-    // This is a synthetic single-variant literal, already in its final
-    // exported shape (e.g. a tag field's type); mark it so a later rewrite
-    // pass that recurses into it doesn't mistake it for an untransformed
-    // enum and re-tag it.
+    // This synthetic single-variant literal (e.g. a tag field's type) is
+    // already in its final exported shape; see `ENUM_REPR_REWRITTEN_MARKER`.
     value_enum
         .attributes
         .insert(ENUM_REPR_REWRITTEN_MARKER, true);
