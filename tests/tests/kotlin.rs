@@ -447,6 +447,36 @@ fn kotlin_rejects_declarations_that_shadow_generic_modifiers() {
 }
 
 #[test]
+fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
+    use specta::datatype::{Generic, GenericDefinition, NamedDataType};
+
+    let mut types = Types::default();
+    NamedDataType::new("Identity", &mut types, |_, datatype| {
+        let generic = Generic::new(Cow::Borrowed("T"));
+        datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
+        datatype.ty = Some(DataType::Generic(generic));
+    });
+
+    let output = Kotlin::default()
+        .export(&types, IdentityFormat)
+        .expect("bare generic aliases should use a legal Kotlin wrapper");
+    assert!(output.contains("value class Identity<T>(public val value: T)"));
+
+    let output = Kotlin::default()
+        .mutable_properties(true)
+        .export(&types, IdentityFormat)
+        .expect("mutable bare generic aliases should use a data class");
+    assert!(output.contains("data class Identity<T>(public var value: T)"));
+
+    let error = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .mutable_properties(true)
+        .export(&types, IdentityFormat)
+        .expect_err("mutable generic wrappers cannot preserve scalar Kotlinx encoding");
+    assert!(error.to_string().contains("generic wrappers"));
+}
+
+#[test]
 fn kotlin_rejects_generics_that_shadow_root_namespaces() {
     use specta::datatype::{GenericDefinition, NamedDataType, Struct};
 

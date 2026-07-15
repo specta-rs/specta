@@ -132,6 +132,35 @@ fn render_named(
             enm,
             &ndt.name,
         ),
+        DataType::Generic(generic) => {
+            if kotlin.serialization == Serialization::Kotlinx && kotlin.mutable_properties {
+                return Err(Error::UnsupportedType {
+                    path: ndt.name.to_string(),
+                    reason: "mutable Kotlinx generic wrappers cannot preserve scalar encoding",
+                });
+            }
+            annotation(out, "", kotlin, "Serializable", None);
+            if kotlin.mutable_properties {
+                out.push_str("public data class ");
+            } else {
+                out.push_str("@kotlin.jvm.JvmInline\npublic value class ");
+            }
+            out.push_str(&name);
+            out.push_str(&generic_declaration(&generics));
+            out.push_str("(public ");
+            out.push_str(property_keyword(kotlin));
+            out.push_str(" value: ");
+            out.push_str(&datatype(
+                kotlin,
+                format,
+                types,
+                &DataType::Generic(generic.clone()),
+                &generic_scope,
+                &ndt.name,
+            )?);
+            out.push(')');
+            Ok(())
+        }
         _ => {
             if contains_named_reference(format, types, &ty, ndt)? {
                 return Err(Error::UnsupportedType {
