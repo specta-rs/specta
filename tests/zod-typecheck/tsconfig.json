@@ -15,6 +15,6 @@
   "include": [
     "verify.test.ts",
     "generated/*.ts",
-    "generated/files/*.ts"
+    "generated/files/**/*.ts"
   ]
 }
