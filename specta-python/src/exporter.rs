@@ -196,8 +196,17 @@ fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
                     .collect::<Vec<_>>()
                     .join("::");
                 let child = primitives::normalized_identifier(segments[index]);
-                seen.entry(format!("{parent}::{child}"))
-                    .or_insert_with(|| format!("module {}", segments[..=index].join("::")));
+                let key = format!("{parent}::{child}");
+                let module = format!("module {}", segments[..=index].join("::"));
+                if let Some(first) = seen.get(&key) {
+                    if first != &module {
+                        return Err(
+                            Error::duplicate_name(child, first, module).with_named_datatype(ndt)
+                        );
+                    }
+                } else {
+                    seen.insert(key, module);
+                }
             }
         }
     }

@@ -606,6 +606,30 @@ fn python_reports_name_collisions() {
 }
 
 #[test]
+fn python_rejects_normalized_namespace_module_collisions() {
+    let mut types = Types::default()
+        .register::<duplicate_a::Duplicate>()
+        .register::<duplicate_b::Duplicate>();
+    types.iter_mut(|datatype| {
+        if datatype.module_path.ends_with("duplicate_a") {
+            datatype.name = "First".into();
+            datatype.module_path = "root::K".into();
+        } else {
+            datatype.name = "Second".into();
+            datatype.module_path = "root::K".into();
+        }
+    });
+
+    let error = Python::default()
+        .layout(Layout::Namespaces)
+        .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("duplicate exported Python name"));
+    assert!(error.to_string().contains("module root::K"));
+    assert!(error.to_string().contains("module root::K"));
+}
+
+#[test]
 fn python_rejects_names_mangled_by_namespace_classes() {
     let mut types = Types::default().register::<namespace_dunder::Secret>();
     types.iter_mut(|datatype| datatype.name = "__Secret".into());
