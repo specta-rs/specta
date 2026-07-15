@@ -24,6 +24,7 @@ mod layouts;
 mod legacy_impls;
 mod maybe_undefined;
 mod openapi;
+mod python;
 mod references;
 mod rust;
 mod semantic;

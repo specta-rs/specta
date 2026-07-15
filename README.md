@@ -31,7 +31,7 @@
 | **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
 | **JSON Schema** | 🚧 **Partial** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
-| **Python**      | 🚧 **Planned** | `specta-python`                                                   | Python dataclasses and type hints                 |
+| **Python**      | 🚧 **Partial** | [`specta-python`](./specta-python)                                | Python 3.13 TypedDicts and type hints             |
 | **C#**          | 🚧 **Planned** | `specta-csharp`                                                   | C# classes and enums                              |
 | **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
 
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (6)**: Rust, OpenAPI, Go, Java, Kotlin, and JSON Schema have broad type support but are still stabilizing
-- **Planned (3)**: Zod, Python, and C# exporters are in development
+- **Partially Implemented (7)**: Rust, OpenAPI, Go, Java, Kotlin, JSON Schema, and Python have broad type support but are still stabilizing
+- **Planned (2)**: Zod and C# exporters are in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -74,6 +74,7 @@ cargo add specta_rust        # Rust (partial)
 cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
 cargo add specta_java        # Java 17 (partial)
 cargo add specta_go           # Go (partial)
+cargo add specta-python      # Python 3.13 type hints (partial)
 cargo add specta_kotlin       # Kotlin (partial)
 cargo add specta_jsonschema   # JSON Schema (partial)
 # cargo add specta_zod         # Zod schemas (planned)
