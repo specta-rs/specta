@@ -900,6 +900,7 @@ fn rewrite_datatype_for_phase(
                 // `ty: None` slots across later passes; see
                 // `PRESERVED_ARITY_PAYLOAD_MARKER`.
                 s.attributes.contains_key(PRESERVED_ARITY_PAYLOAD_MARKER),
+                true,
             )?;
 
             // A declared-multi-field tuple struct stays an array even when
@@ -948,6 +949,10 @@ fn rewrite_datatype_for_phase(
             for (variant_name, variant) in &mut e.variants {
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, variant_name)?;
+                let conditional_omission_applies = !matches!(
+                    &variant.fields,
+                    Fields::Unnamed(unnamed) if unnamed.fields.len() == 1
+                );
 
                 rewrite_fields_for_phase(
                     &mut variant.fields,
@@ -958,6 +963,7 @@ fn rewrite_datatype_for_phase(
                     rename_rule,
                     false,
                     true,
+                    conditional_omission_applies,
                 )?;
 
                 let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
@@ -1306,6 +1312,7 @@ fn rewrite_fields_for_phase(
     rename_all_rule: Option<RenameRule>,
     container_default: bool,
     preserve_skipped_unnamed_fields: bool,
+    conditional_omission_applies: bool,
 ) -> Result<(), Error> {
     match fields {
         Fields::Unit => {}
@@ -1331,7 +1338,14 @@ fn rewrite_fields_for_phase(
                 }
 
                 apply_field_attrs(field, mode, container_default)?;
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
+                rewrite_field_for_phase(
+                    field,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    conditional_omission_applies,
+                )?;
             }
 
             if !preserve_skipped_unnamed_fields
@@ -1366,7 +1380,14 @@ fn rewrite_fields_for_phase(
                     *name = Cow::Owned(key);
                 }
 
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
+                rewrite_field_for_phase(
+                    field,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    conditional_omission_applies,
+                )?;
             }
         }
     }
@@ -1410,11 +1431,14 @@ fn rewrite_field_for_phase(
     original_types: &Types,
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
+    conditional_omission_applies: bool,
 ) -> Result<(), Error> {
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)?
         && attrs.skip_serializing_if.is_some()
     {
-        if matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize) {
+        if conditional_omission_applies
+            && matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize)
+        {
             field.optional = true;
 
             if mode == PhaseRewrite::Serialize

@@ -549,6 +549,11 @@ fn option_is_none_omits_null_in_serialize_phase() {
 
 #[test]
 fn tuple_variant_skip_serializing_if_unifies_and_splits_owner() {
+    assert_eq!(
+        serde_json::to_string(&TupleVariantSkipSerializingIfOnly::Value(None)).unwrap(),
+        r#"{"Value":null}"#,
+    );
+
     let unified = Typescript::default()
         .export(
             &Types::default().register::<TupleVariantSkipSerializingIfOnly>(),
@@ -570,6 +575,10 @@ fn tuple_variant_skip_serializing_if_unifies_and_splits_owner() {
 
     assert!(rendered.contains("TupleVariantSkipSerializingIfOnly_Serialize"));
     assert!(rendered.contains("TupleVariantSkipSerializingIfOnly_Deserialize"));
+    assert!(
+        rendered.contains("TupleVariantSkipSerializingIfOnly_Serialize = { Value: string | null }"),
+        "unexpected phased output: {rendered}"
+    );
 }
 
 #[test]
