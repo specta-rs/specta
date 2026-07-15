@@ -99,6 +99,23 @@ struct GenericRecursiveNode {
     child: GenericRecursiveWrapper<GenericRecursiveNode>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericRecursiveLeaf<T>(T);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericRecursiveBranches<T> {
+    first: GenericRecursiveLeaf<u8>,
+    second: GenericRecursiveLeaf<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericRecursiveBranchedNode {
+    child: GenericRecursiveBranches<Box<GenericRecursiveBranchedNode>>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Page<T> {
@@ -289,6 +306,22 @@ fn recursion_detection_substitutes_generic_arguments() {
         "generic recursion was not boxed:\n{output}"
     );
     compile_source("generic-recursion", &output);
+}
+
+#[test]
+fn recursion_detection_checks_each_generic_instantiation() {
+    let types = Types::default()
+        .register::<GenericRecursiveLeaf<u8>>()
+        .register::<GenericRecursiveBranches<Box<GenericRecursiveBranchedNode>>>()
+        .register::<GenericRecursiveBranchedNode>();
+    let output = Rust::default().export(&types, Identity).unwrap();
+    assert!(
+        output.contains(
+            "pub child: ::std::boxed::Box<GenericRecursiveBranches<GenericRecursiveBranchedNode>>,",
+        ),
+        "later generic instantiation was not checked for recursion:\n{output}"
+    );
+    compile_source("branched-generic-recursion", &output);
 }
 
 #[test]

@@ -490,7 +490,12 @@ fn reaches_directly(
     collect_direct_targets(types, &ty, &mut next);
     next.into_iter().any(|next| {
         let path = rust_path(next.ndt);
-        path == target || (visited.insert(path) && reaches_directly(types, next, target, visited))
+        if path == target {
+            return true;
+        }
+
+        let mut branch_visited = visited.clone();
+        branch_visited.insert(path) && reaches_directly(types, next, target, &mut branch_visited)
     })
 }
 
