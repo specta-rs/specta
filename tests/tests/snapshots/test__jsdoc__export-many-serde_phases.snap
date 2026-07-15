@@ -236,9 +236,9 @@ expression: output
 	* 	demo: [string, boolean],
 	* }, boolean]} demo
 	*
-	* @typedef {SkippedFieldWithinVariant_Serialize | SkippedFieldWithinVariant_Deserialize} SkippedFieldWithinVariant
-	* @property {SkippedFieldWithinVariant_Serialize} Serialize
-	* @property {SkippedFieldWithinVariant_Deserialize} Deserialize
+	* @typedef {{ type: "A"; data?: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data?: null }} A
+	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
 	*		"test-ing": string,

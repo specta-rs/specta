@@ -819,9 +819,70 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
 
     validate_untagged_variants(enm, &path)?;
     validate_other_variant(enm, &path, &repr, mode)?;
+    validate_adjacent_collapsed_newtype_variants(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(enm, types, path, &mut HashSet::new())?;
+    }
+
+    Ok(())
+}
+
+/// An adjacently tagged newtype variant whose sole non-`Option` field is
+/// `#[serde(skip)]`ped is direction-asymmetric even though the skip itself is
+/// symmetric: serde's serializer omits the `content` key entirely, but its
+/// deserializer still requires `content: null`. No unified shape can
+/// represent both directions, so unified mode rejects it (matching the
+/// policy for one-sided renames/skips). A skipped `Option` sole field is
+/// exempt: serde's `missing_field` helper deserializes a missing `content`
+/// key as `None`, so the unified `content?: null` shape is exact for both
+/// directions.
+fn validate_adjacent_collapsed_newtype_variants(
+    enm: &Enum,
+    path: &str,
+    repr: &EnumRepr,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    if mode != ApplyMode::Unified || !matches!(repr, EnumRepr::Adjacent { .. }) {
+        return Ok(());
+    }
+
+    for (name, variant) in &enm.variants {
+        if variant.skip {
+            continue;
+        }
+        if SerdeVariantAttrs::from_attributes(&variant.attributes)?
+            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
+        {
+            continue;
+        }
+
+        let Fields::Unnamed(unnamed) = &variant.fields else {
+            continue;
+        };
+        let [field] = unnamed.fields.as_slice() else {
+            continue;
+        };
+
+        // Only serde-level symmetric skips exhibit the asymmetry (one-sided
+        // skips are already rejected by the field-level check; specta-only
+        // skips are invisible to serde).
+        if !SerdeFieldAttrs::from_attributes(&field.attributes)?
+            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
+        {
+            continue;
+        }
+
+        if field.attributes.contains_key(crate::SKIPPED_NULLABLE_FIELD) {
+            continue;
+        }
+
+        return Err(Error::invalid_phased_type_usage(
+            format!("{path}.{name}"),
+            "`#[serde(skip)]` on an adjacently tagged newtype variant's non-`Option` field \
+             requires `PhasesFormat` because serde's serializer omits the `content` key while \
+             its deserializer requires `content: null`",
+        ));
     }
 
     Ok(())

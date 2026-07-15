@@ -25,7 +25,19 @@ enum AdjEmpty {
     EmptyStruct {},
     EmptyTuple(),
     AllSkipped(#[serde(skip)] u8, #[serde(skip)] u8),
+}
+
+// A newtype variant whose skipped sole field is NOT `Option` is
+// direction-asymmetric: serde's serializer omits `c` (like a unit variant),
+// but its deserializer requires `c: null`. No unified shape can represent
+// both directions, so `specta_serde::Format` rejects it and `PhasesFormat`
+// splits it into exact per-phase shapes.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjNewtypeSkip {
     NewtypeSkip(#[serde(skip)] u8),
+    Live(String),
 }
 
 #[test]
@@ -55,14 +67,14 @@ fn adjacent_tagged_empty_payloads_serde_ground_truth() {
     // collapses this to unit (no `c` key), unlike the multi-field
     // `AllSkipped` case above...
     assert_eq!(
-        serde_json::to_string(&AdjEmpty::NewtypeSkip(1)).unwrap(),
+        serde_json::to_string(&AdjNewtypeSkip::NewtypeSkip(1)).unwrap(),
         r#"{"t":"NewtypeSkip"}"#
     );
     // ...but serde's *deserializer* is asymmetric: it still requires the `c`
     // key to be present and exactly `null`.
-    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip"}"#).is_err());
-    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip","c":null}"#).is_ok());
-    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip","c":[]}"#).is_err());
+    assert!(serde_json::from_str::<AdjNewtypeSkip>(r#"{"t":"NewtypeSkip"}"#).is_err());
+    assert!(serde_json::from_str::<AdjNewtypeSkip>(r#"{"t":"NewtypeSkip","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjNewtypeSkip>(r#"{"t":"NewtypeSkip","c":[]}"#).is_err());
 
     // Round trips that *do* succeed.
     assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"Unit"}"#).is_ok());
@@ -96,10 +108,24 @@ fn adjacent_tagged_empty_payloads_typescript() {
         ts.contains(r#""AllSkipped""#) && ts.contains("c: []"),
         "all-skipped tuple variant must have `c: []`:\n{ts}"
     );
+}
+
+#[test]
+fn adjacent_tagged_newtype_skip_unified_errors() {
+    // Serialize omits `c`; deserialize requires `c: null` -- no unified
+    // shape can represent both directions, so `Format` must reject it
+    // (matching the #518 policy for one-sided renames/skips) rather than
+    // guess.
+    let result = Typescript::default().export(
+        &Types::default().register::<AdjNewtypeSkip>(),
+        specta_serde::Format,
+    );
+
+    let err = result.expect_err("unified export must reject the asymmetric shape");
+    let message = err.to_string();
     assert!(
-        ts.contains(r#"{ t: "NewtypeSkip"; c?: null }"#),
-        "collapsed newtype variant is ser/de asymmetric; unified mode must \
-         render an optional `c?: null`:\n{ts}"
+        message.contains("PhasesFormat"),
+        "error must point at `PhasesFormat`:\n{message}"
     );
 }
 
@@ -109,19 +135,19 @@ fn adjacent_tagged_newtype_skip_phases() {
     // must split the enum so each phase gets its exact shape.
     let ts = Typescript::default()
         .export(
-            &Types::default().register::<AdjEmpty>(),
+            &Types::default().register::<AdjNewtypeSkip>(),
             specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 
     assert!(
-        ts.contains(r#"AdjEmpty_Serialize"#) && ts.contains(r#"AdjEmpty_Deserialize"#),
+        ts.contains(r#"AdjNewtypeSkip_Serialize"#) && ts.contains(r#"AdjNewtypeSkip_Deserialize"#),
         "enum must split into per-phase types:\n{ts}"
     );
 
     let serialize_ty = ts
         .lines()
-        .find(|line| line.contains("AdjEmpty_Serialize ="))
+        .find(|line| line.contains("AdjNewtypeSkip_Serialize ="))
         .expect("serialize type must be exported");
     assert!(
         serialize_ty.contains(r#"{ t: "NewtypeSkip" }"#),
@@ -130,7 +156,7 @@ fn adjacent_tagged_newtype_skip_phases() {
 
     let deserialize_ty = ts
         .lines()
-        .find(|line| line.contains("AdjEmpty_Deserialize ="))
+        .find(|line| line.contains("AdjNewtypeSkip_Deserialize ="))
         .expect("deserialize type must be exported");
     assert!(
         deserialize_ty.contains(r#"{ t: "NewtypeSkip"; c: null }"#),

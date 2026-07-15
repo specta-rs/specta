@@ -2212,9 +2212,13 @@ fn transform_adjacent_variant(
             }
             PhaseRewrite::Unified => {
                 // For `Option` fields `content?: null` is exact for both
-                // directions. Otherwise it is best effort: it accepts serde's
-                // serialize output (no key) while still letting callers write
-                // the `content: null` the deserializer demands.
+                // directions. The non-`Option` case is rejected up front by
+                // `validate_adjacent_collapsed_newtype_variants` (unified
+                // mode can't represent its ser/de asymmetry), so this branch
+                // is defensive best-effort for datatypes that bypassed
+                // validation: it accepts serde's serialize output (no key)
+                // while still letting callers write the `content: null` the
+                // deserializer demands.
                 let mut field = Field::new(DataType::Tuple(Tuple::new(vec![])));
                 field.optional = true;
                 fields.push((Cow::Owned(content.to_string()), field));
