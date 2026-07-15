@@ -49,6 +49,15 @@ struct BorrowField<'a> {
     value: Cow<'a, str>,
 }
 
+// `#[serde(borrow)]` on a field: the path-only form (serde's most common spelling). This already
+// worked before the fix — kept as a regression guard for the path-only fall-through.
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+struct BorrowFieldPathOnly<'a> {
+    #[serde(borrow)]
+    value: Cow<'a, str>,
+}
+
 // Combined case: an unknown-with-value attribute (`expecting`) followed by an attribute specta
 // *does* act on (`rename_all`). This guards against a fix that consumes too much input and
 // swallows the following attribute along with its comma.
@@ -62,14 +71,94 @@ struct ExpectingWithRenameAll {
     foo_bar: String,
 }
 
+// Adversarial value: the string contains a comma, which must be treated as part of the string
+// literal (not a nested-meta separator), and the following `tag` must still take effect.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(expecting = "a, b", tag = "t")]
+enum ExpectingCommaThenTag {
+    VariantOne { x: String },
+}
+
+// Adversarial value: a bound string containing `+`, followed by `rename_all` which must still
+// take effect.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(bound = "T: Clone + Serialize", rename_all = "camelCase")]
+struct BoundPlusThenRenameAll<T: Clone> {
+    the_value: T,
+}
+
+// The parenthesized-list form of `bound` (nested metas), followed by a known `rename` that must
+// still take effect.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(
+    bound(
+        serialize = "T: Serialize",
+        deserialize = "T: serde::de::DeserializeOwned"
+    ),
+    rename = "NestedBoundRenamed"
+)]
+struct NestedBoundThenRename<T> {
+    value: T,
+}
+
+// `#[serde(crate = "...")]` uses the `crate` keyword as the attribute path, followed by a known
+// attribute that must still take effect.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(crate = "serde", rename_all = "camelCase")]
+struct CrateThenRenameAll {
+    foo_bar: String,
+}
+
+// Variant-level unknown-with-value attribute (`parse_variant_meta`'s fall-through), followed by a
+// known `rename` that must still take effect.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantLevelUnknown {
+    #[serde(bound = "", rename = "renamed_variant")]
+    A { foo_bar: String },
+}
+
+fn export<T: Type>() -> String {
+    Typescript::default()
+        .export(&Types::default().register::<T>(), specta_serde::Format)
+        .expect("typescript export should succeed")
+}
+
 #[test]
 fn rename_all_still_applies_after_unknown_valued_attr() {
-    let ts = Typescript::default()
-        .export(
-            &Types::default().register::<ExpectingWithRenameAll>(),
-            specta_serde::Format,
-        )
-        .expect("typescript export should succeed");
+    insta::assert_snapshot!(
+        "serde-unknown-attrs-expecting-with-rename-all",
+        export::<ExpectingWithRenameAll>()
+    );
+}
 
-    insta::assert_snapshot!("serde-unknown-attrs-expecting-with-rename-all", ts);
+// Prove the skip consumes exactly the unknown attribute's value and nothing more, even for
+// adversarial values (commas and `+` inside strings, nested parens, keyword paths), by asserting
+// the *effect* of the known attribute that follows it.
+#[test]
+fn known_attrs_still_apply_after_adversarial_unknown_values() {
+    let ts = export::<ExpectingCommaThenTag>();
+    assert!(ts.contains("t: \"VariantOne\""), "tag not applied: {ts}");
+
+    let ts = export::<BoundPlusThenRenameAll<String>>();
+    assert!(ts.contains("theValue"), "rename_all not applied: {ts}");
+
+    let ts = export::<NestedBoundThenRename<String>>();
+    assert!(
+        ts.contains("NestedBoundRenamed"),
+        "rename not applied: {ts}"
+    );
+
+    let ts = export::<CrateThenRenameAll>();
+    assert!(ts.contains("fooBar"), "rename_all not applied: {ts}");
+
+    let ts = export::<VariantLevelUnknown>();
+    assert!(
+        ts.contains("renamed_variant"),
+        "variant rename not applied: {ts}"
+    );
 }
