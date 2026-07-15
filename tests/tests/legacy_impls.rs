@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use specta::{Type, Types};
-use specta_typescript::Typescript;
+use specta_typescript::{Typescript, semantic::Configuration};
 use specta_util::Remapper;
 
 #[derive(Debug)]
@@ -162,6 +162,15 @@ fn serde_json_number_uses_untagged_wire_shape() {
             .contains("forbids exporting BigInt-style types"),
         "unexpected error: {err}"
     );
+
+    let lossless_types = Configuration::empty()
+        .enable_lossless_bigints()
+        .apply_types(&types)
+        .into_owned();
+    let lossless_output = Typescript::default()
+        .export(&lossless_types, specta_serde::Format)
+        .unwrap();
+    assert!(lossless_output.contains("bigint"));
 
     let types = Remapper::new()
         .dangerous_bigints_as_number()

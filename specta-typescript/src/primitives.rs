@@ -2128,6 +2128,11 @@ fn enum_dt(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    if is_remapped_finite_number(e) {
+        s.push_str("number");
+        return Ok(());
+    }
+
     if e.variants.is_empty() {
         s.push_str(NEVER);
         return Ok(());
@@ -2190,6 +2195,34 @@ fn enum_dt(
     push_union(s, variants);
 
     Ok(())
+}
+
+fn is_remapped_finite_number(e: &Enum) -> bool {
+    e.attributes.get_named_as("specta:finite_number") == Some(&true)
+        && e.variants.len() == 3
+        && [
+            ("f64", Primitive::f64),
+            ("i64", Primitive::i32),
+            ("u64", Primitive::u32),
+        ]
+        .into_iter()
+        .zip(&e.variants)
+        .all(|((expected_name, expected_primitive), (name, variant))| {
+            name == expected_name
+                && matches!(
+                    &variant.fields,
+                    Fields::Unnamed(fields)
+                        if matches!(
+                            fields.fields.as_slice(),
+                            [field]
+                                if matches!(
+                                    field.ty.as_ref(),
+                                    Some(DataType::Primitive(primitive))
+                                        if primitive == &expected_primitive
+                                )
+                        )
+                )
+        })
 }
 
 fn tuple_dt(

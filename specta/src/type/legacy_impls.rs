@@ -135,12 +135,14 @@ const _: () = {
 
     struct SerdeNumber;
     impl Type for SerdeNumber {
-        /// `serde_json::Number` serializes as an untagged JSON number, but retains its
-        /// `f64`/`i64`/`u64` variants so exporters can guard integers outside JavaScript's
-        /// safe range instead of silently treating every value as an `f64`.
+        /// `serde_json::Number` is finite and serializes as an untagged JSON number. Its
+        /// `i64`/`u64` variants remain visible for precision guards; the finite-number
+        /// marker lets exporters collapse explicitly remapped variants without inheriting
+        /// the nullability of arbitrary `f64` values.
         fn definition(_: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
             attributes.insert("serde:container:untagged", true);
+            attributes.insert("specta:finite_number", true);
 
             DataType::Enum(Enum {
                 variants: vec![
