@@ -574,7 +574,7 @@ fn typed_dict_expression<'a>(
         let base = format!("_specta_typed_dict_{}", anonymous_type_name(&location));
         let mut name = base.clone();
         let mut suffix = 2;
-        while !state.names.insert(name.clone()) {
+        while !state.names.insert(normalized_identifier(&name)) {
             name = format!("{base}_{suffix}");
             suffix += 1;
         }

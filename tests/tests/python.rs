@@ -468,6 +468,50 @@ fn python_preserves_dunder_wire_keys() {
 }
 
 #[test]
+fn python_disambiguates_normalized_anonymous_helper_names() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct First {
+        first: String,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Second {
+        second: bool,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Outer {
+        #[serde(rename = "K")]
+        #[specta(inline)]
+        first: First,
+        #[serde(rename = "K")]
+        #[specta(inline)]
+        second: Second,
+    }
+
+    let output = Python::default()
+        .export(&Types::default().register::<Outer>(), specta_serde::Format)
+        .unwrap();
+    assert!(
+        output.contains("_specta_typed_dict_test__python__OuterK = "),
+        "{output}"
+    );
+    assert!(
+        output.contains("_specta_typed_dict_test__python__OuterK_2 = "),
+        "{output}"
+    );
+    assert!(
+        output.contains(
+            "{\"K\": \"_specta_typed_dict_test__python__OuterK\", \"K\": \"_specta_typed_dict_test__python__OuterK_2\"}"
+        ),
+        "{output}"
+    );
+}
+
+#[test]
 fn python_functional_typed_dict_preserves_optional_keys() {
     #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
