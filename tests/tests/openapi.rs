@@ -98,6 +98,7 @@ struct StrictUnit;
 #[specta(collect = false)]
 struct StrictOptionalPrimitive {
     value: Option<String>,
+    nested: Option<Option<String>>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -271,6 +272,14 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     );
     assert_eq!(
         optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["value"]["nullable"],
+        true
+    );
+    assert_eq!(
+        optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["nested"]["type"],
+        "string"
+    );
+    assert_eq!(
+        optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["nested"]["nullable"],
         true
     );
 

@@ -107,7 +107,7 @@ fn transform_object(
     // Collapse nullable unions before recursively transforming their branches.
     // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
     // it can be represented by OpenAPI 3.0's `nullable` keyword.
-    collapse_nullable_any_of(&mut schema);
+    while collapse_nullable_any_of(&mut schema) {}
 
     let prefix_items = schema.remove("prefixItems").or_else(|| {
         schema
@@ -230,9 +230,9 @@ fn unsupported(component: &str, feature: &'static str) -> Error {
     }
 }
 
-fn collapse_nullable_any_of(schema: &mut Map<String, Value>) {
+fn collapse_nullable_any_of(schema: &mut Map<String, Value>) -> bool {
     let Some(Value::Array(mut any_of)) = schema.remove("anyOf") else {
-        return;
+        return false;
     };
     let nullable_count = any_of
         .iter()
@@ -240,7 +240,7 @@ fn collapse_nullable_any_of(schema: &mut Map<String, Value>) {
         .count();
     if nullable_count != 1 {
         schema.insert("anyOf".to_string(), Value::Array(any_of));
-        return;
+        return false;
     }
 
     any_of.retain(|value| !is_nullable_only(value));
@@ -248,7 +248,7 @@ fn collapse_nullable_any_of(schema: &mut Map<String, Value>) {
     schema.insert("x-specta-nullable".to_string(), Value::Bool(true));
     if any_of.len() != 1 {
         schema.insert("anyOf".to_string(), Value::Array(any_of));
-        return;
+        return true;
     }
 
     let inner = any_of.pop().unwrap_or_else(|| json!({}));
@@ -258,6 +258,7 @@ fn collapse_nullable_any_of(schema: &mut Map<String, Value>) {
             schema.insert("allOf".to_string(), Value::Array(vec![inner]));
         }
     }
+    true
 }
 
 fn is_nullable_only(value: &Value) -> bool {
