@@ -2984,12 +2984,12 @@ fn internal_tag_payload_compatibility(
             Ok(EnumRepr::Untagged) => {
                 let mut is_effectively_empty = true;
                 let mut rewritten = enm.clone();
-                let mut changed = false;
-                for ((_, variant), (_, rewritten_variant)) in
-                    enm.variants.iter().zip(&mut rewritten.variants)
-                {
+                filter_enum_variants_for_phase(&mut rewritten, mode)?;
+                let mut changed = rewritten.variants.len() != enm.variants.len();
+                for (_, rewritten_variant) in &mut rewritten.variants {
+                    let variant = rewritten_variant.clone();
                     let Some(variant_payload) = internal_tag_variant_payload_compatibility(
-                        variant,
+                        &variant,
                         original_types,
                         seen,
                         mode,

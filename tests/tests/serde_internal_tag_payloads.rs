@@ -323,9 +323,43 @@ enum UntaggedExternalPayload {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedExternalPayloadWithSkippedScalar {
+    #[serde(skip)]
+    Dead(i32),
+    External(ExternalPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedMapPayloadWithSkippedScalar {
+    #[serde(skip)]
+    Dead(String),
+    Live {
+        value: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "kind")]
 enum UntaggedExternalPayloadWrapper {
     Value(UntaggedExternalPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum UntaggedExternalPayloadWithSkippedScalarWrapper {
+    Value(UntaggedExternalPayloadWithSkippedScalar),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum UntaggedMapPayloadWithSkippedScalarWrapper {
+    Value(UntaggedMapPayloadWithSkippedScalar),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -846,6 +880,38 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         ty,
         DataType::Tuple(tuple) if tuple.elements.is_empty()
     )));
+
+    let mapped = specta_serde::Format
+        .map_types(&Types::default().register::<UntaggedExternalPayloadWithSkippedScalarWrapper>())
+        .expect("skipped untagged variants must not participate in contextual replacement")
+        .into_owned();
+    let wrapper = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "UntaggedExternalPayloadWithSkippedScalarWrapper")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped skipped-variant wrapper definition should exist");
+    assert!(contains_named_field(wrapper, "Unit", |ty| matches!(
+        ty,
+        DataType::Tuple(tuple) if tuple.elements.is_empty()
+    )));
+
+    let mapped = specta_serde::Format
+        .map_types(&Types::default().register::<UntaggedMapPayloadWithSkippedScalarWrapper>())
+        .expect("filtering a skipped branch must itself produce a contextual replacement")
+        .into_owned();
+    let wrapper = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "UntaggedMapPayloadWithSkippedScalarWrapper")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped map-only wrapper definition should exist");
+    assert!(contains_named_field(wrapper, "value", |ty| matches!(
+        ty,
+        DataType::Primitive(specta::datatype::Primitive::i32)
+    )));
+    assert!(
+        !contains_string_primitive(wrapper),
+        "the skipped scalar branch must not leak into the replacement: {wrapper:#?}"
+    );
 }
 
 #[test]
@@ -999,6 +1065,47 @@ fn contains_empty_object(ty: &DataType) -> bool {
         DataType::List(list) => contains_empty_object(&list.ty),
         DataType::Map(map) => {
             contains_empty_object(map.key_ty()) || contains_empty_object(map.value_ty())
+        }
+        DataType::Primitive(_) | DataType::Reference(_) | DataType::Generic(_) => false,
+    }
+}
+
+fn contains_string_primitive(ty: &DataType) -> bool {
+    match ty {
+        DataType::Primitive(specta::datatype::Primitive::str) => true,
+        DataType::Struct(strct) => match &strct.fields {
+            specta::datatype::Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .any(|(_, field)| field.ty.as_ref().is_some_and(contains_string_primitive)),
+            specta::datatype::Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .any(|field| field.ty.as_ref().is_some_and(contains_string_primitive)),
+            specta::datatype::Fields::Unit => false,
+        },
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .any(|(_, variant)| match &variant.fields {
+                specta::datatype::Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .any(|(_, field)| field.ty.as_ref().is_some_and(contains_string_primitive)),
+                specta::datatype::Fields::Unnamed(fields) => fields
+                    .fields
+                    .iter()
+                    .any(|field| field.ty.as_ref().is_some_and(contains_string_primitive)),
+                specta::datatype::Fields::Unit => false,
+            }),
+        DataType::Intersection(parts)
+        | DataType::Tuple(specta::datatype::Tuple {
+            elements: parts, ..
+        }) => parts.iter().any(contains_string_primitive),
+        DataType::Nullable(ty) => contains_string_primitive(ty),
+        DataType::List(list) => contains_string_primitive(&list.ty),
+        DataType::Map(map) => {
+            contains_string_primitive(map.key_ty()) || contains_string_primitive(map.value_ty())
         }
         DataType::Primitive(_) | DataType::Reference(_) | DataType::Generic(_) => false,
     }
