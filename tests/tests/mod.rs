@@ -20,6 +20,7 @@ mod jsonschema;
 mod layouts;
 mod legacy_impls;
 mod maybe_undefined;
+mod openapi;
 mod references;
 mod semantic;
 mod serde_container_rename;

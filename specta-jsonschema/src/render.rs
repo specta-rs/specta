@@ -23,6 +23,7 @@ pub(crate) struct Renderer<'a> {
     definitions: Map<String, Value>,
     in_progress: Vec<String>,
     name_counts: BTreeMap<Cow<'static, str>, usize>,
+    definition_owners: BTreeMap<String, (NamedDataType, Generics)>,
 }
 
 impl<'a> Renderer<'a> {
@@ -38,10 +39,18 @@ impl<'a> Renderer<'a> {
             definitions: Map::new(),
             in_progress: Vec::new(),
             name_counts,
+            definition_owners: BTreeMap::new(),
         }
     }
 
-    pub(crate) fn render_definitions(mut self) -> Result<Map<String, Value>, Error> {
+    pub(crate) fn render_definitions(
+        mut self,
+        roots: &[DataType],
+    ) -> Result<Map<String, Value>, Error> {
+        for root in roots {
+            self.render_datatype(root, &Generics::new(), "registered root", 0)?;
+        }
+
         for ndt in self.types.into_sorted_iter() {
             if ndt.ty.is_none() {
                 continue;
@@ -56,7 +65,13 @@ impl<'a> Renderer<'a> {
                         .clone()
                         .map(|default| (generic.name.clone(), default))
                 })
-                .collect();
+                .collect::<Generics>();
+            // JSON Schema and OpenAPI have no generic declarations. Concrete
+            // instantiations are materialized while rendering references; an
+            // unconstrained template would only create a misleading `{}` hole.
+            if generics.len() != ndt.generics.len() {
+                continue;
+            }
             let key = self.definition_key(ndt, &generics);
             self.ensure_definition(ndt, key, generics, "$defs")?;
         }
@@ -71,6 +86,19 @@ impl<'a> Renderer<'a> {
         generics: Generics,
         path: &str,
     ) -> Result<(), Error> {
+        if let Some((owner, owner_generics)) = self.definition_owners.get(&key) {
+            if owner != ndt || owner_generics != &generics {
+                return Err(Error::DuplicateDefinitionName {
+                    name: key,
+                    first: type_path(owner),
+                    second: type_path(ndt),
+                });
+            }
+        } else {
+            self.definition_owners
+                .insert(key.clone(), (ndt.clone(), generics.clone()));
+        }
+
         if self.definitions.contains_key(&key) || self.in_progress.contains(&key) {
             return Ok(());
         }
@@ -335,11 +363,61 @@ impl<'a> Renderer<'a> {
                 .transpose()?
                 .flatten(),
             DataType::Reference(Reference::Named(reference)) => {
-                Some(self.render_named_reference(reference, generics, path, depth)?)
+                if self.is_unconstrained_string_map_key(
+                    &DataType::Reference(Reference::Named(reference.clone())),
+                    generics,
+                    0,
+                ) {
+                    return Ok(None);
+                }
+                let schema = self.render_named_reference(reference, generics, path, depth)?;
+                (!is_unconstrained_string_schema(&schema)).then_some(schema)
             }
             DataType::Nullable(inner) => self.map_key_schema(inner, generics, path, depth)?,
             _ => None,
         })
+    }
+
+    fn is_unconstrained_string_map_key(
+        &self,
+        dt: &DataType,
+        generics: &Generics,
+        depth: usize,
+    ) -> bool {
+        if depth > INLINE_RECURSION_LIMIT {
+            return false;
+        }
+
+        match dt {
+            DataType::Primitive(Primitive::str) => true,
+            DataType::Generic(generic) => generics
+                .get(generic.name())
+                .is_some_and(|ty| self.is_unconstrained_string_map_key(ty, generics, depth + 1)),
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Unnamed(fields) if fields.fields.len() == 1 => {
+                    fields.fields[0].ty.as_ref().is_some_and(|ty| {
+                        self.is_unconstrained_string_map_key(ty, generics, depth + 1)
+                    })
+                }
+                _ => false,
+            },
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    self.is_unconstrained_string_map_key(dt, generics, depth + 1)
+                }
+                NamedReferenceType::Reference {
+                    generics: reference_generics,
+                    ..
+                } => self.types.get(reference).is_some_and(|ndt| {
+                    let generics = self.resolve_generics(ndt, reference_generics, generics);
+                    ndt.ty.as_ref().is_some_and(|ty| {
+                        self.is_unconstrained_string_map_key(ty, &generics, depth + 1)
+                    })
+                }),
+                NamedReferenceType::Recursive(_) => false,
+            },
+            _ => false,
+        }
     }
 
     fn render_struct(
@@ -363,6 +441,13 @@ impl<'a> Renderer<'a> {
         match fields {
             Fields::Unit => Ok(object([("type", string("null"))])),
             Fields::Unnamed(fields) => {
+                if let [field] = fields.fields.as_slice()
+                    && let Some(ty) = &field.ty
+                {
+                    let mut schema = self.render_datatype(ty, generics, path, depth + 1)?;
+                    self.apply_metadata(&mut schema, None, &field.docs, field.deprecated.as_ref());
+                    return Ok(schema);
+                }
                 self.render_unnamed_fields(&fields.fields, generics, path, depth)
             }
             Fields::Named(fields) => {
@@ -481,6 +566,11 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
+        let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED)
+            || enm
+                .variants
+                .iter()
+                .any(|(_, variant)| variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED));
         let variants = enm
             .variants
             .iter()
@@ -500,6 +590,7 @@ impl<'a> Renderer<'a> {
         match variants.as_slice() {
             [] => Ok(Value::Bool(false)),
             [variant] => Ok(variant.clone()),
+            _ if untagged => Ok(object([("anyOf", Value::Array(variants))])),
             _ => Ok(object([("oneOf", Value::Array(variants))])),
         }
     }
@@ -520,12 +611,12 @@ impl<'a> Renderer<'a> {
         let schema = match &variant.fields {
             Fields::Unit => object([("const", string(name))]),
             Fields::Unnamed(fields) => {
-                if let [field] = fields.fields.as_slice() {
-                    if let Some(ty) = &field.ty {
-                        let payload = self.render_datatype(ty, generics, path, depth + 1)?;
-                        if !schema_has_const(&payload, name) {
-                            return Ok(payload);
-                        }
+                if let [field] = fields.fields.as_slice()
+                    && let Some(ty) = &field.ty
+                {
+                    let payload = self.render_datatype(ty, generics, path, depth + 1)?;
+                    if !schema_has_const(&payload, name) {
+                        return Ok(payload);
                     }
                 }
 
@@ -695,6 +786,20 @@ impl<'a> Renderer<'a> {
     }
 }
 
+fn is_unconstrained_string_schema(schema: &Value) -> bool {
+    schema.as_object().is_some_and(|schema| {
+        schema.get("type").and_then(Value::as_str) == Some("string") && schema.len() == 1
+    })
+}
+
+fn type_path(ndt: &NamedDataType) -> String {
+    if ndt.module_path.is_empty() {
+        ndt.name.to_string()
+    } else {
+        format!("{}::{}", ndt.module_path, ndt.name)
+    }
+}
+
 fn substitute_generics(dt: &DataType, generics: &Generics) -> DataType {
     match dt {
         DataType::Generic(generic) => generics
@@ -758,17 +863,21 @@ fn primitive_schema(primitive: &Primitive) -> Value {
             ("minLength", number(1)),
             ("maxLength", number(1)),
         ]),
-        Primitive::i8 => integer(Some(i8::MIN.into()), Some(i8::MAX.into()), None),
-        Primitive::i16 => integer(Some(i16::MIN.into()), Some(i16::MAX.into()), None),
-        Primitive::i32 => integer(None, None, None),
-        Primitive::i64 => integer(None, None, None),
-        Primitive::i128 | Primitive::isize => integer(None, None, None),
-        Primitive::u8 => integer(Some(0), Some(u8::MAX.into()), None),
-        Primitive::u16 => integer(Some(0), Some(u16::MAX.into()), None),
-        Primitive::u32 => integer(Some(0), None, None),
-        Primitive::u64 => integer(Some(0), None, None),
-        Primitive::u128 | Primitive::usize => integer(Some(0), None, None),
-        Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => number_schema(None),
+        Primitive::i8 => integer(Some(i8::MIN.into()), Some(i8::MAX.into()), Some("int32")),
+        Primitive::i16 => integer(Some(i16::MIN.into()), Some(i16::MAX.into()), Some("int32")),
+        Primitive::i32 => integer(Some(i32::MIN.into()), Some(i32::MAX.into()), Some("int32")),
+        Primitive::i64 => integer(Some(i64::MIN), Some(i64::MAX), Some("int64")),
+        Primitive::i128 => integer(None, None, Some("int128")),
+        Primitive::isize => integer(None, None, Some("isize")),
+        Primitive::u8 => integer(Some(0), Some(u8::MAX.into()), Some("int32")),
+        Primitive::u16 => integer(Some(0), Some(u16::MAX.into()), Some("int32")),
+        Primitive::u32 => integer(Some(0), Some(u32::MAX.into()), Some("int64")),
+        Primitive::u64 => integer(Some(0), None, Some("uint64")),
+        Primitive::u128 => integer(Some(0), None, Some("uint128")),
+        Primitive::usize => integer(Some(0), None, Some("usize")),
+        Primitive::f16 | Primitive::f32 => number_schema(Some("float")),
+        Primitive::f64 => number_schema(Some("double")),
+        Primitive::f128 => number_schema(Some("float128")),
     }
 }
 

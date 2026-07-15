@@ -103,6 +103,13 @@ enum UntaggedValue {
 }
 
 #[derive(Serialize, Deserialize, Type)]
+#[serde(untagged)]
+enum OverlappingUntagged {
+    First(u32),
+    Second(u32),
+}
+
+#[derive(Serialize, Deserialize, Type)]
 struct FlattenA {
     a: String,
 }
@@ -126,6 +133,12 @@ struct DocumentedFields {
     name: String,
 }
 
+#[derive(Serialize, Deserialize, Type)]
+struct SkippedNewtype(#[serde(skip)] u8);
+
+#[derive(Type)]
+struct SpectaSkippedNewtype(#[specta(skip)] u8);
+
 #[test]
 fn exports_metadata_and_primitives() {
     let types = Types::default().register::<Primitives>();
@@ -147,6 +160,42 @@ fn exports_field_docs_as_descriptions() {
         .unwrap();
 
     insta::assert_json_snapshot!(schema);
+}
+
+#[test]
+fn serde_skip_on_newtype_preserves_bare_wire_shape() {
+    assert_eq!(
+        serde_json::to_value(SkippedNewtype(0)).unwrap(),
+        serde_json::json!(0)
+    );
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<SkippedNewtype>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let skipped = &schema["$defs"]["SkippedNewtype"];
+
+    assert_eq!(skipped["type"], "integer");
+    assert_eq!(skipped["minimum"], 0);
+    assert_eq!(skipped["maximum"], 255);
+}
+
+#[test]
+fn specta_skipped_newtype_preserves_empty_tuple_shape() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<SpectaSkippedNewtype>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let skipped = &schema["$defs"]["SpectaSkippedNewtype"];
+
+    assert_eq!(skipped["type"], "array");
+    assert_eq!(skipped["prefixItems"], serde_json::json!([]));
+    assert_eq!(skipped["items"], false);
+    assert_eq!(skipped["minItems"], 0);
+    assert_eq!(skipped["maxItems"], 0);
 }
 
 #[test]
@@ -187,6 +236,22 @@ fn exports_generic_instantiations() {
 }
 
 #[test]
+fn directly_registered_generic_root_is_materialized() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<Wrapper<String>>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert_eq!(
+        schema["$defs"]["Wrapper_String"]["properties"]["value"]["type"],
+        "string"
+    );
+    assert!(schema["$defs"].get("Wrapper").is_none());
+}
+
+#[test]
 fn exports_root_ref() {
     let types = Types::default().register::<User>();
     let schema = JsonSchema::default()
@@ -220,6 +285,24 @@ fn exports_untagged_enums() {
     assert!(validator.is_valid(&serde_json::json!("hello")));
     assert!(validator.is_valid(&serde_json::json!({ "id": 1 })));
     assert!(!validator.is_valid(&serde_json::json!({ "Object": { "id": 1 } })));
+}
+
+#[test]
+fn overlapping_untagged_enums_use_any_of() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<OverlappingUntagged>(),
+            specta_serde::Format,
+            "OverlappingUntagged",
+        )
+        .unwrap();
+
+    assert!(schema["$defs"]["OverlappingUntagged"]["anyOf"].is_array());
+    assert!(
+        jsonschema::validator_for(&schema)
+            .unwrap()
+            .is_valid(&serde_json::json!(42))
+    );
 }
 
 #[test]
