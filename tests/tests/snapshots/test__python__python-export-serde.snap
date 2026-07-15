@@ -674,9 +674,13 @@ type RenamedFieldKeys = _specta_typed_dict_test__types__RenamedFieldKeys
 
 type RenamedVariantWithSkippedPayload = _specta_typing.Literal["a-b"]
 
-class Result[T, E](_specta_typing.TypedDict):
-    ok: T
-    err: E
+_specta_type_var_std__result__ResultOk_T = _specta_typing.TypeVar("_specta_type_var_std__result__ResultOk_T")
+_specta_typed_dict_std__result__ResultOk = _specta_typing.TypedDict("_specta_typed_dict_std__result__ResultOk", {"Ok": "_specta_type_var_std__result__ResultOk_T"})
+
+_specta_type_var_std__result__ResultErr_E = _specta_typing.TypeVar("_specta_type_var_std__result__ResultErr_E")
+_specta_typed_dict_std__result__ResultErr = _specta_typing.TypedDict("_specta_typed_dict_std__result__ResultErr", {"Err": "_specta_type_var_std__result__ResultErr_E"})
+
+type Result[T, E] = _specta_typed_dict_std__result__ResultErr[E] | _specta_typed_dict_std__result__ResultOk[T]
 
 class Second(_specta_typing.TypedDict):
     a: _specta_builtins.int

@@ -548,9 +548,7 @@ class RenamedFieldKeys(_specta_typing.TypedDict):
 
 type RenamedVariantWithSkippedPayload = _specta_builtins.tuple[()]
 
-class Result[T, E](_specta_typing.TypedDict):
-    ok: T
-    err: E
+type Result[T, E] = E | T
 
 class Second(_specta_typing.TypedDict):
     a: _specta_builtins.int
