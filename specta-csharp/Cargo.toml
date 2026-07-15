@@ -1,0 +1,27 @@
+[package]
+name = "specta-csharp"
+description = "Export your Rust types to C#"
+version = "0.0.4"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-csharp/latest/specta-csharp"
+keywords = ["specta", "csharp", "dotnet", "typesafe"]
+categories = ["development-tools::ffi"]
+readme = "../README.md"
+
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.26", path = "../specta" }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive"] }
+specta-serde = { version = "=0.0.13", path = "../specta-serde" }

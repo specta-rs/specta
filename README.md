@@ -32,7 +32,7 @@
 | **JSON Schema** | 🚧 **Partial** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
 | **Zod**         | 🚧 **Planned** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod schema validation                             |
 | **Python**      | 🚧 **Partial** | [`specta-python`](./specta-python)                                | Python 3.13 TypedDicts and type hints             |
-| **C#**          | 🚧 **Planned** | `specta-csharp`                                                   | C# classes and enums                              |
+| **C#**          | 🚧 **Partial** | `specta-csharp`                                                   | Records, enums, generics, namespaces, file layouts |
 | **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
 
 ### Legend
@@ -46,8 +46,8 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (7)**: Rust, OpenAPI, Go, Java, Kotlin, JSON Schema, and Python have broad type support but are still stabilizing
-- **Planned (2)**: Zod and C# exporters are in development
+- **Partially Implemented (8)**: Rust, OpenAPI, Go, C#, Java, Kotlin, JSON Schema, and Python have broad type support but are still stabilizing
+- **Planned (1)**: The Zod exporter is in development
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
 
@@ -78,6 +78,7 @@ cargo add specta-python      # Python 3.13 type hints (partial)
 cargo add specta_kotlin       # Kotlin (partial)
 cargo add specta_jsonschema   # JSON Schema (partial)
 # cargo add specta_zod         # Zod schemas (planned)
+cargo add specta_csharp        # C# (partial)
 ```
 
 Then you can use Specta like following:
