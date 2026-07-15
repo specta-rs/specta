@@ -356,13 +356,22 @@ impl<'a> Renderer<'a> {
         reference_generics: &[(Generic, DataType)],
         parent_generics: &Generics,
     ) -> Generics {
-        let mut generics = default_generics(ndt);
-
+        let mut generics = Generics::new();
         for (generic, ty) in reference_generics {
             generics.insert(
                 generic.name().clone(),
                 substitute_generics(ty, parent_generics),
             );
+        }
+        for generic in ndt.generics.iter() {
+            if !generics.contains_key(&generic.name)
+                && let Some(default) = &generic.default
+            {
+                generics.insert(
+                    generic.name.clone(),
+                    substitute_generics(default, &generics),
+                );
+            }
         }
 
         let resolved = generics.clone();
@@ -562,27 +571,59 @@ impl<'a> Renderer<'a> {
                     .flatten(),
                 Fields::Unit | Fields::Named(_) => None,
             },
-            DataType::Enum(enm) if enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED) => {
+            DataType::Enum(enm) => {
+                let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+                let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
                 let mut schemas = Vec::new();
-                for (_, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
-                    let Fields::Unnamed(fields) = &variant.fields else {
-                        continue;
+                for (name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
+                    let mut schema = match &variant.fields {
+                        Fields::Unit
+                            if !untagged
+                                && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) =>
+                        {
+                            object([("const", string(name))])
+                        }
+                        Fields::Unnamed(fields)
+                            if untagged
+                                || rewritten
+                                || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) =>
+                        {
+                            let Some(field) = fields.fields.iter().find(|field| field.ty.is_some())
+                            else {
+                                continue;
+                            };
+                            let Some(ty) = field.ty.as_ref() else {
+                                continue;
+                            };
+                            let Some(mut schema) =
+                                self.map_key_schema(ty, generics, path, depth + 1)?
+                            else {
+                                return Ok(None);
+                            };
+                            self.apply_metadata(
+                                &mut schema,
+                                None,
+                                &field.docs,
+                                field.deprecated.as_ref(),
+                            );
+                            schema
+                        }
+                        _ => continue,
                     };
-                    let Some(ty) = fields.fields.iter().find_map(|field| field.ty.as_ref()) else {
-                        continue;
-                    };
-                    let Some(schema) = self.map_key_schema(ty, generics, path, depth + 1)? else {
-                        return Ok(None);
-                    };
+                    self.apply_metadata(
+                        &mut schema,
+                        None,
+                        &variant.docs,
+                        variant.deprecated.as_ref(),
+                    );
                     schemas.push(schema);
                 }
                 match schemas.as_slice() {
-                    [] => None,
+                    [] => Some(Value::Bool(false)),
                     [schema] => Some(schema.clone()),
                     _ => Some(object([("anyOf", Value::Array(schemas))])),
                 }
             }
-            DataType::Enum(_) => Some(self.render_datatype(dt, generics, path, depth + 1)?),
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
                 NamedReferenceType::Inline { dt, .. } => {
                     self.map_key_schema(dt, generics, path, depth + 1)?
@@ -689,8 +730,11 @@ impl<'a> Renderer<'a> {
         let items = live
             .iter()
             .enumerate()
-            .map(|(idx, (_, ty))| {
-                self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1)
+            .map(|(idx, (field, ty))| -> Result<_, Error> {
+                let mut schema =
+                    self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1)?;
+                self.apply_metadata(&mut schema, None, &field.docs, field.deprecated.as_ref());
+                Ok(schema)
             })
             .collect::<Result<Vec<_>, _>>()?;
         if fields.len() == 1
@@ -954,6 +998,13 @@ impl<'a> Renderer<'a> {
         }
         let description = metadata_description(docs, deprecated);
         if !description.is_empty() {
+            let description = schema
+                .get("description")
+                .and_then(Value::as_str)
+                .filter(|existing| *existing != description)
+                .map_or(description.clone(), |existing| {
+                    format!("{description}\n\n{existing}")
+                });
             schema.insert("description".to_string(), string(description));
         }
         if deprecated.is_some() {

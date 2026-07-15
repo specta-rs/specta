@@ -628,12 +628,17 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "minItems": 3,
       "prefixItems": [
         {
+          "deprecated": true,
           "type": "string"
         },
         {
+          "deprecated": true,
+          "description": "Deprecated: Nope",
           "type": "string"
         },
         {
+          "deprecated": true,
+          "description": "Deprecated: Nope",
           "maximum": 2147483647,
           "minimum": -2147483648,
           "type": "integer"

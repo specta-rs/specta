@@ -106,6 +106,23 @@ struct UsesGenericComposition {
 #[derive(Type)]
 struct Newtype(String);
 
+/// Annotated newtype container documentation.
+#[derive(Type)]
+struct AnnotatedNewtype(
+    /// Newtype field documentation.
+    #[deprecated(note = "Use another field")]
+    String,
+);
+
+#[derive(Type)]
+struct AnnotatedTuple(
+    /// First tuple field documentation.
+    #[deprecated(note = "Use the second field")]
+    String,
+    /// Second tuple field documentation.
+    u32,
+);
+
 #[derive(Serialize, Deserialize, Type)]
 #[serde(untagged)]
 enum OverlappingUntagged {
@@ -204,6 +221,18 @@ enum RewrittenOuterPayload {
 #[derive(Type)]
 struct RawNewtypeEnumMap {
     values: std::collections::HashMap<RawNewtypeEnum, String>,
+}
+
+#[derive(Type, Serialize, Deserialize, Eq, PartialEq, std::hash::Hash)]
+enum MixedMapKey {
+    Unit,
+    #[serde(untagged)]
+    Number(u8),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct MixedMapKeyMap {
+    values: std::collections::HashMap<MixedMapKey, String>,
 }
 
 #[derive(Type, Serialize)]
@@ -428,6 +457,39 @@ fn exports_newtype_struct_as_its_wire_value() {
 }
 
 #[test]
+fn preserves_unnamed_field_metadata() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default()
+                .register::<AnnotatedNewtype>()
+                .register::<AnnotatedTuple>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    let newtype_description = schema["$defs"]["AnnotatedNewtype"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(newtype_description.contains("Annotated newtype container documentation."));
+    assert!(newtype_description.contains("Newtype field documentation."));
+    assert_eq!(schema["$defs"]["AnnotatedNewtype"]["deprecated"], true);
+    assert!(
+        schema["$defs"]["AnnotatedTuple"]["prefixItems"][0]["description"]
+            .as_str()
+            .is_some_and(|description| description.contains("First tuple field documentation."))
+    );
+    assert_eq!(
+        schema["$defs"]["AnnotatedTuple"]["prefixItems"][0]["deprecated"],
+        true
+    );
+    assert!(
+        schema["$defs"]["AnnotatedTuple"]["prefixItems"][1]["description"]
+            .as_str()
+            .is_some_and(|description| description.contains("Second tuple field documentation."))
+    );
+}
+
+#[test]
 fn overlapping_untagged_variants_are_a_union() {
     let schema = JsonSchema::default()
         .export_ref_value(
@@ -629,6 +691,46 @@ fn allows_finite_recursive_generic_cycles() {
 }
 
 #[test]
+fn resolves_dependent_defaults_after_explicit_generics() {
+    let mut types = Types::default();
+    let dependent = NamedDataType::new("Dependent", &mut types, |_, ndt| {
+        let t = GenericDefinition::new("T".into(), Some(Primitive::str.into()));
+        let u = GenericDefinition::new("U".into(), Some(DataType::Generic(t.reference())));
+        ndt.generics = vec![t.clone(), u.clone()].into();
+        ndt.ty = Some(
+            Struct::named()
+                .field("first", Field::new(DataType::Generic(t.reference())))
+                .field("second", Field::new(DataType::Generic(u.reference())))
+                .build(),
+        );
+    });
+    let t = dependent.generics[0].reference();
+    NamedDataType::new("UsesDependent", &mut types, move |_, ndt| {
+        ndt.ty = Some(
+            Struct::named()
+                .field(
+                    "value",
+                    Field::new(dependent.reference(vec![(t, Primitive::i32.into())]).into()),
+                )
+                .build(),
+        );
+    });
+
+    let schema = JsonSchema::default()
+        .export_value(&types, IdentityFormat)
+        .unwrap();
+    assert_eq!(
+        schema["$defs"]["Dependent<i32, i32>"]["properties"]["first"]["type"],
+        "integer"
+    );
+    assert_eq!(
+        schema["$defs"]["Dependent<i32, i32>"]["properties"]["second"]["type"],
+        "integer"
+    );
+    assert!(schema["$defs"].get("Dependent<i32, str>").is_none());
+}
+
+#[test]
 fn rejects_raw_newtype_enum_map_keys() {
     let error = JsonSchema::default()
         .export_value(
@@ -641,6 +743,50 @@ fn rejects_raw_newtype_enum_map_keys() {
         error,
         specta_jsonschema::Error::InvalidMapKey { .. }
     ));
+}
+
+#[test]
+fn variant_untagged_map_keys_use_lexical_schemas() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<MixedMapKeyMap>(),
+            specta_serde::Format,
+            "MixedMapKeyMap",
+        )
+        .unwrap();
+    let property_names =
+        &schema["$defs"]["MixedMapKeyMap"]["properties"]["values"]["propertyNames"];
+    assert!(property_names["anyOf"].as_array().is_some_and(|branches| {
+        branches.iter().any(|branch| branch["pattern"].is_string())
+            && branches.iter().all(|branch| branch["type"] != "integer")
+    }));
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "values": { "Unit": "unit", "255": "number" }
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "values": { "256": "out of range" }
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "values": { "not-a-number": "invalid" }
+    })));
+}
+
+#[test]
+fn empty_inline_enum_map_keys_reject_all_property_names() {
+    let mut types = Types::default();
+    NamedDataType::new("EmptyEnumMap", &mut types, |_, ndt| {
+        ndt.ty = Some(SpectaMap::new(Enum::default().into(), Primitive::str.into()).into());
+    });
+
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, IdentityFormat, "EmptyEnumMap")
+        .unwrap();
+    assert_eq!(schema["$defs"]["EmptyEnumMap"]["propertyNames"], false);
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({})));
+    assert!(!validator.is_valid(&serde_json::json!({ "anything": "value" })));
 }
 
 #[test]
