@@ -737,29 +737,32 @@ fn struct_to_swift(
                 Ok("Void".to_string())
             } else if fields.fields.len() == 1 {
                 // Single field tuple struct - convert to a proper struct with a 'value' field
-                let field_type = datatype_to_swift(
-                    swift,
-                    format,
-                    types,
-                    fields.fields[0]
-                        .ty
-                        .as_ref()
-                        .expect("tuple field should have a type"),
-                    generic_scope,
-                )?;
+                let Some(ty) = fields.fields[0].ty.as_ref() else {
+                    // The sole field is skipped (`ty: None`), so nothing
+                    // reaches the wire.
+                    return Ok("Void".to_string());
+                };
+                let field_type = datatype_to_swift(swift, format, types, ty, generic_scope)?;
                 Ok(format!("    let value: {}\n", field_type))
             } else {
                 // Multiple field tuple struct - convert to a proper struct with numbered fields
                 let mut result = String::new();
                 for (i, field) in fields.fields.iter().enumerate() {
-                    let field_type = datatype_to_swift(
-                        swift,
-                        format,
-                        types,
-                        field.ty.as_ref().expect("tuple field should have a type"),
-                        generic_scope.clone(),
-                    )?;
-                    result.push_str(&format!("    public let field{}: {}\n", i, field_type));
+                    // Skipped slots (`ty: None` markers preserving the
+                    // declared arity) never reach the wire.
+                    let Some(ty) = field.ty.as_ref() else {
+                        continue;
+                    };
+                    let field_type =
+                        datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
+                    // A `#[serde(default)]` trailing tuple element may be
+                    // absent on deserialize; Swift's closest representation
+                    // is an Optional property.
+                    let optional_marker = if field.optional { "?" } else { "" };
+                    result.push_str(&format!(
+                        "    public let field{}: {}{}\n",
+                        i, field_type, optional_marker
+                    ));
                 }
                 Ok(result)
             }
