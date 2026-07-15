@@ -20,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 default = []
 
 ## Support for [serde](https://serde.rs)
-serde = ["dep:serde"]
+serde = ["dep:serde", "serde/derive", "specta/derive"]
 
 [lints]
 workspace = true
