@@ -46,6 +46,67 @@ impl From<ConvertedMapWire> for ConvertedScalar {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct GenericConvertedWire<T> {
+    converted_value: T,
+}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(bound = "T: Clone + Type", collect = false)]
+#[serde(
+    into = "GenericConvertedWire<T>",
+    from = "GenericConvertedWire<T>",
+    bound(
+        serialize = "T: Clone + Serialize",
+        deserialize = "T: Deserialize<'de>"
+    )
+)]
+struct GenericConverted<T>(T);
+
+impl<T> From<GenericConverted<T>> for GenericConvertedWire<T> {
+    fn from(value: GenericConverted<T>) -> Self {
+        Self {
+            converted_value: value.0,
+        }
+    }
+}
+
+impl<T> From<GenericConvertedWire<T>> for GenericConverted<T> {
+    fn from(value: GenericConvertedWire<T>) -> Self {
+        Self(value.converted_value)
+    }
+}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ConvertedEmptyWire {}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(into = "ConvertedEmptyWire", from = "ConvertedEmptyWire")]
+struct ConvertedUnit;
+
+impl From<ConvertedUnit> for ConvertedEmptyWire {
+    fn from(_: ConvertedUnit) -> Self {
+        Self {}
+    }
+}
+
+impl From<ConvertedEmptyWire> for ConvertedUnit {
+    fn from(_: ConvertedEmptyWire) -> Self {
+        Self
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedConvertedEmpty {
+    Converted(ConvertedUnit),
+    Map { value: i32 },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct HiddenNewtype(#[specta(skip)] i32);
 
 #[derive(Type, Serialize, Deserialize)]
@@ -72,6 +133,13 @@ enum NewtypePayloads {
 #[serde(tag = "kind")]
 enum ConvertedPayloadWrapper {
     Value(ConvertedScalar),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum GenericConvertedPayloadWrapper {
+    Value(GenericConverted<i32>),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -593,6 +661,9 @@ fn format_accepts_newtype_unit_and_generic_payloads() {
         .map_types(&Types::default().register::<ConvertedPayloadWrapper>())
         .expect("map-shaped conversion wires are valid internally tagged payloads");
     specta_serde::Format
+        .map_types(&Types::default().register::<GenericPayload<UntaggedConvertedEmpty>>())
+        .expect("converted empty branches use their map-shaped wire encoding");
+    specta_serde::Format
         .map_types(&Types::default().register::<GenericPayload<Inner>>())
         .expect("generic payloads must be validated at their concrete use site");
     specta_serde::Format
@@ -671,6 +742,24 @@ fn format_accepts_newtype_unit_and_generic_payloads() {
     assert!(
         err.to_string().contains("context-sensitive enum encoding"),
         "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn generic_conversion_wire_substitutes_concrete_arguments() {
+    let mapped = specta_serde::Format
+        .map_types(&Types::default().register::<GenericConvertedPayloadWrapper>())
+        .expect("a concrete generic conversion wire is a valid map payload")
+        .into_owned();
+    let wrapper = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "GenericConvertedPayloadWrapper")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped wrapper definition should exist");
+
+    assert!(
+        !contains_generic(wrapper),
+        "conversion attributes must not retain the generic placeholder: {wrapper:#?}"
     );
 }
 
@@ -1275,6 +1364,58 @@ fn contains_named_field(
         DataType::Primitive(_)
         | DataType::Reference(specta::datatype::Reference::Opaque(_))
         | DataType::Generic(_) => false,
+    }
+}
+
+fn contains_generic(ty: &DataType) -> bool {
+    match ty {
+        DataType::Generic(_) => true,
+        DataType::Struct(strct) => match &strct.fields {
+            specta::datatype::Fields::Unit => false,
+            specta::datatype::Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .any(contains_generic),
+            specta::datatype::Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .any(contains_generic),
+        },
+        DataType::Enum(enm) => enm.variants.iter().any(|(_, variant)| {
+            let fields = match &variant.fields {
+                specta::datatype::Fields::Unit => return false,
+                specta::datatype::Fields::Unnamed(fields) => fields
+                    .fields
+                    .iter()
+                    .filter_map(|field| field.ty.as_ref())
+                    .collect::<Vec<_>>(),
+                specta::datatype::Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .filter_map(|(_, field)| field.ty.as_ref())
+                    .collect::<Vec<_>>(),
+            };
+            fields.into_iter().any(contains_generic)
+        }),
+        DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic),
+        DataType::List(list) => contains_generic(&list.ty),
+        DataType::Map(map) => contains_generic(map.key_ty()) || contains_generic(map.value_ty()),
+        DataType::Intersection(parts) => parts.iter().any(contains_generic),
+        DataType::Nullable(inner) => contains_generic(inner),
+        DataType::Reference(specta::datatype::Reference::Named(reference)) => {
+            match &reference.inner {
+                specta::datatype::NamedReferenceType::Inline { dt, .. } => contains_generic(dt),
+                specta::datatype::NamedReferenceType::Reference { generics, .. } => generics
+                    .iter()
+                    .any(|(_, argument)| contains_generic(argument)),
+                specta::datatype::NamedReferenceType::Recursive(_) => false,
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(specta::datatype::Reference::Opaque(_)) => {
+            false
+        }
     }
 }
 

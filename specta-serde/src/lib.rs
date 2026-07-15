@@ -120,7 +120,10 @@ mod repr;
 mod validate;
 
 use inflection::RenameRule;
-use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
+use parser::{
+    CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED, CONTAINER_TRY_FROM_RESOLVED,
+    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+};
 use phased::PhasedTy;
 use repr::EnumRepr;
 
@@ -3139,6 +3142,12 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite_for_mode(
         seen: &mut HashSet<Reference>,
         mode: PhaseRewrite,
     ) -> Result<bool, Error> {
+        if let Some(converted) = conversion_datatype_for_mode(ty, mode)?
+            && converted != *ty
+        {
+            return empty_payload_uses_unit_encoding(&converted, types, seen, mode);
+        }
+
         match ty {
             DataType::Struct(strct) => match transparent_payload(strct, mode)? {
                 TransparentPayload::Payload(ty) => {
@@ -3693,8 +3702,12 @@ fn substitute_generics(ty: &mut DataType, generics: &[(specta::datatype::Generic
                 *ty = concrete.clone();
             }
         }
-        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Struct(strct) => {
+            substitute_container_attribute_generics(&mut strct.attributes, generics);
+            substitute_field_generics(&mut strct.fields, generics);
+        }
         DataType::Enum(enm) => {
+            substitute_container_attribute_generics(&mut enm.attributes, generics);
             for (_, variant) in &mut enm.variants {
                 substitute_field_generics(&mut variant.fields, generics);
             }
@@ -3724,6 +3737,23 @@ fn substitute_generics(ty: &mut DataType, generics: &[(specta::datatype::Generic
             }
         }
         DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_container_attribute_generics(
+    attributes: &mut specta::datatype::Attributes,
+    generics: &[(specta::datatype::Generic, DataType)],
+) {
+    for key in [
+        CONTAINER_INTO_RESOLVED,
+        CONTAINER_FROM_RESOLVED,
+        CONTAINER_TRY_FROM_RESOLVED,
+    ] {
+        let Some(mut ty) = attributes.get_named_as::<DataType>(key).cloned() else {
+            continue;
+        };
+        substitute_generics(&mut ty, generics);
+        attributes.insert(key, ty);
     }
 }
 
