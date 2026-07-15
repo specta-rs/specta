@@ -20,6 +20,13 @@ pub enum Error {
         /// Invalid identifier.
         name: String,
     },
+    /// A declaration or package would shadow a root namespace used by generated Kotlin code.
+    ReservedNamespace {
+        /// Location of the conflicting name.
+        path: String,
+        /// Conflicting namespace segment.
+        name: String,
+    },
     /// A named reference was not present in the supplied type collection.
     DanglingReference {
         /// Location of the missing reference.
@@ -95,6 +102,9 @@ impl fmt::Display for Error {
             }
             Self::InvalidIdentifier { path, name } => {
                 write!(f, "invalid Kotlin identifier '{name}' at {path}")
+            }
+            Self::ReservedNamespace { path, name } => {
+                write!(f, "reserved Kotlin namespace '{name}' at {path}")
             }
             Self::DanglingReference { path } => write!(f, "dangling named reference at {path}"),
             Self::RecursiveInlineType { path } => {

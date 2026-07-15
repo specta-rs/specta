@@ -10,7 +10,7 @@ use specta::{
 
 use crate::{
     Error, Kotlin, Layout, NamingConvention, Serialization, UnknownType,
-    reserved_names::{GENERIC_MODIFIERS, RESERVED},
+    reserved_names::{GENERIC_MODIFIERS, RESERVED, ROOT_NAMESPACES},
 };
 
 pub(crate) enum Selection<'a> {
@@ -1270,7 +1270,14 @@ fn named_type_identifier(
     } else {
         ndt.name.to_string()
     };
-    converted_identifier(kotlin, &name, NameKind::Type, path)
+    let name = converted_identifier(kotlin, &name, NameKind::Type, path)?;
+    if ROOT_NAMESPACES.contains(&name.as_str()) {
+        return Err(Error::ReservedNamespace {
+            path: path.into(),
+            name,
+        });
+    }
+    Ok(name)
 }
 
 fn convert_name(convention: NamingConvention, name: &str, kind: NameKind) -> String {
@@ -1364,6 +1371,12 @@ fn ensure_unique(
 }
 
 fn package_name(package: &str) -> Result<String, Error> {
+    if package.split('.').next() == Some("kotlin") {
+        return Err(Error::ReservedNamespace {
+            path: "package".into(),
+            name: "kotlin".into(),
+        });
+    }
     package
         .split('.')
         .map(|part| identifier(part, "package"))

@@ -551,6 +551,27 @@ fn kotlin_qualifies_builtins_that_generated_types_can_shadow() {
 }
 
 #[test]
+fn kotlin_rejects_names_that_shadow_root_namespaces() {
+    for name in ["kotlin", "kotlinx", "java"] {
+        let mut types = Types::default();
+        specta::datatype::NamedDataType::new(name, &mut types, |_, datatype| {
+            datatype.ty = Some(DataType::Struct(specta::datatype::Struct::unit()));
+        });
+        assert!(matches!(
+            Kotlin::default().export(&types, IdentityFormat),
+            Err(Error::ReservedNamespace { name: actual, .. }) if actual == name
+        ));
+    }
+
+    assert!(matches!(
+        Kotlin::default()
+            .package("kotlin.generated")
+            .export(&Types::default().register::<Account<String>>(), IdentityFormat),
+        Err(Error::ReservedNamespace { name, .. }) if name == "kotlin"
+    ));
+}
+
+#[test]
 fn kotlin_files_layout() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&root).expect("temporary workspace directory should be creatable");

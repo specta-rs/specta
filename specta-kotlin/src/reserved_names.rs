@@ -30,3 +30,7 @@ pub(crate) const RESERVED: &[&str] = &[
 ];
 
 pub(crate) const GENERIC_MODIFIERS: &[&str] = &["out", "reified"];
+
+// Kotlin has no root-namespace operator, so declarations with these names can shadow the first
+// segment of fully qualified types and annotations emitted by the exporter.
+pub(crate) const ROOT_NAMESPACES: &[&str] = &["java", "kotlin", "kotlinx"];
