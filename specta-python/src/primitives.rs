@@ -2,6 +2,7 @@
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashSet},
 };
 
@@ -18,10 +19,36 @@ use crate::{Error, Layout, Python, opaque, reserved_names::RESERVED_NAMES};
 type Location = Vec<Cow<'static, str>>;
 
 #[derive(Clone, Copy)]
-pub(crate) struct RenderContext<'a> {
+pub(crate) struct RenderContext<'a, 'state> {
     pub exporter: &'a Python,
     pub types: &'a Types,
     pub current_module: &'a str,
+    state: Option<&'state RefCell<RenderState>>,
+    generic_helper: Option<usize>,
+}
+
+#[derive(Default)]
+struct RenderState {
+    helpers: Vec<TypedDictHelper>,
+    names: BTreeSet<String>,
+}
+
+struct TypedDictHelper {
+    name: String,
+    generics: Vec<Generic>,
+    fields: Vec<(String, String)>,
+}
+
+impl<'a> RenderContext<'a, 'static> {
+    pub(crate) fn new(exporter: &'a Python, types: &'a Types, current_module: &'a str) -> Self {
+        Self {
+            exporter,
+            types,
+            current_module,
+            state: None,
+            generic_helper: None,
+        }
+    }
 }
 
 /// Renders top-level Python declarations for the supplied named datatypes.
@@ -41,6 +68,8 @@ pub fn export<'a>(
                 exporter,
                 types,
                 current_module: "",
+                state: None,
+                generic_helper: None,
             },
             ndt,
             indent,
@@ -63,6 +92,8 @@ pub fn inline(exporter: &Python, types: &Types, datatype: &DataType) -> Result<S
             exporter,
             types,
             current_module: "",
+            state: None,
+            generic_helper: None,
         },
         datatype,
         Vec::new(),
@@ -77,6 +108,8 @@ pub fn reference(exporter: &Python, types: &Types, reference: &Reference) -> Res
             exporter,
             types,
             current_module: "",
+            state: None,
+            generic_helper: None,
         },
         &DataType::Reference(reference.clone()),
         Vec::new(),
@@ -85,15 +118,30 @@ pub fn reference(exporter: &Python, types: &Types, reference: &Reference) -> Res
 }
 
 pub(crate) fn export_named(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     ndt: &NamedDataType,
     indent: &str,
 ) -> Result<String, Error> {
-    export_named_inner(ctx, ndt, indent).map_err(|error| error.with_named_datatype(ndt))
+    let state = RefCell::new(RenderState::default());
+    let ctx = RenderContext {
+        exporter: ctx.exporter,
+        types: ctx.types,
+        current_module: ctx.current_module,
+        state: Some(&state),
+        generic_helper: None,
+    };
+    let declaration =
+        export_named_inner(ctx, ndt, indent).map_err(|error| error.with_named_datatype(ndt))?;
+    let helpers = render_typed_dict_helpers(&state.borrow(), indent);
+    Ok(match (helpers.is_empty(), declaration.is_empty()) {
+        (true, _) => declaration,
+        (_, true) => helpers,
+        _ => format!("{helpers}\n{declaration}"),
+    })
 }
 
 fn export_named_inner(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     ndt: &NamedDataType,
     indent: &str,
 ) -> Result<String, Error> {
@@ -176,7 +224,18 @@ fn export_named_inner(
     out.push_str(&name);
     write_generic_parameters(&mut out, ctx, &ndt.generics, &location)?;
     out.push_str(" = ");
-    out.push_str(&datatype_to_python(ctx, ty, location, &generics)?);
+    let rendered = datatype_to_python(ctx, ty, location, &generics)?;
+    if rendered == name
+        || rendered
+            .strip_prefix(&name)
+            .is_some_and(|suffix| suffix.starts_with('[') && suffix.ends_with(']'))
+    {
+        // A direct self-alias has no finite Python value and is rejected as a cyclic definition
+        // by type checkers. `Never` represents that empty set without emitting invalid syntax.
+        out.push_str("_specta_typing.Never");
+    } else {
+        out.push_str(&rendered);
+    }
     out.push('\n');
     Ok(out)
 }
@@ -241,7 +300,7 @@ fn member_comments(out: &mut String, indent: &str, datatype: &DataType) {
 
 fn write_generic_parameters(
     out: &mut String,
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     generics: &[GenericDefinition],
     location: &Location,
 ) -> Result<(), Error> {
@@ -289,7 +348,7 @@ fn write_generic_parameters(
 }
 
 fn datatype_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     datatype: &DataType,
     location: Location,
     generics: &[Generic],
@@ -342,7 +401,7 @@ fn datatype_to_python(
                 ));
             }
             validate_identifier(generic.name(), &crate::error::display_path(&location))?;
-            Ok(generic.name().to_string())
+            Ok(generic_to_python(ctx, generic))
         }
         DataType::Reference(reference) => reference_to_python(ctx, reference, location, generics),
     }
@@ -361,7 +420,7 @@ fn primitive_to_python(primitive: &Primitive) -> &'static str {
 }
 
 fn struct_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     strct: &Struct,
     location: Location,
     generics: &[Generic],
@@ -384,7 +443,7 @@ fn struct_to_python(
 }
 
 fn unnamed_fields_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     fields: &[Field],
     location: Location,
     generics: &[Generic],
@@ -441,7 +500,7 @@ fn unnamed_fields_to_python(
 }
 
 fn enum_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     enm: &Enum,
     location: Location,
     generics: &[Generic],
@@ -480,37 +539,180 @@ fn enum_to_python(
 }
 
 fn typed_dict_expression<'a>(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     fields: impl Iterator<Item = (&'a str, &'a Field, &'a DataType)>,
     location: Location,
     generics: &[Generic],
 ) -> Result<String, Error> {
-    let name = anonymous_type_name(&location);
+    let Some(state) = ctx.state else {
+        let name = anonymous_type_name(&location);
+        let fields = fields
+            .map(|(name, field, ty)| {
+                let mut field_location = location.clone();
+                field_location.push(Cow::Owned(name.to_string()));
+                let ty = datatype_to_python(ctx, ty, field_location, generics)?;
+                Ok(format!(
+                    "{}: {}",
+                    python_string(name),
+                    if field.optional {
+                        format!("_specta_typing.NotRequired[{ty}]")
+                    } else {
+                        ty
+                    }
+                ))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+        return Ok(format!(
+            "_specta_typing.TypedDict({}, {{{}}})",
+            python_string(&name),
+            fields.join(", ")
+        ));
+    };
+
+    let helper = {
+        let mut state = state.borrow_mut();
+        let base = format!("_specta_typed_dict_{}", anonymous_type_name(&location));
+        let mut name = base.clone();
+        let mut suffix = 2;
+        while !state.names.insert(name.clone()) {
+            name = format!("{base}_{suffix}");
+            suffix += 1;
+        }
+        let helper = state.helpers.len();
+        state.helpers.push(TypedDictHelper {
+            name,
+            generics: generics.to_vec(),
+            fields: Vec::new(),
+        });
+        helper
+    };
+    let helper_ctx = RenderContext {
+        generic_helper: Some(helper),
+        ..ctx
+    };
     let fields = fields
         .map(|(name, field, ty)| {
             let mut field_location = location.clone();
             field_location.push(Cow::Owned(name.to_string()));
-            let ty = datatype_to_python(ctx, ty, field_location, generics)?;
-            Ok(format!(
-                "{}: {}",
-                python_string(name),
+            let ty = datatype_to_python(helper_ctx, ty, field_location, generics)?;
+            Ok((
+                name.to_string(),
                 if field.optional {
                     format!("_specta_typing.NotRequired[{ty}]")
                 } else {
                     ty
-                }
+                },
             ))
         })
         .collect::<Result<Vec<_>, Error>>()?;
-    Ok(format!(
-        "_specta_typing.TypedDict({}, {{{}}})",
-        python_string(&name),
-        fields.join(", ")
-    ))
+    let fields = deduplicate_typed_dict_fields(fields);
+    let (name, used_generics) = {
+        let mut state = state.borrow_mut();
+        let helper_name = state.helpers[helper].name.clone();
+        let used_generics = generics
+            .iter()
+            .filter(|generic| {
+                let type_var = helper_type_var(&helper_name, generic);
+                fields
+                    .iter()
+                    .any(|(_, ty)| contains_python_identifier(ty, &type_var))
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        state.helpers[helper].fields = fields;
+        state.helpers[helper].generics = used_generics.clone();
+        (helper_name, used_generics)
+    };
+    if used_generics.is_empty() {
+        Ok(name)
+    } else {
+        Ok(format!(
+            "{name}[{}]",
+            used_generics
+                .iter()
+                .map(|generic| generic_to_python(ctx, generic))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))
+    }
+}
+
+fn contains_python_identifier(value: &str, identifier: &str) -> bool {
+    value.match_indices(identifier).any(|(start, matched)| {
+        let end = start + matched.len();
+        let is_identifier = |character: char| character == '_' || character.is_alphanumeric();
+        value[..start]
+            .chars()
+            .next_back()
+            .is_none_or(|character| !is_identifier(character))
+            && value[end..]
+                .chars()
+                .next()
+                .is_none_or(|character| !is_identifier(character))
+    })
+}
+
+fn deduplicate_typed_dict_fields(fields: Vec<(String, String)>) -> Vec<(String, String)> {
+    fields.into_iter().fold(Vec::new(), |mut fields, field| {
+        if let Some(existing) = fields.iter_mut().find(|existing| existing.0 == field.0) {
+            existing.1 = field.1;
+        } else {
+            fields.push(field);
+        }
+        fields
+    })
+}
+
+fn generic_to_python(ctx: RenderContext<'_, '_>, generic: &Generic) -> String {
+    if let (Some(state), Some(helper)) = (ctx.state, ctx.generic_helper) {
+        let state = state.borrow();
+        return helper_type_var(&state.helpers[helper].name, generic);
+    }
+    generic.name().to_string()
+}
+
+fn helper_type_var(helper: &str, generic: &Generic) -> String {
+    format!(
+        "_specta_type_var_{}_{}",
+        helper.trim_start_matches("_specta_typed_dict_"),
+        normalized_identifier(generic.name())
+    )
+}
+
+fn render_typed_dict_helpers(state: &RenderState, indent: &str) -> String {
+    let mut out = String::new();
+    for helper in &state.helpers {
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        for generic in &helper.generics {
+            let type_var = helper_type_var(&helper.name, generic);
+            out.push_str(indent);
+            out.push_str(&type_var);
+            out.push_str(" = _specta_typing.TypeVar(");
+            out.push_str(&python_string(&type_var));
+            out.push_str(")\n");
+        }
+        out.push_str(indent);
+        out.push_str(&helper.name);
+        out.push_str(" = _specta_typing.TypedDict(");
+        out.push_str(&python_string(&helper.name));
+        out.push_str(", {");
+        out.push_str(
+            &helper
+                .fields
+                .iter()
+                .map(|(name, ty)| format!("{}: {}", python_string(name), python_string(ty)))
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        out.push_str("})\n");
+    }
+    out
 }
 
 fn intersection_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     parts: &[DataType],
     location: Location,
     generics: &[Generic],
@@ -567,7 +769,7 @@ fn intersection_to_python(
 }
 
 fn is_map_like(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     datatype: &DataType,
     visiting: &mut HashSet<NamedReference>,
 ) -> bool {
@@ -641,7 +843,7 @@ fn join_union(types: impl IntoIterator<Item = String>) -> String {
 type ObjectFields = BTreeMap<String, (Field, DataType)>;
 
 fn intersection_variants(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     parts: &[DataType],
     location: &Location,
     visiting: &mut HashSet<NamedReference>,
@@ -679,7 +881,7 @@ fn intersection_variants(
 }
 
 fn object_variants(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     datatype: &DataType,
     location: &Location,
     visiting: &mut HashSet<NamedReference>,
@@ -859,7 +1061,7 @@ fn substitute_fields(fields: &mut Fields, generics: &[(Generic, DataType)]) {
 }
 
 fn reference_to_python(
-    ctx: RenderContext<'_>,
+    ctx: RenderContext<'_, '_>,
     reference: &Reference,
     location: Location,
     generics: &[Generic],
@@ -965,7 +1167,7 @@ pub(crate) fn exported_type_name(exporter: &Python, ndt: &NamedDataType) -> Stri
     }
 }
 
-fn referenced_type_name(ctx: RenderContext<'_>, ndt: &NamedDataType) -> String {
+fn referenced_type_name(ctx: RenderContext<'_, '_>, ndt: &NamedDataType) -> String {
     match ctx.exporter.layout {
         Layout::ModulePrefixedName => module_prefixed_name(ndt),
         Layout::Namespaces if !ndt.module_path.is_empty() => {

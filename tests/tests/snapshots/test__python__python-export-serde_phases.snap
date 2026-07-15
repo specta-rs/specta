@@ -9,12 +9,18 @@ from __future__ import annotations
 import builtins as _specta_builtins
 import typing as _specta_typing
 
+_specta_typed_dict_test__types__Ab = _specta_typing.TypedDict("_specta_typed_dict_test__types__Ab", {"b": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__Ad = _specta_typing.TypedDict("_specta_typed_dict_test__types__Ad", {"flattened": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__Ae = _specta_typing.TypedDict("_specta_typed_dict_test__types__Ae", {"generic_flattened": "_specta_builtins.int"})
+
 class A(_specta_typing.TypedDict):
     a: B
-    b: _specta_typing.TypedDict("test__types__Ab", {"b": _specta_builtins.int})
+    b: _specta_typed_dict_test__types__Ab
     c: B
-    d: _specta_typing.TypedDict("test__types__Ad", {"flattened": _specta_builtins.int})
-    e: _specta_typing.TypedDict("test__types__Ae", {"generic_flattened": _specta_builtins.int})
+    d: _specta_typed_dict_test__types__Ad
+    e: _specta_typed_dict_test__types__Ae
 
 class AGenericStruct[T](_specta_typing.TypedDict):
     field: Demo[T, _specta_builtins.bool]
@@ -22,13 +28,39 @@ class AGenericStruct[T](_specta_typing.TypedDict):
 class ActualType(_specta_typing.TypedDict):
     a: GenericType[_specta_builtins.str]
 
-type AdjacentlyTagged = _specta_typing.TypedDict("test__types__AdjacentlyTaggedA", {"t": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__AdjacentlyTaggedB", {"t": _specta_typing.Literal["B"], "c": _specta_typing.TypedDict("test__types__AdjacentlyTaggedBc", {"id": _specta_builtins.str, "method": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__AdjacentlyTaggedC", {"t": _specta_typing.Literal["C"], "c": _specta_builtins.str})
+_specta_typed_dict_test__types__AdjacentlyTaggedA = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedA", {"t": "_specta_typing.Literal[\"A\"]"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedB = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedB", {"t": "_specta_typing.Literal[\"B\"]", "c": "_specta_typed_dict_test__types__AdjacentlyTaggedBc"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedBc = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedBc", {"id": "_specta_builtins.str", "method": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedC = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedC", {"t": "_specta_typing.Literal[\"C\"]", "c": "_specta_builtins.str"})
+
+type AdjacentlyTagged = _specta_typed_dict_test__types__AdjacentlyTaggedA | _specta_typed_dict_test__types__AdjacentlyTaggedB | _specta_typed_dict_test__types__AdjacentlyTaggedC
 
 type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Deserialize | AdjacentlyTaggedWithAlias_Serialize
 
-type AdjacentlyTaggedWithAlias_Deserialize = _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_DeserializeA", {"type": _specta_typing.Literal["A"], "data": _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_DeserializeAdata", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_DeserializeAdata", {"field": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_DeserializeB", {"type": _specta_typing.Literal["B"], "data": _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_DeserializeBdata", {"other": _specta_builtins.int})})
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata | _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2"})
 
-type AdjacentlyTaggedWithAlias_Serialize = _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_SerializeA", {"type": _specta_typing.Literal["A"], "data": _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_SerializeAdata", {"field": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_SerializeB", {"type": _specta_typing.Literal["B"], "data": _specta_typing.TypedDict("test__types__AdjacentlyTaggedWithAlias_SerializeBdata", {"other": _specta_builtins.int})})
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata", {"field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2", {"bruh": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeBdata"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeBdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeBdata", {"other": "_specta_builtins.int"})
+
+type AdjacentlyTaggedWithAlias_Deserialize = _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeA | _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeB
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeAdata"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeAdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeAdata", {"field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeBdata"})
+
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeBdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeBdata", {"other": "_specta_builtins.int"})
+
+type AdjacentlyTaggedWithAlias_Serialize = _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeA | _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_SerializeB
 
 class B(_specta_typing.TypedDict):
     b: _specta_builtins.int
@@ -37,8 +69,10 @@ type BasicEnum = _specta_typing.Literal["A"] | _specta_typing.Literal["B"]
 
 type BoxFlattened = BoxedInner
 
+_specta_typed_dict_test__types__BoxInlinec = _specta_typing.TypedDict("_specta_typed_dict_test__types__BoxInlinec", {"a": "_specta_builtins.int"})
+
 class BoxInline(_specta_typing.TypedDict):
-    c: _specta_typing.TypedDict("test__types__BoxInlinec", {"a": _specta_builtins.int})
+    c: _specta_typed_dict_test__types__BoxInlinec
 
 class BoxedInner(_specta_typing.TypedDict):
     a: _specta_builtins.int
@@ -49,13 +83,19 @@ class ChainedGenericDefault[T = _specta_builtins.str, U = T](_specta_typing.Type
     first: T
     second: U
 
+_specta_typed_dict_test__types__CommentedEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__CommentedEnumA", {"A": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__CommentedEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__CommentedEnumB", {"B": "_specta_typed_dict_test__types__CommentedEnumBB"})
+
+_specta_typed_dict_test__types__CommentedEnumBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__CommentedEnumBB", {"a": "_specta_builtins.int"})
+
 #  Some triple-slash comment
 #  Some more triple-slash comment
 # Variant A:  Some triple-slash comment
 # Variant A:  Some more triple-slash comment
 # Variant B:  Some triple-slash comment
 # Variant B:  Some more triple-slash comment
-type CommentedEnum = _specta_typing.TypedDict("test__types__CommentedEnumA", {"A": _specta_builtins.int}) | _specta_typing.TypedDict("test__types__CommentedEnumB", {"B": _specta_typing.TypedDict("test__types__CommentedEnumBB", {"a": _specta_builtins.int})})
+type CommentedEnum = _specta_typed_dict_test__types__CommentedEnumA | _specta_typed_dict_test__types__CommentedEnumB
 
 #  Some triple-slash comment
 #  Some more triple-slash comment
@@ -133,7 +173,9 @@ class DoubleFlattened(_specta_typing.TypedDict):
     a: ToBeFlattened
     b: ToBeFlattened
 
-type Eight = _specta_typing.Literal["B"] | _specta_typing.TypedDict("test__types__EightA", {"A": _specta_builtins.str})
+_specta_typed_dict_test__types__EightA = _specta_typing.TypedDict("_specta_typed_dict_test__types__EightA", {"A": "_specta_builtins.str"})
+
+type Eight = _specta_typed_dict_test__types__EightA | _specta_typing.Literal["B"]
 
 type EmptyEnum = _specta_typing.Never
 
@@ -149,13 +191,35 @@ class EmptyStruct(_specta_typing.TypedDict):
 class EmptyStructWithTag(_specta_typing.TypedDict):
     a: _specta_typing.Literal["EmptyStructWithTag"]
 
-type Enum2New = _specta_typing.TypedDict("test__types__Enum2NewB", {"t": _specta_typing.Literal["B"]}) | _specta_typing.TypedDict("test__types__Enum2NewC", {"t": _specta_typing.Literal["C"]}) | _specta_typing.TypedDict("test__types__Enum2NewD", {"t": _specta_typing.Literal["D"], "enumField": None})
+_specta_typed_dict_test__types__Enum2NewC = _specta_typing.TypedDict("_specta_typed_dict_test__types__Enum2NewC", {"t": "_specta_typing.Literal[\"C\"]"})
 
-type Enum3New = _specta_typing.TypedDict("test__types__Enum3NewA", {"t": _specta_typing.Literal["A"], "b": _specta_builtins.str})
+_specta_typed_dict_test__types__Enum2NewB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Enum2NewB", {"t": "_specta_typing.Literal[\"B\"]"})
 
-type EnumMacroAttributes = _specta_typing.TypedDict("test__types__EnumMacroAttributesA", {"A": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__EnumMacroAttributesD", {"D": _specta_typing.TypedDict("test__types__EnumMacroAttributesDD", {"a": _specta_builtins.str, "bbbbbb": _specta_builtins.int})}) | _specta_typing.TypedDict("test__types__EnumMacroAttributesbbb", {"bbb": _specta_builtins.int}) | _specta_typing.TypedDict("test__types__EnumMacroAttributescccc", {"cccc": _specta_builtins.int})
+_specta_typed_dict_test__types__Enum2NewD = _specta_typing.TypedDict("_specta_typed_dict_test__types__Enum2NewD", {"t": "_specta_typing.Literal[\"D\"]", "enumField": "None"})
 
-type EnumNew = _specta_typing.TypedDict("test__types__EnumNewA", {"t": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__EnumNewB", {"t": _specta_typing.Literal["B"]})
+type Enum2New = _specta_typed_dict_test__types__Enum2NewB | _specta_typed_dict_test__types__Enum2NewC | _specta_typed_dict_test__types__Enum2NewD
+
+_specta_typed_dict_test__types__Enum3NewA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Enum3NewA", {"t": "_specta_typing.Literal[\"A\"]", "b": "_specta_builtins.str"})
+
+type Enum3New = _specta_typed_dict_test__types__Enum3NewA
+
+_specta_typed_dict_test__types__EnumMacroAttributesA = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumMacroAttributesA", {"A": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__EnumMacroAttributesbbb = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumMacroAttributesbbb", {"bbb": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__EnumMacroAttributescccc = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumMacroAttributescccc", {"cccc": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__EnumMacroAttributesD = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumMacroAttributesD", {"D": "_specta_typed_dict_test__types__EnumMacroAttributesDD"})
+
+_specta_typed_dict_test__types__EnumMacroAttributesDD = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumMacroAttributesDD", {"a": "_specta_builtins.str", "bbbbbb": "_specta_builtins.int"})
+
+type EnumMacroAttributes = _specta_typed_dict_test__types__EnumMacroAttributesA | _specta_typed_dict_test__types__EnumMacroAttributesD | _specta_typed_dict_test__types__EnumMacroAttributesbbb | _specta_typed_dict_test__types__EnumMacroAttributescccc
+
+_specta_typed_dict_test__types__EnumNewA = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumNewA", {"t": "_specta_typing.Literal[\"A\"]"})
+
+_specta_typed_dict_test__types__EnumNewB = _specta_typing.TypedDict("_specta_typed_dict_test__types__EnumNewB", {"t": "_specta_typing.Literal[\"B\"]"})
+
+type EnumNew = _specta_typed_dict_test__types__EnumNewA | _specta_typed_dict_test__types__EnumNewB
 
 class EnumReferenceRecordKey(_specta_typing.TypedDict):
     a: _specta_builtins.dict[BasicEnum, _specta_builtins.int]
@@ -180,9 +244,17 @@ type EnumWithVariantAlias_Deserialize = _specta_typing.Literal["Other"] | _spect
 
 type EnumWithVariantAlias_Serialize = _specta_typing.Literal["Other"] | _specta_typing.Literal["Variant"]
 
-type ExternallyTagged = _specta_typing.Literal["A"] | _specta_typing.TypedDict("test__types__ExternallyTaggedB", {"B": _specta_typing.TypedDict("test__types__ExternallyTaggedBB", {"id": _specta_builtins.str, "method": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__ExternallyTaggedC", {"C": _specta_builtins.str})
+_specta_typed_dict_test__types__ExternallyTaggedB = _specta_typing.TypedDict("_specta_typed_dict_test__types__ExternallyTaggedB", {"B": "_specta_typed_dict_test__types__ExternallyTaggedBB"})
 
-type ExtraBracketsInTupleVariant = _specta_typing.TypedDict("test__types__ExtraBracketsInTupleVariantA", {"A": _specta_builtins.str})
+_specta_typed_dict_test__types__ExternallyTaggedBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__ExternallyTaggedBB", {"id": "_specta_builtins.str", "method": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__ExternallyTaggedC = _specta_typing.TypedDict("_specta_typed_dict_test__types__ExternallyTaggedC", {"C": "_specta_builtins.str"})
+
+type ExternallyTagged = _specta_typed_dict_test__types__ExternallyTaggedB | _specta_typed_dict_test__types__ExternallyTaggedC | _specta_typing.Literal["A"]
+
+_specta_typed_dict_test__types__ExtraBracketsInTupleVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__ExtraBracketsInTupleVariantA", {"A": "_specta_builtins.str"})
+
+type ExtraBracketsInTupleVariant = _specta_typed_dict_test__types__ExtraBracketsInTupleVariantA
 
 type ExtraBracketsInUnnamedStruct = _specta_builtins.str
 
@@ -193,43 +265,97 @@ class FlattenA(_specta_typing.TypedDict):
     a: _specta_builtins.int
     b: _specta_builtins.int
 
-type FlattenB = _specta_typing.TypedDict("test__types__FlattenBintersection0", {"a": _specta_builtins.int, "b": _specta_builtins.int, "c": _specta_builtins.int})
+_specta_typed_dict_test__types__FlattenBintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenBintersection0", {"a": "_specta_builtins.int", "b": "_specta_builtins.int", "c": "_specta_builtins.int"})
 
-type FlattenC = _specta_typing.TypedDict("test__types__FlattenCintersection0", {"a": _specta_builtins.int, "b": _specta_builtins.int, "c": _specta_builtins.int})
+type FlattenB = _specta_typed_dict_test__types__FlattenBintersection0
+
+_specta_typed_dict_test__types__FlattenCintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenCintersection0", {"a": "_specta_builtins.int", "b": "_specta_builtins.int", "c": "_specta_builtins.int"})
+
+type FlattenC = _specta_typed_dict_test__types__FlattenCintersection0
 
 class FlattenD(_specta_typing.TypedDict):
     a: FlattenA
     c: _specta_builtins.int
 
+_specta_typed_dict_test__types__FlattenEbintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEbintersection0", {"a": "_specta_builtins.int", "b": "_specta_builtins.int", "c": "_specta_builtins.int"})
+
 class FlattenE(_specta_typing.TypedDict):
-    b: _specta_typing.TypedDict("test__types__FlattenEbintersection0", {"a": _specta_builtins.int, "b": _specta_builtins.int, "c": _specta_builtins.int})
+    b: _specta_typed_dict_test__types__FlattenEbintersection0
     d: _specta_builtins.int
 
-type FlattenEnum = _specta_typing.TypedDict("test__types__FlattenEnumOne", {"tag": _specta_typing.Literal["One"]}) | _specta_typing.TypedDict("test__types__FlattenEnumThree", {"tag": _specta_typing.Literal["Three"]}) | _specta_typing.TypedDict("test__types__FlattenEnumTwo", {"tag": _specta_typing.Literal["Two"]})
+_specta_typed_dict_test__types__FlattenEnumOne = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumOne", {"tag": "_specta_typing.Literal[\"One\"]"})
 
-type FlattenEnumStruct = _specta_typing.TypedDict("test__types__FlattenEnumStructintersection0", {"outer": _specta_builtins.str, "tag": _specta_typing.Literal["One"]}) | _specta_typing.TypedDict("test__types__FlattenEnumStructintersection1", {"outer": _specta_builtins.str, "tag": _specta_typing.Literal["Two"]}) | _specta_typing.TypedDict("test__types__FlattenEnumStructintersection2", {"outer": _specta_builtins.str, "tag": _specta_typing.Literal["Three"]})
+_specta_typed_dict_test__types__FlattenEnumTwo = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumTwo", {"tag": "_specta_typing.Literal[\"Two\"]"})
+
+_specta_typed_dict_test__types__FlattenEnumThree = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumThree", {"tag": "_specta_typing.Literal[\"Three\"]"})
+
+type FlattenEnum = _specta_typed_dict_test__types__FlattenEnumOne | _specta_typed_dict_test__types__FlattenEnumThree | _specta_typed_dict_test__types__FlattenEnumTwo
+
+_specta_typed_dict_test__types__FlattenEnumStructintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumStructintersection0", {"outer": "_specta_builtins.str", "tag": "_specta_typing.Literal[\"One\"]"})
+
+_specta_typed_dict_test__types__FlattenEnumStructintersection1 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumStructintersection1", {"outer": "_specta_builtins.str", "tag": "_specta_typing.Literal[\"Two\"]"})
+
+_specta_typed_dict_test__types__FlattenEnumStructintersection2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenEnumStructintersection2", {"outer": "_specta_builtins.str", "tag": "_specta_typing.Literal[\"Three\"]"})
+
+type FlattenEnumStruct = _specta_typed_dict_test__types__FlattenEnumStructintersection0 | _specta_typed_dict_test__types__FlattenEnumStructintersection1 | _specta_typed_dict_test__types__FlattenEnumStructintersection2
+
+_specta_typed_dict_test__types__FlattenFbintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenFbintersection0", {"a": "_specta_builtins.int", "b": "_specta_builtins.int", "c": "_specta_builtins.int"})
 
 class FlattenF(_specta_typing.TypedDict):
-    b: _specta_typing.TypedDict("test__types__FlattenFbintersection0", {"a": _specta_builtins.int, "b": _specta_builtins.int, "c": _specta_builtins.int})
+    b: _specta_typed_dict_test__types__FlattenFbintersection0
     d: _specta_builtins.int
 
 class FlattenG(_specta_typing.TypedDict):
     b: FlattenB
     d: _specta_builtins.int
 
-type FlattenOnNestedEnum = _specta_typing.TypedDict("test__types__FlattenOnNestedEnumintersection0", {"id": _specta_builtins.str, "type": _specta_typing.Literal["a"], "value": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__FlattenOnNestedEnumintersection1", {"id": _specta_builtins.str, "type": _specta_typing.Literal["b"], "value": _specta_builtins.int})
+_specta_typed_dict_test__types__FlattenOnNestedEnumintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenOnNestedEnumintersection0", {"id": "_specta_builtins.str", "type": "_specta_typing.Literal[\"a\"]", "value": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__FlattenOnNestedEnumintersection1 = _specta_typing.TypedDict("_specta_typed_dict_test__types__FlattenOnNestedEnumintersection1", {"id": "_specta_builtins.str", "type": "_specta_typing.Literal[\"b\"]", "value": "_specta_builtins.int"})
+
+type FlattenOnNestedEnum = _specta_typed_dict_test__types__FlattenOnNestedEnumintersection0 | _specta_typed_dict_test__types__FlattenOnNestedEnumintersection1
 
 type FlattenedInner = Inner
 
+_specta_typed_dict_test__types__Fourthb = _specta_typing.TypedDict("_specta_typed_dict_test__types__Fourthb", {"a": "_specta_builtins.str"})
+
 class Fourth(_specta_typing.TypedDict):
     a: First
-    b: _specta_typing.TypedDict("test__types__Fourthb", {"a": _specta_builtins.str})
+    b: _specta_typed_dict_test__types__Fourthb
 
 class Generic1[T](_specta_typing.TypedDict):
     value: T
     values: _specta_builtins.list[T]
 
-type Generic2[A, B, C] = _specta_typing.TypedDict("test__types__Generic2A", {"A": A}) | _specta_typing.TypedDict("test__types__Generic2B", {"B": _specta_builtins.tuple[B, B, B]}) | _specta_typing.TypedDict("test__types__Generic2C", {"C": _specta_builtins.list[C]}) | _specta_typing.TypedDict("test__types__Generic2D", {"D": _specta_builtins.list[_specta_builtins.list[_specta_builtins.list[A]]]}) | _specta_typing.TypedDict("test__types__Generic2E", {"E": _specta_typing.TypedDict("test__types__Generic2EE", {"a": A, "b": B, "c": C})}) | _specta_typing.TypedDict("test__types__Generic2X", {"X": _specta_builtins.list[_specta_builtins.int]}) | _specta_typing.TypedDict("test__types__Generic2Y", {"Y": _specta_builtins.int}) | _specta_typing.TypedDict("test__types__Generic2Z", {"Z": _specta_builtins.list[_specta_builtins.list[_specta_builtins.int]]})
+_specta_type_var_test__types__Generic2A_A = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2A_A")
+_specta_typed_dict_test__types__Generic2A = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2A", {"A": "_specta_type_var_test__types__Generic2A_A"})
+
+_specta_type_var_test__types__Generic2B_B = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2B_B")
+_specta_typed_dict_test__types__Generic2B = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2B", {"B": "_specta_builtins.tuple[_specta_type_var_test__types__Generic2B_B, _specta_type_var_test__types__Generic2B_B, _specta_type_var_test__types__Generic2B_B]"})
+
+_specta_type_var_test__types__Generic2C_C = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2C_C")
+_specta_typed_dict_test__types__Generic2C = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2C", {"C": "_specta_builtins.list[_specta_type_var_test__types__Generic2C_C]"})
+
+_specta_type_var_test__types__Generic2D_A = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2D_A")
+_specta_typed_dict_test__types__Generic2D = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2D", {"D": "_specta_builtins.list[_specta_builtins.list[_specta_builtins.list[_specta_type_var_test__types__Generic2D_A]]]"})
+
+_specta_type_var_test__types__Generic2E_A = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2E_A")
+_specta_type_var_test__types__Generic2E_B = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2E_B")
+_specta_type_var_test__types__Generic2E_C = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2E_C")
+_specta_typed_dict_test__types__Generic2E = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2E", {"E": "_specta_typed_dict_test__types__Generic2EE[_specta_type_var_test__types__Generic2E_A, _specta_type_var_test__types__Generic2E_B, _specta_type_var_test__types__Generic2E_C]"})
+
+_specta_type_var_test__types__Generic2EE_A = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2EE_A")
+_specta_type_var_test__types__Generic2EE_B = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2EE_B")
+_specta_type_var_test__types__Generic2EE_C = _specta_typing.TypeVar("_specta_type_var_test__types__Generic2EE_C")
+_specta_typed_dict_test__types__Generic2EE = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2EE", {"a": "_specta_type_var_test__types__Generic2EE_A", "b": "_specta_type_var_test__types__Generic2EE_B", "c": "_specta_type_var_test__types__Generic2EE_C"})
+
+_specta_typed_dict_test__types__Generic2X = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2X", {"X": "_specta_builtins.list[_specta_builtins.int]"})
+
+_specta_typed_dict_test__types__Generic2Y = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2Y", {"Y": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__Generic2Z = _specta_typing.TypedDict("_specta_typed_dict_test__types__Generic2Z", {"Z": "_specta_builtins.list[_specta_builtins.list[_specta_builtins.int]]"})
+
+type Generic2[A, B, C] = _specta_typed_dict_test__types__Generic2A[A] | _specta_typed_dict_test__types__Generic2B[B] | _specta_typed_dict_test__types__Generic2C[C] | _specta_typed_dict_test__types__Generic2D[A] | _specta_typed_dict_test__types__Generic2E[A, B, C] | _specta_typed_dict_test__types__Generic2X | _specta_typed_dict_test__types__Generic2Y | _specta_typed_dict_test__types__Generic2Z
 
 class GenericAutoBound[T](_specta_typing.TypedDict):
     value: T
@@ -277,20 +403,34 @@ type GenericType[T] = None | T
 
 type HasGenericAlias = _specta_builtins.dict[_specta_builtins.int, _specta_builtins.str]
 
+_specta_typed_dict_test__types__InlineConstGenericContainerb = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineConstGenericContainerb", {"data": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "a": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "d": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]"})
+
+_specta_typed_dict_test__types__InlineConstGenericContainerc = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineConstGenericContainerc", {"data": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "a": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "d": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]"})
+
 class InlineConstGenericContainer(_specta_typing.TypedDict):
-    b: _specta_typing.TypedDict("test__types__InlineConstGenericContainerb", {"data": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "a": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "d": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]})
-    c: _specta_typing.TypedDict("test__types__InlineConstGenericContainerc", {"data": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "a": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "d": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]})
+    b: _specta_typed_dict_test__types__InlineConstGenericContainerb
+    c: _specta_typed_dict_test__types__InlineConstGenericContainerc
     d: _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]
 
-type InlineEnumField = _specta_typing.TypedDict("test__types__InlineEnumFieldA", {"A": _specta_typing.TypedDict("test__types__InlineEnumFieldAA", {"a": _specta_builtins.str})})
+_specta_typed_dict_test__types__InlineEnumFieldA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineEnumFieldA", {"A": "_specta_typed_dict_test__types__InlineEnumFieldAA"})
 
-type InlineFlattenGenerics = _specta_typing.TypedDict("test__types__InlineFlattenGenericsintersection0", {"g": InlineFlattenGenericsG[_specta_builtins.str], "gi": _specta_typing.TypedDict("test__types__InlineFlattenGenericsintersection0gi", {"t": _specta_builtins.str}), "t": _specta_builtins.str})
+_specta_typed_dict_test__types__InlineEnumFieldAA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineEnumFieldAA", {"a": "_specta_builtins.str"})
+
+type InlineEnumField = _specta_typed_dict_test__types__InlineEnumFieldA
+
+_specta_typed_dict_test__types__InlineFlattenGenericsintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineFlattenGenericsintersection0", {"g": "InlineFlattenGenericsG[_specta_builtins.str]", "gi": "_specta_typed_dict_test__types__InlineFlattenGenericsintersection0gi", "t": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__InlineFlattenGenericsintersection0gi = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineFlattenGenericsintersection0gi", {"t": "_specta_builtins.str"})
+
+type InlineFlattenGenerics = _specta_typed_dict_test__types__InlineFlattenGenericsintersection0
 
 class InlineFlattenGenericsG[T](_specta_typing.TypedDict):
     t: T
 
+_specta_typed_dict_test__types__InlineOptionalTypeoptional_field = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineOptionalTypeoptional_field", {"a": "_specta_builtins.str"})
+
 class InlineOptionalType(_specta_typing.TypedDict):
-    optional_field: None | _specta_typing.TypedDict("test__types__InlineOptionalTypeoptional_field", {"a": _specta_builtins.str})
+    optional_field: None | _specta_typed_dict_test__types__InlineOptionalTypeoptional_field
 
 class InlineRecursiveConstGeneric(_specta_typing.TypedDict):
     data: _specta_builtins.list[_specta_builtins.int]
@@ -298,9 +438,13 @@ class InlineRecursiveConstGeneric(_specta_typing.TypedDict):
     d: _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]
     e: InlineRecursiveConstGeneric
 
+_specta_typed_dict_test__types__InlineRecursiveConstGenericContainerb = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineRecursiveConstGenericContainerb", {"data": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "a": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "d": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "e": "InlineRecursiveConstGeneric"})
+
+_specta_typed_dict_test__types__InlineRecursiveConstGenericContainerc = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineRecursiveConstGenericContainerc", {"data": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "a": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]", "d": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "e": "InlineRecursiveConstGeneric"})
+
 class InlineRecursiveConstGenericContainer(_specta_typing.TypedDict):
-    b: _specta_typing.TypedDict("test__types__InlineRecursiveConstGenericContainerb", {"data": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "a": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "d": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "e": InlineRecursiveConstGeneric})
-    c: _specta_typing.TypedDict("test__types__InlineRecursiveConstGenericContainerc", {"data": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "a": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int], "d": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "e": InlineRecursiveConstGeneric})
+    b: _specta_typed_dict_test__types__InlineRecursiveConstGenericContainerb
+    c: _specta_typed_dict_test__types__InlineRecursiveConstGenericContainerc
     d: _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]
 
 class InlineStruct(_specta_typing.TypedDict):
@@ -310,49 +454,97 @@ class InlineStruct(_specta_typing.TypedDict):
 class InlineTuple(_specta_typing.TypedDict):
     demo: _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.bool]
 
+_specta_typed_dict_test__types__InlineTuple2demo0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineTuple2demo0", {"demo": "_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.bool]"})
+
 class InlineTuple2(_specta_typing.TypedDict):
-    demo: _specta_builtins.tuple[_specta_typing.TypedDict("test__types__InlineTuple2demo0", {"demo": _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.bool]}), _specta_builtins.bool]
+    demo: _specta_builtins.tuple[_specta_typed_dict_test__types__InlineTuple2demo0, _specta_builtins.bool]
+
+_specta_typed_dict_test__types__InlinerStructinline_this = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlinerStructinline_this", {"ref_struct": "SimpleStruct", "val": "_specta_builtins.int"})
 
 class InlinerStruct(_specta_typing.TypedDict):
-    inline_this: _specta_typing.TypedDict("test__types__InlinerStructinline_this", {"ref_struct": SimpleStruct, "val": _specta_builtins.int})
+    inline_this: _specta_typed_dict_test__types__InlinerStructinline_this
     dont_inline_this: RefStruct
 
-type Inner = _specta_typing.TypedDict("test__types__Innerintersection0", {"a": _specta_builtins.int})
+_specta_typed_dict_test__types__Innerintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__Innerintersection0", {"a": "_specta_builtins.int"})
+
+type Inner = _specta_typed_dict_test__types__Innerintersection0
 
 type InternallyTaggedD = _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]
 
-type InternallyTaggedE = _specta_typing.TypedDict("test__types__InternallyTaggedEA", {"type": _specta_typing.Literal["A"]})
+_specta_typed_dict_test__types__InternallyTaggedEA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedEA", {"type": "_specta_typing.Literal[\"A\"]"})
 
-type InternallyTaggedF = _specta_typing.TypedDict("test__types__InternallyTaggedFA", {"type": _specta_typing.Literal["A"]})
+type InternallyTaggedE = _specta_typed_dict_test__types__InternallyTaggedEA
+
+_specta_typed_dict_test__types__InternallyTaggedFA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedFA", {"type": "_specta_typing.Literal[\"A\"]"})
+
+type InternallyTaggedF = _specta_typed_dict_test__types__InternallyTaggedFA
 
 type InternallyTaggedFInner = None
 
-type InternallyTaggedH = _specta_typing.TypedDict("test__types__InternallyTaggedHA", {"type": _specta_typing.Literal["A"]})
+_specta_typed_dict_test__types__InternallyTaggedHA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedHA", {"type": "_specta_typing.Literal[\"A\"]"})
+
+type InternallyTaggedH = _specta_typed_dict_test__types__InternallyTaggedHA
 
 type InternallyTaggedHInner = None
 
-type InternallyTaggedL = _specta_typing.TypedDict("test__types__InternallyTaggedLAintersection0", {"type": _specta_typing.Literal["A"]})
+_specta_typed_dict_test__types__InternallyTaggedLAintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedLAintersection0", {"type": "_specta_typing.Literal[\"A\"]"})
 
-type InternallyTaggedLInner = _specta_typing.TypedDict("test__types__InternallyTaggedLInnerA", {"type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__InternallyTaggedLInnerB", {"type": _specta_typing.Literal["B"]})
+type InternallyTaggedL = _specta_typed_dict_test__types__InternallyTaggedLAintersection0
 
-type InternallyTaggedM = _specta_typing.TypedDict("test__types__InternallyTaggedMA", {"type": _specta_typing.Literal["A"]})
+_specta_typed_dict_test__types__InternallyTaggedLInnerA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedLInnerA", {"type": "_specta_typing.Literal[\"A\"]"})
+
+_specta_typed_dict_test__types__InternallyTaggedLInnerB = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedLInnerB", {"type": "_specta_typing.Literal[\"B\"]"})
+
+type InternallyTaggedLInner = _specta_typed_dict_test__types__InternallyTaggedLInnerA | _specta_typed_dict_test__types__InternallyTaggedLInnerB
+
+_specta_typed_dict_test__types__InternallyTaggedMA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedMA", {"type": "_specta_typing.Literal[\"A\"]"})
+
+type InternallyTaggedM = _specta_typed_dict_test__types__InternallyTaggedMA
 
 type InternallyTaggedMInner = None
 
 type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Deserialize | InternallyTaggedWithAlias_Serialize
 
-type InternallyTaggedWithAlias_Deserialize = _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeAintersection0", {"field": _specta_builtins.str, "type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeAintersection1", {"bruh": _specta_builtins.str, "type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_DeserializeB", {"type": _specta_typing.Literal["B"], "other": _specta_builtins.int})
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0", {"field": "_specta_builtins.str", "type": "_specta_typing.Literal[\"A\"]"})
 
-type InternallyTaggedWithAlias_Serialize = _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_SerializeA", {"type": _specta_typing.Literal["A"], "field": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__InternallyTaggedWithAlias_SerializeB", {"type": _specta_typing.Literal["B"], "other": _specta_builtins.int})
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1", {"bruh": "_specta_builtins.str", "type": "_specta_typing.Literal[\"A\"]"})
+
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeB", {"type": "_specta_typing.Literal[\"B\"]", "other": "_specta_builtins.int"})
+
+type InternallyTaggedWithAlias_Deserialize = _specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0 | _specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1 | _specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeB
+
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeA", {"type": "_specta_typing.Literal[\"A\"]", "field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeB", {"type": "_specta_typing.Literal[\"B\"]", "other": "_specta_builtins.int"})
+
+type InternallyTaggedWithAlias_Serialize = _specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeA | _specta_typed_dict_test__types__InternallyTaggedWithAlias_SerializeB
 
 class InvalidToValidType(_specta_typing.TypedDict):
     cause: None
 
-type Issue221External = _specta_typing.TypedDict("test__types__Issue221ExternalA", {"A": _specta_typing.TypedDict("test__types__Issue221ExternalAA", {"a": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__Issue221ExternalB", {"B": _specta_typing.TypedDict("test__types__Issue221ExternalBB", {"b": _specta_builtins.str})})
+_specta_typed_dict_test__types__Issue221ExternalA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221ExternalA", {"A": "_specta_typed_dict_test__types__Issue221ExternalAA"})
 
-type Issue221UntaggedMixed = _specta_typing.TypedDict("test__types__Issue221UntaggedMixedA", {"a": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__Issue221UntaggedMixedB", {"b": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__Issue221UntaggedMixedUnsafe", {"values": _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]})
+_specta_typed_dict_test__types__Issue221ExternalAA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221ExternalAA", {"a": "_specta_builtins.str"})
 
-type Issue221UntaggedSafe = _specta_typing.TypedDict("test__types__Issue221UntaggedSafeA", {"a": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__Issue221UntaggedSafeB", {"b": _specta_builtins.str})
+_specta_typed_dict_test__types__Issue221ExternalB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221ExternalB", {"B": "_specta_typed_dict_test__types__Issue221ExternalBB"})
+
+_specta_typed_dict_test__types__Issue221ExternalBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221ExternalBB", {"b": "_specta_builtins.str"})
+
+type Issue221External = _specta_typed_dict_test__types__Issue221ExternalA | _specta_typed_dict_test__types__Issue221ExternalB
+
+_specta_typed_dict_test__types__Issue221UntaggedMixedA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedMixedA", {"a": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__Issue221UntaggedMixedB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedMixedB", {"b": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe", {"values": "_specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]"})
+
+type Issue221UntaggedMixed = _specta_typed_dict_test__types__Issue221UntaggedMixedA | _specta_typed_dict_test__types__Issue221UntaggedMixedB | _specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe
+
+_specta_typed_dict_test__types__Issue221UntaggedSafeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedSafeA", {"a": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__Issue221UntaggedSafeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedSafeB", {"b": "_specta_builtins.str"})
+
+type Issue221UntaggedSafe = _specta_typed_dict_test__types__Issue221UntaggedSafeA | _specta_typed_dict_test__types__Issue221UntaggedSafeB
 
 class Issue281(_specta_typing.TypedDict):
     default_unity_arguments: _specta_builtins.list[_specta_builtins.str]
@@ -360,23 +552,53 @@ class Issue281(_specta_typing.TypedDict):
 #  https://github.com/specta-rs/specta/issues/374
 type Issue374 = Issue374_Deserialize | Issue374_Serialize
 
-#  https://github.com/specta-rs/specta/issues/374
-type Issue374_Deserialize = _specta_typing.TypedDict("test__types__Issue374_Deserialize", {"foo": _specta_typing.NotRequired[_specta_builtins.bool], "bar": _specta_typing.NotRequired[_specta_builtins.bool]})
+_specta_typed_dict_test__types__Issue374_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Deserialize", {"foo": "_specta_typing.NotRequired[_specta_builtins.bool]", "bar": "_specta_typing.NotRequired[_specta_builtins.bool]"})
 
 #  https://github.com/specta-rs/specta/issues/374
-type Issue374_Serialize = _specta_typing.TypedDict("test__types__Issue374_Serialize", {"foo": _specta_typing.NotRequired[_specta_builtins.bool], "bar": _specta_typing.NotRequired[_specta_builtins.bool]})
+type Issue374_Deserialize = _specta_typed_dict_test__types__Issue374_Deserialize
 
-type KebabCase = _specta_typing.TypedDict("test__types__KebabCase", {"test-ing": _specta_builtins.str})
+_specta_typed_dict_test__types__Issue374_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue374_Serialize", {"foo": "_specta_typing.NotRequired[_specta_builtins.bool]", "bar": "_specta_typing.NotRequired[_specta_builtins.bool]"})
 
-type LifetimeGenericEnum[T] = _specta_typing.TypedDict("test__types__LifetimeGenericEnumBorrowed", {"Borrowed": T}) | _specta_typing.TypedDict("test__types__LifetimeGenericEnumOwned", {"Owned": T})
+#  https://github.com/specta-rs/specta/issues/374
+type Issue374_Serialize = _specta_typed_dict_test__types__Issue374_Serialize
+
+_specta_typed_dict_test__types__KebabCase = _specta_typing.TypedDict("_specta_typed_dict_test__types__KebabCase", {"test-ing": "_specta_builtins.str"})
+
+type KebabCase = _specta_typed_dict_test__types__KebabCase
+
+_specta_type_var_test__types__LifetimeGenericEnumBorrowed_T = _specta_typing.TypeVar("_specta_type_var_test__types__LifetimeGenericEnumBorrowed_T")
+_specta_typed_dict_test__types__LifetimeGenericEnumBorrowed = _specta_typing.TypedDict("_specta_typed_dict_test__types__LifetimeGenericEnumBorrowed", {"Borrowed": "_specta_type_var_test__types__LifetimeGenericEnumBorrowed_T"})
+
+_specta_type_var_test__types__LifetimeGenericEnumOwned_T = _specta_typing.TypeVar("_specta_type_var_test__types__LifetimeGenericEnumOwned_T")
+_specta_typed_dict_test__types__LifetimeGenericEnumOwned = _specta_typing.TypedDict("_specta_typed_dict_test__types__LifetimeGenericEnumOwned", {"Owned": "_specta_type_var_test__types__LifetimeGenericEnumOwned_T"})
+
+type LifetimeGenericEnum[T] = _specta_typed_dict_test__types__LifetimeGenericEnumBorrowed[T] | _specta_typed_dict_test__types__LifetimeGenericEnumOwned[T]
 
 class LifetimeGenericStruct[T](_specta_typing.TypedDict):
     borrowed: _specta_builtins.list[T]
     owned: _specta_builtins.list[T]
 
-type LoadProjectEvent = _specta_typing.TypedDict("test__types__LoadProjectEventfinished", {"event": _specta_typing.Literal["finished"], "data": _specta_typing.TypedDict("test__types__LoadProjectEventfinisheddata", {"projectName": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__LoadProjectEventprogressTest", {"event": _specta_typing.Literal["progressTest"], "data": _specta_typing.TypedDict("test__types__LoadProjectEventprogressTestdata", {"projectName": _specta_builtins.str, "status": _specta_builtins.str, "progress": _specta_builtins.int})}) | _specta_typing.TypedDict("test__types__LoadProjectEventstarted", {"event": _specta_typing.Literal["started"], "data": _specta_typing.TypedDict("test__types__LoadProjectEventstarteddata", {"projectName": _specta_builtins.str})})
+_specta_typed_dict_test__types__LoadProjectEventstarted = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventstarted", {"event": "_specta_typing.Literal[\"started\"]", "data": "_specta_typed_dict_test__types__LoadProjectEventstarteddata"})
 
-type MacroEnum = _specta_typing.TypedDict("test__types__MacroEnumDemo", {"Demo": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__MacroEnumDemo2", {"Demo2": _specta_typing.TypedDict("test__types__MacroEnumDemo2Demo2", {"demo2": _specta_builtins.str})})
+_specta_typed_dict_test__types__LoadProjectEventstarteddata = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventstarteddata", {"projectName": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__LoadProjectEventprogressTest = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventprogressTest", {"event": "_specta_typing.Literal[\"progressTest\"]", "data": "_specta_typed_dict_test__types__LoadProjectEventprogressTestdata"})
+
+_specta_typed_dict_test__types__LoadProjectEventprogressTestdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventprogressTestdata", {"projectName": "_specta_builtins.str", "status": "_specta_builtins.str", "progress": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__LoadProjectEventfinished = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventfinished", {"event": "_specta_typing.Literal[\"finished\"]", "data": "_specta_typed_dict_test__types__LoadProjectEventfinisheddata"})
+
+_specta_typed_dict_test__types__LoadProjectEventfinisheddata = _specta_typing.TypedDict("_specta_typed_dict_test__types__LoadProjectEventfinisheddata", {"projectName": "_specta_builtins.str"})
+
+type LoadProjectEvent = _specta_typed_dict_test__types__LoadProjectEventfinished | _specta_typed_dict_test__types__LoadProjectEventprogressTest | _specta_typed_dict_test__types__LoadProjectEventstarted
+
+_specta_typed_dict_test__types__MacroEnumDemo = _specta_typing.TypedDict("_specta_typed_dict_test__types__MacroEnumDemo", {"Demo": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__MacroEnumDemo2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__MacroEnumDemo2", {"Demo2": "_specta_typed_dict_test__types__MacroEnumDemo2Demo2"})
+
+_specta_typed_dict_test__types__MacroEnumDemo2Demo2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__MacroEnumDemo2Demo2", {"demo2": "_specta_builtins.str"})
+
+type MacroEnum = _specta_typed_dict_test__types__MacroEnumDemo | _specta_typed_dict_test__types__MacroEnumDemo2
 
 type MacroStruct = _specta_builtins.str
 
@@ -388,15 +610,27 @@ type MaybeValidKey[T] = T
 class MyEmptyInput(_specta_typing.TypedDict):
     pass
 
-type MyEnum = _specta_typing.TypedDict("test__types__MyEnumA", {"A": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__MyEnumB", {"B": _specta_builtins.int})
+_specta_typed_dict_test__types__MyEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumA", {"A": "_specta_builtins.str"})
 
-type MyEnumAdjacent = _specta_typing.TypedDict("test__types__MyEnumAdjacentVariant", {"t": _specta_typing.Literal["Variant"], "c": First})
+_specta_typed_dict_test__types__MyEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumB", {"B": "_specta_builtins.int"})
 
-type MyEnumExternal = _specta_typing.TypedDict("test__types__MyEnumExternalVariant", {"Variant": First})
+type MyEnum = _specta_typed_dict_test__types__MyEnumA | _specta_typed_dict_test__types__MyEnumB
 
-type MyEnumTagged = _specta_typing.TypedDict("test__types__MyEnumTaggedVariantintersection0", {"a": _specta_builtins.str, "type": _specta_typing.Literal["Variant"]})
+_specta_typed_dict_test__types__MyEnumAdjacentVariant = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumAdjacentVariant", {"t": "_specta_typing.Literal[\"Variant\"]", "c": "First"})
 
-type MyEnumUntagged = _specta_typing.TypedDict("test__types__MyEnumUntaggedVariant", {"inner": First})
+type MyEnumAdjacent = _specta_typed_dict_test__types__MyEnumAdjacentVariant
+
+_specta_typed_dict_test__types__MyEnumExternalVariant = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumExternalVariant", {"Variant": "First"})
+
+type MyEnumExternal = _specta_typed_dict_test__types__MyEnumExternalVariant
+
+_specta_typed_dict_test__types__MyEnumTaggedVariantintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumTaggedVariantintersection0", {"a": "_specta_builtins.str", "type": "_specta_typing.Literal[\"Variant\"]"})
+
+type MyEnumTagged = _specta_typed_dict_test__types__MyEnumTaggedVariantintersection0
+
+_specta_typed_dict_test__types__MyEnumUntaggedVariant = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumUntaggedVariant", {"inner": "First"})
+
+type MyEnumUntagged = _specta_typed_dict_test__types__MyEnumUntaggedVariant
 
 class NamedConstGeneric(_specta_typing.TypedDict):
     data: _specta_builtins.list[_specta_builtins.int]
@@ -408,24 +642,52 @@ class NamedConstGenericContainer(_specta_typing.TypedDict):
     b: NamedConstGeneric
     d: _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]
 
-type NestedEnum = _specta_typing.TypedDict("test__types__NestedEnuma", {"type": _specta_typing.Literal["a"], "value": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__NestedEnumb", {"type": _specta_typing.Literal["b"], "value": _specta_builtins.int})
+_specta_typed_dict_test__types__NestedEnuma = _specta_typing.TypedDict("_specta_typed_dict_test__types__NestedEnuma", {"type": "_specta_typing.Literal[\"a\"]", "value": "_specta_builtins.str"})
 
-type Ninth = _specta_typing.TypedDict("test__types__NinthA", {"t": _specta_typing.Literal["A"], "c": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__NinthB", {"t": _specta_typing.Literal["B"]}) | _specta_typing.TypedDict("test__types__NinthC", {"t": _specta_typing.Literal["C"], "c": _specta_typing.TypedDict("test__types__NinthCc", {"a": _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__NinthD", {"t": _specta_typing.Literal["D"], "c": First})
+_specta_typed_dict_test__types__NestedEnumb = _specta_typing.TypedDict("_specta_typed_dict_test__types__NestedEnumb", {"type": "_specta_typing.Literal[\"b\"]", "value": "_specta_builtins.int"})
+
+type NestedEnum = _specta_typed_dict_test__types__NestedEnuma | _specta_typed_dict_test__types__NestedEnumb
+
+_specta_typed_dict_test__types__NinthA = _specta_typing.TypedDict("_specta_typed_dict_test__types__NinthA", {"t": "_specta_typing.Literal[\"A\"]", "c": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__NinthB = _specta_typing.TypedDict("_specta_typed_dict_test__types__NinthB", {"t": "_specta_typing.Literal[\"B\"]"})
+
+_specta_typed_dict_test__types__NinthC = _specta_typing.TypedDict("_specta_typed_dict_test__types__NinthC", {"t": "_specta_typing.Literal[\"C\"]", "c": "_specta_typed_dict_test__types__NinthCc"})
+
+_specta_typed_dict_test__types__NinthCc = _specta_typing.TypedDict("_specta_typed_dict_test__types__NinthCc", {"a": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__NinthD = _specta_typing.TypedDict("_specta_typed_dict_test__types__NinthD", {"t": "_specta_typing.Literal[\"D\"]", "c": "First"})
+
+type Ninth = _specta_typed_dict_test__types__NinthA | _specta_typed_dict_test__types__NinthB | _specta_typed_dict_test__types__NinthC | _specta_typed_dict_test__types__NinthD
 
 type NonOptional = None | _specta_builtins.str
 
 type Optional = Optional_Deserialize | Optional_Serialize
 
-type OptionalInEnum = _specta_typing.TypedDict("test__types__OptionalInEnumA", {"A": _specta_typing.NotRequired[None | _specta_builtins.str]}) | _specta_typing.TypedDict("test__types__OptionalInEnumB", {"B": _specta_typing.TypedDict("test__types__OptionalInEnumBB", {"a": None | _specta_builtins.str})}) | _specta_typing.TypedDict("test__types__OptionalInEnumC", {"C": _specta_typing.TypedDict("test__types__OptionalInEnumCC", {"a": _specta_typing.NotRequired[None | _specta_builtins.str]})})
+_specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumA", {"A": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+
+_specta_typed_dict_test__types__OptionalInEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumB", {"B": "_specta_typed_dict_test__types__OptionalInEnumBB"})
+
+_specta_typed_dict_test__types__OptionalInEnumBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumBB", {"a": "None | _specta_builtins.str"})
+
+_specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"C": "_specta_typed_dict_test__types__OptionalInEnumCC"})
+
+_specta_typed_dict_test__types__OptionalInEnumCC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumCC", {"a": "_specta_typing.NotRequired[None | _specta_builtins.str]"})
+
+type OptionalInEnum = _specta_typed_dict_test__types__OptionalInEnumA | _specta_typed_dict_test__types__OptionalInEnumB | _specta_typed_dict_test__types__OptionalInEnumC
 
 type OptionalOnNamedField = None | _specta_builtins.str
 
 class OptionalOnTransparentNamedField(_specta_typing.TypedDict):
     b: None | _specta_builtins.str
 
-type Optional_Deserialize = _specta_typing.TypedDict("test__types__Optional_Deserialize", {"a": None | _specta_builtins.int, "b": _specta_typing.NotRequired[None | _specta_builtins.int], "c": None | _specta_builtins.str, "d": _specta_typing.NotRequired[_specta_builtins.bool]})
+_specta_typed_dict_test__types__Optional_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Deserialize", {"a": "None | _specta_builtins.int", "b": "_specta_typing.NotRequired[None | _specta_builtins.int]", "c": "None | _specta_builtins.str", "d": "_specta_typing.NotRequired[_specta_builtins.bool]"})
 
-type Optional_Serialize = _specta_typing.TypedDict("test__types__Optional_Serialize", {"a": None | _specta_builtins.int, "b": _specta_typing.NotRequired[None | _specta_builtins.int], "c": _specta_typing.NotRequired[_specta_builtins.str], "d": _specta_builtins.bool})
+type Optional_Deserialize = _specta_typed_dict_test__types__Optional_Deserialize
+
+_specta_typed_dict_test__types__Optional_Serialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__Optional_Serialize", {"a": "None | _specta_builtins.int", "b": "_specta_typing.NotRequired[None | _specta_builtins.int]", "c": "_specta_typing.NotRequired[_specta_builtins.str]", "d": "_specta_builtins.bool"})
+
+type Optional_Serialize = _specta_typed_dict_test__types__Optional_Serialize
 
 class OverridenStruct(_specta_typing.TypedDict):
     overriden_field: _specta_builtins.str
@@ -437,7 +699,15 @@ class Pair[Z, A](_specta_typing.TypedDict):
 class PlaceholderInnerField(_specta_typing.TypedDict):
     a: _specta_builtins.str
 
-type Primitives = _specta_typing.TypedDict("tests__tests__types__Primitives", {"i8": _specta_builtins.int, "i16": _specta_builtins.int, "i32": _specta_builtins.int, "u8": _specta_builtins.int, "u16": _specta_builtins.int, "u32": _specta_builtins.int, "f32": _specta_builtins.float, "f64": _specta_builtins.float, "bool": _specta_builtins.bool, "char": _specta_builtins.str, "Range<i32>": Range[_specta_builtins.int], "RangeInclusive<i32>": RangeInclusive[_specta_builtins.int], "()": None, "(String, i32)": _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int], "(String, i32, bool)": _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int, _specta_builtins.bool], "((String, i32), (bool, char, bool), ())": _specta_builtins.tuple[_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int], _specta_builtins.tuple[_specta_builtins.bool, _specta_builtins.str, _specta_builtins.bool], None], "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": _specta_builtins.tuple[_specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool], "(Vec<i32>, Vec<bool>)": _specta_builtins.tuple[_specta_builtins.list[_specta_builtins.int], _specta_builtins.list[_specta_builtins.bool]], "String": _specta_builtins.str, "PathBuf": _specta_builtins.str, "IpAddr": _specta_builtins.str, "Ipv4Addr": _specta_builtins.str, "Ipv6Addr": _specta_builtins.str, "SocketAddr": _specta_builtins.str, "SocketAddrV4": _specta_builtins.str, "SocketAddrV6": _specta_builtins.str, "Cow<'static, str>": _specta_builtins.str, "Cow<'static, i32>": _specta_builtins.int, "&'static str": _specta_builtins.str, "&'static bool": _specta_builtins.bool, "&'static i32": _specta_builtins.int, "Vec<i32>": _specta_builtins.list[_specta_builtins.int], "&'static [i32]": _specta_builtins.list[_specta_builtins.int], "&'static [i32; 3]": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "[i32; 3]": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int], "Vec<MyEnum>": _specta_builtins.list[MyEnum], "&'static [MyEnum]": _specta_builtins.list[MyEnum], "&'static [MyEnum; 6]": _specta_builtins.tuple[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum], "[MyEnum; 2]": _specta_builtins.tuple[MyEnum, MyEnum], "&'static [i32; 1]": _specta_builtins.tuple[_specta_builtins.int], "&'static [i32; 0]": _specta_builtins.tuple[()], "Option<i32>": None | _specta_builtins.int, "Option<()>": None, "Option<Vec<i32>>": None | _specta_builtins.list[_specta_builtins.int], "Result<String, i32>": Result[_specta_builtins.str, _specta_builtins.int], "Vec<Option<Cow<'static, i32>>>": _specta_builtins.list[None | _specta_builtins.int], "Option<Vec<Cow<'static, i32>>>": None | _specta_builtins.list[_specta_builtins.int], "[Vec<String>; 3]": _specta_builtins.tuple[_specta_builtins.list[_specta_builtins.str], _specta_builtins.list[_specta_builtins.str], _specta_builtins.list[_specta_builtins.str]], "Option<Option<String>>": None | _specta_builtins.str, "Option<Option<Option<String>>>": None | _specta_builtins.str, "PhantomData<()>": None, "PhantomData<String>": None, "Infallible": _specta_typing.Never, "Unit1": Unit1, "Unit2": Unit2, "Unit3": Unit3, "Unit4": Unit4, "Unit5": Unit5, "Unit6": Unit6, "Unit7": Unit7, "SimpleStruct": SimpleStruct, "TupleStruct1": TupleStruct1, "TupleStruct3": TupleStruct3, "TestEnum": TestEnum, "RefStruct": RefStruct, "InlinerStruct": InlinerStruct, "GenericStruct<i32>": GenericStruct[_specta_builtins.int], "GenericStruct<String>": GenericStruct[_specta_builtins.str], "FlattenEnumStruct": FlattenEnumStruct, "OverridenStruct": OverridenStruct, "HasGenericAlias": HasGenericAlias, "EnumMacroAttributes": EnumMacroAttributes, "InlineEnumField": InlineEnumField, "InlineOptionalType": InlineOptionalType, "Rename": Rename, "TransparentType": TransparentType, "TransparentType2": TransparentType2, "TransparentTypeWithOverride": TransparentTypeWithOverride, "[Option<u8>; 3]": _specta_builtins.tuple[None | _specta_builtins.int, None | _specta_builtins.int, None | _specta_builtins.int], "HashMap<BasicEnum, ()>": _specta_builtins.dict[BasicEnum, None], "HashMap<BasicEnum, i32>": _specta_builtins.dict[BasicEnum, _specta_builtins.int], "Option<Option<Option<Option<i32>>>>": None | _specta_builtins.int, "Vec<PlaceholderInnerField>": _specta_builtins.list[PlaceholderInnerField], "EnumReferenceRecordKey": EnumReferenceRecordKey, "FlattenOnNestedEnum": FlattenOnNestedEnum, "MyEmptyInput": MyEmptyInput, "(String)": _specta_builtins.str, "(String,)": _specta_builtins.tuple[_specta_builtins.str], "ExtraBracketsInTupleVariant": ExtraBracketsInTupleVariant, "ExtraBracketsInUnnamedStruct": ExtraBracketsInUnnamedStruct, "Vec<MyEnum>": _specta_builtins.list[MyEnum], "InlineTuple": InlineTuple, "InlineTuple2": InlineTuple2, "Box<str>": _specta_builtins.str, "Box<String>": _specta_builtins.str, "SkippedFieldWithinVariant": SkippedFieldWithinVariant, "KebabCase": KebabCase, "&[&str]": _specta_builtins.list[_specta_builtins.str], "Issue281<'_>": Issue281, "LifetimeGenericStruct<'_, i32>": LifetimeGenericStruct[_specta_builtins.int], "LifetimeGenericEnum<'_, i32>": LifetimeGenericEnum[_specta_builtins.int], "RenameWithWeirdCharsField": RenameWithWeirdCharsField, "RenameWithWeirdCharsVariant": RenameWithWeirdCharsVariant, "RenamedFieldKeys": RenamedFieldKeys, "RenamedVariantWithSkippedPayload": RenamedVariantWithSkippedPayload, "type_type::Type": Type, "ActualType": ActualType, "SpectaTypeOverride": SpectaTypeOverride, "ContainerTypeOverrideStruct": ContainerTypeOverrideStruct, "ContainerTypeOverrideEnum": ContainerTypeOverrideEnum, "ContainerTypeOverrideGeneric<Box<dyn Any>>": ContainerTypeOverrideGeneric, "ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric[_specta_builtins.int], "ContainerTypeOverrideTuple": ContainerTypeOverrideTuple, "ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric[_specta_builtins.int], "InvalidToValidType": InvalidToValidType, "TupleStruct": TupleStruct, "TupleStructWithRep": TupleStructWithRep, "GenericTupleStruct<String>": GenericTupleStruct[_specta_builtins.str], "BracedStruct": BracedStruct, "Struct": StructNew, "Struct2": Struct2, "Enum": EnumNew, "Enum2": Enum2New, "Enum3": Enum3New, "StructRenameAllUppercase": StructRenameAllUppercase, "RenameSerdeSpecialChar": RenameSerdeSpecialChar, "EnumRenameAllUppercase": EnumRenameAllUppercase, "Recursive": Recursive, "RecursiveMapValue": RecursiveMapValue, "RecursiveTransparent": RecursiveTransparent, "RecursiveInEnum": RecursiveInEnum, "NonOptional": NonOptional, "OptionalOnNamedField": OptionalOnNamedField, "OptionalOnTransparentNamedField": OptionalOnTransparentNamedField, "OptionalInEnum": OptionalInEnum, "UntaggedVariants": UntaggedVariants, "UntaggedVariantsWithoutValue": UntaggedVariantsWithoutValue, "UntaggedVariantsWithDuplicateBranches": UntaggedVariantsWithDuplicateBranches, "HashMap<String, ()>": _specta_builtins.dict[_specta_builtins.str, None], "Regular": Regular, "HashMap<Infallible, ()>": _specta_builtins.dict[_specta_typing.Never, None], "HashMap<TransparentStruct, ()>": _specta_builtins.dict[TransparentStruct, None], "HashMap<UnitVariants, ()>": _specta_builtins.dict[UnitVariants, None], "HashMap<UntaggedVariantsKey, ()>": _specta_builtins.dict[UntaggedVariantsKey, None], "ValidMaybeValidKey": ValidMaybeValidKey, "ValidMaybeValidKeyNested": ValidMaybeValidKeyNested, "MacroStruct": MacroStruct, "MacroStruct2": MacroStruct2, "MacroEnum": MacroEnum, "DeprecatedType": DeprecatedType, "DeprecatedTypeWithMsg": DeprecatedTypeWithMsg, "DeprecatedTypeWithMsg2": DeprecatedTypeWithMsg2, "DeprecatedFields": DeprecatedFields, "DeprecatedTupleVariant": DeprecatedTupleVariant, "DeprecatedEnumVariants": DeprecatedEnumVariants, "CommentedStruct": CommentedStruct, "CommentedEnum": CommentedEnum, "SingleLineComment": SingleLineComment, "NonGeneric": Demo[_specta_builtins.int, _specta_builtins.bool], "HalfGenericA<u8>": Demo[_specta_builtins.int, _specta_builtins.bool], "HalfGenericB<bool>": Demo[_specta_builtins.int, _specta_builtins.bool], "FullGeneric<u8, bool>": Demo[_specta_builtins.int, _specta_builtins.bool], "Another<bool>": Demo[_specta_builtins.int, _specta_builtins.bool], "MapA<u32>": _specta_builtins.dict[_specta_builtins.str, _specta_builtins.int], "MapB<u32>": _specta_builtins.dict[_specta_builtins.int, _specta_builtins.str], "MapC<u32>": _specta_builtins.dict[_specta_builtins.str, AGenericStruct[_specta_builtins.int]], "AGenericStruct<u32>": AGenericStruct[_specta_builtins.int], "A": A, "DoubleFlattened": DoubleFlattened, "FlattenedInner": FlattenedInner, "BoxFlattened": BoxFlattened, "BoxInline": BoxInline, "First": First, "Second": Second, "Third": Third, "Fourth": Fourth, "TagOnStructWithInline": TagOnStructWithInline, "Sixth": Sixth, "Seventh": Seventh, "Eight": Eight, "Ninth": Ninth, "Tenth": Tenth, "MyEnumTagged": MyEnumTagged, "MyEnumExternal": MyEnumExternal, "MyEnumAdjacent": MyEnumAdjacent, "MyEnumUntagged": MyEnumUntagged, "EmptyStruct": EmptyStruct, "EmptyStructWithTag": EmptyStructWithTag, "AdjacentlyTagged": AdjacentlyTagged, "LoadProjectEvent": LoadProjectEvent, "ExternallyTagged": ExternallyTagged, "Issue221External": Issue221External, "InternallyTaggedD": InternallyTaggedD, "InternallyTaggedE": InternallyTaggedE, "InternallyTaggedF": InternallyTaggedF, "InternallyTaggedH": InternallyTaggedH, "InternallyTaggedL": InternallyTaggedL, "InternallyTaggedM": InternallyTaggedM, "Issue221UntaggedSafe": Issue221UntaggedSafe, "Issue221UntaggedMixed": Issue221UntaggedMixed, "EmptyEnum": EmptyEnum, "EmptyEnumTagged": EmptyEnumTagged, "EmptyEnumTaggedWContent": EmptyEnumTaggedWContent, "EmptyEnumUntagged": EmptyEnumUntagged, "SkipOnlyField": SkipOnlyField, "SkipField": SkipField, "SkipVariant": SkipVariant, "SkipUnnamedFieldInVariant": SkipUnnamedFieldInVariant, "SkipNamedFieldInVariant": SkipNamedFieldInVariant, "TransparentWithSkip": TransparentWithSkip, "TransparentWithSkip2": TransparentWithSkip2, "TransparentWithSkip3": TransparentWithSkip3, "SkipVariant2": SkipVariant2, "SkipVariant3": SkipVariant3, "SkipStructFields": SkipStructFields, "SpectaSkipNonTypeField": SpectaSkipNonTypeField, "FlattenA": FlattenA, "FlattenB": FlattenB, "FlattenC": FlattenC, "FlattenD": FlattenD, "FlattenE": FlattenE, "FlattenF": FlattenF, "FlattenG": FlattenG, "TupleNested": TupleNested, "Generic1<()>": Generic1[None], "GenericAutoBound<()>": GenericAutoBound[None], "GenericAutoBound2<()>": GenericAutoBound2[None], "Container1": Container1, "Generic2<(), String, i32>": Generic2[None, _specta_builtins.str, _specta_builtins.int], "GenericNewType1<()>": GenericNewType1[None], "GenericTuple<()>": GenericTuple[None], "GenericStruct2<()>": GenericStruct2[None], "InlineGenericNewtype<String>": _specta_builtins.str, "InlineGenericNested<String>": _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.list[_specta_builtins.str], _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.str], _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str], None | _specta_builtins.str, _specta_typing.Literal["Unit"] | _specta_typing.TypedDict("tests__tests__types__PrimitivesInlineGenericNested_String_5Named", {"Named": _specta_typing.TypedDict("tests__tests__types__PrimitivesInlineGenericNested_String_5NamedNamed", {"value": _specta_builtins.str})}) | _specta_typing.TypedDict("tests__tests__types__PrimitivesInlineGenericNested_String_5Unnamed", {"Unnamed": _specta_builtins.str})], "InlineFlattenGenericsG<()>": InlineFlattenGenericsG[None], "InlineFlattenGenerics": InlineFlattenGenerics, "GenericDefault": GenericDefault, "ChainedGenericDefault": ChainedGenericDefault, "ChainedGenericDefault<String, String>": ChainedGenericDefault, "ChainedGenericDefault<i32>": ChainedGenericDefault[_specta_builtins.int, _specta_builtins.int], "ChainedGenericDefault<String, i32>": ChainedGenericDefault[_specta_builtins.str, _specta_builtins.int], "GenericDefaultSkipped": GenericDefaultSkipped[_specta_builtins.str], "GenericDefaultSkippedNonType": GenericDefaultSkippedNonType[_specta_typing.Any], "GenericParameterOrderPreserved": GenericParameterOrderPreserved, "ConstGenericInNonConstContainer": ConstGenericInNonConstContainer, "ConstGenericInConstContainer": ConstGenericInConstContainer, "NamedConstGenericContainer": NamedConstGenericContainer, "InlineConstGenericContainer": InlineConstGenericContainer, "InlineRecursiveConstGenericContainer": InlineRecursiveConstGenericContainer, "TestCollectionRegister": TestCollectionRegister, "TestCollectionRegister": TestCollectionRegister})
+_specta_typed_dict_tests__tests__types__Primitives = _specta_typing.TypedDict("_specta_typed_dict_tests__tests__types__Primitives", {"i8": "_specta_builtins.int", "i16": "_specta_builtins.int", "i32": "_specta_builtins.int", "u8": "_specta_builtins.int", "u16": "_specta_builtins.int", "u32": "_specta_builtins.int", "f32": "_specta_builtins.float", "f64": "_specta_builtins.float", "bool": "_specta_builtins.bool", "char": "_specta_builtins.str", "Range<i32>": "Range[_specta_builtins.int]", "RangeInclusive<i32>": "RangeInclusive[_specta_builtins.int]", "()": "None", "(String, i32)": "_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int]", "(String, i32, bool)": "_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int, _specta_builtins.bool]", "((String, i32), (bool, char, bool), ())": "_specta_builtins.tuple[_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.int], _specta_builtins.tuple[_specta_builtins.bool, _specta_builtins.str, _specta_builtins.bool], None]", "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": "_specta_builtins.tuple[_specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool, _specta_builtins.bool]", "(Vec<i32>, Vec<bool>)": "_specta_builtins.tuple[_specta_builtins.list[_specta_builtins.int], _specta_builtins.list[_specta_builtins.bool]]", "String": "_specta_builtins.str", "PathBuf": "_specta_builtins.str", "IpAddr": "_specta_builtins.str", "Ipv4Addr": "_specta_builtins.str", "Ipv6Addr": "_specta_builtins.str", "SocketAddr": "_specta_builtins.str", "SocketAddrV4": "_specta_builtins.str", "SocketAddrV6": "_specta_builtins.str", "Cow<'static, str>": "_specta_builtins.str", "Cow<'static, i32>": "_specta_builtins.int", "&'static str": "_specta_builtins.str", "&'static bool": "_specta_builtins.bool", "&'static i32": "_specta_builtins.int", "Vec<i32>": "_specta_builtins.list[_specta_builtins.int]", "&'static [i32]": "_specta_builtins.list[_specta_builtins.int]", "&'static [i32; 3]": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "[i32; 3]": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int, _specta_builtins.int]", "Vec<MyEnum>": "_specta_builtins.list[MyEnum]", "&'static [MyEnum]": "_specta_builtins.list[MyEnum]", "&'static [MyEnum; 6]": "_specta_builtins.tuple[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]", "[MyEnum; 2]": "_specta_builtins.tuple[MyEnum, MyEnum]", "&'static [i32; 1]": "_specta_builtins.tuple[_specta_builtins.int]", "&'static [i32; 0]": "_specta_builtins.tuple[()]", "Option<i32>": "None | _specta_builtins.int", "Option<()>": "None", "Option<Vec<i32>>": "None | _specta_builtins.list[_specta_builtins.int]", "Result<String, i32>": "Result[_specta_builtins.str, _specta_builtins.int]", "Vec<Option<Cow<'static, i32>>>": "_specta_builtins.list[None | _specta_builtins.int]", "Option<Vec<Cow<'static, i32>>>": "None | _specta_builtins.list[_specta_builtins.int]", "[Vec<String>; 3]": "_specta_builtins.tuple[_specta_builtins.list[_specta_builtins.str], _specta_builtins.list[_specta_builtins.str], _specta_builtins.list[_specta_builtins.str]]", "Option<Option<String>>": "None | _specta_builtins.str", "Option<Option<Option<String>>>": "None | _specta_builtins.str", "PhantomData<()>": "None", "PhantomData<String>": "None", "Infallible": "_specta_typing.Never", "Unit1": "Unit1", "Unit2": "Unit2", "Unit3": "Unit3", "Unit4": "Unit4", "Unit5": "Unit5", "Unit6": "Unit6", "Unit7": "Unit7", "SimpleStruct": "SimpleStruct", "TupleStruct1": "TupleStruct1", "TupleStruct3": "TupleStruct3", "TestEnum": "TestEnum", "RefStruct": "RefStruct", "InlinerStruct": "InlinerStruct", "GenericStruct<i32>": "GenericStruct[_specta_builtins.int]", "GenericStruct<String>": "GenericStruct[_specta_builtins.str]", "FlattenEnumStruct": "FlattenEnumStruct", "OverridenStruct": "OverridenStruct", "HasGenericAlias": "HasGenericAlias", "EnumMacroAttributes": "EnumMacroAttributes", "InlineEnumField": "InlineEnumField", "InlineOptionalType": "InlineOptionalType", "Rename": "Rename", "TransparentType": "TransparentType", "TransparentType2": "TransparentType2", "TransparentTypeWithOverride": "TransparentTypeWithOverride", "[Option<u8>; 3]": "_specta_builtins.tuple[None | _specta_builtins.int, None | _specta_builtins.int, None | _specta_builtins.int]", "HashMap<BasicEnum, ()>": "_specta_builtins.dict[BasicEnum, None]", "HashMap<BasicEnum, i32>": "_specta_builtins.dict[BasicEnum, _specta_builtins.int]", "Option<Option<Option<Option<i32>>>>": "None | _specta_builtins.int", "Vec<PlaceholderInnerField>": "_specta_builtins.list[PlaceholderInnerField]", "EnumReferenceRecordKey": "EnumReferenceRecordKey", "FlattenOnNestedEnum": "FlattenOnNestedEnum", "MyEmptyInput": "MyEmptyInput", "(String)": "_specta_builtins.str", "(String,)": "_specta_builtins.tuple[_specta_builtins.str]", "ExtraBracketsInTupleVariant": "ExtraBracketsInTupleVariant", "ExtraBracketsInUnnamedStruct": "ExtraBracketsInUnnamedStruct", "InlineTuple": "InlineTuple", "InlineTuple2": "InlineTuple2", "Box<str>": "_specta_builtins.str", "Box<String>": "_specta_builtins.str", "SkippedFieldWithinVariant": "SkippedFieldWithinVariant", "KebabCase": "KebabCase", "&[&str]": "_specta_builtins.list[_specta_builtins.str]", "Issue281<'_>": "Issue281", "LifetimeGenericStruct<'_, i32>": "LifetimeGenericStruct[_specta_builtins.int]", "LifetimeGenericEnum<'_, i32>": "LifetimeGenericEnum[_specta_builtins.int]", "RenameWithWeirdCharsField": "RenameWithWeirdCharsField", "RenameWithWeirdCharsVariant": "RenameWithWeirdCharsVariant", "RenamedFieldKeys": "RenamedFieldKeys", "RenamedVariantWithSkippedPayload": "RenamedVariantWithSkippedPayload", "type_type::Type": "Type", "ActualType": "ActualType", "SpectaTypeOverride": "SpectaTypeOverride", "ContainerTypeOverrideStruct": "ContainerTypeOverrideStruct", "ContainerTypeOverrideEnum": "ContainerTypeOverrideEnum", "ContainerTypeOverrideGeneric<Box<dyn Any>>": "ContainerTypeOverrideGeneric", "ContainerTypeOverrideToGeneric<i32>": "ContainerTypeOverrideToGeneric[_specta_builtins.int]", "ContainerTypeOverrideTuple": "ContainerTypeOverrideTuple", "ContainerTypeOverrideTupleGeneric<i32>": "ContainerTypeOverrideTupleGeneric[_specta_builtins.int]", "InvalidToValidType": "InvalidToValidType", "TupleStruct": "TupleStruct", "TupleStructWithRep": "TupleStructWithRep", "GenericTupleStruct<String>": "GenericTupleStruct[_specta_builtins.str]", "BracedStruct": "BracedStruct", "Struct": "StructNew", "Struct2": "Struct2", "Enum": "EnumNew", "Enum2": "Enum2New", "Enum3": "Enum3New", "StructRenameAllUppercase": "StructRenameAllUppercase", "RenameSerdeSpecialChar": "RenameSerdeSpecialChar", "EnumRenameAllUppercase": "EnumRenameAllUppercase", "Recursive": "Recursive", "RecursiveMapValue": "RecursiveMapValue", "RecursiveTransparent": "RecursiveTransparent", "RecursiveInEnum": "RecursiveInEnum", "NonOptional": "NonOptional", "OptionalOnNamedField": "OptionalOnNamedField", "OptionalOnTransparentNamedField": "OptionalOnTransparentNamedField", "OptionalInEnum": "OptionalInEnum", "UntaggedVariants": "UntaggedVariants", "UntaggedVariantsWithoutValue": "UntaggedVariantsWithoutValue", "UntaggedVariantsWithDuplicateBranches": "UntaggedVariantsWithDuplicateBranches", "HashMap<String, ()>": "_specta_builtins.dict[_specta_builtins.str, None]", "Regular": "Regular", "HashMap<Infallible, ()>": "_specta_builtins.dict[_specta_typing.Never, None]", "HashMap<TransparentStruct, ()>": "_specta_builtins.dict[TransparentStruct, None]", "HashMap<UnitVariants, ()>": "_specta_builtins.dict[UnitVariants, None]", "HashMap<UntaggedVariantsKey, ()>": "_specta_builtins.dict[UntaggedVariantsKey, None]", "ValidMaybeValidKey": "ValidMaybeValidKey", "ValidMaybeValidKeyNested": "ValidMaybeValidKeyNested", "MacroStruct": "MacroStruct", "MacroStruct2": "MacroStruct2", "MacroEnum": "MacroEnum", "DeprecatedType": "DeprecatedType", "DeprecatedTypeWithMsg": "DeprecatedTypeWithMsg", "DeprecatedTypeWithMsg2": "DeprecatedTypeWithMsg2", "DeprecatedFields": "DeprecatedFields", "DeprecatedTupleVariant": "DeprecatedTupleVariant", "DeprecatedEnumVariants": "DeprecatedEnumVariants", "CommentedStruct": "CommentedStruct", "CommentedEnum": "CommentedEnum", "SingleLineComment": "SingleLineComment", "NonGeneric": "Demo[_specta_builtins.int, _specta_builtins.bool]", "HalfGenericA<u8>": "Demo[_specta_builtins.int, _specta_builtins.bool]", "HalfGenericB<bool>": "Demo[_specta_builtins.int, _specta_builtins.bool]", "FullGeneric<u8, bool>": "Demo[_specta_builtins.int, _specta_builtins.bool]", "Another<bool>": "Demo[_specta_builtins.int, _specta_builtins.bool]", "MapA<u32>": "_specta_builtins.dict[_specta_builtins.str, _specta_builtins.int]", "MapB<u32>": "_specta_builtins.dict[_specta_builtins.int, _specta_builtins.str]", "MapC<u32>": "_specta_builtins.dict[_specta_builtins.str, AGenericStruct[_specta_builtins.int]]", "AGenericStruct<u32>": "AGenericStruct[_specta_builtins.int]", "A": "A", "DoubleFlattened": "DoubleFlattened", "FlattenedInner": "FlattenedInner", "BoxFlattened": "BoxFlattened", "BoxInline": "BoxInline", "First": "First", "Second": "Second", "Third": "Third", "Fourth": "Fourth", "TagOnStructWithInline": "TagOnStructWithInline", "Sixth": "Sixth", "Seventh": "Seventh", "Eight": "Eight", "Ninth": "Ninth", "Tenth": "Tenth", "MyEnumTagged": "MyEnumTagged", "MyEnumExternal": "MyEnumExternal", "MyEnumAdjacent": "MyEnumAdjacent", "MyEnumUntagged": "MyEnumUntagged", "EmptyStruct": "EmptyStruct", "EmptyStructWithTag": "EmptyStructWithTag", "AdjacentlyTagged": "AdjacentlyTagged", "LoadProjectEvent": "LoadProjectEvent", "ExternallyTagged": "ExternallyTagged", "Issue221External": "Issue221External", "InternallyTaggedD": "InternallyTaggedD", "InternallyTaggedE": "InternallyTaggedE", "InternallyTaggedF": "InternallyTaggedF", "InternallyTaggedH": "InternallyTaggedH", "InternallyTaggedL": "InternallyTaggedL", "InternallyTaggedM": "InternallyTaggedM", "Issue221UntaggedSafe": "Issue221UntaggedSafe", "Issue221UntaggedMixed": "Issue221UntaggedMixed", "EmptyEnum": "EmptyEnum", "EmptyEnumTagged": "EmptyEnumTagged", "EmptyEnumTaggedWContent": "EmptyEnumTaggedWContent", "EmptyEnumUntagged": "EmptyEnumUntagged", "SkipOnlyField": "SkipOnlyField", "SkipField": "SkipField", "SkipVariant": "SkipVariant", "SkipUnnamedFieldInVariant": "SkipUnnamedFieldInVariant", "SkipNamedFieldInVariant": "SkipNamedFieldInVariant", "TransparentWithSkip": "TransparentWithSkip", "TransparentWithSkip2": "TransparentWithSkip2", "TransparentWithSkip3": "TransparentWithSkip3", "SkipVariant2": "SkipVariant2", "SkipVariant3": "SkipVariant3", "SkipStructFields": "SkipStructFields", "SpectaSkipNonTypeField": "SpectaSkipNonTypeField", "FlattenA": "FlattenA", "FlattenB": "FlattenB", "FlattenC": "FlattenC", "FlattenD": "FlattenD", "FlattenE": "FlattenE", "FlattenF": "FlattenF", "FlattenG": "FlattenG", "TupleNested": "TupleNested", "Generic1<()>": "Generic1[None]", "GenericAutoBound<()>": "GenericAutoBound[None]", "GenericAutoBound2<()>": "GenericAutoBound2[None]", "Container1": "Container1", "Generic2<(), String, i32>": "Generic2[None, _specta_builtins.str, _specta_builtins.int]", "GenericNewType1<()>": "GenericNewType1[None]", "GenericTuple<()>": "GenericTuple[None]", "GenericStruct2<()>": "GenericStruct2[None]", "InlineGenericNewtype<String>": "_specta_builtins.str", "InlineGenericNested<String>": "_specta_builtins.tuple[_specta_builtins.str, _specta_builtins.list[_specta_builtins.str], _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.str], _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str], None | _specta_builtins.str, _specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Named | _specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Unnamed | _specta_typing.Literal[\"Unit\"]]", "InlineFlattenGenericsG<()>": "InlineFlattenGenericsG[None]", "InlineFlattenGenerics": "InlineFlattenGenerics", "GenericDefault": "GenericDefault", "ChainedGenericDefault": "ChainedGenericDefault", "ChainedGenericDefault<String, String>": "ChainedGenericDefault", "ChainedGenericDefault<i32>": "ChainedGenericDefault[_specta_builtins.int, _specta_builtins.int]", "ChainedGenericDefault<String, i32>": "ChainedGenericDefault[_specta_builtins.str, _specta_builtins.int]", "GenericDefaultSkipped": "GenericDefaultSkipped[_specta_builtins.str]", "GenericDefaultSkippedNonType": "GenericDefaultSkippedNonType[_specta_typing.Any]", "GenericParameterOrderPreserved": "GenericParameterOrderPreserved", "ConstGenericInNonConstContainer": "ConstGenericInNonConstContainer", "ConstGenericInConstContainer": "ConstGenericInConstContainer", "NamedConstGenericContainer": "NamedConstGenericContainer", "InlineConstGenericContainer": "InlineConstGenericContainer", "InlineRecursiveConstGenericContainer": "InlineRecursiveConstGenericContainer", "TestCollectionRegister": "TestCollectionRegister"})
+
+_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Unnamed = _specta_typing.TypedDict("_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Unnamed", {"Unnamed": "_specta_builtins.str"})
+
+_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Named = _specta_typing.TypedDict("_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5Named", {"Named": "_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5NamedNamed"})
+
+_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5NamedNamed = _specta_typing.TypedDict("_specta_typed_dict_tests__tests__types__PrimitivesInlineGenericNested_String_5NamedNamed", {"value": "_specta_builtins.str"})
+
+type Primitives = _specta_typed_dict_tests__tests__types__Primitives
 
 class Range[T](_specta_typing.TypedDict):
     start: T
@@ -450,9 +720,11 @@ class RangeInclusive[T](_specta_typing.TypedDict):
 class Recursive(_specta_typing.TypedDict):
     demo: Recursive
 
-type RecursiveInEnum = _specta_typing.TypedDict("test__types__RecursiveInEnumA", {"A": RecursiveInEnum})
+_specta_typed_dict_test__types__RecursiveInEnumA = _specta_typing.TypedDict("_specta_typed_dict_test__types__RecursiveInEnumA", {"A": "RecursiveInEnum"})
 
-type RecursiveInline = RecursiveInline
+type RecursiveInEnum = _specta_typed_dict_test__types__RecursiveInEnumA
+
+type RecursiveInline = _specta_typing.Never
 
 class RecursiveMapValue(_specta_typing.TypedDict):
     demo: _specta_builtins.dict[_specta_builtins.str, RecursiveMapValue]
@@ -465,13 +737,21 @@ type Regular = _specta_builtins.dict[_specta_builtins.str, None]
 
 type Rename = _specta_typing.Literal["OneWord"] | _specta_typing.Literal["Two words"]
 
-type RenameSerdeSpecialChar = _specta_typing.TypedDict("test__types__RenameSerdeSpecialChar", {"a/b": _specta_builtins.int})
+_specta_typed_dict_test__types__RenameSerdeSpecialChar = _specta_typing.TypedDict("_specta_typed_dict_test__types__RenameSerdeSpecialChar", {"a/b": "_specta_builtins.int"})
 
-type RenameWithWeirdCharsField = _specta_typing.TypedDict("test__types__RenameWithWeirdCharsField", {"@odata.context": _specta_builtins.str})
+type RenameSerdeSpecialChar = _specta_typed_dict_test__types__RenameSerdeSpecialChar
 
-type RenameWithWeirdCharsVariant = _specta_typing.TypedDict("test__types__RenameWithWeirdCharsVariant_odata_context", {"@odata.context": _specta_builtins.str})
+_specta_typed_dict_test__types__RenameWithWeirdCharsField = _specta_typing.TypedDict("_specta_typed_dict_test__types__RenameWithWeirdCharsField", {"@odata.context": "_specta_builtins.str"})
 
-type RenamedFieldKeys = _specta_typing.TypedDict("test__types__RenamedFieldKeys", {"": _specta_builtins.str, "a\"b": _specta_builtins.str, "a\\b": _specta_builtins.str, "line\nbreak": _specta_builtins.str, "line break": _specta_builtins.str, "line break": _specta_builtins.str})
+type RenameWithWeirdCharsField = _specta_typed_dict_test__types__RenameWithWeirdCharsField
+
+_specta_typed_dict_test__types__RenameWithWeirdCharsVariant_odata_context = _specta_typing.TypedDict("_specta_typed_dict_test__types__RenameWithWeirdCharsVariant_odata_context", {"@odata.context": "_specta_builtins.str"})
+
+type RenameWithWeirdCharsVariant = _specta_typed_dict_test__types__RenameWithWeirdCharsVariant_odata_context
+
+_specta_typed_dict_test__types__RenamedFieldKeys = _specta_typing.TypedDict("_specta_typed_dict_test__types__RenamedFieldKeys", {"": "_specta_builtins.str", "a\"b": "_specta_builtins.str", "a\\b": "_specta_builtins.str", "line\nbreak": "_specta_builtins.str", "line break": "_specta_builtins.str", "line break": "_specta_builtins.str"})
+
+type RenamedFieldKeys = _specta_typed_dict_test__types__RenamedFieldKeys
 
 type RenamedVariantWithSkippedPayload = _specta_typing.Literal["a-b"]
 
@@ -493,10 +773,16 @@ class SimpleStruct(_specta_typing.TypedDict):
     d: _specta_builtins.list[_specta_builtins.str]
     e: None | _specta_builtins.str
 
+_specta_typed_dict_test__types__SingleLineCommentA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SingleLineCommentA", {"A": "_specta_builtins.int"})
+
+_specta_typed_dict_test__types__SingleLineCommentB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SingleLineCommentB", {"B": "_specta_typed_dict_test__types__SingleLineCommentBB"})
+
+_specta_typed_dict_test__types__SingleLineCommentBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SingleLineCommentBB", {"a": "_specta_builtins.int"})
+
 #  Some single-line comment
 # Variant A:  Some single-line comment
 # Variant B:  Some single-line comment
-type SingleLineComment = _specta_typing.TypedDict("test__types__SingleLineCommentA", {"A": _specta_builtins.int}) | _specta_typing.TypedDict("test__types__SingleLineCommentB", {"B": _specta_typing.TypedDict("test__types__SingleLineCommentBB", {"a": _specta_builtins.int})})
+type SingleLineComment = _specta_typed_dict_test__types__SingleLineCommentA | _specta_typed_dict_test__types__SingleLineCommentB
 
 class Sixth(_specta_typing.TypedDict):
     a: First
@@ -505,7 +791,15 @@ class Sixth(_specta_typing.TypedDict):
 class SkipField(_specta_typing.TypedDict):
     b: _specta_builtins.int
 
-type SkipNamedFieldInVariant = _specta_typing.TypedDict("test__types__SkipNamedFieldInVariantA", {"A": _specta_typing.TypedDict("test__types__SkipNamedFieldInVariantAA", {})}) | _specta_typing.TypedDict("test__types__SkipNamedFieldInVariantB", {"B": _specta_typing.TypedDict("test__types__SkipNamedFieldInVariantBB", {"b": _specta_builtins.int})})
+_specta_typed_dict_test__types__SkipNamedFieldInVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipNamedFieldInVariantA", {"A": "_specta_typed_dict_test__types__SkipNamedFieldInVariantAA"})
+
+_specta_typed_dict_test__types__SkipNamedFieldInVariantAA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipNamedFieldInVariantAA", {})
+
+_specta_typed_dict_test__types__SkipNamedFieldInVariantB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipNamedFieldInVariantB", {"B": "_specta_typed_dict_test__types__SkipNamedFieldInVariantBB"})
+
+_specta_typed_dict_test__types__SkipNamedFieldInVariantBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipNamedFieldInVariantBB", {"b": "_specta_builtins.int"})
+
+type SkipNamedFieldInVariant = _specta_typed_dict_test__types__SkipNamedFieldInVariantA | _specta_typed_dict_test__types__SkipNamedFieldInVariantB
 
 class SkipOnlyField(_specta_typing.TypedDict):
     pass
@@ -513,15 +807,29 @@ class SkipOnlyField(_specta_typing.TypedDict):
 class SkipStructFields(_specta_typing.TypedDict):
     a: _specta_builtins.int
 
-type SkipUnnamedFieldInVariant = _specta_typing.Literal["A"] | _specta_typing.TypedDict("test__types__SkipUnnamedFieldInVariantB", {"B": _specta_builtins.tuple[_specta_builtins.int]})
+_specta_typed_dict_test__types__SkipUnnamedFieldInVariantB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipUnnamedFieldInVariantB", {"B": "_specta_builtins.tuple[_specta_builtins.int]"})
 
-type SkipVariant = _specta_typing.TypedDict("test__types__SkipVariantA", {"A": _specta_builtins.str})
+type SkipUnnamedFieldInVariant = _specta_typed_dict_test__types__SkipUnnamedFieldInVariantB | _specta_typing.Literal["A"]
 
-type SkipVariant2 = _specta_typing.TypedDict("test__types__SkipVariant2A", {"tag": _specta_typing.Literal["A"], "data": _specta_builtins.str})
+_specta_typed_dict_test__types__SkipVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipVariantA", {"A": "_specta_builtins.str"})
 
-type SkipVariant3 = _specta_typing.TypedDict("test__types__SkipVariant3A", {"A": _specta_typing.TypedDict("test__types__SkipVariant3AA", {"a": _specta_builtins.str})})
+type SkipVariant = _specta_typed_dict_test__types__SkipVariantA
 
-type SkippedFieldWithinVariant = _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantA", {"type": _specta_typing.Literal["A"], "data": _specta_typing.NotRequired[None]}) | _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantB", {"type": _specta_typing.Literal["B"], "data": _specta_builtins.str})
+_specta_typed_dict_test__types__SkipVariant2A = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipVariant2A", {"tag": "_specta_typing.Literal[\"A\"]", "data": "_specta_builtins.str"})
+
+type SkipVariant2 = _specta_typed_dict_test__types__SkipVariant2A
+
+_specta_typed_dict_test__types__SkipVariant3A = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipVariant3A", {"A": "_specta_typed_dict_test__types__SkipVariant3AA"})
+
+_specta_typed_dict_test__types__SkipVariant3AA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkipVariant3AA", {"a": "_specta_builtins.str"})
+
+type SkipVariant3 = _specta_typed_dict_test__types__SkipVariant3A
+
+_specta_typed_dict_test__types__SkippedFieldWithinVariantA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typing.NotRequired[None]"})
+
+_specta_typed_dict_test__types__SkippedFieldWithinVariantB = _specta_typing.TypedDict("_specta_typed_dict_test__types__SkippedFieldWithinVariantB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_builtins.str"})
+
+type SkippedFieldWithinVariant = _specta_typed_dict_test__types__SkippedFieldWithinVariantA | _specta_typed_dict_test__types__SkippedFieldWithinVariantB
 
 class SpectaSkipNonTypeField(_specta_typing.TypedDict):
     a: _specta_builtins.int
@@ -557,32 +865,64 @@ type StructWithAlias = StructWithAlias_Deserialize | StructWithAlias_Serialize
 
 type StructWithAliasAndRename = StructWithAliasAndRename_Deserialize | StructWithAliasAndRename_Serialize
 
-type StructWithAliasAndRename_Deserialize = _specta_typing.TypedDict("test__types__StructWithAliasAndRename_Deserialize", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__StructWithAliasAndRename_Deserialize", {"renamed_field": _specta_builtins.str})
+_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize", {"renamed_field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2", {"bruh": "_specta_builtins.str"})
+
+type StructWithAliasAndRename_Deserialize = _specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize | _specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2
 
 class StructWithAliasAndRename_Serialize(_specta_typing.TypedDict):
     renamed_field: _specta_builtins.str
 
-type StructWithAlias_Deserialize = _specta_typing.TypedDict("test__types__StructWithAlias_Deserialize", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__StructWithAlias_Deserialize", {"field": _specta_builtins.str})
+_specta_typed_dict_test__types__StructWithAlias_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize", {"field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__StructWithAlias_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize_2", {"bruh": "_specta_builtins.str"})
+
+type StructWithAlias_Deserialize = _specta_typed_dict_test__types__StructWithAlias_Deserialize | _specta_typed_dict_test__types__StructWithAlias_Deserialize_2
 
 class StructWithAlias_Serialize(_specta_typing.TypedDict):
     field: _specta_builtins.str
 
 type StructWithMultipleAliases = StructWithMultipleAliases_Deserialize | StructWithMultipleAliases_Serialize
 
-type StructWithMultipleAliases_Deserialize = _specta_typing.TypedDict("test__types__StructWithMultipleAliases_Deserialize", {"alternative": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__StructWithMultipleAliases_Deserialize", {"another": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__StructWithMultipleAliases_Deserialize", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__StructWithMultipleAliases_Deserialize", {"field": _specta_builtins.str})
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize", {"field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2", {"bruh": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3", {"alternative": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4", {"another": "_specta_builtins.str"})
+
+type StructWithMultipleAliases_Deserialize = _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2 | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3 | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4
 
 class StructWithMultipleAliases_Serialize(_specta_typing.TypedDict):
     field: _specta_builtins.str
 
-type TagOnStructWithInline = _specta_typing.TypedDict("test__types__TagOnStructWithInline", {"type": _specta_typing.Literal["TagOnStructWithInline"], "a": First, "b": _specta_typing.TypedDict("test__types__TagOnStructWithInlineb", {"a": _specta_builtins.str})})
+_specta_typed_dict_test__types__TagOnStructWithInline = _specta_typing.TypedDict("_specta_typed_dict_test__types__TagOnStructWithInline", {"type": "_specta_typing.Literal[\"TagOnStructWithInline\"]", "a": "First", "b": "_specta_typed_dict_test__types__TagOnStructWithInlineb"})
 
-type Tenth = First | None | _specta_builtins.str | _specta_typing.TypedDict("test__types__TenthC", {"a": _specta_builtins.str})
+_specta_typed_dict_test__types__TagOnStructWithInlineb = _specta_typing.TypedDict("_specta_typed_dict_test__types__TagOnStructWithInlineb", {"a": "_specta_builtins.str"})
+
+type TagOnStructWithInline = _specta_typed_dict_test__types__TagOnStructWithInline
+
+_specta_typed_dict_test__types__TenthC = _specta_typing.TypedDict("_specta_typed_dict_test__types__TenthC", {"a": "_specta_builtins.str"})
+
+type Tenth = First | None | _specta_builtins.str | _specta_typed_dict_test__types__TenthC
 
 type TestCollectionRegister = _specta_typing.Never
 
-type TestEnum = _specta_typing.Literal["Unit"] | _specta_typing.TypedDict("test__types__TestEnumMultiple", {"Multiple": _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]}) | _specta_typing.TypedDict("test__types__TestEnumSingle", {"Single": _specta_builtins.int}) | _specta_typing.TypedDict("test__types__TestEnumStruct", {"Struct": _specta_typing.TypedDict("test__types__TestEnumStructStruct", {"a": _specta_builtins.int})})
+_specta_typed_dict_test__types__TestEnumSingle = _specta_typing.TypedDict("_specta_typed_dict_test__types__TestEnumSingle", {"Single": "_specta_builtins.int"})
 
-type Third = _specta_typing.TypedDict("test__types__Thirdintersection0", {"a": _specta_builtins.str, "b": _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str], "c": First})
+_specta_typed_dict_test__types__TestEnumMultiple = _specta_typing.TypedDict("_specta_typed_dict_test__types__TestEnumMultiple", {"Multiple": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.int]"})
+
+_specta_typed_dict_test__types__TestEnumStruct = _specta_typing.TypedDict("_specta_typed_dict_test__types__TestEnumStruct", {"Struct": "_specta_typed_dict_test__types__TestEnumStructStruct"})
+
+_specta_typed_dict_test__types__TestEnumStructStruct = _specta_typing.TypedDict("_specta_typed_dict_test__types__TestEnumStructStruct", {"a": "_specta_builtins.int"})
+
+type TestEnum = _specta_typed_dict_test__types__TestEnumMultiple | _specta_typed_dict_test__types__TestEnumSingle | _specta_typed_dict_test__types__TestEnumStruct | _specta_typing.Literal["Unit"]
+
+_specta_typed_dict_test__types__Thirdintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__Thirdintersection0", {"a": "_specta_builtins.str", "b": "_specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]", "c": "First"})
+
+type Third = _specta_typed_dict_test__types__Thirdintersection0
 
 class ToBeFlattened(_specta_typing.TypedDict):
     a: _specta_builtins.str
@@ -627,13 +967,21 @@ type Unit4 = None
 
 type Unit5 = _specta_typing.Literal["A"]
 
-type Unit6 = _specta_typing.TypedDict("test__types__Unit6A", {"A": _specta_builtins.tuple[()]})
+_specta_typed_dict_test__types__Unit6A = _specta_typing.TypedDict("_specta_typed_dict_test__types__Unit6A", {"A": "_specta_builtins.tuple[()]"})
 
-type Unit7 = _specta_typing.TypedDict("test__types__Unit7A", {"A": _specta_typing.TypedDict("test__types__Unit7AA", {})})
+type Unit6 = _specta_typed_dict_test__types__Unit6A
+
+_specta_typed_dict_test__types__Unit7A = _specta_typing.TypedDict("_specta_typed_dict_test__types__Unit7A", {"A": "_specta_typed_dict_test__types__Unit7AA"})
+
+_specta_typed_dict_test__types__Unit7AA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Unit7AA", {})
+
+type Unit7 = _specta_typed_dict_test__types__Unit7A
 
 type UnitVariants = _specta_typing.Literal["A"] | _specta_typing.Literal["B"] | _specta_typing.Literal["C"]
 
-type UntaggedVariants = _specta_builtins.int | _specta_builtins.str | _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.bool] | _specta_typing.TypedDict("test__types__UntaggedVariantsD", {"id": _specta_builtins.str})
+_specta_typed_dict_test__types__UntaggedVariantsD = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedVariantsD", {"id": "_specta_builtins.str"})
+
+type UntaggedVariants = _specta_builtins.int | _specta_builtins.str | _specta_builtins.tuple[_specta_builtins.str, _specta_builtins.bool] | _specta_typed_dict_test__types__UntaggedVariantsD
 
 type UntaggedVariantsKey = _specta_builtins.int | _specta_builtins.str
 
@@ -643,9 +991,19 @@ type UntaggedVariantsWithoutValue = _specta_builtins.int | _specta_builtins.str 
 
 type UntaggedWithAlias = UntaggedWithAlias_Deserialize | UntaggedWithAlias_Serialize
 
-type UntaggedWithAlias_Deserialize = _specta_typing.TypedDict("test__types__UntaggedWithAlias_DeserializeA", {"bruh": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__UntaggedWithAlias_DeserializeA", {"field": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__UntaggedWithAlias_DeserializeB", {"other": _specta_builtins.int})
+_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA", {"field": "_specta_builtins.str"})
 
-type UntaggedWithAlias_Serialize = _specta_typing.TypedDict("test__types__UntaggedWithAlias_SerializeA", {"field": _specta_builtins.str}) | _specta_typing.TypedDict("test__types__UntaggedWithAlias_SerializeB", {"other": _specta_builtins.int})
+_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2", {"bruh": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeB", {"other": "_specta_builtins.int"})
+
+type UntaggedWithAlias_Deserialize = _specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA | _specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2 | _specta_typed_dict_test__types__UntaggedWithAlias_DeserializeB
+
+_specta_typed_dict_test__types__UntaggedWithAlias_SerializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_SerializeA", {"field": "_specta_builtins.str"})
+
+_specta_typed_dict_test__types__UntaggedWithAlias_SerializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_SerializeB", {"other": "_specta_builtins.int"})
+
+type UntaggedWithAlias_Serialize = _specta_typed_dict_test__types__UntaggedWithAlias_SerializeA | _specta_typed_dict_test__types__UntaggedWithAlias_SerializeB
 
 type ValidMaybeValidKey = _specta_builtins.dict[MaybeValidKey[_specta_builtins.str], None]
 

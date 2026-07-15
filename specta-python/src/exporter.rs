@@ -311,11 +311,7 @@ fn render_namespace_node(
     let mut has_body = false;
     for ndt in namespace.types {
         let declaration = primitives::export_named(
-            primitives::RenderContext {
-                exporter,
-                types,
-                current_module: &ndt.module_path,
-            },
+            primitives::RenderContext::new(exporter, types, &ndt.module_path),
             ndt,
             &child_indent,
         )?;
@@ -383,11 +379,7 @@ fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Err
         }
         for ndt in ndts {
             let declaration = primitives::export_named(
-                primitives::RenderContext {
-                    exporter,
-                    types,
-                    current_module: &module,
-                },
+                primitives::RenderContext::new(exporter, types, &module),
                 ndt,
                 "",
             )?;

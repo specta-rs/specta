@@ -379,7 +379,7 @@ fn python_flatten_uses_omitted_generic_defaults() {
         .export(&Types::default().register::<Outer>(), specta_serde::Format)
         .unwrap();
     assert!(
-        output.contains("\"value\": _specta_builtins.str"),
+        output.contains("\"value\": \"_specta_builtins.str\""),
         "{output}"
     );
 }
@@ -411,7 +411,7 @@ fn python_flatten_substitutes_generics_inside_inline_references() {
         .export(&Types::default().register::<Outer>(), specta_serde::Format)
         .unwrap();
     assert!(
-        output.contains("\"value\": _specta_builtins.str"),
+        output.contains("\"value\": \"_specta_builtins.str\""),
         "{output}"
     );
 }
@@ -456,12 +456,14 @@ fn python_preserves_dunder_wire_keys() {
         )
         .unwrap();
     assert!(output.contains(
-        "type Dunder = _specta_typing.TypedDict(\"test__python__Dunder\", {\"__private\": _specta_builtins.str})"
+        "_specta_typed_dict_test__python__Dunder = _specta_typing.TypedDict(\"_specta_typed_dict_test__python__Dunder\", {\"__private\": \"_specta_builtins.str\"})"
     ));
+    assert!(output.contains("type Dunder = _specta_typed_dict_test__python__Dunder"));
     assert!(!output.contains("class Dunder("));
     assert!(output.contains(
-        "type Normalized = _specta_typing.TypedDict(\"test__python__Normalized\", {\"K\": _specta_builtins.str})"
+        "_specta_typed_dict_test__python__Normalized = _specta_typing.TypedDict(\"_specta_typed_dict_test__python__Normalized\", {\"K\": \"_specta_builtins.str\"})"
     ));
+    assert!(output.contains("type Normalized = _specta_typed_dict_test__python__Normalized"));
     assert!(!output.contains("class Normalized("));
 }
 
@@ -481,8 +483,10 @@ fn python_functional_typed_dict_preserves_optional_keys() {
         )
         .unwrap();
     assert!(output.contains(
-        "type OptionalKey = _specta_typing.TypedDict(\"test__python__OptionalKey\", {\"value\": _specta_typing.NotRequired[_specta_builtins.str]})"
+        "_specta_typed_dict_test__python__OptionalKey = _specta_typing.TypedDict(\"_specta_typed_dict_test__python__OptionalKey\", {\"value\": \"_specta_typing.NotRequired[_specta_builtins.str]\"})"
     ));
+    assert!(output.contains("type OptionalKey = _specta_typed_dict_test__python__OptionalKey"));
+    assert!(!output.contains(": _specta_typing.TypedDict("));
     assert!(!output.contains("class OptionalKey("));
 }
 
