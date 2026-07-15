@@ -14,6 +14,7 @@ macro_rules! register {
 
 mod bound;
 mod core_type_impls;
+mod csharp;
 mod errors;
 mod functions;
 mod go;
