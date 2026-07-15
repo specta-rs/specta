@@ -1862,6 +1862,7 @@ fn contains_recursive_inline(ty: &DataType) -> bool {
         DataType::Enum(enm) => enm
             .variants
             .iter()
+            .filter(|(_, variant)| !variant.skip)
             .any(|(_, variant)| fields_contain_recursive_inline(&variant.fields)),
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Recursive(_) => true,
@@ -2342,9 +2343,12 @@ fn pascal_case(name: &str) -> String {
 }
 
 fn module_segments(module: &str) -> Vec<String> {
+    if module == "virtual" {
+        return Vec::new();
+    }
     module
         .split("::")
-        .filter(|part| !part.is_empty() && *part != "virtual")
+        .filter(|part| !part.is_empty())
         .map(pascal_case)
         .collect()
 }

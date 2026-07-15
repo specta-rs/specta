@@ -132,6 +132,21 @@ enum InlineEnumWithSkippedPayload {
 
 #[derive(Type)]
 #[specta(collect = false)]
+enum InlineEnumWithSkippedRecursivePayload {
+    Visible,
+    #[specta(skip)]
+    Hidden(#[specta(inline)] InlineNode),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineSkippedRecursiveEnumOwner {
+    #[specta(inline)]
+    state: InlineEnumWithSkippedRecursivePayload,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct InlineSkippedEnumOwner {
     #[specta(inline)]
     state: InlineEnumWithSkippedPayload,
@@ -416,6 +431,19 @@ fn skipped_payload_variants_do_not_change_inline_enum_kind() {
 }
 
 #[test]
+fn skipped_inline_enum_variants_do_not_trigger_recursion_errors() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<InlineSkippedRecursiveEnumOwner>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("Visible,"));
+    assert!(!output.contains("Hidden"));
+}
+
+#[test]
 fn duplicate_generic_parameters_are_rejected() {
     let mut types = Types::default().register::<GenericType<String>>();
     types.iter_mut(|datatype| {
@@ -464,6 +492,18 @@ fn invalid_namespace_and_module_paths_are_rejected_before_writes() {
         Err(Error::InvalidName { .. })
     ));
     assert!(!root.exists());
+}
+
+#[test]
+fn real_virtual_module_segments_are_preserved() {
+    let mut types = Types::default().register::<Status>();
+    types.iter_mut(|ndt| ndt.module_path = "foo::virtual".into());
+
+    let output = CSharp::new()
+        .layout(Layout::Namespaces)
+        .export(&types, IdentityFormat)
+        .unwrap();
+    assert!(output.contains("namespace Specta.Generated.Foo.Virtual"));
 }
 
 #[test]
