@@ -216,6 +216,22 @@ fn exports_generic_instantiations() {
 }
 
 #[test]
+fn directly_registered_generic_root_is_materialized() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<Wrapper<String>>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert_eq!(
+        schema["$defs"]["Wrapper_String"]["properties"]["value"]["type"],
+        "string"
+    );
+    assert!(schema["$defs"].get("Wrapper").is_none());
+}
+
+#[test]
 fn exports_root_ref() {
     let types = Types::default().register::<User>();
     let schema = JsonSchema::default()

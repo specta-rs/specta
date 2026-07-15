@@ -43,7 +43,14 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    pub(crate) fn render_definitions(mut self) -> Result<Map<String, Value>, Error> {
+    pub(crate) fn render_definitions(
+        mut self,
+        roots: &[DataType],
+    ) -> Result<Map<String, Value>, Error> {
+        for root in roots {
+            self.render_datatype(root, &Generics::new(), "registered root", 0)?;
+        }
+
         for ndt in self.types.into_sorted_iter() {
             if ndt.ty.is_none() {
                 continue;

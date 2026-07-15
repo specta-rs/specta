@@ -39,6 +39,12 @@ struct UsesGenerics {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct RootWrapper<T> {
+    value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct EventAlias(ApiEvent);
 
 #[derive(Type, PartialEq, Eq, std::hash::Hash)]
@@ -231,6 +237,23 @@ fn openapi_preserves_shapes_metadata_and_generics() {
         "openapi-representative-shapes",
         serde_json::to_string_pretty(&value).expect("snapshot value should serialize")
     );
+}
+
+#[test]
+fn openapi_materializes_directly_registered_generic_root() {
+    let document = OpenApi::default()
+        .export_document(
+            &Types::default().register::<RootWrapper<String>>(),
+            specta_serde::Format,
+        )
+        .expect("a directly registered concrete generic should export");
+    let value = serde_json::to_value(document).unwrap();
+
+    assert_eq!(
+        value["components"]["schemas"]["RootWrapper_String"]["properties"]["value"]["type"],
+        "string"
+    );
+    assert!(value["components"]["schemas"].get("RootWrapper").is_none());
 }
 
 #[test]
