@@ -607,6 +607,41 @@ fn opaque_renderer_and_inline_helpers() {
 }
 
 #[test]
+fn inline_tuple_structs_preserve_optional_fields() {
+    let mut field = Field::new(DataType::Primitive(specta::datatype::Primitive::u8));
+    field.optional = true;
+    let ty = Struct::unnamed().field(field).build();
+    assert_eq!(
+        Rust::default()
+            .inline(&Types::default(), &ty, Identity)
+            .unwrap(),
+        "(::std::option::Option<u8>,)"
+    );
+}
+
+#[test]
+fn generic_recursive_inline_references_fail_contextually() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Node<T>(T, #[specta(inline)] std::vec::Vec<Node<T>>);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Container {
+        #[specta(inline)]
+        node: Node<u8>,
+    }
+
+    let error = Rust::default()
+        .export(&Types::default().register::<Container>(), Identity)
+        .unwrap_err();
+    assert!(
+        matches!(error, specta_rust::Error::RecursiveInline { .. }),
+        "unexpected recursive-inline error: {error}"
+    );
+}
+
+#[test]
 fn custom_header_keeps_generated_marker() {
     let output = Rust::default()
         .header("#![allow(clippy::all)]")
@@ -748,6 +783,29 @@ fn files_layout_does_not_follow_symlinks() {
         .export_to(&root, &Types::default(), Identity)
         .unwrap();
     assert!(outside_file.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn files_layout_refuses_symlinked_generated_paths() {
+    use std::os::unix::fs::symlink;
+
+    let root = test_output_dir("symlink-generated-root");
+    let outside = test_output_dir("symlink-generated-outside");
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_dir_all(&outside);
+    fs::create_dir_all(&root).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    let outside_file = outside.join("target.rs");
+    fs::write(&outside_file, "user owned\n").unwrap();
+    symlink(&outside_file, root.join("mod.rs")).unwrap();
+
+    let error = Rust::default()
+        .layout(Layout::Files)
+        .export_to(&root, &Types::default(), Identity)
+        .unwrap_err();
+    assert!(matches!(error, specta_rust::Error::Io { .. }));
+    assert_eq!(fs::read_to_string(outside_file).unwrap(), "user owned\n");
 }
 
 fn test_output_dir(name: &str) -> PathBuf {

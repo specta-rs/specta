@@ -662,8 +662,18 @@ fn render_datatype(
                 let fields = fields
                     .fields
                     .iter()
-                    .filter_map(|field| field.ty.as_ref())
-                    .map(|ty| render_datatype(exporter, format, types, ty, path))
+                    .enumerate()
+                    .filter_map(|(index, field)| field.ty.as_ref().map(|ty| (index, field, ty)))
+                    .map(|(index, field, ty)| {
+                        render_field_type(
+                            exporter,
+                            format,
+                            types,
+                            field,
+                            ty,
+                            &format!("{path}.{index}"),
+                        )
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
                 match fields.as_slice() {
                     [only] => format!("({only},)"),
@@ -704,6 +714,14 @@ fn render_reference(
             return Err(Error::DanglingReference {
                 path: path.into(),
                 reference: format!("{reference:?} (referenced type has no definition)"),
+            });
+        }
+        if let NamedReferenceType::Recursive(cycle) = &reference.inner
+            && !ndt.generics.is_empty()
+        {
+            return Err(Error::RecursiveInline {
+                path: path.into(),
+                cycle: format!("{cycle:?}"),
             });
         }
         let mut name = reference_name(exporter, types, ndt, path)?;
@@ -1184,13 +1202,43 @@ fn export_files(
         &mut files,
     )?;
 
+    ensure_no_symlinks(root)?;
     std::fs::create_dir_all(root)
         .map_err(|source| Error::io("create output directory", root, source))?;
     remove_stale_generated_files(root, &files)?;
     for (path, source) in files {
+        ensure_no_symlinks(&path)?;
         create_parent(&path)?;
+        ensure_no_symlinks(&path)?;
         std::fs::write(&path, source)
             .map_err(|source| Error::io("write generated file", &path, source))?;
+    }
+    Ok(())
+}
+
+fn ensure_no_symlinks(path: &Path) -> Result<(), Error> {
+    for path in path
+        .ancestors()
+        .filter(|path| !path.as_os_str().is_empty())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::io(
+                    "write through symlinked output path",
+                    path,
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "generated output paths must not contain symlinks",
+                    ),
+                ));
+            }
+            Ok(_) => {}
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => return Err(Error::io("inspect output path", path, source)),
+        }
     }
     Ok(())
 }
