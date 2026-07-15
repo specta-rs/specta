@@ -392,10 +392,16 @@ fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Err
         std::fs::write(&path, out).map_err(|source| Error::write_file(path.clone(), source))?;
     }
 
+    let stale_directories = old_files
+        .difference(&generated)
+        .filter_map(|path| path.parent().map(Path::to_path_buf))
+        .collect::<Vec<_>>();
     for stale in old_files.difference(&generated) {
         std::fs::remove_file(stale).map_err(|source| Error::write_file(stale.clone(), source))?;
     }
-    remove_empty_directories(root, root)?;
+    for directory in stale_directories {
+        remove_empty_ancestors(directory, root)?;
+    }
     Ok(())
 }
 
@@ -591,30 +597,23 @@ fn collect_generated_files(root: &Path) -> Result<HashSet<PathBuf>, Error> {
     Ok(files)
 }
 
-fn remove_empty_directories(path: &Path, root: &Path) -> Result<(), Error> {
-    let entries = match std::fs::read_dir(path) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(source) => return Err(Error::create_dir(path.to_path_buf(), source)),
-    };
-    for entry in entries {
-        let entry = entry.map_err(|source| Error::create_dir(path.to_path_buf(), source))?;
-        let entry_path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|source| Error::create_dir(entry_path.clone(), source))?;
-        if file_type.is_dir() && !file_type.is_symlink() {
-            remove_empty_directories(&entry_path, root)?;
+fn remove_empty_ancestors(mut path: PathBuf, root: &Path) -> Result<(), Error> {
+    while path != root && path.starts_with(root) {
+        match std::fs::read_dir(&path) {
+            Ok(mut entries) => {
+                if entries.next().is_some() {
+                    break;
+                }
+                std::fs::remove_dir(&path)
+                    .map_err(|source| Error::create_dir(path.clone(), source))?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => return Err(Error::create_dir(path, source)),
         }
-    }
-    if path != root
-        && std::fs::read_dir(path)
-            .map_err(|source| Error::create_dir(path.to_path_buf(), source))?
-            .next()
-            .is_none()
-    {
-        std::fs::remove_dir(path)
-            .map_err(|source| Error::create_dir(path.to_path_buf(), source))?;
+        let Some(parent) = path.parent() else {
+            break;
+        };
+        path = parent.to_path_buf();
     }
     Ok(())
 }

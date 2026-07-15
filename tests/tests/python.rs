@@ -398,6 +398,13 @@ fn python_export_to_file_and_files_layout() {
         .layout(Layout::Files)
         .export_to(&package, &types, IdentityFormat)
         .unwrap();
+    let unrelated = package.join("unrelated/empty");
+    std::fs::create_dir_all(&unrelated).unwrap();
+    Python::default()
+        .layout(Layout::Files)
+        .export_to(&package, &types, IdentityFormat)
+        .unwrap();
+    assert!(unrelated.exists());
     assert!(package.join("__init__.py").exists());
     assert!(package.join("test/__init__.py").exists());
     assert!(package.join("test/python/__init__.py").exists());
