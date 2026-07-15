@@ -238,9 +238,18 @@ fn render_datatype(
         DataType::Tuple(tuple) => match tuple.elements.as_slice() {
             [] => "[0]any".into(),
             elements => {
+                let mut discarded_ctx = Context::default();
                 for (index, element) in elements.iter().enumerate() {
                     path.push(index.to_string());
-                    let _ = render_datatype(exporter, types, element, generics, path, false, ctx)?;
+                    let _ = render_datatype(
+                        exporter,
+                        types,
+                        element,
+                        generics,
+                        path,
+                        false,
+                        &mut discarded_ctx,
+                    )?;
                     path.pop();
                 }
                 format!("[{}]any", elements.len())
@@ -295,9 +304,18 @@ fn render_struct(
                     _ => unreachable!("one source field has at most one live field"),
                 }
             } else {
+                let mut discarded_ctx = Context::default();
                 for (index, ty) in live.iter().enumerate() {
                     path.push(index.to_string());
-                    let _ = render_datatype(exporter, types, ty, generics, path, false, ctx)?;
+                    let _ = render_datatype(
+                        exporter,
+                        types,
+                        ty,
+                        generics,
+                        path,
+                        false,
+                        &mut discarded_ctx,
+                    )?;
                     path.pop();
                 }
                 Ok(format!("[{}]any", live.len()))
@@ -629,13 +647,11 @@ fn render_map_key(
             | Primitive::i16
             | Primitive::i32
             | Primitive::i64
-            | Primitive::i128
             | Primitive::isize
             | Primitive::u8
             | Primitive::u16
             | Primitive::u32
             | Primitive::u64
-            | Primitive::u128
             | Primitive::usize,
         ) => true,
         DataType::Generic(_) => false,
@@ -675,13 +691,11 @@ fn map_key_is_valid_inner(types: &Types, dt: &DataType, visited: &mut BTreeSet<S
             | Primitive::i16
             | Primitive::i32
             | Primitive::i64
-            | Primitive::i128
             | Primitive::isize
             | Primitive::u8
             | Primitive::u16
             | Primitive::u32
             | Primitive::u64
-            | Primitive::u128
             | Primitive::usize,
         ) => true,
         DataType::Generic(_) => false,
