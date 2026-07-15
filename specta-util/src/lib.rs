@@ -13,5 +13,12 @@ mod selection;
 mod array;
 mod remapper;
 
+#[doc(hidden)]
+#[cfg(feature = "serde")]
+pub mod __private {
+    pub use serde;
+    pub use specta;
+}
+
 pub use array::FixedArray;
 pub use remapper::Remapper;
