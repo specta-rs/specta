@@ -404,14 +404,19 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
-        let items = fields
+        // Skipped `ty: None` slots (kept by skip-reduced tuples to preserve
+        // their declared arity) are off-wire — serde emits only the live
+        // elements — so both the prefix items and the size bounds are
+        // computed over live fields only.
+        let live = fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
+            .collect::<Vec<_>>();
+        let items = live
             .iter()
             .enumerate()
-            .map(|(idx, field)| {
-                field.ty.as_ref().map_or_else(
-                    || Ok(Value::Object(Map::new())),
-                    |ty| self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1),
-                )
+            .map(|(idx, (_, ty))| {
+                self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1)
             })
             .collect::<Result<Vec<_>, _>>()?;
         // serde accepts sequences truncated anywhere inside the trailing run
@@ -422,7 +427,7 @@ impl<'a> Renderer<'a> {
         let mut min_items = items.len();
         if fields.len() > 1 {
             min_items = 0;
-            for (idx, field) in fields.iter().enumerate() {
+            for (idx, (field, _)) in live.iter().enumerate() {
                 if !field.optional {
                     min_items = idx + 1;
                 }

@@ -89,3 +89,28 @@ fn swift_tuple_default_phases() {
         "the defaulted element must be optional in the deserialize half: {rendered}"
     );
 }
+
+/// Control: Swift skips `ty: None` marker slots, so a skip-reduced defaulted
+/// tuple renders only the live element (optional on deserialize).
+#[derive(Type, Deserialize, Serialize)]
+#[specta(collect = false)]
+struct SwiftSkipSlotTuple(#[serde(skip)] u8, #[serde(default)] u8);
+
+#[test]
+fn swift_skip_slot_tuple_phases() {
+    let rendered = Swift::default()
+        .export(
+            &Types::default().register::<SwiftSkipSlotTuple>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("Swift should support skip-reduced defaulted tuple structs");
+
+    assert!(
+        !rendered.contains("field0"),
+        "the off-wire skipped slot must not render: {rendered}"
+    );
+    assert!(
+        rendered.contains("field1: UInt8?"),
+        "the live element is optional in the deserialize half: {rendered}"
+    );
+}

@@ -395,3 +395,28 @@ fn zod_tuple_default_phases() {
         "the defaulted element must be `.optional()` in the deserialize half: {rendered}"
     );
 }
+
+/// Control: zod's tuple arm filters live fields already, so a skip-reduced
+/// defaulted tuple sizes over live elements only.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodSkipSlotTuple(#[serde(skip)] u8, #[serde(default)] u8);
+
+#[test]
+fn zod_skip_slot_tuple_phases() {
+    let rendered = Zod::default()
+        .export(
+            &Types::default().register::<ZodSkipSlotTuple>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("Zod should support skip-reduced defaulted tuple structs");
+
+    assert!(
+        rendered.contains("ZodSkipSlotTuple_DeserializeSchema = z.tuple([z.int().optional()])"),
+        "only the live element is sized, and it is optional on deserialize: {rendered}"
+    );
+    assert!(
+        rendered.contains("ZodSkipSlotTuple_SerializeSchema = z.tuple([z.int()])"),
+        "serialize keeps the single live element required: {rendered}"
+    );
+}

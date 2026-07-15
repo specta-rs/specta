@@ -1,0 +1,52 @@
+---
+source: tests/tests/jsonschema.rs
+assertion_line: 104
+expression: rendered
+---
+{
+  "$defs": {
+    "JsonSkipSlotTuple": {
+      "description": " A skip-reduced tuple struct's `ty: None` marker slots (kept so the\n declared arity survives for other exporters) are OFF-wire: serde emits\n `[2]` and accepts `[]`/`[2]`. The array schema must be sized over live\n elements only — one prefix item, `minItems: 0` / `maxItems: 1` on\n deserialize and `minItems: 1` on serialize — not two.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/JsonSkipSlotTuple_Serialize"
+        },
+        {
+          "$ref": "#/$defs/JsonSkipSlotTuple_Deserialize"
+        }
+      ],
+      "title": "JsonSkipSlotTuple"
+    },
+    "JsonSkipSlotTuple_Deserialize": {
+      "description": " A skip-reduced tuple struct's `ty: None` marker slots (kept so the\n declared arity survives for other exporters) are OFF-wire: serde emits\n `[2]` and accepts `[]`/`[2]`. The array schema must be sized over live\n elements only — one prefix item, `minItems: 0` / `maxItems: 1` on\n deserialize and `minItems: 1` on serialize — not two.",
+      "items": false,
+      "maxItems": 1,
+      "minItems": 0,
+      "prefixItems": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "JsonSkipSlotTuple_Deserialize",
+      "type": "array"
+    },
+    "JsonSkipSlotTuple_Serialize": {
+      "description": " A skip-reduced tuple struct's `ty: None` marker slots (kept so the\n declared arity survives for other exporters) are OFF-wire: serde emits\n `[2]` and accepts `[]`/`[2]`. The array schema must be sized over live\n elements only — one prefix item, `minItems: 0` / `maxItems: 1` on\n deserialize and `minItems: 1` on serialize — not two.",
+      "items": false,
+      "maxItems": 1,
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "title": "JsonSkipSlotTuple_Serialize",
+      "type": "array"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
