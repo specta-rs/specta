@@ -1670,6 +1670,9 @@ fn unnamed_fields_datatype(
                     force_inline,
                 )?;
                 if i >= optional_from {
+                    if optional_element_needs_parens(ty) {
+                        v = format!("({v})");
+                    }
                     v.push('?');
                 }
                 s.push_str(&inner_comments(
@@ -1703,6 +1706,29 @@ fn trailing_optional_run<'a>(fields: impl Iterator<Item = &'a Field>) -> usize {
         }
     }
     run_start
+}
+
+/// Whether an optional tuple element's type must be parenthesized before the
+/// trailing `?` marker: `[number, (number | null)?]` is valid TypeScript
+/// while `[number, number | null?]` is not, and likewise for intersections.
+fn optional_element_needs_parens(ty: &DataType) -> bool {
+    match ty {
+        DataType::Nullable(_) | DataType::Enum(_) | DataType::Intersection(_) => true,
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => optional_element_needs_parens(dt),
+            _ => false,
+        },
+        // A lone live unnamed field renders as its bare inner type.
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => unnamed
+                .fields
+                .first()
+                .and_then(|field| field.ty.as_ref())
+                .is_some_and(optional_element_needs_parens),
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 fn struct_dt(
@@ -2141,6 +2167,9 @@ fn enum_variant_datatype(
                         false,
                     )?;
                     if idx >= optional_from {
+                        if optional_element_needs_parens(ty) {
+                            out = format!("({out})");
+                        }
                         out.push('?');
                     }
                     Ok(out)

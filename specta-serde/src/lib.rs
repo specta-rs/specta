@@ -2585,10 +2585,12 @@ fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
 
 /// The variant counterpart of [`field_is_dead_in_both_phases`]:
 /// [`filter_enum_variants_for_phase`] drops such a variant from both
-/// generated halves.
+/// generated halves — either via the specta-level [`Variant::skip`] flag
+/// (dropped unconditionally) or the serde skip-flag pair.
 fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
-    Ok(SerdeVariantAttrs::from_attributes(&variant.attributes)?
-        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
+    Ok(variant.skip
+        || SerdeVariantAttrs::from_attributes(&variant.attributes)?
+            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
 }
 
 fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {

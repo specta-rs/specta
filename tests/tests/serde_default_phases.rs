@@ -937,3 +937,133 @@ fn non_trailing_hand_built_tuple_default_does_not_split() {
     // Trailing defaults still splitting is pinned by
     // `trailing_tuple_default_renders_optional_element_per_phase`.
 }
+
+/// A defaulted trailing element whose type renders as a union must be
+/// parenthesized before the optional marker: `[number, (number | null)?]`
+/// (`number | null?` is invalid TypeScript).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OptTupleDefault(u8, #[serde(default)] Option<u8>);
+
+/// `#[specta(skip)]` on a variant removes it from BOTH phase rewrites
+/// (`filter_enum_variants_for_phase` drops `variant.skip` unconditionally),
+/// so a defaulted payload field inside it must not split the enum.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpectaSkippedVariant {
+    #[specta(skip)]
+    Hidden {
+        #[serde(default)]
+        x: i32,
+    },
+    Visible {
+        y: i32,
+    },
+}
+
+/// Same, with the hidden payload referencing a genuinely-splitting type:
+/// the dead variant must not tie the enum (or its dependents) to that split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpectaSkippedVariantRef {
+    #[specta(skip)]
+    Hidden(WithFieldDefault),
+    Visible {
+        y: i32,
+    },
+}
+
+/// A dependent of [`SpectaSkippedVariantRef`] must not split either.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SpectaSkippedVariantParent {
+    inner: SpectaSkippedVariantRef,
+}
+
+#[test]
+fn optional_tuple_element_with_union_type_is_parenthesized() {
+    // serde_json ground truth: the trailing `Option` default may be omitted
+    // or null; serialize always emits it.
+    let v: OptTupleDefault = serde_json::from_str("[1]").unwrap();
+    assert!(v.0 == 1 && v.1.is_none());
+    assert_eq!(
+        serde_json::to_string(&OptTupleDefault(1, None)).unwrap(),
+        "[1,null]"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OptTupleDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support defaulted Option tuple elements");
+
+    assert!(
+        rendered.contains("OptTupleDefault_Deserialize = [number, (number | null)?]"),
+        "a union-typed optional tuple element must be parenthesized: {rendered}"
+    );
+    assert!(
+        rendered.contains("OptTupleDefault_Serialize = [number, number | null]"),
+        "the serialize half stays required and unparenthesized: {rendered}"
+    );
+}
+
+#[test]
+fn specta_skipped_variant_is_dead_in_both_phases() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SpectaSkippedVariant>()
+                .register::<SpectaSkippedVariantParent>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept `#[specta(skip)]` variants");
+
+    for split_name in [
+        "SpectaSkippedVariant_Serialize",
+        "SpectaSkippedVariantRef_Serialize",
+        "SpectaSkippedVariantParent_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "a `#[specta(skip)]` variant is removed from both phases and \
+             must not split its enum or dependents (found `{split_name}`): {rendered}"
+        );
+    }
+}
+
+/// The derive erases a `#[specta(skip)]` variant's payload types, but a
+/// hand-built datatype can carry `Variant::skip` with a live defaulted
+/// payload. `filter_enum_variants_for_phase` drops `skip` variants from
+/// BOTH phases, so such a payload must not split the enum.
+#[test]
+fn hand_built_skip_variant_with_default_payload_does_not_split() {
+    use specta::datatype::{Enum, Field, NamedDataType, Primitive, Variant};
+
+    let mut types = Types::default();
+    NamedDataType::new("HandBuiltEnum", &mut types, |_, ndt| {
+        let mut hidden_payload = Field::new(DataType::Primitive(Primitive::u8));
+        hidden_payload
+            .attributes
+            .insert("serde:field:default", true);
+        let hidden = Variant::named().skip().field("x", hidden_payload).build();
+        let visible = Variant::named()
+            .field("y", Field::new(DataType::Primitive(Primitive::u8)))
+            .build();
+
+        let mut e = Enum::default();
+        e.variants.push(("Hidden".into(), hidden));
+        e.variants.push(("Visible".into(), visible));
+        ndt.ty = Some(DataType::Enum(e));
+    });
+
+    let rendered = Typescript::default()
+        .export(&types, PhasesFormat)
+        .expect("PhasesFormat should accept `Variant::skip` with live payloads");
+
+    assert!(
+        !rendered.contains("HandBuiltEnum_Serialize"),
+        "a `Variant::skip` variant is removed from both phases and its \
+         payload must not split the enum: {rendered}"
+    );
+}
