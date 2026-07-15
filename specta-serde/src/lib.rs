@@ -2435,7 +2435,9 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
 /// Whether at least one named field survives into the exported deserialize
 /// shape — the only fields a container `#[serde(default)]` can widen (a
 /// `skip_deserializing` field's default is applied invisibly, off the wire,
-/// and a `#[specta(skip)]` field (`ty: None`) is hidden from the export).
+/// a `#[specta(skip)]` field (`ty: None`) is hidden from the export, and
+/// serde never applies defaults to `flatten` fields: their keys stay
+/// required on deserialize).
 fn struct_has_deserialize_wire_field(fields: &Fields) -> Result<bool, Error> {
     let Fields::Named(named) = fields else {
         return Ok(false);
@@ -2444,7 +2446,7 @@ fn struct_has_deserialize_wire_field(fields: &Fields) -> Result<bool, Error> {
     for (_, field) in &named.fields {
         if field.ty.is_some()
             && !SerdeFieldAttrs::from_attributes(&field.attributes)?
-                .is_some_and(|attrs| attrs.skip_deserializing)
+                .is_some_and(|attrs| attrs.skip_deserializing || attrs.flatten)
         {
             return Ok(true);
         }
@@ -2521,9 +2523,15 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
                 // (including via full `skip`, e.g. `#[serde(skip, default =
                 // "...")]` cache fields) the default is applied invisibly,
                 // and a `#[specta(skip)]` field (`ty: None`) is hidden from
-                // both exported phases entirely. An asymmetric serde skip
+                // both exported phases entirely. serde also never applies
+                // `default` to a `flatten` field — base-only input still
+                // fails with "missing field", so the flattened keys are
+                // equally required in both phases. An asymmetric serde skip
                 // still splits via the skip check below.
-                || (attrs.default && !attrs.skip_deserializing && field.ty.is_some())
+                || (attrs.default
+                    && !attrs.skip_deserializing
+                    && !attrs.flatten
+                    && field.ty.is_some())
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with

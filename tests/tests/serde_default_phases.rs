@@ -668,3 +668,94 @@ fn split_does_not_propagate_through_both_phase_skipped_positions() {
         );
     }
 }
+
+/// serde ignores `default` on flattened fields in BOTH directions, so
+/// `#[serde(flatten, default)]` must not split (ground truth asserted
+/// below). An inner type with its own container default still splits itself
+/// and propagates through flatten — pinned by
+/// [`default_split_propagates_through_flatten`] as the control.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenFieldDefault {
+    base: i32,
+    #[serde(flatten, default)]
+    inner: NoDefault,
+}
+
+/// Outer container `#[serde(default)]` cannot widen a flattened field either
+/// (ground truth below), so a container default over ONLY flattened fields
+/// must not split.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct FlattenOnlyContainerDefault {
+    #[serde(flatten)]
+    inner: NoDefault,
+}
+
+/// Control: one plain field alongside the flatten keeps the container
+/// default observable (the plain field is widened), so this must split.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct FlattenPlusPlainContainerDefault {
+    base: i32,
+    #[serde(flatten)]
+    inner: NoDefault,
+}
+
+#[test]
+fn default_on_flattened_field_does_not_split() {
+    // serde_json ground truth: `default` never rescues a flattened field.
+    // Field-level `flatten, default`: base-only input is REJECTED.
+    let r: Result<FlattenFieldDefault, _> = serde_json::from_str(r#"{"base":1}"#);
+    assert!(
+        r.is_err(),
+        "serde ignores `default` on flattened fields; base-only input must fail"
+    );
+    // And serialize always inlines the inner keys.
+    let v = FlattenFieldDefault {
+        base: 1,
+        inner: NoDefault { a: 2 },
+    };
+    assert_eq!(serde_json::to_string(&v).unwrap(), r#"{"base":1,"a":2}"#);
+    // Outer container default: still rejected, even for `{}`.
+    let r: Result<FlattenOnlyContainerDefault, _> = serde_json::from_str("{}");
+    assert!(
+        r.is_err(),
+        "an outer container default cannot rescue flattened keys either"
+    );
+
+    // Both phases therefore share one shape: no split, no cascade.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<FlattenFieldDefault>()
+                .register::<FlattenOnlyContainerDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept `flatten, default` fields");
+    for split_name in [
+        "FlattenFieldDefault_Serialize",
+        "FlattenOnlyContainerDefault_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "`default` is inert on flattened fields and must not cause a \
+             phase split (found `{split_name}`): {rendered}"
+        );
+    }
+
+    // Control: a plain sibling field keeps the container default observable.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPlusPlainContainerDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept container default with flatten");
+    assert!(
+        rendered.contains("FlattenPlusPlainContainerDefault_Serialize"),
+        "a plain field alongside a flatten still makes the container default \
+         directional: {rendered}"
+    );
+}
