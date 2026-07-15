@@ -1616,6 +1616,7 @@ fn unnamed_fields_datatype(
     format: Option<&dyn Format>,
     types: &Types,
     fields: &[(&Field, &DataType)],
+    declared_len: usize,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
@@ -1623,7 +1624,11 @@ fn unnamed_fields_datatype(
     force_inline: bool,
 ) -> Result<(), Error> {
     match fields {
-        [(field, ty)] => {
+        // Only a genuine newtype (declared arity 1) renders as its bare
+        // inner type. A declared-multi-field tuple reduced to one live
+        // element by skips stays a sequence on the wire, so it keeps the
+        // array form below.
+        [(field, ty)] if declared_len == 1 => {
             let mut v = String::new();
             datatype_with_inline_attr(
                 &mut v,
@@ -1754,6 +1759,7 @@ fn struct_dt(
                 .iter()
                 .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>(),
+            unnamed.fields.len(),
             location,
             parent_name,
             prefix,

@@ -1124,3 +1124,66 @@ fn container_default_on_tuple_struct_splits_with_all_optional_elements() {
         "a newtype container default is inert and must not split: {rendered}"
     );
 }
+
+/// A tuple variant reduced to one live element by `#[serde(skip)]` STAYS a
+/// sequence on the wire (`{"V":[2]}`), and its trailing default makes that
+/// element omittable on deserialize — the payload must keep its declared
+/// arity and render `[number]` / `[number?]`, not collapse to a bare
+/// newtype `number`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipSlotVariant {
+    V(#[serde(skip)] u8, #[serde(default)] u8),
+}
+
+/// Control: same shape without the default — no split, sequence kept.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipSlotControl {
+    W(#[serde(skip)] u8, u8),
+}
+
+#[test]
+fn skip_reduced_tuple_variant_keeps_arity_with_optional_payload() {
+    // serde_json ground truth.
+    assert_eq!(
+        serde_json::to_string(&SkipSlotVariant::V(9, 2)).unwrap(),
+        r#"{"V":[2]}"#
+    );
+    let SkipSlotVariant::V(a, b) = serde_json::from_str(r#"{"V":[]}"#).unwrap();
+    assert!(a == 0 && b == 0);
+    let SkipSlotVariant::V(a, b) = serde_json::from_str(r#"{"V":[2]}"#).unwrap();
+    assert!(a == 0 && b == 2);
+    assert!(serde_json::from_str::<SkipSlotVariant>(r#"{"V":2}"#).is_err());
+    assert_eq!(
+        serde_json::to_string(&SkipSlotControl::W(9, 2)).unwrap(),
+        r#"{"W":[2]}"#
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SkipSlotVariant>()
+                .register::<SkipSlotControl>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support skip-reduced defaulted tuple variants");
+
+    assert!(
+        rendered.contains("SkipSlotVariant_Serialize = { V: [number] }"),
+        "serialize keeps the one-live-element sequence: {rendered}"
+    );
+    assert!(
+        rendered.contains("SkipSlotVariant_Deserialize = { V: [number?] }"),
+        "deserialize marks the defaulted element optional WITHOUT collapsing \
+         the sequence to a bare newtype: {rendered}"
+    );
+    assert!(
+        !rendered.contains("SkipSlotControl_Serialize"),
+        "the default-free control must not split: {rendered}"
+    );
+    assert!(
+        rendered.contains("SkipSlotControl = { W: [number] }"),
+        "the default-free control keeps its sequence shape: {rendered}"
+    );
+}
