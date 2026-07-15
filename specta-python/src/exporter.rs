@@ -547,9 +547,36 @@ fn collect_referenced_types(
                         }
                         visiting.remove(reference);
                     }
-                }
-                for (_, generic) in generics {
-                    collect_referenced_types(types, generic, references, visiting);
+
+                    let mut scoped = Vec::new();
+                    let mut resolved_arguments = Vec::new();
+                    let mut all_default = true;
+                    for definition in ndt.generics.iter() {
+                        let explicit = generics
+                            .iter()
+                            .find(|(generic, _)| generic == &definition.reference())
+                            .map(|(_, datatype)| datatype.clone());
+                        let default = definition.default.as_ref().map(|default| {
+                            let mut default = default.clone();
+                            primitives::substitute_generics(&mut default, &scoped);
+                            default
+                        });
+                        let resolved = explicit.or_else(|| default.clone()).unwrap_or_else(|| {
+                            DataType::Reference(Reference::opaque(crate::opaque::Unknown))
+                        });
+                        all_default &= default.as_ref().is_some_and(|default| default == &resolved);
+                        scoped.push((definition.reference(), resolved.clone()));
+                        resolved_arguments.push(resolved);
+                    }
+                    if !all_default {
+                        for argument in &resolved_arguments {
+                            collect_referenced_types(types, argument, references, visiting);
+                        }
+                    }
+                } else {
+                    for (_, generic) in generics {
+                        collect_referenced_types(types, generic, references, visiting);
+                    }
                 }
             }
             NamedReferenceType::Inline { dt, .. } => {

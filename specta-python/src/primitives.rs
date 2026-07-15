@@ -793,7 +793,7 @@ fn object_variants(
     }
 }
 
-fn substitute_generics(datatype: &mut DataType, generics: &[(Generic, DataType)]) {
+pub(crate) fn substitute_generics(datatype: &mut DataType, generics: &[(Generic, DataType)]) {
     match datatype {
         DataType::Generic(generic) => {
             if let Some((_, replacement)) = generics.iter().find(|(name, _)| name == generic) {

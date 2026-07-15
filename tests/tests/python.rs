@@ -171,6 +171,23 @@ mod generic_default_import {
             pub value: T,
         }
     }
+
+    pub mod definition {
+        #[derive(specta::Type)]
+        #[specta(collect = false)]
+        pub struct Pair<T, U = super::target::Other> {
+            pub first: T,
+            pub second: U,
+        }
+    }
+
+    pub mod partial_consumer {
+        #[derive(specta::Type)]
+        #[specta(collect = false)]
+        pub struct Uses {
+            pub pair: super::definition::Pair<String>,
+        }
+    }
 }
 
 impl Format for IdentityFormat {
@@ -576,7 +593,9 @@ fn python_files_layout_uses_unambiguous_import_aliases() {
 
 #[test]
 fn python_files_layout_imports_generic_defaults() {
-    let types = Types::default().register::<generic_default_import::consumer::Box>();
+    let types = Types::default()
+        .register::<generic_default_import::consumer::Box>()
+        .register::<generic_default_import::partial_consumer::Uses>();
     let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&temp).unwrap();
     let temp = TempDir::new_in(temp).unwrap();
@@ -596,6 +615,16 @@ fn python_files_layout_imports_generic_defaults() {
         consumer.rfind("from ..target import Other as ").unwrap()
             > consumer.find("class Box[").unwrap()
     );
+
+    let partial_consumer = std::fs::read_to_string(
+        package.join("test/python/generic_default_import/partial_consumer/__init__.py"),
+    )
+    .unwrap();
+    assert!(partial_consumer.contains("from ..definition import Pair as "));
+    assert!(partial_consumer.contains("from ..target import Other as "));
+    assert!(partial_consumer.contains(
+        "Pair[_specta_builtins.str, _specta_import_4_test_6_python_22_generic_default_import_6_target_Other]"
+    ));
 }
 
 #[test]
