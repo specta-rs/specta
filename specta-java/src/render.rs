@@ -647,11 +647,9 @@ fn field_datatype(
                 path,
             )?;
         }
-        DataType::Enum(value)
-            if generic_names.is_empty()
-                && (is_unit_enum(value) || resolved_string_enum(value).is_some()) =>
-        {
+        DataType::Enum(value) if is_unit_enum(value) || resolved_string_enum(value).is_some() => {
             render_unit_enum(&mut nested, "public ", &type_name, value, path)?;
+            return Ok((type_name, Some(nested)));
         }
         DataType::Enum(value) => {
             render_tagged_enum(

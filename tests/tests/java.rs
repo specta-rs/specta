@@ -550,18 +550,29 @@ fn genuine_inline_single_variant_enums_remain_enums() {
         status: SingleVariant,
     }
 
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericInlineSingleVariant<T> {
+        #[specta(inline)]
+        status: SingleVariant,
+        value: T,
+    }
+
     let temp = temp_dir();
     let path = temp.path().join("Bindings.java");
     Java::default()
         .export_to(
             &path,
-            &Types::default().register::<InlineSingleVariant>(),
+            &Types::default()
+                .register::<InlineSingleVariant>()
+                .register::<GenericInlineSingleVariant<String>>(),
             IdentityFormat,
         )
         .unwrap();
     let source = std::fs::read_to_string(&path).unwrap();
-    assert!(source.contains("public enum Status"));
-    assert!(source.contains("Status status"));
+    assert_eq!(source.match_indices("public enum Status").count(), 2);
+    assert_eq!(source.match_indices("Status status").count(), 2);
+    assert!(!source.contains("Status<T> status"));
     compile_java(temp.path(), &[&path]);
 }
 
