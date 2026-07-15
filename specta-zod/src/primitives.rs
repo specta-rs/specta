@@ -1,6 +1,6 @@
 //! Primitives provide building blocks for Specta-based libraries.
 
-use std::{borrow::Cow, fmt::Write as _};
+use std::{borrow::Cow, collections::HashSet, fmt::Write as _};
 
 use specta::{
     Types,
@@ -229,15 +229,20 @@ fn export_single_internal(
             return Ok(());
         }
 
+        let map_key_generics = generic_map_key_parameters(ty, types);
         let mut generic_params = Vec::with_capacity(ndt.generics.len());
         let mut fn_params = Vec::with_capacity(ndt.generics.len());
+        let mut overload_params = Vec::with_capacity(ndt.generics.len());
         let mut first_default = None;
-        for generic in ndt.generics.iter() {
+        for (index, generic) in ndt.generics.iter().enumerate() {
             let name = generic.name.as_ref();
             validate_type_name(name, format!("{name_path}.<generic {name}>"))?;
 
+            let mut generic_group = vec![format!("{name} extends z.ZodType")];
+            let mut fn_group = Vec::new();
+            let mut overload_group = vec![format!("{name}: {name}")];
             if let Some(default) = &generic.default {
-                first_default.get_or_insert(fn_params.len());
+                first_default.get_or_insert(index);
                 let mut default_schema = String::new();
                 datatype(
                     &mut default_schema,
@@ -249,12 +254,40 @@ fn export_single_internal(
                     false,
                     type_render_stack,
                 )?;
-                generic_params.push(format!("{name} extends z.ZodType"));
-                fn_params.push(format!("{name}: z.ZodType = {default_schema}"));
+                fn_group.push(format!("{name}: z.ZodType = {default_schema}"));
+                if map_key_generics.contains(name) {
+                    let key_name = map_key_generic_name(name);
+                    let mut default_key_schema = String::new();
+                    map_key_datatype(
+                        &mut default_key_schema,
+                        exporter,
+                        types,
+                        default,
+                        vec![
+                            ndt.name.clone(),
+                            format!("<generic {name} default key>").into(),
+                        ],
+                        &[],
+                        type_render_stack,
+                    )?;
+                    generic_group.push(format!("{key_name} extends z.ZodType<PropertyKey>"));
+                    overload_group.push(format!("{key_name}: {key_name}"));
+                    fn_group.push(format!(
+                        "{key_name}: z.ZodType<PropertyKey> = {default_key_schema}"
+                    ));
+                }
             } else {
-                generic_params.push(format!("{name} extends z.ZodType"));
-                fn_params.push(format!("{name}: z.ZodType"));
+                fn_group.push(format!("{name}: {name}"));
+                if map_key_generics.contains(name) {
+                    let key_name = map_key_generic_name(name);
+                    generic_group.push(format!("{key_name} extends z.ZodType<PropertyKey>"));
+                    overload_group.push(format!("{key_name}: {key_name}"));
+                    fn_group.push(format!("{key_name}: {key_name}"));
+                }
             }
+            generic_params.push(generic_group);
+            fn_params.push(fn_group);
+            overload_params.push(overload_group);
         }
 
         let mut schema_expr = String::new();
@@ -272,13 +305,16 @@ fn export_single_internal(
 
         if let Some(first_default) = first_default {
             for argument_count in first_default..=ndt.generics.len() {
-                let generics = generic_params[..argument_count].join(", ");
-                let params = ndt.generics[..argument_count]
+                let generics = generic_params[..argument_count]
                     .iter()
-                    .map(|generic| {
-                        let name = generic.name.as_ref();
-                        format!("{name}: {name}")
-                    })
+                    .flatten()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let params = overload_params[..argument_count]
+                    .iter()
+                    .flatten()
+                    .cloned()
                     .collect::<Vec<_>>()
                     .join(", ");
                 let type_arguments = ndt.generics[..argument_count]
@@ -304,17 +340,21 @@ fn export_single_internal(
             writeln!(
                 s,
                 "{indent}export function {schema_name}({}): z.ZodType<any> {{\n{indent}\treturn {schema_expr};\n{indent}}}",
-                fn_params.join(", ")
+                fn_params
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )?;
         } else {
-            let generic_params = generic_params.join(", ");
-            let fn_params = ndt
-                .generics
-                .iter()
-                .map(|generic| {
-                    let name = generic.name.as_ref();
-                    format!("{name}: {name}")
-                })
+            let generic_params = generic_params
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let fn_params = fn_params
+                .into_iter()
+                .flatten()
                 .collect::<Vec<_>>()
                 .join(", ");
             writeln!(
@@ -340,7 +380,11 @@ fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
 
 fn typescript_alias_datatype(dt: &mut DataType, map_key: bool, types: &Types) {
     match dt {
-        DataType::Primitive(_) | DataType::Generic(_) => {}
+        DataType::Primitive(_) => {}
+        DataType::Generic(_) if map_key => {
+            *dt = DataType::Reference(specta_typescript::define("string"));
+        }
+        DataType::Generic(_) => {}
         DataType::List(list) => typescript_alias_datatype(&mut list.ty, map_key, types),
         DataType::Map(map) => {
             if contains_zod_define(map.key_ty(), types, &[], &mut Vec::new()) {
@@ -467,6 +511,102 @@ fn contains_zod_define(
             NamedReferenceType::Recursive(_) => false,
         },
     }
+}
+
+fn map_key_generic_name(generic: &str) -> String {
+    format!("$key${generic}")
+}
+
+fn generic_map_key_parameters(dt: &DataType, types: &Types) -> HashSet<String> {
+    fn collect_fields(
+        fields: &Fields,
+        types: &Types,
+        map_key: bool,
+        generics: &[(GenericReference, DataType)],
+        stack: &mut Vec<NamedReference>,
+        result: &mut HashSet<String>,
+    ) {
+        match fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .for_each(|dt| collect(dt, types, map_key, generics, stack, result)),
+            Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .for_each(|dt| collect(dt, types, map_key, generics, stack, result)),
+        }
+    }
+
+    fn collect(
+        dt: &DataType,
+        types: &Types,
+        map_key: bool,
+        generics: &[(GenericReference, DataType)],
+        stack: &mut Vec<NamedReference>,
+        result: &mut HashSet<String>,
+    ) {
+        match dt {
+            DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+            DataType::Generic(generic) => {
+                if let Some((_, replacement)) =
+                    generics.iter().find(|(candidate, _)| candidate == generic)
+                    && !matches!(replacement, DataType::Generic(candidate) if candidate == generic)
+                {
+                    collect(replacement, types, map_key, generics, stack, result);
+                } else if map_key {
+                    result.insert(generic.name().to_string());
+                }
+            }
+            DataType::List(list) => collect(&list.ty, types, map_key, generics, stack, result),
+            DataType::Map(map) => {
+                collect(map.key_ty(), types, true, generics, stack, result);
+                collect(map.value_ty(), types, false, generics, stack, result);
+            }
+            DataType::Nullable(inner) => collect(inner, types, map_key, generics, stack, result),
+            DataType::Struct(strct) => {
+                collect_fields(&strct.fields, types, map_key, generics, stack, result)
+            }
+            DataType::Enum(enm) => enm.variants.iter().for_each(|(_, variant)| {
+                collect_fields(&variant.fields, types, map_key, generics, stack, result)
+            }),
+            DataType::Tuple(tuple) => tuple
+                .elements
+                .iter()
+                .for_each(|dt| collect(dt, types, map_key, generics, stack, result)),
+            DataType::Intersection(types_) => types_
+                .iter()
+                .for_each(|dt| collect(dt, types, map_key, generics, stack, result)),
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    collect(dt, types, map_key, generics, stack, result)
+                }
+                NamedReferenceType::Reference { .. } => {
+                    if stack.contains(reference) {
+                        return;
+                    }
+                    let Some(ty) = types.get(reference).and_then(|ndt| ndt.ty.as_ref()) else {
+                        return;
+                    };
+                    let Ok(reference_generics) = resolved_reference_generics(reference, generics)
+                    else {
+                        return;
+                    };
+                    stack.push(reference.clone());
+                    collect(ty, types, map_key, &reference_generics, stack, result);
+                    stack.pop();
+                }
+                NamedReferenceType::Recursive(_) => {}
+            },
+        }
+    }
+
+    let mut result = HashSet::new();
+    collect(dt, types, false, &[], &mut Vec::new(), &mut result);
+    result
 }
 
 fn fields_contain_zod_define(
@@ -883,13 +1023,14 @@ fn map_key_is_finite(
                 resolved_reference_generics(reference, generics)
                     .is_ok_and(|generics| map_key_is_finite(dt, types, &generics))
             }),
-        DataType::Generic(generic) => generics
-            .iter()
-            .find(|(candidate, _)| candidate == generic)
-            .is_some_and(|(_, dt)| {
-                !matches!(dt, DataType::Generic(candidate) if candidate == generic)
-                    && map_key_is_finite(dt, types, generics)
-            }),
+        DataType::Generic(generic) => {
+            match generics.iter().find(|(candidate, _)| candidate == generic) {
+                Some((_, dt)) if !matches!(dt, DataType::Generic(candidate) if candidate == generic) => {
+                    map_key_is_finite(dt, types, generics)
+                }
+                _ => true,
+            }
+        }
         _ => false,
     }
 }
@@ -1065,7 +1206,7 @@ fn map_key_datatype(
                     type_render_stack,
                 )?;
             } else {
-                generic_dt(s, generic);
+                s.push_str(&map_key_generic_name(generic.name()));
             }
         }
         _ => datatype(
@@ -1603,11 +1744,13 @@ fn reference_named_dt(
             .cloned()
             .collect::<Vec<_>>();
 
-        reference_expr.push('(');
-        for (i, (_, v)) in reference_generics.iter().enumerate() {
-            if i != 0 {
-                reference_expr.push_str(", ");
-            }
+        let map_key_generics = ndt
+            .ty
+            .as_ref()
+            .map(|ty| generic_map_key_parameters(ty, types))
+            .unwrap_or_default();
+        let mut schema_arguments = Vec::new();
+        for (generic, v) in reference_generics {
             let mut generic_schema = String::new();
             datatype(
                 &mut generic_schema,
@@ -1619,8 +1762,23 @@ fn reference_named_dt(
                 false,
                 type_render_stack,
             )?;
-            reference_expr.push_str(&generic_schema);
+            schema_arguments.push(generic_schema);
+            if map_key_generics.contains(generic.name().as_ref()) {
+                let mut key_schema = String::new();
+                map_key_datatype(
+                    &mut key_schema,
+                    exporter,
+                    types,
+                    v,
+                    vec![],
+                    &scoped_generics,
+                    type_render_stack,
+                )?;
+                schema_arguments.push(key_schema);
+            }
         }
+        reference_expr.push('(');
+        reference_expr.push_str(&schema_arguments.join(", "));
         reference_expr.push(')');
     }
 

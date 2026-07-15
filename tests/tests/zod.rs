@@ -37,6 +37,12 @@ struct ProtoField {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct GenericMap<K = bool> {
+    values: HashMap<K, String>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct StructWithStructWithBigInt {
     #[specta(inline)]
     abc: StructWithBigInt,
@@ -303,6 +309,46 @@ fn zod_emits_proto_as_a_computed_object_key() {
     let out = export_for::<ProtoField>().unwrap();
     assert!(out.contains("[\"__proto__\"]: z.string()"), "{out}");
     assert!(!out.contains("\n  __proto__: z.string()"), "{out}");
+}
+
+#[test]
+fn zod_generic_maps_receive_serialized_key_schemas() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum FiniteKey {
+        First,
+        Second,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UsesGenericMaps {
+        booleans: GenericMap<bool>,
+        integers: GenericMap<i32>,
+        finite: GenericMap<FiniteKey>,
+    }
+
+    let out = export_for::<UsesGenericMaps>().unwrap();
+    assert!(
+        out.contains("export function GenericMapSchema(): z.ZodType<GenericMap>;"),
+        "{out}"
+    );
+    assert!(
+        out.contains("export function GenericMapSchema<K extends z.ZodType, $key$K extends z.ZodType<PropertyKey>>(K: K, $key$K: $key$K): z.ZodType<GenericMap<z.output<K>>>;"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GenericMapSchema(z.boolean(), z.enum([\"true\", \"false\"]))"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GenericMapSchema(z.int().min(-2147483648).max(2147483647), z.string().regex(/^-?\\d+$/)"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GenericMapSchema(z.lazy(() => FiniteKeySchema), z.union([z.literal(\"First\"), z.literal(\"Second\")]))"),
+        "{out}"
+    );
 }
 
 #[test]

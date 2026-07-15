@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ExternalEnumSchema,
   GenericSchema,
+  GenericMapHolderSchema,
   OptionalFlattenSchema,
   ProtoFieldSchema,
   RecursiveSchema,
@@ -33,6 +34,16 @@ test("generated schemas validate representative wire values", () => {
   expect(OptionalFlattenSchema.parse({ id: "id", inner: "kept" })).toEqual({ id: "id", inner: "kept" });
   expect(ProtoFieldSchema.safeParse(JSON.parse('{"__proto__":"value"}')).success).toBe(true);
   expect(ProtoFieldSchema.safeParse({}).success).toBe(false);
+  expect(GenericMapHolderSchema.safeParse({
+    booleans: { values: { true: "yes" } },
+    integers: { values: { "-2": "value" } },
+    finite: { values: { First: "value" } },
+  }).success).toBe(true);
+  expect(GenericMapHolderSchema.safeParse({
+    booleans: { values: { invalid: "no" } },
+    integers: { values: { nope: "no" } },
+    finite: { values: { Third: "no" } },
+  }).success).toBe(false);
 });
 
 test("generated schemas reject invalid primitive wire values", () => {

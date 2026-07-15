@@ -73,6 +73,18 @@ struct ProtoField {
     prototype: String,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+struct GenericMap<K: Eq + std::hash::Hash = bool> {
+    values: HashMap<K, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct GenericMapHolder {
+    booleans: GenericMap<bool>,
+    integers: GenericMap<i32>,
+    finite: GenericMap<FiniteKey>,
+}
+
 #[derive(Type)]
 #[allow(dead_code)]
 struct OpaqueTypes {
@@ -150,6 +162,7 @@ fn main() {
                 .register::<DefinedMapKey>()
                 .register::<OptionalFlatten>()
                 .register::<ProtoField>()
+                .register::<GenericMapHolder>()
                 .register::<OpaqueTypes>()
                 .register::<ExternalEnum>()
                 .register::<UntaggedMatchingField>()
