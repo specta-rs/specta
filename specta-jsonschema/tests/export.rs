@@ -38,6 +38,12 @@ struct User {
     email: Option<String>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+struct PhaseSplitRoot {
+    #[serde(skip_deserializing)]
+    serialize_only: String,
+}
+
 #[derive(Type)]
 struct Collections {
     tags: Vec<String>,
@@ -402,6 +408,17 @@ fn exports_typed_anonymous_root_schema() {
     assert_eq!(schema["type"], "array");
     assert_eq!(schema["items"]["$ref"], "#/$defs/User");
     assert!(schema["$defs"].get("User").is_some());
+}
+
+#[test]
+fn formats_typed_anonymous_roots_against_the_mapped_graph() {
+    let schema = JsonSchema::default()
+        .export_type_value::<Vec<PhaseSplitRoot>>(specta_serde::PhasesFormat)
+        .unwrap();
+
+    assert_eq!(schema["items"]["$ref"], "#/$defs/PhaseSplitRoot_Serialize");
+    assert!(schema["$defs"].get("PhaseSplitRoot_Serialize").is_some());
+    assert!(schema["$defs"].get("PhaseSplitRoot_Deserialize").is_some());
 }
 
 #[test]
