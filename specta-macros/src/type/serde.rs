@@ -154,6 +154,14 @@ fn parse_variant_attrs(attrs: &[Attribute]) -> Result<Option<VariantAttrs>> {
     Ok(found.then_some(parsed))
 }
 
+/// Whether the field is skipped by serde in at least one phase (`skip`,
+/// `skip_serializing`, or `skip_deserializing`). `skip_serializing_if` is
+/// conditional, not structural, and deliberately excluded.
+pub(super) fn field_has_phase_skip(attrs: &[Attribute]) -> Result<bool> {
+    Ok(parse_field_attrs(attrs)?
+        .is_some_and(|parsed| parsed.skip_serializing || parsed.skip_deserializing))
+}
+
 fn parse_field_attrs(attrs: &[Attribute]) -> Result<Option<FieldAttrs>> {
     let mut parsed = FieldAttrs::default();
     let mut found = false;

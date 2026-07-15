@@ -34,6 +34,11 @@ pub fn construct_field_with_variant_skip(
     raw_attrs: &[syn::Attribute],
     variant_skip: bool,
 ) -> syn::Result<TokenStream> {
+    // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
+    // override below: serde only ever sees the real field type, so the
+    // override must not influence serde-behavioral markers.
+    let declared_ty_is_option = is_option_type(field_ty);
+
     let field_ty = type_with_inferred_lifetimes(attrs.r#type.as_ref().unwrap_or(field_ty));
 
     let runtime_attrs = build_runtime_attributes(
@@ -63,12 +68,17 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
-    // A skipped field's type never enters the datatype graph (it does not
-    // even need to implement `Type`), but whether it was declared as
-    // `Option<T>` still matters to consumers: e.g. serde deserializes a
-    // missing value into a skipped `Option` field as `None` while other
-    // skipped types have stricter requirements. Record it syntactically.
-    let skipped_nullable_attribute = (attrs.skip && is_option_type(&field_ty))
+    // Whether a skipped field was declared as `Option<T>` matters to
+    // consumers: e.g. serde deserializes a missing value into a skipped
+    // `Option` field as `None` while other skipped types have stricter
+    // requirements. Record it syntactically here for every skip spelling --
+    // for symmetric `#[serde(skip)]` the type never even enters the datatype
+    // graph, and for one-sided skips the exported datatype may be overridden
+    // (`#[specta(type = ...)]`), so the real syntax is the only reliable
+    // source.
+    let field_has_skip =
+        attrs.skip || variant_skip || super::serde::field_has_phase_skip(raw_attrs)?;
+    let skipped_nullable_attribute = (field_has_skip && declared_ty_is_option)
         .then(|| quote!(field.attributes.insert("specta:skipped_nullable", true);));
 
     let field_ty = if attrs.skip || variant_skip {

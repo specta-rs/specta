@@ -1579,14 +1579,21 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
     })
 }
 
-/// Marker recording that a skipped field's original type was `Option<T>`.
-/// serde's `missing_field` helper special-cases `Option` on deserialize (a
-/// missing key yields `None`), which changes what an adjacently tagged
-/// collapsed newtype variant requires for its `content` key.
+/// Marker recording that a skipped field's *declared Rust type* was
+/// `Option<T>`. serde's `missing_field` helper special-cases `Option` on
+/// deserialize (a missing key yields `None`), which changes what an
+/// adjacently tagged collapsed newtype variant requires for its `content`
+/// key.
 ///
-/// Written by the `Type` derive for `#[serde(skip)]` fields (whose type never
-/// enters the datatype graph), and below for phase-specific skips where the
-/// [`DataType::Nullable`] type is still visible when the marker is produced.
+/// Written exclusively by the `Type` derive from the real field syntax, for
+/// every skip spelling. It is deliberately NOT inferred from the exported
+/// datatype here: a `#[specta(type = Option<...>)]` override produces a
+/// [`DataType::Nullable`] that serde knows nothing about (and vice versa),
+/// so the exported shape is not evidence of serde's `Option` behavior.
+/// Hand-built datatypes without the marker conservatively keep `content`
+/// required, which is exact for non-`Option` fields and merely conservative
+/// for writers of actual `Option` fields (serde accepts an explicit
+/// `content: null` for those too).
 const SKIPPED_NULLABLE_FIELD: &str = "specta:skipped_nullable";
 
 fn skipped_field_marker(field: &Field) -> Field {
@@ -1595,9 +1602,6 @@ fn skipped_field_marker(field: &Field) -> Field {
     skipped.deprecated = field.deprecated.clone();
     skipped.docs = field.docs.clone();
     skipped.attributes = field.attributes.clone();
-    if matches!(field.ty, Some(DataType::Nullable(_))) {
-        skipped.attributes.insert(SKIPPED_NULLABLE_FIELD, true);
-    }
     skipped
 }
 
@@ -2752,12 +2756,9 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
     // A skipped `Option` sole field is *not* asymmetric: serde's
     // `missing_field` helper deserializes a missing `content` key as `None`,
     // so the unified `content?: null` shape is exact for both phases and no
-    // split is needed. Symmetric `#[serde(skip)]` erases the field type at
-    // derive time (`ty: None`), so `Option`-ness is read from the marker the
-    // derive records instead.
-    if matches!(field.ty, Some(DataType::Nullable(_)))
-        || field.attributes.contains_key(SKIPPED_NULLABLE_FIELD)
-    {
+    // split is needed. `Option`-ness is read only from the marker the derive
+    // records from the real field syntax; see [`SKIPPED_NULLABLE_FIELD`].
+    if field.attributes.contains_key(SKIPPED_NULLABLE_FIELD) {
         return Ok(false);
     }
 

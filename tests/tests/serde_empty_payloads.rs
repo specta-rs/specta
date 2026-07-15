@@ -258,6 +258,58 @@ fn adjacent_tagged_option_skip_deserializing_phases() {
     );
 }
 
+// A `#[specta(type = Option<u8>)]` override must NOT be mistaken for a real
+// `Option` field: serde only sees the actual Rust type (`u8`), so its
+// deserializer still requires `c` to be present. `Option`-ness must be
+// derived from the real field syntax, never from the exported datatype.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjNullableOverrideSkipDe {
+    V(
+        #[serde(skip_deserializing)]
+        #[specta(type = Option<u8>)]
+        u8,
+    ),
+}
+
+#[test]
+fn adjacent_tagged_nullable_override_skip_deserializing_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjNullableOverrideSkipDe::V(7)).unwrap(),
+        r#"{"t":"V","c":7}"#
+    );
+
+    // The real field is `u8`, so unlike a genuine `Option` the deserializer
+    // rejects a missing `c` (serde's `missing_field` Option special case
+    // does not apply) and only accepts `c: null`.
+    assert!(serde_json::from_str::<AdjNullableOverrideSkipDe>(r#"{"t":"V"}"#).is_err());
+    assert!(serde_json::from_str::<AdjNullableOverrideSkipDe>(r#"{"t":"V","c":null}"#).is_ok());
+}
+
+#[test]
+fn adjacent_tagged_nullable_override_skip_deserializing_phases() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjNullableOverrideSkipDe>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    let deserialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjNullableOverrideSkipDe_Deserialize ="))
+        .expect("deserialize type must be exported");
+    assert!(
+        deserialize_ty.contains(r#"{ t: "V"; c: null }"#),
+        "a nullable *override* on a non-Option field must keep `c` required:\n{ts}"
+    );
+    assert!(
+        !deserialize_ty.contains("c?:"),
+        "a nullable *override* on a non-Option field must not make `c` optional:\n{ts}"
+    );
+}
+
 // --- Bug B: externally tagged multi-field tuple variants with all fields
 // skipped must stay `{ A: [] }`, not collapse to a bare string literal. ---
 
