@@ -818,11 +818,17 @@ struct InlineTuple2 {
     demo: (InlineTuple, bool),
 }
 
+// The skipped sole field is `Option` so the unified `data?: null` shape is
+// exact for both serde directions and the fixture stays exportable under
+// `specta_serde::Format`. A skipped non-`Option` sole field is
+// direction-asymmetric under adjacent tagging (serialize omits `data`,
+// deserialize requires `data: null`) and is a unified-mode *error*; that
+// case is covered by dedicated tests in `serde_empty_payloads.rs`.
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type", content = "data")]
 enum SkippedFieldWithinVariant {
-    A(#[serde(skip)] String),
+    A(#[serde(skip)] Option<String>),
     B(String),
 }
 

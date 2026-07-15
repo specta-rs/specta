@@ -868,14 +868,23 @@ fn rewrite_datatype_for_phase(
 
     match ty {
         DataType::Struct(s) => {
-            let container_default = SerdeContainerAttrs::from_attributes(&s.attributes)?
-                .is_some_and(|attrs| attrs.default);
+            let container_attrs = SerdeContainerAttrs::from_attributes(&s.attributes)?;
+            let container_default = container_attrs.as_ref().is_some_and(|attrs| attrs.default);
+            let container_transparent = container_attrs.is_some_and(|attrs| attrs.transparent);
             let container_rename_all = container_rename_all_rule(
                 &s.attributes,
                 mode,
                 "struct rename_all",
                 container_name.unwrap_or("<anonymous struct>"),
             )?;
+
+            // A `#[serde(transparent)]` struct serializes as its sole live
+            // field's bare value regardless of declared arity, so it is
+            // exempt from the declared-arity tuple rewrite below.
+            let original_unnamed_arity = match &s.fields {
+                Fields::Unnamed(unnamed) if !container_transparent => Some(unnamed.fields.len()),
+                Fields::Unit | Fields::Named(_) | Fields::Unnamed(_) => None,
+            };
 
             rewrite_fields_for_phase(
                 &mut s.fields,
@@ -890,6 +899,36 @@ fn rewrite_datatype_for_phase(
                 // `PRESERVED_ARITY_PAYLOAD_MARKER`.
                 s.attributes.contains_key(PRESERVED_ARITY_PAYLOAD_MARKER),
             )?;
+
+            // A declared-multi-field tuple struct stays an array even when
+            // `#[serde(skip)]` reduces it to exactly one live field: serde
+            // still serializes it as `[value]`, not a bare `value`. The
+            // latter is only correct for a *genuine* single-field (newtype)
+            // struct, which `Fields::Unnamed` already renders bare by
+            // design. Rewriting the live field(s) into a `DataType::Tuple`
+            // forces array rendering regardless of the live count.
+            // (Exporters must render named `Tuple` definitions -- see
+            // specta-swift's `export_type`, which treats them as tuple
+            // structs.)
+            let live_unnamed_types = match (original_unnamed_arity, &s.fields) {
+                (Some(arity), Fields::Unnamed(unnamed))
+                    if arity > 1 && unnamed.fields.len() == 1 =>
+                {
+                    Some(
+                        unnamed
+                            .fields
+                            .iter()
+                            .filter_map(|f| f.ty.clone())
+                            .collect::<Vec<_>>(),
+                    )
+                }
+                _ => None,
+            };
+            if let Some(live_unnamed_types) = live_unnamed_types {
+                *ty = DataType::Tuple(Tuple::new(live_unnamed_types));
+                return Ok(());
+            }
+
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
             normalize_container_attrs_for_phase(&mut s.attributes, mode)?;
             if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
@@ -1555,6 +1594,24 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
     })
 }
 
+/// Marker recording that a field's *declared Rust type* was `Option<T>`.
+/// serde's `missing_field` helper special-cases `Option` on deserialize (a
+/// missing key yields `None`), which changes what an adjacently tagged
+/// newtype variant requires for its `content` key -- both when the sole
+/// field is skipped (collapse handling) and when it is live (a missing
+/// `content` deserializes as `None` even without any skip attrs).
+///
+/// Written exclusively by the `Type` derive from the real field syntax. It
+/// is deliberately NOT inferred from the exported datatype here: a
+/// `#[specta(type = Option<...>)]` override produces a
+/// [`DataType::Nullable`] that serde knows nothing about (and vice versa),
+/// so the exported shape is not evidence of serde's `Option` behavior.
+/// Hand-built datatypes without the marker conservatively keep `content`
+/// required, which is exact for non-`Option` fields and merely conservative
+/// for writers of actual `Option` fields (serde accepts an explicit
+/// `content: null` for those too).
+const NULLABLE_FIELD: &str = "specta:nullable";
+
 /// Whether a tuple struct's skipped `ty: None` slots must survive the
 /// rewrite so the declared arity reaches the renderer. serde keeps the
 /// sequence representation for skip-reduced tuple structs
@@ -1601,14 +1658,6 @@ fn unnamed_live_fields(unnamed: &UnnamedFields) -> impl Iterator<Item = &Field> 
 
 fn unnamed_live_field_count(unnamed: &UnnamedFields) -> usize {
     unnamed_live_fields(unnamed).count()
-}
-
-fn unnamed_has_effective_payload(unnamed: &UnnamedFields) -> bool {
-    unnamed_live_field_count(unnamed) != 0
-}
-
-fn unnamed_fields_all_skipped(unnamed: &UnnamedFields) -> bool {
-    !unnamed.fields.is_empty() && !unnamed_has_effective_payload(unnamed)
 }
 
 /// Marker attribute key recorded on an [`Enum`]'s
@@ -1703,7 +1752,7 @@ fn rewrite_enum_repr_for_phase(
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {
-                    transform_external_variant(serialized_name.clone(), &variant, widen_tag)?
+                    transform_external_variant(serialized_name.clone(), &variant, widen_tag, mode)?
                 }
                 EnumRepr::Internal { tag } => transform_internal_variant(
                     serialized_name.clone(),
@@ -1725,6 +1774,7 @@ fn rewrite_enum_repr_for_phase(
                         content.as_ref(),
                         &variant,
                         widen_tag,
+                        mode,
                     )?
                 }
                 EnumRepr::Untagged => unreachable!(),
@@ -2137,11 +2187,18 @@ fn transform_external_variant(
     serialized_name: String,
     variant: &Variant,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
-    let skipped_only_unnamed = match &variant.fields {
-        Fields::Unnamed(unnamed) => unnamed_fields_all_skipped(unnamed),
-        Fields::Unit | Fields::Named(_) => false,
-    };
+    // Only a genuine newtype variant (declared arity 1) collapses to a unit
+    // string when its sole field is skipped. A declared-multi-field tuple
+    // variant stays a tuple variant even when *serde* skips reduce it to 0
+    // live fields -- serde still requires (and emits) an empty array payload,
+    // so it must render as `{ Name: [] }`, not a bare string literal. A
+    // payload hidden by `#[specta(skip)]` instead follows the hidden-field
+    // convention (the bare string, like the pre-rewrite behavior): serde
+    // still transports the values, so fabricating `[]` would be wrong.
+    let collapses_to_unit =
+        variant_collapses_to_unit(variant) || variant_payload_is_hidden(variant, mode)?;
 
     Ok(match &variant.fields {
         Fields::Unit => clone_variant_with_unnamed_fields(
@@ -2152,7 +2209,7 @@ fn transform_external_variant(
                 string_literal_datatype(serialized_name)
             })],
         ),
-        _ if skipped_only_unnamed => clone_variant_with_unnamed_fields(
+        _ if collapses_to_unit => clone_variant_with_unnamed_fields(
             variant,
             vec![Field::new(if widen_tag {
                 DataType::Primitive(Primitive::str)
@@ -2175,6 +2232,7 @@ fn transform_adjacent_variant(
     content: &str,
     variant: &Variant,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
@@ -2185,10 +2243,72 @@ fn transform_adjacent_variant(
         }),
     )];
 
-    if variant_has_effective_payload(variant) {
-        let payload = variant_payload_field(variant)
+    // Every non-unit variant kind carries a `content` key, even when the
+    // payload itself is empty: `Foo {}` -> `content: {}`, `Foo()` -> `content:
+    // []`, and a declared-multi-field tuple reduced to 0 live fields by
+    // `#[serde(skip)]` -> `content: []`. Only genuine unit variants omit it in
+    // both phases; newtype variants collapsed to unit by a skipped sole field
+    // omit it on serialize only (see below).
+    if variant_payload_is_hidden(variant, mode)? {
+        // Hidden-field convention: serde still transports the
+        // `#[specta(skip)]`ped values under `content`, but the user asked to
+        // hide them, so `content` is omitted entirely (fabricating `[]`
+        // would claim a wire shape serde rejects).
+    } else if !variant_collapses_to_unit(variant) {
+        let mut payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
+        // serde's adjacent deserializer routes a missing `content` key
+        // through `missing_field`, which yields `None` for a *newtype*
+        // `Option` payload even without any skip attrs -- `{"t":"V"}`
+        // deserializes to `V(None)` while the serializer always emits
+        // `content`. Deserialize-facing shapes therefore keep `content`
+        // optional, mirroring `field_is_optional_for_mode`'s treatment of
+        // missing-input-allowed (`#[serde(default)]`) fields: optional in
+        // the deserialize and unified phases, required in serialize.
+        if matches!(mode, PhaseRewrite::Deserialize | PhaseRewrite::Unified)
+            && sole_live_field_is_nullable(variant)
+        {
+            payload.optional = true;
+        }
         fields.push((Cow::Owned(content.to_string()), payload));
+    } else if !matches!(variant.fields, Fields::Unit) && sole_field_is_serde_skipped(variant, mode)?
+    {
+        // A newtype variant collapsed to unit by a serde-skipped sole field
+        // is asymmetric under adjacent tagging: serde's serializer omits
+        // `content` entirely (like a unit variant), but its deserializer
+        // still requires `content` to be present and exactly `null` --
+        // UNLESS the skipped field is an `Option`, which serde's
+        // `missing_field` helper deserializes as `None` when the key is
+        // absent, making `content` genuinely optional on deserialize too.
+        // `DataType::Tuple(vec![])` renders as `null`.
+        //
+        // A sole field hidden WITHOUT a serde skip (`#[specta(skip)]` or a
+        // hand-built `Field { ty: None, .. }`) does not take this branch:
+        // serde still transports the payload symmetrically, the skip merely
+        // hides it from the export, so `content` is omitted in every mode
+        // (the `else` fall-through), matching the hidden-field convention.
+        let skipped_nullable = skipped_sole_field_is_nullable(variant);
+        match mode {
+            PhaseRewrite::Serialize => {}
+            PhaseRewrite::Deserialize => {
+                let mut field = Field::new(DataType::Tuple(Tuple::new(vec![])));
+                field.optional = skipped_nullable;
+                fields.push((Cow::Owned(content.to_string()), field));
+            }
+            PhaseRewrite::Unified => {
+                // For `Option` fields `content?: null` is exact for both
+                // directions. The non-`Option` case is rejected up front by
+                // `validate_adjacent_collapsed_newtype_variants` (unified
+                // mode can't represent its ser/de asymmetry), so this branch
+                // is defensive best-effort for datatypes that bypassed
+                // validation: it accepts serde's serialize output (no key)
+                // while still letting callers write the `content: null` the
+                // deserializer demands.
+                let mut field = Field::new(DataType::Tuple(Tuple::new(vec![])));
+                field.optional = true;
+                fields.push((Cow::Owned(content.to_string()), field));
+            }
+        }
     }
 
     Ok(clone_variant_with_named_fields(variant, fields))
@@ -2355,12 +2475,94 @@ fn is_generated_string_literal_datatype(ty: &DataType) -> bool {
     }
 }
 
-fn variant_has_effective_payload(variant: &Variant) -> bool {
+/// A variant/struct whose declared arity collapses to serde's unit
+/// representation: genuine unit fields, and newtype (declared arity 1)
+/// unnamed fields whose sole field has been skipped. Every other shape
+/// (including empty tuples/structs and multi-field tuples reduced to 0 or 1
+/// live fields by `#[serde(skip)]`) still serializes with a payload -- an
+/// empty tuple variant serializes as `[]`, an empty struct variant as `{}`,
+/// and a declared-multi-field tuple stays a sequence even when skips reduce
+/// it to 0 or 1 live fields.
+fn variant_collapses_to_unit(variant: &Variant) -> bool {
     match &variant.fields {
-        Fields::Unit => false,
-        Fields::Named(named) => !&named.fields.is_empty(),
-        Fields::Unnamed(unnamed) => unnamed_has_effective_payload(unnamed),
+        Fields::Unit => true,
+        Fields::Unnamed(unnamed) => {
+            unnamed.fields.len() == 1 && unnamed_live_field_count(unnamed) == 0
+        }
+        Fields::Named(_) => false,
     }
+}
+
+/// Whether a tuple variant's payload is *hidden* rather than serde-skipped:
+/// zero live fields, at least one of which lacks a serde skip for the given
+/// phase (`#[specta(skip)]` or a hand-built `Field { ty: None, .. }`). serde
+/// still transports those values on the wire, so no payload shape is known
+/// to the export -- the variant follows the hidden-field convention (payload
+/// omitted) instead of fabricating an `[]` serde would reject. A genuinely
+/// empty tuple variant (`V()`) and an all-serde-skipped one really are `[]`
+/// on the wire and are NOT hidden.
+fn variant_payload_is_hidden(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
+    let Fields::Unnamed(unnamed) = &variant.fields else {
+        return Ok(false);
+    };
+    if unnamed.fields.is_empty() || unnamed_live_field_count(unnamed) != 0 {
+        return Ok(false);
+    }
+
+    for field in &unnamed.fields {
+        if !should_skip_field_for_mode(field, mode)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+/// Whether a collapsed newtype variant's sole field carries a *serde* skip
+/// for the given phase, as opposed to being hidden by `#[specta(skip)]` (or a
+/// hand-built `Field { ty: None, .. }`), which serde knows nothing about.
+fn sole_field_is_serde_skipped(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
+    match &variant.fields {
+        Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
+            [field] => should_skip_field_for_mode(field, mode),
+            _ => Ok(false),
+        },
+        Fields::Unit | Fields::Named(_) => Ok(false),
+    }
+}
+
+/// Whether a newtype variant's *live* sole payload was declared as
+/// `Option<T>` (see [`NULLABLE_FIELD`]). Declared arity must be 1: a
+/// multi-field tuple variant deserializes as a sequence, so serde's
+/// `missing_field` `Option` special case never applies to it.
+fn sole_live_field_is_nullable(variant: &Variant) -> bool {
+    match &variant.fields {
+        Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
+            [field] => field.ty.is_some() && field.attributes.contains_key(NULLABLE_FIELD),
+            _ => false,
+        },
+        Fields::Unit | Fields::Named(_) => false,
+    }
+}
+
+/// Whether a collapsed newtype variant's skipped sole field was declared as
+/// `Option<T>` (see [`NULLABLE_FIELD`]; the attribute survives on the
+/// `ty: None` placeholder produced by [`skipped_field_marker`]).
+fn skipped_sole_field_is_nullable(variant: &Variant) -> bool {
+    match &variant.fields {
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .first()
+            .is_some_and(|field| field.attributes.contains_key(NULLABLE_FIELD)),
+        Fields::Unit | Fields::Named(_) => false,
+    }
+}
+
+/// A [`DataType`] that always renders as an empty array (`[]`), as opposed to
+/// `DataType::Tuple(Tuple::new(vec![]))`, which renders as `null` because it
+/// also represents Rust's unit type `()`.
+fn empty_array_datatype() -> DataType {
+    Struct::unnamed().build()
 }
 
 fn variant_payload_field(variant: &Variant) -> Option<Field> {
@@ -2379,7 +2581,13 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             let non_skipped = unnamed_live_fields(unnamed).collect::<Vec<_>>();
 
             match non_skipped.as_slice() {
-                [] => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
+                // A newtype (declared arity 1) whose sole field is skipped
+                // collapses to serde's *unit* payload (`null`), unlike
+                // zero-arg / multi-field all-skipped tuples which stay `[]`.
+                [] if original_unnamed_len == 1 => {
+                    Some(Field::new(DataType::Tuple(Tuple::new(vec![]))))
+                }
+                [] => Some(Field::new(empty_array_datatype())),
                 [single] if original_unnamed_len == 1 => Some((*single).clone()),
                 // A bare `Tuple` has no `Field`s, so it cannot carry the
                 // `optional` flag a phase rewrite sets on a defaulted
@@ -2603,24 +2811,32 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
                 && SerdeContainerAttrs::from_attributes(&s.attributes)?
                     .is_some_and(|attrs| attrs.default))
             || fields_have_local_difference(&s.fields)?),
-        DataType::Enum(e) => Ok(container_has_local_difference(&e.attributes)?
-            || e.variants
-                .iter()
-                .try_fold(false, |has_difference, (_, variant)| {
-                    if has_difference {
-                        return Ok(true);
-                    }
+        DataType::Enum(e) => {
+            let adjacent = matches!(
+                EnumRepr::from_attrs(&e.attributes)?,
+                EnumRepr::Adjacent { .. }
+            );
 
-                    // A variant removed from both phases renders in neither
-                    // half, so none of its own or its payload's attrs can
-                    // constitute a phase difference.
-                    if variant_is_dead_in_both_phases(variant)? {
-                        return Ok(false);
-                    }
+            Ok(container_has_local_difference(&e.attributes)?
+                || e.variants
+                    .iter()
+                    .try_fold(false, |has_difference, (_, variant)| {
+                        if has_difference {
+                            return Ok(true);
+                        }
 
-                    Ok(variant_has_local_difference(variant)?
-                        || fields_have_local_difference(&variant.fields)?)
-                })?),
+                        // A variant removed from both phases renders in neither
+                        // half, so none of its own or its payload's attrs can
+                        // constitute a phase difference.
+                        if variant_is_dead_in_both_phases(variant)? {
+                            return Ok(false);
+                        }
+
+                        Ok(variant_has_local_difference(variant)?
+                            || fields_have_local_difference(&variant.fields)?
+                            || (adjacent && adjacent_content_is_phase_asymmetric(variant)?))
+                    })?)
+        }
         DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |has_difference, ty| {
             if has_difference {
                 return Ok(true);
@@ -2745,6 +2961,50 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                 })
         }
     }
+}
+
+/// An adjacently tagged newtype variant whose sole field is skipped in *both*
+/// phases collapses asymmetrically: serde's serializer omits the `content` key
+/// entirely (like a unit variant), while its deserializer still requires
+/// `content: null`. Such enums must split under [`PhasesFormat`] even though
+/// the skip attribute itself is symmetric.
+fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error> {
+    if variant.skip {
+        return Ok(false);
+    }
+
+    // `#[serde(untagged)]` variants bypass the tag/content representation
+    // entirely, so there is no `content` key to be asymmetric about.
+    if let Some(attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        && (attrs.untagged
+            || (variant_is_skipped_for_mode(&attrs, PhaseRewrite::Serialize)
+                && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Deserialize)))
+    {
+        return Ok(false);
+    }
+
+    let Fields::Unnamed(unnamed) = &variant.fields else {
+        return Ok(false);
+    };
+    let [field] = unnamed.fields.as_slice() else {
+        return Ok(false);
+    };
+
+    // A skipped `Option` sole field is *not* asymmetric: serde's
+    // `missing_field` helper deserializes a missing `content` key as `None`,
+    // so the unified `content?: null` shape is exact for both phases and no
+    // split is needed. `Option`-ness is read only from the marker the derive
+    // records from the real field syntax; see [`NULLABLE_FIELD`].
+    if field.attributes.contains_key(NULLABLE_FIELD) {
+        return Ok(false);
+    }
+
+    // Only symmetric *serde* skips exhibit the ser/de content asymmetry. A
+    // field hidden by `#[specta(skip)]` alone (or a hand-built
+    // `Field { ty: None, .. }`) is invisible to serde -- the wire carries the
+    // payload symmetrically -- so `ty` absence is deliberately not evidence.
+    Ok(should_skip_field_for_mode(field, PhaseRewrite::Serialize)?
+        && should_skip_field_for_mode(field, PhaseRewrite::Deserialize)?)
 }
 
 fn single_field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
