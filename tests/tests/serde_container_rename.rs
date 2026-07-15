@@ -193,13 +193,11 @@ enum EnumOneSidedRename {
 /// one direction of the wire format. Under `PhasesFormat` it splits, using the
 /// serialize rename verbatim and the suffixed original name for deserialize.
 ///
-/// The unified-mode rejection is implemented by #518's centralized asymmetry
-/// validation (<https://github.com/specta-rs/specta/pull/518>), which covers
-/// both structs and enums; ignored until that lands so this branch stays
-/// green standalone. Raised in
+/// The unified-mode rejection is #518's centralized asymmetry validation
+/// (<https://github.com/specta-rs/specta/pull/518>), which covers both
+/// structs and enums. Raised in
 /// <https://github.com/specta-rs/specta/pull/525#discussion_r3584444653>.
 #[test]
-#[ignore = "unified-mode rejection requires #518 (fix/serde-unified-one-sided-attrs)"]
 fn enum_one_sided_rename_requires_phases_format() {
     let err = Typescript::default()
         .export(

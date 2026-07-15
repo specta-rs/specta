@@ -1383,9 +1383,11 @@ fn normalize_container_attrs_for_phase(
         attrs.remove(key);
     }
 
-    // The container rename is still needed by `rewrite_named_type_for_phase`
-    // (which runs after this rewrite) to name the exported type, so normalize
-    // it to the phase-selected value instead of dropping it.
+    // The exported name was already fixed from the pre-rewrite attributes
+    // (`split_type_name` via `build_from_original`), but keep the container
+    // rename normalized to the phase-selected value (rather than dropping it)
+    // so the split shape stays self-describing and idempotent: re-inspecting
+    // it finds a symmetric rename matching the phase, not a one-sided one.
     let rename = match mode {
         PhaseRewrite::Serialize => parsed.rename_serialize,
         PhaseRewrite::Deserialize => parsed.rename_deserialize,
