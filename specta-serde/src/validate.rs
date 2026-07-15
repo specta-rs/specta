@@ -119,10 +119,12 @@ fn inner(
                 checked_references,
                 &path,
                 mode,
-                // Struct `rename_all` renames field names, which are always
-                // part of the wire shape. `rename_all_fields` is enum-only in
-                // serde, so stay conservative for structs.
-                true,
+                // Struct `rename_all` only affects the wire when the struct
+                // has a live named field key to rename; unit/newtype/tuple
+                // structs and all-flattened/all-skipped named structs have
+                // none. `rename_all_fields` is enum-only in serde, so stay
+                // conservative for structs.
+                has_live_named_field_keys(&strct.fields)?,
                 true,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
@@ -208,10 +210,13 @@ fn inner(
             // (`rewrite_fields_for_phase` ignores the rule for unit/tuple
             // variants), so it only affects the wire when such a variant
             // exists.
-            let has_named_field_variants = enm
-                .variants
-                .iter()
-                .any(|(_, variant)| !variant.skip && variant_has_live_named_fields(variant));
+            let mut has_named_field_variants = false;
+            for (_, variant) in &enm.variants {
+                if !variant.skip && has_live_named_field_keys(&variant.fields)? {
+                    has_named_field_variants = true;
+                    break;
+                }
+            }
             validate_container_attributes(
                 &enm.attributes,
                 types,
@@ -595,7 +600,7 @@ fn validate_variant_attributes(
     }
 
     if mode == ApplyMode::Unified
-        && variant_has_live_named_fields(variant)
+        && has_live_named_field_keys(&variant.fields)?
         && serde_attrs.rename_all_serialize != serde_attrs.rename_all_deserialize
     {
         // Not gated on `variant_names_emitted`: variant-level `rename_all`
@@ -632,14 +637,33 @@ fn validate_variant_attributes(
     Ok(())
 }
 
-/// Whether a variant has any named field that is actually part of the wire
-/// shape (skipped fields have their type erased and are never rendered).
-/// Mirrors the fields `rewrite_fields_for_phase` can apply rename rules to.
-fn variant_has_live_named_fields(variant: &Variant) -> bool {
-    matches!(
-        &variant.fields,
-        Fields::Named(named) if named.fields.iter().any(|(_, field)| field.ty.is_some())
-    )
+/// Whether these fields contain at least one named field whose *key* is part
+/// of the local wire shape — the keys a `rename_all` / `rename_all_fields`
+/// rule can actually change. Excludes fields with an erased type (never
+/// rendered), flattened fields (their keys come from the flattened type), and
+/// fields skipped in both directions.
+fn has_live_named_field_keys(fields: &Fields) -> Result<bool, Error> {
+    let Fields::Named(named) = fields else {
+        return Ok(false);
+    };
+
+    for (_, field) in &named.fields {
+        if field.ty.is_none() {
+            continue;
+        }
+
+        let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+            return Ok(true);
+        };
+
+        if attrs.flatten || (attrs.skip_serializing && attrs.skip_deserializing) {
+            continue;
+        }
+
+        return Ok(true);
+    }
+
+    Ok(false)
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {

@@ -185,6 +185,52 @@ enum TupleVariantOneSidedRenameAll {
     A(String, u32),
 }
 
+// --- Structs without live named field keys: `rename_all` has nothing to
+// rename ---
+//
+// serde accepts `rename_all` on unit/newtype/tuple structs and on named
+// structs whose fields are all flattened (their keys come from the flattened
+// type) or skipped in both directions; in all of those cases there is no
+// local field key for the rule to change, so a directional value produces
+// identical shapes and must keep working under `Format`. The live-field
+// control is `ContainerRenameAllOneSided` above.
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct TupleStructOneSidedRenameAll(String, u32);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenTarget {
+    field_a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct AllFlattenedOneSidedRenameAll {
+    #[serde(flatten)]
+    inner: FlattenTarget,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct AllSkippedOneSidedRenameAll {
+    #[serde(skip)]
+    field_one: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct FlattenedPlusLiveOneSidedRenameAll {
+    #[serde(flatten)]
+    inner: FlattenTarget,
+    field_one: String,
+}
+
 // --- Controls: these must keep working unchanged under `Format` ---
 
 #[derive(Type, Serialize, Deserialize)]
@@ -645,6 +691,56 @@ fn variant_rename_all_on_tuple_variant_is_not_direction_dependent() {
     assert!(
         rendered.contains("{ A: [string, number] }"),
         "got: {rendered}"
+    );
+}
+
+#[test]
+fn struct_rename_all_without_live_named_field_keys_is_not_direction_dependent() {
+    for (name, result) in [
+        (
+            "TupleStructOneSidedRenameAll",
+            Typescript::default().export(
+                &Types::default().register::<TupleStructOneSidedRenameAll>(),
+                specta_serde::Format,
+            ),
+        ),
+        (
+            "AllFlattenedOneSidedRenameAll",
+            Typescript::default().export(
+                &Types::default().register::<AllFlattenedOneSidedRenameAll>(),
+                specta_serde::Format,
+            ),
+        ),
+        (
+            "AllSkippedOneSidedRenameAll",
+            Typescript::default().export(
+                &Types::default().register::<AllSkippedOneSidedRenameAll>(),
+                specta_serde::Format,
+            ),
+        ),
+    ] {
+        result.unwrap_or_else(|err| {
+            panic!(
+                "{name}: one-sided rename_all without live named field keys should export under Format: {err}"
+            )
+        });
+    }
+}
+
+#[test]
+fn struct_rename_all_with_a_live_named_field_still_requires_phases_format() {
+    // One live named field key alongside flattened fields keeps the rule
+    // direction-dependent.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenedPlusLiveOneSidedRenameAll>(),
+            specta_serde::Format,
+        )
+        .expect_err("one-sided rename_all should still error when a live named field exists");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("rename_all") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
     );
 }
 
