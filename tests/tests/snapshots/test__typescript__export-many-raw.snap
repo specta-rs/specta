@@ -12,10 +12,7 @@ export type RangeInclusive<T> = {
 	end: T,
 };
 
-export type Result<T, E> = {
-	ok: T,
-	err: E,
-};
+export type Result<T, E> = T | E;
 
 export type Unit1 = null;
 

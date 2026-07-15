@@ -24,10 +24,7 @@ Cow<'static, str>:
 Cow<'static, i32>: 
 Vec<i32>: 
 Vec<MyEnum>: 
-Result<String, i32>: export type Result<T, E> = {
-	ok: T,
-	err: E,
-};
+Result<String, i32>: export type Result<T, E> = T | E;
 
 Vec<Option<Cow<'static, i32>>>: 
 PhantomData<()>: 

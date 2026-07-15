@@ -52,10 +52,7 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null
 Option<Vec<i32>>: number[] | null
-Result<String, i32>: {
-	ok: T,
-	err: E,
-}
+Result<String, i32>: T | E
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 Option<Vec<Cow<'static, i32>>>: number[] | null
 [Vec<String>; 3]: [string[], string[], string[]]
