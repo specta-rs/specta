@@ -1379,124 +1379,44 @@ fn is_emitted_named(ndt: &NamedDataType) -> bool {
 }
 
 fn validate_non_object_roots(types: &Types) -> Result<(), Error> {
-    fn collect(
-        types: &Types,
-        ty: &DataType,
-        referenced: &mut HashSet<String>,
-        expanded: &mut HashSet<String>,
-    ) {
+    fn non_object_root_path(types: &Types, ty: &DataType) -> Option<String> {
         match ty {
-            DataType::List(list) => collect(types, &list.ty, referenced, expanded),
-            DataType::Map(map) => {
-                collect(types, map.key_ty(), referenced, expanded);
-                collect(types, map.value_ty(), referenced, expanded);
-            }
-            DataType::Nullable(inner) => collect(types, inner, referenced, expanded),
-            DataType::Tuple(tuple) => {
-                for element in &tuple.elements {
-                    collect(types, element, referenced, expanded);
-                }
-            }
+            DataType::List(list) => non_object_root_path(types, &list.ty),
+            DataType::Map(map) => non_object_root_path(types, map.key_ty())
+                .or_else(|| non_object_root_path(types, map.value_ty())),
+            DataType::Nullable(inner) => non_object_root_path(types, inner),
+            DataType::Tuple(tuple) => tuple
+                .elements
+                .iter()
+                .find_map(|element| non_object_root_path(types, element)),
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-                NamedReferenceType::Inline { dt, .. } => {
-                    collect(types, dt, referenced, expanded);
-                }
-                NamedReferenceType::Reference { generics, .. } => {
-                    for (_, generic) in generics {
-                        collect(types, generic, referenced, expanded);
-                    }
-                    let Some(ndt) = types.get(reference) else {
-                        return;
-                    };
+                NamedReferenceType::Inline { dt, .. } => non_object_root_path(types, dt),
+                NamedReferenceType::Reference { .. } => types.get(reference).and_then(|ndt| {
                     if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                         && is_non_object_struct(&strct.fields)
                     {
-                        let path = rust_path(ndt);
-                        referenced.insert(path.clone());
-                        if expanded.insert(path)
-                            && let Fields::Unnamed(fields) = &strct.fields
-                        {
-                            for field in fields.fields.iter().filter_map(|field| field.ty.as_ref())
-                            {
-                                collect(types, field, referenced, expanded);
-                            }
-                        }
+                        Some(rust_path(ndt))
+                    } else {
+                        None
                     }
-                }
-                NamedReferenceType::Recursive(_) => {}
+                }),
+                NamedReferenceType::Recursive(_) => None,
             },
-            DataType::Struct(strct) => match &strct.fields {
-                Fields::Unit => {}
-                Fields::Unnamed(fields) => {
-                    for field in fields.fields.iter().filter_map(|field| field.ty.as_ref()) {
-                        collect(types, field, referenced, expanded);
-                    }
-                }
-                Fields::Named(fields) => {
-                    for field in fields
-                        .fields
-                        .iter()
-                        .filter_map(|(_, field)| field.ty.as_ref())
-                    {
-                        collect(types, field, referenced, expanded);
-                    }
-                }
-            },
-            DataType::Enum(enm) => {
-                for variant in enm
-                    .variants
-                    .iter()
-                    .filter(|(_, variant)| !variant.skip)
-                    .map(|(_, variant)| variant)
-                {
-                    match &variant.fields {
-                        Fields::Unit => {}
-                        Fields::Unnamed(fields) => {
-                            for field in fields.fields.iter().filter_map(|field| field.ty.as_ref())
-                            {
-                                collect(types, field, referenced, expanded);
-                            }
-                        }
-                        Fields::Named(fields) => {
-                            for field in fields
-                                .fields
-                                .iter()
-                                .filter_map(|(_, field)| field.ty.as_ref())
-                            {
-                                collect(types, field, referenced, expanded);
-                            }
-                        }
-                    }
-                }
-            }
-            DataType::Intersection(items) => {
-                for item in items {
-                    collect(types, item, referenced, expanded);
-                }
-            }
+            DataType::Intersection(items) => items
+                .iter()
+                .find_map(|item| non_object_root_path(types, item)),
             DataType::Primitive(_)
             | DataType::Generic(_)
-            | DataType::Reference(Reference::Opaque(_)) => {}
+            | DataType::Reference(Reference::Opaque(_))
+            | DataType::Struct(_)
+            | DataType::Enum(_) => None,
         }
     }
 
-    let mut referenced = HashSet::new();
-    let mut expanded = HashSet::new();
-    for ndt in types
-        .into_unsorted_iter()
-        .filter(|ndt| is_emitted_named(ndt))
-    {
-        if let Some(ty) = ndt.ty.as_ref() {
-            collect(types, ty, &mut referenced, &mut expanded);
+    for root in types.roots() {
+        if let Some(path) = non_object_root_path(types, root) {
+            return Err(Error::UnsupportedRoot { path });
         }
-    }
-    if let Some(ndt) = types.into_sorted_iter().find(|ndt| {
-        matches!(ndt.ty.as_ref(), Some(DataType::Struct(strct)) if is_non_object_struct(&strct.fields))
-            && !referenced.contains(&rust_path(ndt))
-    }) {
-        return Err(Error::UnsupportedRoot {
-            path: rust_path(ndt),
-        });
     }
     Ok(())
 }
@@ -2332,6 +2252,7 @@ fn record_reserved_names(containing_name: &str) -> HashSet<String> {
         "EqualityContract",
         "PrintMembers",
         "Equals",
+        "GetType",
         "GetHashCode",
         "ToString",
     ]

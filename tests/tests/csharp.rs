@@ -89,6 +89,14 @@ struct ContainingNameCollision {
     clone: bool,
     equality_contract: bool,
     print_members: bool,
+    get_type: bool,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct SkippedWireDependencyOwner {
+    #[serde(skip)]
+    hidden: WireNewtype,
 }
 
 #[derive(Type)]
@@ -375,6 +383,7 @@ fn declaration_collisions_are_disambiguated() {
     let output = CSharp::new().export(&types, IdentityFormat).unwrap();
 
     assert!(output.contains("bool ContainingNameCollision2"));
+    assert!(output.contains("bool GetType2"));
     assert!(output.contains("bool Clone2"));
     assert!(output.contains("bool EqualityContract2"));
     assert!(output.contains("bool PrintMembers2"));
@@ -644,6 +653,19 @@ fn directly_registered_non_object_roots_are_rejected() {
         Err(Error::UnsupportedRoot { .. })
     ));
     assert!(!root.exists());
+}
+
+#[test]
+fn skipped_non_object_dependencies_are_not_treated_as_roots() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<SkippedWireDependencyOwner>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(output.contains("record SkippedWireDependencyOwner"));
+    assert!(!output.contains("WireNewtype"));
 }
 
 #[test]
