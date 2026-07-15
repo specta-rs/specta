@@ -1995,7 +1995,22 @@ fn validate_internally_tag_variant(
     }
 
     match &variant.fields {
-        Fields::Unit | Fields::Named(_) => Ok(()),
+        Fields::Unit => Ok(()),
+        Fields::Named(named) => {
+            for (_, field) in &named.fields {
+                let field_directions = directions.and(FlattenDirections::for_field(field)?);
+                if field.ty.is_none()
+                    && (field_directions.serialize || field_directions.deserialize)
+                {
+                    return Err(Error::invalid_internally_tagged_enum(
+                        path,
+                        variant_name,
+                        "a payload hidden only from Specta cannot be merged with an internal tag",
+                    ));
+                }
+            }
+            Ok(())
+        }
         Fields::Unnamed(unnamed) => {
             let mut fields = unnamed
                 .fields
@@ -2045,6 +2060,32 @@ fn validate_internally_tag_enum_datatype(
         return Ok(());
     }
 
+    let attrs = match ty {
+        DataType::Struct(strct) => SerdeContainerAttrs::from_attributes(&strct.attributes)?,
+        DataType::Enum(enm) => SerdeContainerAttrs::from_attributes(&enm.attributes)?,
+        _ => None,
+    };
+    let directions = match conversion_wire_targets(attrs.as_ref()) {
+        Some((serialize_wire, deserialize_wire)) => {
+            let remaining = validate_internally_tag_conversion_wires(
+                serialize_wire,
+                deserialize_wire,
+                types,
+                path,
+                variant_name,
+                seen,
+                env,
+                reject_contextual_generic_argument,
+                directions,
+            )?;
+            if !remaining.serialize && !remaining.deserialize {
+                return Ok(());
+            }
+            remaining
+        }
+        None => directions,
+    };
+
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(strct)
@@ -2060,9 +2101,14 @@ fn validate_internally_tag_enum_datatype(
                         if !field_directions.serialize && !field_directions.deserialize {
                             continue;
                         }
-                        if let Some(ty) = &field.ty {
-                            live_fields.push((ty, field_directions));
-                        }
+                        let Some(ty) = &field.ty else {
+                            return Err(Error::invalid_internally_tagged_enum(
+                                path,
+                                variant_name,
+                                "a payload hidden only from Specta cannot be merged with an internal tag",
+                            ));
+                        };
+                        live_fields.push((ty, field_directions));
                     }
                 }
                 Fields::Named(named) => {
@@ -2071,9 +2117,14 @@ fn validate_internally_tag_enum_datatype(
                         if !field_directions.serialize && !field_directions.deserialize {
                             continue;
                         }
-                        if let Some(ty) = &field.ty {
-                            live_fields.push((ty, field_directions));
-                        }
+                        let Some(ty) = &field.ty else {
+                            return Err(Error::invalid_internally_tagged_enum(
+                                path,
+                                variant_name,
+                                "a payload hidden only from Specta cannot be merged with an internal tag",
+                            ));
+                        };
+                        live_fields.push((ty, field_directions));
                     }
                 }
             }
@@ -2098,11 +2149,27 @@ fn validate_internally_tag_enum_datatype(
             }
         }
         DataType::Struct(strct) => match &strct.fields {
-            Fields::Unit | Fields::Named(_) => Ok(()),
+            Fields::Unit => Ok(()),
+            Fields::Named(named) => {
+                for (_, field) in &named.fields {
+                    let field_directions = directions.and(FlattenDirections::for_field(field)?);
+                    if field.ty.is_none()
+                        && (field_directions.serialize || field_directions.deserialize)
+                    {
+                        return Err(Error::invalid_internally_tagged_enum(
+                            path,
+                            variant_name,
+                            "a payload hidden only from Specta cannot be merged with an internal tag",
+                        ));
+                    }
+                }
+                Ok(())
+            }
             Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
                 let field = &unnamed.fields[0];
-                field.ty.as_ref().map_or(Ok(()), |ty| {
-                    validate_internally_tag_enum_datatype(
+                let field_directions = directions.and(FlattenDirections::for_field(field)?);
+                match field.ty.as_ref() {
+                    Some(ty) => validate_internally_tag_enum_datatype(
                         ty,
                         types,
                         path,
@@ -2110,9 +2177,15 @@ fn validate_internally_tag_enum_datatype(
                         seen,
                         env,
                         reject_contextual_generic_argument,
-                        directions.and(FlattenDirections::for_field(field)?),
-                    )
-                })
+                        field_directions,
+                    ),
+                    None if !field_directions.serialize && !field_directions.deserialize => Ok(()),
+                    None => Err(Error::invalid_internally_tagged_enum(
+                        path,
+                        variant_name,
+                        "a payload hidden only from Specta cannot be merged with an internal tag",
+                    )),
+                }
             }
             Fields::Unnamed(_) => Err(Error::invalid_internally_tagged_enum(
                 path,
@@ -2227,6 +2300,53 @@ fn validate_internally_tag_enum_datatype(
             "payload cannot be merged with an internal tag",
         )),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_internally_tag_conversion_wires(
+    serialize_wire: Option<&DataType>,
+    deserialize_wire: Option<&DataType>,
+    types: &Types,
+    path: &str,
+    variant_name: &str,
+    seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
+    reject_contextual_generic_argument: bool,
+    directions: FlattenDirections,
+) -> Result<FlattenDirections, Error> {
+    if directions.serialize
+        && let Some(wire) = serialize_wire
+    {
+        validate_internally_tag_enum_datatype(
+            wire,
+            types,
+            path,
+            variant_name,
+            seen,
+            env,
+            reject_contextual_generic_argument,
+            FlattenDirections::SERIALIZE_ONLY,
+        )?;
+    }
+    if directions.deserialize
+        && let Some(wire) = deserialize_wire
+    {
+        validate_internally_tag_enum_datatype(
+            wire,
+            types,
+            path,
+            variant_name,
+            seen,
+            env,
+            reject_contextual_generic_argument,
+            FlattenDirections::DESERIALIZE_ONLY,
+        )?;
+    }
+
+    Ok(FlattenDirections {
+        serialize: directions.serialize && serialize_wire.is_none(),
+        deserialize: directions.deserialize && deserialize_wire.is_none(),
+    })
 }
 
 fn datatype_changes_under_env(ty: &DataType, env: Option<&GenericEnv<'_>>) -> bool {

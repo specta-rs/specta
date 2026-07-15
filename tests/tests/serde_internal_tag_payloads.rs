@@ -21,6 +21,31 @@ struct Unit;
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct ConvertedMapWire {
+    converted_value: i32,
+}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(into = "ConvertedMapWire", from = "ConvertedMapWire")]
+struct ConvertedScalar(i32);
+
+impl From<ConvertedScalar> for ConvertedMapWire {
+    fn from(value: ConvertedScalar) -> Self {
+        Self {
+            converted_value: value.0,
+        }
+    }
+}
+
+impl From<ConvertedMapWire> for ConvertedScalar {
+    fn from(value: ConvertedMapWire) -> Self {
+        Self(value.converted_value)
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct HiddenNewtype(#[specta(skip)] i32);
 
 #[derive(Type, Serialize, Deserialize)]
@@ -45,6 +70,13 @@ enum NewtypePayloads {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
+enum ConvertedPayloadWrapper {
+    Value(ConvertedScalar),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
 enum HiddenNewtypePayload {
     Value(HiddenNewtype),
 }
@@ -54,6 +86,16 @@ enum HiddenNewtypePayload {
 #[serde(tag = "kind")]
 enum DirectHiddenPayload {
     Value(#[specta(skip)] i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum DirectHiddenNamedPayload {
+    Value {
+        #[specta(skip)]
+        value: i32,
+    },
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -529,6 +571,14 @@ fn serde_accepts_newtype_and_unit_struct_payloads() {
         .unwrap(),
         serde_json::json!({ "kind": "Value", "value": 1 })
     );
+
+    let converted = ConvertedPayloadWrapper::Value(ConvertedScalar(1));
+    let converted = serde_json::to_value(converted).unwrap();
+    assert_eq!(
+        converted,
+        serde_json::json!({ "kind": "Value", "converted_value": 1 })
+    );
+    assert!(serde_json::from_value::<ConvertedPayloadWrapper>(converted).is_ok());
 }
 
 #[test]
@@ -539,6 +589,9 @@ fn format_accepts_newtype_unit_and_generic_payloads() {
     specta_serde::Format
         .map_types(&Types::default().register::<TransparentWithSkippedSiblingWrapper>())
         .expect("transparent tuple structs delegate through their sole live field");
+    specta_serde::Format
+        .map_types(&Types::default().register::<ConvertedPayloadWrapper>())
+        .expect("map-shaped conversion wires are valid internally tagged payloads");
     specta_serde::Format
         .map_types(&Types::default().register::<GenericPayload<Inner>>())
         .expect("generic payloads must be validated at their concrete use site");
@@ -916,8 +969,10 @@ fn specta_hidden_newtype_payloads_are_rejected() {
     for types in [
         Types::default().register::<HiddenNewtypePayload>(),
         Types::default().register::<DirectHiddenPayload>(),
+        Types::default().register::<DirectHiddenNamedPayload>(),
         Types::default().register::<HiddenNamedPayload>(),
         Types::default().register::<ExternalWithHiddenPayloadWrapper>(),
+        Types::default().register::<GenericPayload<HiddenNamed>>(),
     ] {
         assert!(
             specta_serde::Format.map_types(&types).is_err(),
