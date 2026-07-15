@@ -933,11 +933,11 @@ fn rewrite_datatype_for_phase(
 
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
             normalize_container_attrs_for_phase(&mut s.attributes, mode)?;
-            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
+            if let Some(intersection) = lower_flattened_struct(s, mode)? {
                 *ty = intersection;
                 return Ok(());
             }
-            if let Some(intersection) = lower_flattened_struct(s)? {
+            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
                 *ty = intersection;
             }
         }
@@ -1055,7 +1055,10 @@ fn rewrite_datatype_for_phase(
     Ok(())
 }
 
-fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error> {
+fn lower_flattened_struct(
+    strct: &mut Struct,
+    mode: PhaseRewrite,
+) -> Result<Option<DataType>, Error> {
     let Fields::Named(named) = &mut strct.fields else {
         return Ok(None);
     };
@@ -1098,7 +1101,9 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
     };
     if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
         base.attributes = strct.attributes.clone();
-        mandatory.insert(0, DataType::Struct(base));
+        let base = lower_field_aliases_for_phase(&mut base.fields, mode)?
+            .unwrap_or(DataType::Struct(base));
+        mandatory.insert(0, base);
     }
 
     Ok(Some(flatten_intersection_with_optionals(

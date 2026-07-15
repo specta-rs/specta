@@ -113,6 +113,21 @@ struct FieldMultipleAliases {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlattenedAliasInner {
+    nested: bool,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldAliasWithFlatten {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    inner: FlattenedAliasInner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum VariantAlias {
     #[serde(alias = "OldValue")]
     Value,
@@ -475,6 +490,21 @@ fn format_unifies_aliases() {
 
     insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
     insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
+}
+
+#[test]
+fn format_unifies_aliases_with_flattened_fields() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<FieldAliasWithFlatten>(),
+            specta_serde::Format,
+        )
+        .expect("Format should preserve flattened fields while widening aliases");
+
+    insta::assert_snapshot!(
+        "serde-conversions-format-unified-field-alias-with-flatten",
+        rendered
+    );
 }
 
 #[test]
