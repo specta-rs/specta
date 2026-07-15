@@ -106,6 +106,13 @@ pub enum Error {
         /// Recursive Rust type path.
         type_path: String,
     },
+
+    /// Draft 7 cannot close a non-mergeable intersection with dynamic object keys.
+    #[error("cannot close Draft 7 intersection with dynamic properties at {path}")]
+    UnsupportedClosedIntersection {
+        /// Schema path being rendered.
+        path: String,
+    },
 }
 
 impl Error {

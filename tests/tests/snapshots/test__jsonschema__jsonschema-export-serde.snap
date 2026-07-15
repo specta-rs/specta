@@ -2818,8 +2818,27 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "unevaluatedProperties": false
     },
     "InternallyTaggedD": {
-      "const": "A",
-      "title": "InternallyTaggedD"
+      "allOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "InternallyTaggedD",
+      "unevaluatedProperties": false
     },
     "InternallyTaggedE": {
       "additionalProperties": false,
@@ -2869,8 +2888,49 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "null"
     },
     "InternallyTaggedL": {
-      "const": "A",
-      "title": "InternallyTaggedL"
+      "allOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "A"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "B"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      ],
+      "title": "InternallyTaggedL",
+      "unevaluatedProperties": false
     },
     "InternallyTaggedLInner": {
       "oneOf": [
@@ -3432,8 +3492,21 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "type": "object"
     },
     "MyEnumTagged": {
-      "const": "Variant",
-      "title": "MyEnumTagged"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        },
+        "type": {
+          "const": "Variant"
+        }
+      },
+      "required": [
+        "type",
+        "a"
+      ],
+      "title": "MyEnumTagged",
+      "type": "object"
     },
     "MyEnumUntagged": {
       "additionalProperties": false,

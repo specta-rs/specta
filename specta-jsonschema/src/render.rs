@@ -118,19 +118,14 @@ impl<'a> Renderer<'a> {
             return Ok(());
         }
 
-        let same_type = self
+        let (same_type_count, maximum_complexity) = self
             .in_progress_types
             .iter()
             .filter(|candidate| candidate.is_same_type_as(&source))
-            .collect::<Vec<_>>();
-        if same_type.len() >= 2
-            && generic_complexity(&source.generics)
-                > same_type
-                    .iter()
-                    .map(|source| generic_complexity(&source.generics))
-                    .max()
-                    .unwrap_or_default()
-        {
+            .fold((0, 0), |(count, maximum), source| {
+                (count + 1, maximum.max(generic_complexity(&source.generics)))
+            });
+        if same_type_count >= 2 && generic_complexity(&source.generics) > maximum_complexity {
             return Err(Error::ExpandingRecursiveGeneric {
                 path: path.to_string(),
                 type_path: source.type_path,
@@ -216,10 +211,36 @@ impl<'a> Renderer<'a> {
 
         let mut schema = Map::new();
         schema.insert("allOf".to_string(), Value::Array(parts));
-        if !self.allow_additional_properties
-            && self.schema_version.supports_unevaluated_properties()
-        {
-            schema.insert("unevaluatedProperties".to_string(), Value::Bool(false));
+        if !self.allow_additional_properties {
+            if self.schema_version.supports_unevaluated_properties() {
+                schema.insert("unevaluatedProperties".to_string(), Value::Bool(false));
+            } else {
+                let mut properties = BTreeSet::new();
+                let mut saw_object = false;
+                if !collect_finite_object_properties(
+                    schema
+                        .get("allOf")
+                        .expect("the intersection parts were just inserted"),
+                    &mut properties,
+                    &mut saw_object,
+                ) {
+                    return Err(Error::UnsupportedClosedIntersection {
+                        path: path.to_string(),
+                    });
+                }
+                if saw_object {
+                    schema.insert(
+                        "properties".to_string(),
+                        Value::Object(
+                            properties
+                                .into_iter()
+                                .map(|property| (property, Value::Bool(true)))
+                                .collect(),
+                        ),
+                    );
+                    schema.insert("additionalProperties".to_string(), Value::Bool(false));
+                }
+            }
         }
 
         Ok(Value::Object(schema))
@@ -480,7 +501,9 @@ impl<'a> Renderer<'a> {
             DataType::Primitive(Primitive::i128) => Some(pattern_schema(
                 &signed_integer_key_pattern(i128::MIN.unsigned_abs(), i128::MAX as u128),
             )),
-            DataType::Primitive(Primitive::isize) => Some(pattern_schema("^-?(0|[1-9][0-9]*)$")),
+            DataType::Primitive(Primitive::isize) => Some(pattern_schema(
+                &signed_integer_key_pattern(isize::MIN.unsigned_abs() as u128, isize::MAX as u128),
+            )),
             DataType::Primitive(Primitive::u8) => Some(pattern_schema(
                 &unsigned_integer_key_pattern(u8::MAX.into()),
             )),
@@ -496,7 +519,9 @@ impl<'a> Renderer<'a> {
             DataType::Primitive(Primitive::u128) => {
                 Some(pattern_schema(&unsigned_integer_key_pattern(u128::MAX)))
             }
-            DataType::Primitive(Primitive::usize) => Some(pattern_schema("^(0|[1-9][0-9]*)$")),
+            DataType::Primitive(Primitive::usize) => Some(pattern_schema(
+                &unsigned_integer_key_pattern(usize::MAX as u128),
+            )),
             DataType::Primitive(Primitive::f32 | Primitive::f64) => Some(pattern_schema(
                 "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$",
             )),
@@ -771,7 +796,7 @@ impl<'a> Renderer<'a> {
                         && let Some(ty) = &field.ty
                     {
                         let payload = self.render_datatype(ty, generics, path, depth + 1)?;
-                        (!schema_has_const(&payload, name)).then_some(payload)
+                        (!schema_is_const(&payload, name)).then_some(payload)
                     } else {
                         None
                     };
@@ -781,7 +806,7 @@ impl<'a> Renderer<'a> {
                     } else {
                         let payload =
                             self.render_unnamed_fields(&fields.fields, generics, path, depth + 1)?;
-                        if rewritten && schema_has_const(&payload, name) {
+                        if rewritten && schema_is_const(&payload, name) {
                             object([("const", string(name))])
                         } else {
                             self.external_variant_schema(name, payload)
@@ -1123,12 +1148,14 @@ fn primitive_schema(primitive: &Primitive) -> Value {
         Primitive::i16 => integer(Some(i16::MIN.into()), Some(i16::MAX.into())),
         Primitive::i32 => integer(Some(i32::MIN.into()), Some(i32::MAX.into())),
         Primitive::i64 => integer(Some(i64::MIN.into()), Some(i64::MAX.into())),
-        Primitive::i128 | Primitive::isize => integer(None, None),
+        Primitive::i128 => integer(None, None),
+        Primitive::isize => integer(Some(isize::MIN.into()), Some(isize::MAX.into())),
         Primitive::u8 => integer(Some(0.into()), Some(u8::MAX.into())),
         Primitive::u16 => integer(Some(0.into()), Some(u16::MAX.into())),
         Primitive::u32 => integer(Some(0.into()), Some(u32::MAX.into())),
         Primitive::u64 => integer(Some(0.into()), Some(u64::MAX.into())),
-        Primitive::u128 | Primitive::usize => integer(Some(0.into()), None),
+        Primitive::u128 => integer(Some(0.into()), None),
+        Primitive::usize => integer(Some(0.into()), Some(usize::MAX.into())),
         Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => number_schema(None),
     }
 }
@@ -1297,6 +1324,43 @@ fn merge_object_intersection(parts: &[Value], allow_additional_properties: bool)
     Some(Value::Object(schema))
 }
 
+fn collect_finite_object_properties(
+    schema: &Value,
+    properties: &mut BTreeSet<String>,
+    saw_object: &mut bool,
+) -> bool {
+    if let Some(schemas) = schema.as_array() {
+        return schemas
+            .iter()
+            .all(|schema| collect_finite_object_properties(schema, properties, saw_object));
+    }
+    let Some(schema) = schema.as_object() else {
+        return true;
+    };
+
+    if schema.contains_key("$ref") {
+        return false;
+    }
+    if schema.get("type").and_then(Value::as_str) == Some("object") {
+        *saw_object = true;
+        if schema
+            .get("additionalProperties")
+            .is_some_and(|additional| additional != &Value::Bool(false))
+        {
+            return false;
+        }
+        if let Some(schema_properties) = schema.get("properties").and_then(Value::as_object) {
+            properties.extend(schema_properties.keys().cloned());
+        }
+    }
+
+    ["allOf", "anyOf", "oneOf"]
+        .into_iter()
+        .filter_map(|keyword| schema.get(keyword).and_then(Value::as_array))
+        .flatten()
+        .all(|schema| collect_finite_object_properties(schema, properties, saw_object))
+}
+
 pub(crate) fn encode_ref_token(value: &str) -> String {
     let pointer = value.replace('~', "~0").replace('/', "~1");
     let mut encoded = String::with_capacity(pointer.len());
@@ -1325,6 +1389,14 @@ fn schema_has_const(schema: &Value, value: &str) -> bool {
         Value::Array(values) => values.iter().any(|value_| schema_has_const(value_, value)),
         _ => false,
     }
+}
+
+fn schema_is_const(schema: &Value, value: &str) -> bool {
+    schema
+        .as_object()
+        .and_then(|schema| schema.get("const"))
+        .and_then(Value::as_str)
+        .is_some_and(|const_| const_ == value)
 }
 
 fn schema_has_property(schema: &Value, property: &str) -> bool {

@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use specta::{
     Format, Type, Types,
     datatype::{
-        DataType, Field, Generic, GenericDefinition, List, NamedDataType, Primitive, Struct,
+        DataType, Field, Generic, GenericDefinition, List, Map as SpectaMap, NamedDataType,
+        Primitive, Struct,
     },
 };
 use specta_jsonschema::{JsonSchema, SchemaVersion};
@@ -22,6 +23,12 @@ struct Primitives {
     u64_field: u64,
     f32_field: f32,
     f64_field: f64,
+}
+
+#[derive(Type)]
+struct PointerPrimitives {
+    isize_field: isize,
+    usize_field: usize,
 }
 
 #[derive(Type)]
@@ -150,6 +157,8 @@ struct LexicalMapKeys {
 struct FixedWidthIntegerMapKeys {
     signed: std::collections::HashMap<i8, String>,
     unsigned: std::collections::HashMap<u8, String>,
+    pointer_signed: std::collections::HashMap<isize, String>,
+    pointer_unsigned: std::collections::HashMap<usize, String>,
 }
 
 #[derive(Type)]
@@ -164,6 +173,18 @@ enum InternalOther {
     Known,
     #[serde(other)]
     Other,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum InnerChoices {
+    Outer,
+    Other,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum RewrittenOuterPayload {
+    Outer(InnerChoices),
+    Unit,
 }
 
 #[derive(Type)]
@@ -387,18 +408,42 @@ fn constrains_fixed_width_integer_map_key_ranges() {
         .unwrap();
 
     let validator = jsonschema::validator_for(&schema).unwrap();
-    assert!(validator.is_valid(&serde_json::json!({
+    let mut valid = serde_json::json!({
         "signed": { "-128": "minimum", "127": "maximum" },
-        "unsigned": { "0": "minimum", "255": "maximum" }
-    })));
+        "unsigned": { "0": "minimum", "255": "maximum" },
+        "pointer_signed": {},
+        "pointer_unsigned": {}
+    });
+    valid["pointer_signed"]
+        .as_object_mut()
+        .unwrap()
+        .insert(isize::MIN.to_string(), serde_json::json!("minimum"));
+    valid["pointer_unsigned"]
+        .as_object_mut()
+        .unwrap()
+        .insert(usize::MAX.to_string(), serde_json::json!("maximum"));
+    assert!(validator.is_valid(&valid));
     assert!(!validator.is_valid(&serde_json::json!({
         "signed": { "128": "out of range" },
-        "unsigned": {}
+        "unsigned": {},
+        "pointer_signed": {},
+        "pointer_unsigned": {}
     })));
     assert!(!validator.is_valid(&serde_json::json!({
         "signed": {},
-        "unsigned": { "256": "out of range" }
+        "unsigned": { "256": "out of range" },
+        "pointer_signed": {},
+        "pointer_unsigned": {}
     })));
+
+    if let Some(out_of_range) = (usize::MAX as u128).checked_add(1) {
+        let mut invalid = valid;
+        invalid["pointer_unsigned"]
+            .as_object_mut()
+            .unwrap()
+            .insert(out_of_range.to_string(), serde_json::json!("out of range"));
+        assert!(!validator.is_valid(&invalid));
+    }
 }
 
 #[test]
@@ -611,6 +656,22 @@ fn rewritten_other_variants_keep_their_wire_shape() {
 }
 
 #[test]
+fn rewritten_newtype_payloads_are_not_collapsed_by_nested_literals() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<RewrittenOuterPayload>(),
+            specta_serde::Format,
+            "RewrittenOuterPayload",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({ "Outer": "Outer" })));
+    assert!(validator.is_valid(&serde_json::json!({ "Outer": "Other" })));
+    assert!(!validator.is_valid(&serde_json::json!("Outer")));
+}
+
+#[test]
 fn untagged_variant_metadata_is_preserved() {
     let schema = JsonSchema::default()
         .export_value(
@@ -665,7 +726,7 @@ fn permissive_objects_allow_unknown_fields_in_intersection_fallbacks() {
             Struct::named()
                 .field("known", Field::new(Primitive::str.into()))
                 .build(),
-            DataType::Nullable(Box::new(Struct::named().build())),
+            DataType::Generic(Generic::new("T".into())),
         ]));
     });
 
@@ -685,10 +746,58 @@ fn permissive_objects_allow_unknown_fields_in_intersection_fallbacks() {
 }
 
 #[test]
+fn draft7_closes_finite_intersection_fallbacks() {
+    let mut types = Types::default();
+    NamedDataType::new("Draft7Fallback", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Intersection(vec![
+            Struct::named()
+                .field("known", Field::new(Primitive::str.into()))
+                .build(),
+            DataType::Generic(Generic::new("T".into())),
+        ]));
+    });
+
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .export_ref_value(&types, IdentityFormat, "Draft7Fallback")
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({ "known": "value" })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "known": "value",
+        "extra": true
+    })));
+}
+
+#[test]
+fn draft7_rejects_dynamic_intersection_fallbacks_that_cannot_be_closed() {
+    let mut types = Types::default();
+    NamedDataType::new("DynamicDraft7Fallback", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Intersection(vec![
+            Struct::named()
+                .field("known", Field::new(Primitive::str.into()))
+                .build(),
+            SpectaMap::new(Primitive::str.into(), Primitive::str.into()).into(),
+        ]));
+    });
+
+    let error = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .export_value(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::UnsupportedClosedIntersection { .. }
+    ));
+}
+
+#[test]
 fn fixed_width_integer_bounds_are_exported() {
     let schema = JsonSchema::default()
         .export_value(
-            &Types::default().register::<Primitives>(),
+            &Types::default()
+                .register::<Primitives>()
+                .register::<PointerPrimitives>(),
             specta_serde::Format,
         )
         .unwrap();
@@ -696,6 +805,10 @@ fn fixed_width_integer_bounds_are_exported() {
     assert_eq!(properties["i32_field"]["minimum"], i32::MIN);
     assert_eq!(properties["i32_field"]["maximum"], i32::MAX);
     assert_eq!(properties["u64_field"]["maximum"], u64::MAX);
+    let pointer = &schema["$defs"]["PointerPrimitives"]["properties"];
+    assert_eq!(pointer["isize_field"]["minimum"], isize::MIN);
+    assert_eq!(pointer["isize_field"]["maximum"], isize::MAX);
+    assert_eq!(pointer["usize_field"]["maximum"], usize::MAX);
 }
 
 #[test]

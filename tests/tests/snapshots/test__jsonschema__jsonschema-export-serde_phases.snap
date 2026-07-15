@@ -204,7 +204,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "data": {
               "allOf": [
                 {
-                  "oneOf": [
+                  "anyOf": [
                     {
                       "additionalProperties": false,
                       "properties": {
@@ -3147,8 +3147,27 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "unevaluatedProperties": false
     },
     "InternallyTaggedD": {
-      "const": "A",
-      "title": "InternallyTaggedD"
+      "allOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ],
+      "title": "InternallyTaggedD",
+      "unevaluatedProperties": false
     },
     "InternallyTaggedE": {
       "additionalProperties": false,
@@ -3198,8 +3217,49 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "null"
     },
     "InternallyTaggedL": {
-      "const": "A",
-      "title": "InternallyTaggedL"
+      "allOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "A"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "const": "B"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      ],
+      "title": "InternallyTaggedL",
+      "unevaluatedProperties": false
     },
     "InternallyTaggedLInner": {
       "oneOf": [
@@ -3286,7 +3346,53 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "InternallyTaggedWithAlias_Deserialize": {
       "oneOf": [
         {
-          "const": "A"
+          "allOf": [
+            {
+              "properties": {
+                "type": {
+                  "const": "A"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "field": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "field"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bruh": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "bruh"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              ],
+              "unevaluatedProperties": false
+            }
+          ],
+          "unevaluatedProperties": false
         },
         {
           "additionalProperties": false,
@@ -3913,8 +4019,21 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "MyEnumTagged": {
-      "const": "Variant",
-      "title": "MyEnumTagged"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        },
+        "type": {
+          "const": "Variant"
+        }
+      },
+      "required": [
+        "type",
+        "a"
+      ],
+      "title": "MyEnumTagged",
+      "type": "object"
     },
     "MyEnumUntagged": {
       "additionalProperties": false,
@@ -6762,7 +6881,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithAliasAndRename_Deserialize": {
       "allOf": [
         {
-          "oneOf": [
+          "anyOf": [
             {
               "additionalProperties": false,
               "properties": {
@@ -6809,7 +6928,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithAlias_Deserialize": {
       "allOf": [
         {
-          "oneOf": [
+          "anyOf": [
             {
               "additionalProperties": false,
               "properties": {
@@ -6885,7 +7004,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithMultipleAliases_Deserialize": {
       "allOf": [
         {
-          "oneOf": [
+          "anyOf": [
             {
               "additionalProperties": false,
               "properties": {
@@ -7462,7 +7581,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         {
           "allOf": [
             {
-              "oneOf": [
+              "anyOf": [
                 {
                   "additionalProperties": false,
                   "properties": {
