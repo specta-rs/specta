@@ -2156,6 +2156,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-rust"
+version = "0.0.1"
+dependencies = [
+ "specta",
+ "specta-serde",
+ "unicode-ident",
+]
+
+[[package]]
 name = "specta-serde"
 version = "0.0.13"
 dependencies = [
@@ -2203,6 +2212,7 @@ dependencies = [
  "specta-java",
  "specta-jsonschema",
  "specta-openapi",
+ "specta-rust",
  "specta-serde",
  "specta-swift",
  "specta-typescript",
