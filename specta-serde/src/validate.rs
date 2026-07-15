@@ -621,15 +621,30 @@ fn validate_flatten_target(
     env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     match ty {
-        // Maps merge directly. Enums are accepted for all four serde
-        // representations: external, internal, and adjacent tagging always
-        // produce map-shaped output when flattened (verified against
-        // serde_json 1.x - even an externally tagged unit variant flattens as
-        // `"Variant": null`). An untagged enum only flattens when the active
-        // variant's payload is map-shaped, but rejecting it statically would
-        // break the common pattern of flattening `serde_json::Value` (an
-        // untagged enum) for extra fields, so it is deliberately accepted.
-        DataType::Map(_) | DataType::Enum(_) => Ok(()),
+        // Maps merge directly.
+        DataType::Map(_) => Ok(()),
+        // Enums are accepted for all four serde representations: external,
+        // internal, and adjacent tagging always produce map-shaped output
+        // when flattened (verified against serde_json 1.x - even an
+        // externally tagged unit variant flattens as `"Variant": null`). An
+        // untagged enum only flattens when the active variant's payload is
+        // map-shaped, but rejecting it statically would break the common
+        // pattern of flattening `serde_json::Value` (an untagged enum) for
+        // extra fields, so it is deliberately accepted. Container
+        // conversions still substitute the wire type, though, so any
+        // declared conversion targets are checked instead.
+        DataType::Enum(enm) => {
+            let attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
+            if let Some((serialize_wire, deserialize_wire)) =
+                conversion_wire_targets(attrs.as_ref())
+            {
+                for wire in [serialize_wire, deserialize_wire].into_iter().flatten() {
+                    validate_flatten_target(wire, types, path, seen, env)?;
+                }
+            }
+
+            Ok(())
+        }
         // An intersection is a structural merge of object-like types (see
         // `DataType::Intersection`'s docs), so it is map-shaped by
         // construction. It can't come out of a derive - specta-serde only
@@ -643,12 +658,31 @@ fn validate_flatten_target(
         // flattening one is a harmless no-op (verified against serde_json).
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Struct(strct) => {
+            let attrs = SerdeContainerAttrs::from_attributes(&strct.attributes)?;
+
+            // `#[serde(into/from/try_from)]` substitute the serde *wire* type
+            // for the declared shape, per direction, so the wire types are
+            // what serde actually flattens. A direction without a conversion
+            // keeps the declared shape, so only skip the declared-shape
+            // checks below when both directions are covered. (Unified mode
+            // separately rejects one-sided conversions during the rewrite -
+            // see `select_conversion_target` in lib.rs - which this mirrors.)
+            if let Some((serialize_wire, deserialize_wire)) =
+                conversion_wire_targets(attrs.as_ref())
+            {
+                for wire in [serialize_wire, deserialize_wire].into_iter().flatten() {
+                    validate_flatten_target(wire, types, path, seen, env)?;
+                }
+
+                if serialize_wire.is_some() && deserialize_wire.is_some() {
+                    return Ok(());
+                }
+            }
+
             // `#[serde(transparent)]` structs delegate (de)serialization
             // straight to their single non-skipped field, so serde sees that
             // field's shape - not a struct/tuple wrapper - when flattened.
-            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
-                .is_some_and(|attrs| attrs.transparent)
-            {
+            if attrs.is_some_and(|attrs| attrs.transparent) {
                 let inner_fields = match &strct.fields {
                     Fields::Unit => return Ok(()),
                     Fields::Unnamed(unnamed) => unnamed
@@ -768,6 +802,24 @@ fn validate_flatten_target(
             ))
         }
     }
+}
+
+/// The serde wire types substituted by container conversions, as
+/// `(serialize, deserialize)` targets: `#[serde(into = ...)]` replaces the
+/// serialize shape and `#[serde(from/try_from = ...)]` the deserialize shape.
+/// Returns `None` when the container declares no conversions. Mirrors the
+/// per-direction selection in `select_conversion_target` (`lib.rs`).
+fn conversion_wire_targets(
+    attrs: Option<&SerdeContainerAttrs>,
+) -> Option<(Option<&DataType>, Option<&DataType>)> {
+    let attrs = attrs?;
+    let serialize = attrs.resolved_into.as_ref();
+    let deserialize = attrs
+        .resolved_from
+        .as_ref()
+        .or(attrs.resolved_try_from.as_ref());
+
+    (serialize.is_some() || deserialize.is_some()).then_some((serialize, deserialize))
 }
 
 fn ensure_codec_override(

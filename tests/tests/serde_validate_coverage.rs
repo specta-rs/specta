@@ -585,6 +585,160 @@ fn flatten_of_generic_newtype_instantiated_with_struct_is_accepted() {
         .expect("substitution must not reject a struct-shaped instantiation");
 }
 
+// `#[serde(into = ..., from = ...)]` substitute the serde *wire* type for the
+// declared shape, so a newtype over a primitive that converts to a named-field
+// wire struct is a perfectly valid flatten target - the raw tuple shape never
+// hits the wire. Ground-truthed below with serde_json.
+// https://github.com/specta-rs/specta/pull/524 (Codex round 2)
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "ConversionWire", from = "ConversionWire")]
+struct ConvertedId(u64);
+
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+struct ConversionWire {
+    id: String,
+}
+
+impl From<ConvertedId> for ConversionWire {
+    fn from(value: ConvertedId) -> Self {
+        Self {
+            id: value.0.to_string(),
+        }
+    }
+}
+
+impl From<ConversionWire> for ConvertedId {
+    fn from(value: ConversionWire) -> Self {
+        Self(value.id.parse().unwrap_or_default())
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenConvertedNewtypeValid {
+    a: i32,
+    #[serde(flatten)]
+    v: ConvertedId,
+}
+
+#[test]
+fn serde_json_confirms_flatten_of_converted_newtype_uses_wire_shape() {
+    let json = serde_json::to_string(&FlattenConvertedNewtypeValid {
+        a: 1,
+        v: ConvertedId(7),
+    })
+    .expect("into-conversion makes the flatten target a named-field struct");
+    assert_eq!(json, r#"{"a":1,"id":"7"}"#);
+
+    let back: FlattenConvertedNewtypeValid =
+        serde_json::from_str(&json).expect("from-conversion deserializes the wire shape back");
+    assert_eq!(back.v.0, 7);
+}
+
+#[test]
+fn flatten_of_converted_newtype_with_struct_wire_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenConvertedNewtypeValid>(),
+            specta_serde::Format,
+        )
+        .expect("the wire shape (a named-field struct) is what serde flattens, not the raw tuple");
+}
+
+// Control: the inverse - a raw shape that would be fine, converting to a wire
+// shape serde can't flatten - must be rejected by wire shape too.
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "Vec<String>", from = "Vec<String>")]
+struct VecWire {
+    x: String,
+}
+
+impl From<VecWire> for Vec<String> {
+    fn from(value: VecWire) -> Self {
+        vec![value.x]
+    }
+}
+
+impl From<Vec<String>> for VecWire {
+    fn from(value: Vec<String>) -> Self {
+        Self {
+            x: value.into_iter().next().unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenConvertedVecWireInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: VecWire,
+}
+
+#[test]
+fn flatten_of_converted_struct_with_vec_wire_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenConvertedVecWireInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "the declared shape is a named-field struct, but the wire shape is a Vec, which \
+             serde_json rejects at runtime with \"can only flatten structs and maps\"",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// One-sided conversion: `into` only affects serialization; without `from`,
+// deserialization still uses the raw declared shape. The flatten target must
+// therefore be valid in *both* directions - here the deserialize direction is
+// the raw newtype over u64, which serde can't flatten a map into.
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "ConversionWire")]
+struct IntoOnlyId(u64);
+
+impl From<IntoOnlyId> for ConversionWire {
+    fn from(value: IntoOnlyId) -> Self {
+        Self {
+            id: value.0.to_string(),
+        }
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenIntoOnlyInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: IntoOnlyId,
+}
+
+#[test]
+fn flatten_of_into_only_conversion_still_checks_raw_deserialize_shape() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenIntoOnlyInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err(
+            "serialize-wire is a struct, but deserialization uses the raw u64 newtype, which \
+             can't be flattened",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 struct FlattenNestedGenericNewtypeVecInvalid {
