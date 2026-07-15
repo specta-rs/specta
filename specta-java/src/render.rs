@@ -945,13 +945,7 @@ fn resolved_string_enum(value: &Enum) -> Option<Vec<(&str, &str)>> {
                     };
                     field.ty.as_ref()?
                 }
-                Fields::Named(fields) => {
-                    let [(_, field)] = fields.fields.as_slice() else {
-                        return None;
-                    };
-                    field.ty.as_ref()?
-                }
-                Fields::Unit => return None,
+                Fields::Unit | Fields::Named(_) => return None,
             };
             string_literal_raw_value(datatype).map(|raw| (variant_name.as_ref(), raw))
         })

@@ -41,6 +41,14 @@ enum Status {
     PendingReview,
 }
 
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum TaggedUnitStatus {
+    Ready,
+    Pending,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind", content = "payload")]
@@ -114,6 +122,25 @@ fn java_export_raw_and_serde() {
             .export(&types(), specta_serde::PhasesFormat)
             .unwrap()
     );
+}
+
+#[test]
+fn tagged_unit_enums_preserve_their_object_shape() {
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<TaggedUnitStatus>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("sealed interface TaggedUnitStatus"));
+    assert!(source.contains("record Ready("));
+    assert!(source.contains("java.lang.String kind"));
+    assert!(!source.contains("enum TaggedUnitStatus"));
+    compile_java(temp.path(), &[&path]);
 }
 
 #[test]
