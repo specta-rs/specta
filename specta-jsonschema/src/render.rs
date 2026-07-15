@@ -726,8 +726,18 @@ impl<'a> Renderer<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let rewritten_may_overlap = rewritten
+            && enm
+                .variants
+                .iter()
+                .filter(|(_, variant)| !variant.skip)
+                .zip(&variants)
+                .any(|((name, _), schema)| {
+                    !schema_has_const(schema, name) && !schema_has_property(schema, name)
+                });
         let any_of = self.allow_additional_properties
             || untagged
+            || rewritten_may_overlap
             || enm.variants.iter().any(|(_, variant)| {
                 !variant.skip && variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
             });
@@ -786,9 +796,7 @@ impl<'a> Renderer<'a> {
                         depth + 1,
                         true,
                     )?;
-                    if rewritten
-                        && (schema_has_const(&payload, name) || schema_has_property(&payload, name))
-                    {
+                    if rewritten {
                         payload
                     } else {
                         self.external_variant_schema(name, payload)

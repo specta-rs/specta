@@ -157,6 +157,15 @@ enum RawNewtypeEnum {
     Value(String),
 }
 
+#[derive(Type, Deserialize)]
+#[serde(tag = "kind")]
+enum InternalOther {
+    #[serde(rename = "known")]
+    Known,
+    #[serde(other)]
+    Other,
+}
+
 #[derive(Type)]
 struct RawNewtypeEnumMap {
     values: std::collections::HashMap<RawNewtypeEnum, String>,
@@ -581,6 +590,24 @@ fn identity_format_preserves_external_newtype_enum_tag() {
 
     assert!(validator.is_valid(&serde_json::json!({ "Value": "text" })));
     assert!(!validator.is_valid(&serde_json::json!("text")));
+}
+
+#[test]
+fn rewritten_other_variants_keep_their_wire_shape() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<InternalOther>(),
+            specta_serde::PhasesFormat,
+            "InternalOther_Deserialize",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({ "kind": "known" })));
+    assert!(validator.is_valid(&serde_json::json!({ "kind": "unknown" })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "Other": { "kind": "unknown" }
+    })));
 }
 
 #[test]
