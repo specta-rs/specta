@@ -175,6 +175,83 @@ struct FieldMultipleAliases {
     value: String,
 }
 
+mod alias_collision {
+    // The collision is intentional: serde gives the earlier alias precedence.
+    #![allow(unreachable_patterns)]
+
+    use super::*;
+
+    #[derive(Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    pub(super) struct FieldAliasCollision {
+        #[serde(alias = "b")]
+        pub(super) a: u32,
+        #[serde(default)]
+        pub(super) b: String,
+    }
+
+    #[derive(Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    pub(super) struct SharedFieldAlias {
+        #[serde(alias = "legacy")]
+        pub(super) a: u32,
+        #[serde(default, alias = "legacy")]
+        pub(super) b: String,
+    }
+
+    #[derive(Clone, Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(from = "Wire", into = "Wire")]
+    pub(super) struct ConvertedFieldAliasCollision {
+        #[serde(alias = "b")]
+        pub(super) a: u32,
+        #[serde(default)]
+        pub(super) b: String,
+    }
+
+    #[derive(Clone, Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(from = "Wire", into = "Wire")]
+    pub(super) enum ConvertedVariantFieldAliasCollision {
+        Value {
+            #[serde(alias = "b")]
+            a: u32,
+            #[serde(default)]
+            b: String,
+        },
+    }
+
+    impl From<ConvertedFieldAliasCollision> for Wire {
+        fn from(_: ConvertedFieldAliasCollision) -> Self {
+            Self { value: 0 }
+        }
+    }
+
+    impl From<Wire> for ConvertedFieldAliasCollision {
+        fn from(_: Wire) -> Self {
+            Self {
+                a: 0,
+                b: String::new(),
+            }
+        }
+    }
+
+    impl From<ConvertedVariantFieldAliasCollision> for Wire {
+        fn from(_: ConvertedVariantFieldAliasCollision) -> Self {
+            Self { value: 0 }
+        }
+    }
+
+    impl From<Wire> for ConvertedVariantFieldAliasCollision {
+        fn from(_: Wire) -> Self {
+            Self::Value {
+                a: 0,
+                b: String::new(),
+            }
+        }
+    }
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenedAliasInner {
@@ -692,6 +769,46 @@ fn format_unifies_aliases() {
 
     insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
     insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
+}
+
+#[test]
+fn format_rejects_alias_colliding_with_live_key() {
+    let parsed: alias_collision::FieldAliasCollision = serde_json::from_str(r#"{"b":1}"#).unwrap();
+    assert_eq!(parsed.a, 1);
+    assert!(parsed.b.is_empty());
+
+    let parsed: alias_collision::SharedFieldAlias =
+        serde_json::from_str(r#"{"legacy":1}"#).unwrap();
+    assert_eq!(parsed.a, 1);
+    assert!(parsed.b.is_empty());
+
+    for (types, collision) in [
+        (
+            Types::default().register::<alias_collision::FieldAliasCollision>(),
+            "field alias `b` collides with a key already accepted by `b`",
+        ),
+        (
+            Types::default().register::<alias_collision::SharedFieldAlias>(),
+            "field alias `legacy` collides with a key already accepted by `a`",
+        ),
+    ] {
+        let err = Typescript::default()
+            .export(&types, specta_serde::Format)
+            .expect_err("colliding aliases cannot be represented by unified intersections");
+        assert!(
+            err.to_string().contains(collision),
+            "unexpected error: {err}"
+        );
+    }
+
+    Typescript::default()
+        .export(
+            &Types::default()
+                .register::<alias_collision::ConvertedFieldAliasCollision>()
+                .register::<alias_collision::ConvertedVariantFieldAliasCollision>(),
+            specta_serde::Format,
+        )
+        .expect("container conversions replace the colliding declared fields");
 }
 
 #[test]

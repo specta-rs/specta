@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use specta::{
     Types,
@@ -137,6 +137,10 @@ fn inner(
         }
         DataType::Struct(strct) => {
             let container_attrs = SerdeContainerAttrs::from_attributes(&strct.attributes)?;
+            let declared_deserialize_live = root_directions.deserialize
+                && !container_attrs.as_ref().is_some_and(|attrs| {
+                    attrs.resolved_from.is_some() || attrs.resolved_try_from.is_some()
+                });
             validate_container_attributes(
                 &strct.attributes,
                 types,
@@ -238,6 +242,7 @@ fn inner(
                         named,
                         struct_field_key_rules(&strct.attributes, &path)?,
                         &path,
+                        declared_deserialize_live,
                         mode,
                     )?;
                     for (name, (field, ty)) in named
@@ -331,6 +336,7 @@ fn inner(
                                 named,
                                 variant_field_key_rules(&container_attrs, variant, variant_name)?,
                                 &format!("{path}::{variant_name}"),
+                                declared_directions.deserialize && variant_directions.deserialize,
                                 mode,
                             )?;
                         }
@@ -787,12 +793,14 @@ fn validate_named_field_keys(
     named: &NamedFields,
     (rule_serialize, rule_deserialize): (Option<RenameRule>, Option<RenameRule>),
     path: &str,
+    declared_deserialize_live: bool,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    if mode != ApplyMode::Unified {
+    if mode != ApplyMode::Unified || !declared_deserialize_live {
         return Ok(());
     }
 
+    let mut occupied_deserialize_keys = HashMap::new();
     for (name, field) in &named.fields {
         if !field_has_live_key(field)? {
             continue;
@@ -819,6 +827,31 @@ fn validate_named_field_keys(
                 Some(serialize_key),
                 Some(deserialize_key),
             ));
+        }
+
+        occupied_deserialize_keys.insert(deserialize_key, name.as_ref());
+    }
+
+    for (name, field) in &named.fields {
+        if !field_has_live_key(field)? {
+            continue;
+        }
+
+        let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+            continue;
+        };
+        for alias in attrs.aliases {
+            if let Some(owner) = occupied_deserialize_keys.get(alias.as_str())
+                && *owner != name.as_ref()
+            {
+                return Err(Error::invalid_phased_type_usage(
+                    format!("{path}.{name}"),
+                    format!(
+                        "field alias `{alias}` collides with a key already accepted by `{owner}`; unified alias lowering cannot represent serde's key precedence safely"
+                    ),
+                ));
+            }
+            occupied_deserialize_keys.insert(alias, name.as_ref());
         }
     }
 
