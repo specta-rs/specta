@@ -1,6 +1,6 @@
 use specta::{
     Types,
-    datatype::{DataType, Fields, NamedReferenceType, Reference},
+    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
 };
 
 /// Recursively replaces [`DataType`]s within a [`DataType`] structure from a set of remap rules.
@@ -61,6 +61,56 @@ impl Remapper {
     /// Rules are checked in the order they are registered.
     pub fn rule(mut self, from: DataType, to: DataType) -> Self {
         self.rules.push((from, to));
+        self
+    }
+
+    /// Remaps the BigInt-style integer primitives — `i64`, `u64`, `i128`, `u128`,
+    /// `isize` and `usize` — so they export as a plain `number` instead of
+    /// erroring or exporting as `bigint`. Signed types map to `i32` and unsigned
+    /// types to `u32` — a fixed-width integer, so the result is a clean `number`
+    /// rather than the `number | null` that `f64` would produce.
+    ///
+    /// This is a convenience for the common case of calling [`rule`](Self::rule)
+    /// once per integer type. `f128` is not included — it is not an integer;
+    /// remap it by hand if you need to.
+    ///
+    /// <div class="warning">
+    ///
+    /// **This is a deliberately lossy escape hatch — hence `dangerous`.**
+    ///
+    /// A JavaScript `number` is an IEEE-754 double, so any integer larger than
+    /// `Number.MAX_SAFE_INTEGER` (`2^53 - 1`) silently loses precision on the
+    /// wire. A `u64` id or timestamp that grows past that range arrives on the
+    /// frontend as the wrong value, with no error to warn you.
+    ///
+    /// Specta deliberately does not expose this as a global option. Calling this
+    /// is you explicitly asserting — in the spirit of an `unsafe` block — that
+    /// you accept that trade-off for these types, and only as a last resort.
+    /// Prefer:
+    ///
+    /// - leaving them as `bigint` (the default), which is lossless;
+    /// - a framework with lossless BigInt support, such as Tauri Specta or
+    ///   TauRPC, if you control the runtime;
+    /// - overriding a single type with `specta_typescript::Number`, rather than
+    ///   every integer at once.
+    ///
+    /// As with any [`rule`](Self::rule), you must ensure Serde applies the same
+    /// representation to the runtime data for the type contract to stay sound.
+    ///
+    /// </div>
+    pub fn dangerous_bigints_as_number(mut self) -> Self {
+        for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
+            self = self.rule(
+                DataType::Primitive(signed),
+                DataType::Primitive(Primitive::i32),
+            );
+        }
+        for unsigned in [Primitive::u64, Primitive::u128, Primitive::usize] {
+            self = self.rule(
+                DataType::Primitive(unsigned),
+                DataType::Primitive(Primitive::u32),
+            );
+        }
         self
     }
 
@@ -234,5 +284,39 @@ mod tests {
         let debug = format!("{types:?}");
         assert!(debug.contains("Primitive(str)"));
         assert!(debug.contains("Primitive(bool)"));
+    }
+
+    #[test]
+    fn dangerous_bigints_as_number_remaps_every_integer() {
+        let remapper = Remapper::new().dangerous_bigints_as_number();
+
+        for p in [Primitive::i64, Primitive::i128, Primitive::isize] {
+            assert_eq!(
+                remapper.remap_dt(DataType::Primitive(p.clone())),
+                Primitive::i32.into(),
+                "{p:?} should remap to i32",
+            );
+        }
+        for p in [Primitive::u64, Primitive::u128, Primitive::usize] {
+            assert_eq!(
+                remapper.remap_dt(DataType::Primitive(p.clone())),
+                Primitive::u32.into(),
+                "{p:?} should remap to u32",
+            );
+        }
+
+        // Safe-width integers and the (non-integer) f128 are left untouched.
+        assert_eq!(
+            remapper.remap_dt(Primitive::i32.into()),
+            Primitive::i32.into()
+        );
+        assert_eq!(
+            remapper.remap_dt(Primitive::u32.into()),
+            Primitive::u32.into()
+        );
+        assert_eq!(
+            remapper.remap_dt(Primitive::f128.into()),
+            Primitive::f128.into()
+        );
     }
 }
