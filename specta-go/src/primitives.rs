@@ -178,7 +178,7 @@ fn is_method_backed_newtype(dt: &DataType, rendered: &str) -> bool {
         return false;
     };
     matches!(fields.fields.as_slice(), [field] if field.ty.is_some())
-        && matches!(rendered, "time.Time" | "*big.Int")
+        && matches!(rendered, "time.Time" | "*time.Time" | "*big.Int")
 }
 
 fn render_string_enum(

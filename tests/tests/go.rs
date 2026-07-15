@@ -206,6 +206,10 @@ fn go_output_is_accepted_by_go_toolchain() {
 
     #[derive(Type)]
     #[specta(collect = false)]
+    struct NullableStamp(Option<ExternalDateTime>);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
     struct BigNumber(i128);
 
     #[derive(Type, Serialize, Deserialize)]
@@ -231,7 +235,10 @@ fn go_output_is_accepted_by_go_toolchain() {
         .package_name("bindings")
         .export_to(
             &newtypes,
-            &Types::default().register::<Stamp>().register::<BigNumber>(),
+            &Types::default()
+                .register::<Stamp>()
+                .register::<NullableStamp>()
+                .register::<BigNumber>(),
             IdentityFormat,
         )
         .unwrap();
@@ -272,6 +279,10 @@ fn go_output_is_accepted_by_go_toolchain() {
     );
     assert!(
         newtypes_before.contains("type BigNumber = *big.Int"),
+        "{newtypes_before}"
+    );
+    assert!(
+        newtypes_before.contains("type NullableStamp = *time.Time"),
         "{newtypes_before}"
     );
 
@@ -321,6 +332,17 @@ func TestMethodBackedNewtypes(t *testing.T) {
 	}
 	if got, err := json.Marshal(stamp); err != nil || string(got) != `"2024-01-02T03:04:05Z"` {
 		t.Fatalf("stamp: %s, %v", got, err)
+	}
+
+	var nullable NullableStamp
+	if err := json.Unmarshal([]byte(`"2024-01-02T03:04:05Z"`), &nullable); err != nil {
+		t.Fatal(err)
+	}
+	if nullable == nil {
+		t.Fatal("nullable stamp was not allocated")
+	}
+	if got, err := json.Marshal(nullable); err != nil || string(got) != `"2024-01-02T03:04:05Z"` {
+		t.Fatalf("nullable stamp: %s, %v", got, err)
 	}
 
 	var number BigNumber
