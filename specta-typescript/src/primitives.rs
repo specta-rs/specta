@@ -727,15 +727,17 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
     }
 }
 
-/// Generate an Typescript string to refer to a specific [`DataType`].
+/// Generate a Typescript string for a specific [`DataType`] while preserving ordinary named
+/// references recursively.
 ///
-/// For primitives this will include the literal type but for named type it will contain a reference.
+/// Unlike [`inline`], named types are rendered as references even when nested within an anonymous
+/// composite type. References explicitly marked as inline are still expanded.
 ///
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &Types,
-    r: &Reference,
+    dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
     datatype(
@@ -743,7 +745,7 @@ pub fn reference(
         exporter.as_ref(),
         None,
         types,
-        &DataType::Reference(r.clone()),
+        dt,
         vec![],
         None,
         "",

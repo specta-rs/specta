@@ -13,10 +13,7 @@ fn render_datatype(ts: &Typescript, types: &Types, dt: &DataType) -> String {
     let types = specta_serde::Format.map_types(types).unwrap();
     let dt = specta_serde::Format.map_type(&types, dt).unwrap();
 
-    match &*dt {
-        DataType::Reference(r) => primitives::reference(ts, &types, r).unwrap(),
-        dt => primitives::inline(ts, &types, dt).unwrap(),
-    }
+    primitives::reference(ts, &types, &dt).unwrap()
 }
 
 /// Multiline
