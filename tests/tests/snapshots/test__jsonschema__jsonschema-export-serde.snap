@@ -794,36 +794,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "EmptyStructWithTag",
       "type": "object"
     },
-    "Enum": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "t": {
-              "const": "A"
-            }
-          },
-          "required": [
-            "t"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "t": {
-              "const": "B"
-            }
-          },
-          "required": [
-            "t"
-          ],
-          "type": "object"
-        }
-      ],
-      "title": "Enum"
-    },
-    "Enum2": {
+    "Enum2New": {
       "oneOf": [
         {
           "additionalProperties": false,
@@ -866,9 +837,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "object"
         }
       ],
-      "title": "Enum2"
+      "title": "Enum2New"
     },
-    "Enum3": {
+    "Enum3New": {
       "additionalProperties": false,
       "properties": {
         "b": {
@@ -882,7 +853,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "t",
         "b"
       ],
-      "title": "Enum3",
+      "title": "Enum3New",
       "type": "object"
     },
     "EnumMacroAttributes": {
@@ -950,6 +921,35 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         }
       ],
       "title": "EnumMacroAttributes"
+    },
+    "EnumNew": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "A"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "t": {
+              "const": "B"
+            }
+          },
+          "required": [
+            "t"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "EnumNew"
     },
     "EnumReferenceRecordKey": {
       "additionalProperties": false,
@@ -4197,13 +4197,13 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "$ref": "#/$defs/EmptyStructWithTag"
         },
         "Enum": {
-          "$ref": "#/$defs/Enum"
+          "$ref": "#/$defs/EnumNew"
         },
         "Enum2": {
-          "$ref": "#/$defs/Enum2"
+          "$ref": "#/$defs/Enum2New"
         },
         "Enum3": {
-          "$ref": "#/$defs/Enum3"
+          "$ref": "#/$defs/Enum3New"
         },
         "EnumMacroAttributes": {
           "$ref": "#/$defs/EnumMacroAttributes"
