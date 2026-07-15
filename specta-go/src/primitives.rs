@@ -487,22 +487,7 @@ fn collect_intersection_fields(
                 if !visited.insert(type_path.clone()) {
                     return false;
                 }
-                let substitutions = ndt
-                    .generics
-                    .iter()
-                    .filter_map(|definition| {
-                        arguments
-                            .iter()
-                            .find(|(generic, _)| generic == &definition.reference())
-                            .map(|(_, ty)| (definition.reference(), ty.clone()))
-                            .or_else(|| {
-                                definition
-                                    .default
-                                    .clone()
-                                    .map(|ty| (definition.reference(), ty))
-                            })
-                    })
-                    .collect::<HashMap<_, _>>();
+                let substitutions = resolve_reference_arguments(ndt, arguments);
                 let result = ndt.ty.as_ref().is_some_and(|ty| {
                     let mut ty = ty.clone();
                     substitute_generics(&mut ty, &substitutions);

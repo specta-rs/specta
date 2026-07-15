@@ -767,7 +767,7 @@ fn go_only_pointers_recursive_required_references() {
     #[specta(collect = false)]
     struct ErasedTupleStruct(i128, String);
 
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     struct ChainedGenericDefault<T = String, U = T> {
         first: T,
@@ -777,6 +777,13 @@ fn go_only_pointers_recursive_required_references() {
     #[derive(Type)]
     #[specta(collect = false)]
     struct UsesChainedGenericDefault {
+        value: ChainedGenericDefault<i32>,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct FlattenedChainedGenericDefault {
+        #[serde(flatten)]
         value: ChainedGenericDefault<i32>,
     }
 
@@ -818,6 +825,17 @@ fn go_only_pointers_recursive_required_references() {
         generic.contains("Value ChainedGenericDefault[int32, int32]"),
         "{generic}"
     );
+
+    let flattened = Go::default()
+        .export(
+            &Types::default()
+                .register::<ChainedGenericDefault<i32>>()
+                .register::<FlattenedChainedGenericDefault>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    assert!(flattened.contains("First  int32"), "{flattened}");
+    assert!(flattened.contains("Second int32"), "{flattened}");
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&root).unwrap();
