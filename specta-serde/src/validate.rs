@@ -582,12 +582,25 @@ fn validate_container_attributes(
         ));
     }
 
-    for (suffix, target) in [
-        ("<serde_into>", container_attrs.resolved_into.as_ref()),
-        ("<serde_from>", container_attrs.resolved_from.as_ref()),
+    // A directional conversion target is only used in its own phase (`into`
+    // only ever serializes, `from`/`try_from` only ever deserialize - see
+    // `select_conversion_target`), so flatten liveness narrows per target,
+    // composed with the caller's root liveness.
+    for (suffix, target, target_directions) in [
+        (
+            "<serde_into>",
+            container_attrs.resolved_into.as_ref(),
+            FlattenDirections::SERIALIZE_ONLY,
+        ),
+        (
+            "<serde_from>",
+            container_attrs.resolved_from.as_ref(),
+            FlattenDirections::DESERIALIZE_ONLY,
+        ),
         (
             "<serde_try_from>",
             container_attrs.resolved_try_from.as_ref(),
+            FlattenDirections::DESERIALIZE_ONLY,
         ),
     ] {
         if let Some(target) = target {
@@ -599,7 +612,7 @@ fn validate_container_attributes(
                 mode,
                 true,
                 env,
-                root_directions,
+                root_directions.and(target_directions),
             )?;
         }
     }

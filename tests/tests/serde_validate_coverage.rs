@@ -2082,3 +2082,92 @@ fn registered_nested_dead_flatten_graph_stays_rejected() {
         "unexpected error: {err}"
     );
 }
+
+// Directional conversion targets are only used in their own phase: an `into`
+// wire only ever serializes and a `from`/`try_from` wire only ever
+// deserializes (`select_conversion_target`). The general walk's traversal of
+// resolved conversion targets must therefore narrow the flatten liveness per
+// target, composed with the caller's root: during serialize-phase `map_type`
+// a `from` wire is unreachable entirely, and an `into` wire's
+// deserialize-only shapes are unreachable. Hand-built (like the nested-field
+// tests above) because derive-registered wire types are validated standalone
+// too.
+fn conversion_target_datatype(
+    types: &mut Types,
+    conversion_key: &'static str,
+    wire_flatten_skip: &'static str,
+) -> specta::datatype::DataType {
+    use specta::datatype::{DataType, Field, Struct};
+
+    let mut v = Field::new(<Vec<u8> as Type>::definition(types));
+    v.attributes.insert("serde:field:flatten", true);
+    v.attributes.insert(wire_flatten_skip, true);
+    let wire = Struct::named().field("v", v).build();
+
+    let mut dt = Struct::named()
+        .field("a", Field::new(<i32 as Type>::definition(types)))
+        .build();
+    let DataType::Struct(strct) = &mut dt else {
+        unreachable!()
+    };
+    strct.attributes.insert(conversion_key, wire);
+
+    dt
+}
+
+#[test]
+fn phases_map_type_from_wire_is_not_validated_in_serialize_phase() {
+    use specta::Format as _;
+
+    // The from-wire contains a *serialize-live* invalid flatten, but a
+    // `from` target never participates in the serialize rendering.
+    let mut types = Types::default();
+    let dt = conversion_target_datatype(
+        &mut types,
+        "serde:container:from_resolved",
+        "serde:field:skip_deserializing",
+    );
+
+    specta_serde::PhasesFormat
+        .map_type(&types, &dt)
+        .expect("a from-wire is only ever deserialized; the serialize phase never renders it");
+}
+
+#[test]
+fn phases_map_type_into_wire_serialize_live_flatten_is_rejected() {
+    use specta::Format as _;
+
+    // Control: the same wire as an `into` target IS serialize-relevant.
+    let mut types = Types::default();
+    let dt = conversion_target_datatype(
+        &mut types,
+        "serde:container:into_resolved",
+        "serde:field:skip_deserializing",
+    );
+
+    let err = specta_serde::PhasesFormat
+        .map_type(&types, &dt)
+        .expect_err("the into-wire's flattened Vec is live on the serialize side");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn phases_map_type_into_wire_deserialize_only_flatten_is_accepted() {
+    use specta::Format as _;
+
+    // Codex's exact case: an into-only wire whose flatten is only invalid on
+    // the deserialize side, which an into-wire never exercises.
+    let mut types = Types::default();
+    let dt = conversion_target_datatype(
+        &mut types,
+        "serde:container:into_resolved",
+        "serde:field:skip_serializing",
+    );
+
+    specta_serde::PhasesFormat.map_type(&types, &dt).expect(
+        "an into-wire is only ever serialized; its deserialize-only shapes are unreachable",
+    );
+}
