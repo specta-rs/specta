@@ -321,6 +321,29 @@ fn go_reports_invalid_configuration_and_map_keys() {
         .unwrap_err();
     assert!(err.to_string().contains("map key"), "{err}");
 
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct ScalarKey(String);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct ScalarKeyMap {
+        values: HashMap<ScalarKey, String>,
+    }
+
+    let scalar_key = Go::default()
+        .export(
+            &Types::default()
+                .register::<ScalarKey>()
+                .register::<ScalarKeyMap>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    assert!(
+        scalar_key.contains("Values map[ScalarKey]string"),
+        "{scalar_key}"
+    );
+
     #[derive(Type, Serialize)]
     #[specta(collect = false)]
     struct InvalidTag {
@@ -492,6 +515,14 @@ fn go_only_pointers_recursive_required_references() {
         values: Vec<T>,
     }
 
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct AliasA(Box<AliasB>);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct AliasB(Box<AliasA>);
+
     let non_recursive = Go::default().export(&types(), IdentityFormat).unwrap();
     assert!(
         non_recursive.contains("ID ID `json:\"id\"`"),
@@ -507,7 +538,9 @@ fn go_only_pointers_recursive_required_references() {
         .register::<GenericA>()
         .register::<GenericB<GenericA>>()
         .register::<SafeGenericA>()
-        .register::<SafeGenericB<SafeGenericA>>();
+        .register::<SafeGenericB<SafeGenericA>>()
+        .register::<AliasA>()
+        .register::<AliasB>();
     let generic = Go::default()
         .export(&generic_types, IdentityFormat)
         .unwrap();
@@ -517,6 +550,8 @@ fn go_only_pointers_recursive_required_references() {
         generic.contains("B SafeGenericB[SafeGenericA]"),
         "{generic}"
     );
+    assert!(generic.contains("type AliasA *AliasB"), "{generic}");
+    assert!(generic.contains("type AliasB *AliasA"), "{generic}");
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&root).unwrap();

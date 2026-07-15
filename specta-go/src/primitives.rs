@@ -290,7 +290,7 @@ fn render_struct(
                 .collect::<Vec<_>>();
             if fields.fields.len() == 1 {
                 match live.as_slice() {
-                    [ty] => render_datatype(exporter, types, ty, generics, path, false, ctx),
+                    [ty] => render_datatype(exporter, types, ty, generics, path, true, ctx),
                     [] => Ok("any".into()),
                     _ => unreachable!("one source field has at most one live field"),
                 }
@@ -663,6 +663,10 @@ fn render_map_key(
 }
 
 fn map_key_is_valid(types: &Types, dt: &DataType) -> bool {
+    map_key_is_valid_inner(types, dt, &mut BTreeSet::new())
+}
+
+fn map_key_is_valid_inner(types: &Types, dt: &DataType, visited: &mut BTreeSet<String>) -> bool {
     match dt {
         DataType::Primitive(
             Primitive::str
@@ -682,15 +686,26 @@ fn map_key_is_valid(types: &Types, dt: &DataType) -> bool {
         ) => true,
         DataType::Generic(_) => false,
         DataType::Enum(enm) => string_enum_variants(enm).is_some(),
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(fields) => matches!(
+                fields.fields.as_slice(),
+                [field] if field
+                    .ty
+                    .as_ref()
+                    .is_some_and(|dt| map_key_is_valid_inner(types, dt, visited))
+            ),
+            Fields::Unit | Fields::Named(_) => false,
+        },
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-            NamedReferenceType::Inline { dt, .. } => map_key_is_valid(types, dt),
+            NamedReferenceType::Inline { dt, .. } => map_key_is_valid_inner(types, dt, visited),
             NamedReferenceType::Reference { .. } | NamedReferenceType::Recursive(_) => {
                 types.get(reference).is_some_and(|ndt| {
                     ndt.generics.is_empty()
+                        && visited.insert(rust_type_path(ndt))
                         && ndt
                             .ty
                             .as_ref()
-                            .is_some_and(|dt| map_key_is_valid(types, dt))
+                            .is_some_and(|dt| map_key_is_valid_inner(types, dt, visited))
                 })
             }
         },
