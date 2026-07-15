@@ -5,7 +5,9 @@ use std::{borrow::Cow, fs};
 use serde::{Deserialize, Serialize};
 use specta::{
     Format, Type, Types,
-    datatype::{Field, Generic, GenericDefinition, List, NamedDataType, Primitive, Struct},
+    datatype::{
+        DataType, Field, Generic, GenericDefinition, List, NamedDataType, Primitive, Struct,
+    },
 };
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
@@ -153,6 +155,11 @@ struct FixedWidthIntegerMapKeys {
 #[derive(Type)]
 enum RawNewtypeEnum {
     Value(String),
+}
+
+#[derive(Type)]
+struct RawNewtypeEnumMap {
+    values: std::collections::HashMap<RawNewtypeEnum, String>,
 }
 
 #[derive(Type, Serialize)]
@@ -462,6 +469,59 @@ fn rejects_expanding_recursive_generics() {
     assert!(matches!(
         error,
         specta_jsonschema::Error::ExpandingRecursiveGeneric { .. }
+    ));
+}
+
+#[test]
+fn allows_finite_recursive_generic_cycles() {
+    let mut types = Types::default();
+    NamedDataType::new("Flip", &mut types, |_, ndt| {
+        let a = GenericDefinition::new("A".into(), Some(Primitive::str.into()));
+        let b = GenericDefinition::new("B".into(), Some(Primitive::u32.into()));
+        ndt.generics = vec![a.clone(), b.clone()].into();
+        ndt.ty = Some(
+            Struct::named()
+                .field(
+                    "next",
+                    Field::new(
+                        ndt.reference(vec![
+                            (a.reference(), DataType::Generic(b.reference())),
+                            (b.reference(), DataType::Generic(a.reference())),
+                        ])
+                        .into(),
+                    ),
+                )
+                .build(),
+        );
+    });
+
+    let schema = JsonSchema::default()
+        .export_value(&types, IdentityFormat)
+        .unwrap();
+    assert!(schema["$defs"].get("Flip<str, u32>").is_some());
+    assert!(schema["$defs"].get("Flip<u32, str>").is_some());
+    assert_eq!(
+        schema["$defs"]["Flip<str, u32>"]["properties"]["next"]["$ref"],
+        "#/$defs/Flip%3Cu32%2C%20str%3E"
+    );
+    assert_eq!(
+        schema["$defs"]["Flip<u32, str>"]["properties"]["next"]["$ref"],
+        "#/$defs/Flip%3Cstr%2C%20u32%3E"
+    );
+}
+
+#[test]
+fn rejects_raw_newtype_enum_map_keys() {
+    let error = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<RawNewtypeEnumMap>(),
+            IdentityFormat,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::InvalidMapKey { .. }
     ));
 }
 

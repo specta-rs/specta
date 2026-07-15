@@ -30,13 +30,22 @@ struct DefinitionSource {
     generics: Generics,
 }
 
+impl DefinitionSource {
+    fn is_same_type_as(&self, other: &Self) -> bool {
+        self.type_path == other.type_path
+            && self.file == other.file
+            && self.line == other.line
+            && self.column == other.column
+    }
+}
+
 pub(crate) struct Renderer<'a> {
     schema_version: SchemaVersion,
     types: &'a Types,
     definitions: Map<String, Value>,
     definition_sources: BTreeMap<String, DefinitionSource>,
     in_progress: Vec<String>,
-    in_progress_types: Vec<(String, &'static str, u32, u32)>,
+    in_progress_types: Vec<DefinitionSource>,
     name_counts: BTreeMap<Cow<'static, str>, usize>,
     allow_additional_properties: bool,
 }
@@ -109,13 +118,19 @@ impl<'a> Renderer<'a> {
             return Ok(());
         }
 
-        let source_id = (
-            source.type_path.clone(),
-            source.file,
-            source.line,
-            source.column,
-        );
-        if self.in_progress_types.contains(&source_id) {
+        let same_type = self
+            .in_progress_types
+            .iter()
+            .filter(|candidate| candidate.is_same_type_as(&source))
+            .collect::<Vec<_>>();
+        if same_type.len() >= 2
+            && generic_complexity(&source.generics)
+                > same_type
+                    .iter()
+                    .map(|source| generic_complexity(&source.generics))
+                    .max()
+                    .unwrap_or_default()
+        {
             return Err(Error::ExpandingRecursiveGeneric {
                 path: path.to_string(),
                 type_path: source.type_path,
@@ -128,7 +143,7 @@ impl<'a> Renderer<'a> {
         };
 
         self.in_progress.push(key.clone());
-        self.in_progress_types.push(source_id);
+        self.in_progress_types.push(source);
         let schema = self.render_datatype(ty, &generics, path, 0);
         self.in_progress_types.pop();
         self.in_progress.pop();
@@ -387,21 +402,30 @@ impl<'a> Renderer<'a> {
                     .is_some_and(|ty| self.is_valid_map_key(ty, generics, depth + 1)),
                 _ => false,
             },
-            DataType::Enum(enm) => enm
-                .variants
-                .iter()
-                .filter(|(_, variant)| !variant.skip)
-                .all(|(_, variant)| match &variant.fields {
-                    Fields::Unit => !enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED),
-                    Fields::Unnamed(fields) => {
-                        let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
-                        fields.next().is_some_and(|ty| {
-                            fields.next().is_none()
-                                && self.is_valid_map_key(ty, generics, depth + 1)
-                        })
-                    }
-                    Fields::Named(_) => false,
-                }),
+            DataType::Enum(enm) => {
+                let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+                let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+                enm.variants
+                    .iter()
+                    .filter(|(_, variant)| !variant.skip)
+                    .all(|(_, variant)| match &variant.fields {
+                        Fields::Unit => {
+                            !untagged && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                        }
+                        Fields::Unnamed(fields) => {
+                            let mut fields =
+                                fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                            (untagged
+                                || rewritten
+                                || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED))
+                                && fields.next().is_some_and(|ty| {
+                                    fields.next().is_none()
+                                        && self.is_valid_map_key(ty, generics, depth + 1)
+                                })
+                        }
+                        Fields::Named(_) => false,
+                    })
+            }
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
                 NamedReferenceType::Inline { dt, .. } => {
                     self.is_valid_map_key(dt, generics, depth + 1)
@@ -922,6 +946,56 @@ impl<'a> Renderer<'a> {
             DataType::Reference(Reference::Opaque(reference)) => reference.type_name().to_string(),
             other => format!("{other:?}"),
         }
+    }
+}
+
+fn generic_complexity(generics: &Generics) -> usize {
+    generics.values().map(datatype_complexity).sum()
+}
+
+fn datatype_complexity(dt: &DataType) -> usize {
+    1 + match dt {
+        DataType::Primitive(_)
+        | DataType::Generic(_)
+        | DataType::Reference(Reference::Opaque(_)) => 0,
+        DataType::List(list) => datatype_complexity(&list.ty),
+        DataType::Map(map) => {
+            datatype_complexity(map.key_ty()) + datatype_complexity(map.value_ty())
+        }
+        DataType::Struct(strct) => fields_complexity(&strct.fields),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .map(|(_, variant)| fields_complexity(&variant.fields))
+            .sum(),
+        DataType::Tuple(tuple) => tuple.elements.iter().map(datatype_complexity).sum(),
+        DataType::Nullable(inner) => datatype_complexity(inner),
+        DataType::Intersection(types) => types.iter().map(datatype_complexity).sum(),
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => datatype_complexity(dt),
+            NamedReferenceType::Reference { generics, .. } => {
+                generics.iter().map(|(_, ty)| datatype_complexity(ty)).sum()
+            }
+            NamedReferenceType::Recursive(_) => 0,
+        },
+    }
+}
+
+fn fields_complexity(fields: &Fields) -> usize {
+    match fields {
+        Fields::Unit => 0,
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .map(datatype_complexity)
+            .sum(),
+        Fields::Named(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|(_, field)| field.ty.as_ref())
+            .map(datatype_complexity)
+            .sum(),
     }
 }
 
