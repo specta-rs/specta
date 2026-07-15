@@ -476,7 +476,7 @@ type SkipVariant2 = _specta_typing.TypedDict("test__types__SkipVariant2A", {"tag
 
 type SkipVariant3 = _specta_typing.TypedDict("test__types__SkipVariant3A", {"A": _specta_typing.TypedDict("test__types__SkipVariant3AA", {"a": _specta_builtins.str})})
 
-type SkippedFieldWithinVariant = _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantA", {"type": _specta_typing.Literal["A"]}) | _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantB", {"type": _specta_typing.Literal["B"], "data": _specta_builtins.str})
+type SkippedFieldWithinVariant = _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantA", {"type": _specta_typing.Literal["A"], "data": _specta_typing.NotRequired[None]}) | _specta_typing.TypedDict("test__types__SkippedFieldWithinVariantB", {"type": _specta_typing.Literal["B"], "data": _specta_builtins.str})
 
 class SpectaSkipNonTypeField(_specta_typing.TypedDict):
     a: _specta_builtins.int
@@ -551,7 +551,7 @@ type Unit4 = None
 
 type Unit5 = _specta_typing.Literal["A"]
 
-type Unit6 = _specta_typing.TypedDict("test__types__Unit6A", {"A": None})
+type Unit6 = _specta_typing.TypedDict("test__types__Unit6A", {"A": _specta_builtins.tuple[()]})
 
 type Unit7 = _specta_typing.TypedDict("test__types__Unit7A", {"A": _specta_typing.TypedDict("test__types__Unit7AA", {})})
 
