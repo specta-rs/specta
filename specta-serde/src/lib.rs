@@ -1428,6 +1428,7 @@ fn rewrite_enum_repr_for_phase(
                         content.as_ref(),
                         &variant,
                         widen_tag,
+                        mode,
                     )?
                 }
                 EnumRepr::Untagged => unreachable!(),
@@ -1903,6 +1904,7 @@ fn transform_adjacent_variant(
     content: &str,
     variant: &Variant,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
@@ -1916,12 +1918,36 @@ fn transform_adjacent_variant(
     // Every non-unit variant kind carries a `content` key, even when the
     // payload itself is empty: `Foo {}` -> `content: {}`, `Foo()` -> `content:
     // []`, and a declared-multi-field tuple reduced to 0 live fields by
-    // `#[serde(skip)]` -> `content: []`. Only genuine unit variants (and
-    // newtype variants collapsed to unit by a skipped sole field) omit it.
+    // `#[serde(skip)]` -> `content: []`. Only genuine unit variants omit it in
+    // both phases; newtype variants collapsed to unit by a skipped sole field
+    // omit it on serialize only (see below).
     if !variant_collapses_to_unit(variant) {
         let payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         fields.push((Cow::Owned(content.to_string()), payload));
+    } else if !matches!(variant.fields, Fields::Unit) {
+        // A newtype variant collapsed to unit by a skipped sole field is
+        // asymmetric under adjacent tagging: serde's serializer omits
+        // `content` entirely (like a unit variant), but its deserializer
+        // still requires `content` to be present and exactly `null`.
+        // `DataType::Tuple(vec![])` renders as `null`.
+        match mode {
+            PhaseRewrite::Serialize => {}
+            PhaseRewrite::Deserialize => {
+                fields.push((
+                    Cow::Owned(content.to_string()),
+                    Field::new(DataType::Tuple(Tuple::new(vec![]))),
+                ));
+            }
+            PhaseRewrite::Unified => {
+                // Best effort: an optional `content?: null` accepts serde's
+                // serialize output (no key) while still letting callers write
+                // the `content: null` the deserializer demands.
+                let mut field = Field::new(DataType::Tuple(Tuple::new(vec![])));
+                field.optional = true;
+                fields.push((Cow::Owned(content.to_string()), field));
+            }
+        }
     }
 
     Ok(clone_variant_with_named_fields(variant, fields))
@@ -2094,10 +2120,7 @@ fn variant_collapses_to_unit(variant: &Variant) -> bool {
 /// `DataType::Tuple(Tuple::new(vec![]))`, which renders as `null` because it
 /// also represents Rust's unit type `()`.
 fn empty_array_datatype() -> DataType {
-    match Struct::unnamed().build() {
-        DataType::Struct(s) => DataType::Struct(s),
-        _ => unreachable!("Struct::unnamed always builds a struct"),
-    }
+    Struct::unnamed().build()
 }
 
 fn variant_payload_field(variant: &Variant) -> Option<Field> {
@@ -2305,17 +2328,25 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     match dt {
         DataType::Struct(s) => Ok(container_has_local_difference(&s.attributes)?
             || fields_have_local_difference(&s.fields)?),
-        DataType::Enum(e) => Ok(container_has_local_difference(&e.attributes)?
-            || e.variants
-                .iter()
-                .try_fold(false, |has_difference, (_, variant)| {
-                    if has_difference {
-                        return Ok(true);
-                    }
+        DataType::Enum(e) => {
+            let adjacent = matches!(
+                EnumRepr::from_attrs(&e.attributes)?,
+                EnumRepr::Adjacent { .. }
+            );
 
-                    Ok(variant_has_local_difference(variant)?
-                        || fields_have_local_difference(&variant.fields)?)
-                })?),
+            Ok(container_has_local_difference(&e.attributes)?
+                || e.variants
+                    .iter()
+                    .try_fold(false, |has_difference, (_, variant)| {
+                        if has_difference {
+                            return Ok(true);
+                        }
+
+                        Ok(variant_has_local_difference(variant)?
+                            || fields_have_local_difference(&variant.fields)?
+                            || (adjacent && adjacent_content_is_phase_asymmetric(variant)?))
+                    })?)
+        }
         DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |has_difference, ty| {
             if has_difference {
                 return Ok(true);
@@ -2396,6 +2427,35 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                 })
         }
     }
+}
+
+/// An adjacently tagged newtype variant whose sole field is skipped in *both*
+/// phases collapses asymmetrically: serde's serializer omits the `content` key
+/// entirely (like a unit variant), while its deserializer still requires
+/// `content: null`. Such enums must split under [`PhasesFormat`] even though
+/// the skip attribute itself is symmetric.
+fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error> {
+    if variant.skip {
+        return Ok(false);
+    }
+
+    if let Some(attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Serialize)
+        && variant_is_skipped_for_mode(&attrs, PhaseRewrite::Deserialize)
+    {
+        return Ok(false);
+    }
+
+    let Fields::Unnamed(unnamed) = &variant.fields else {
+        return Ok(false);
+    };
+    let [field] = unnamed.fields.as_slice() else {
+        return Ok(false);
+    };
+
+    Ok(field.ty.is_none()
+        || (should_skip_field_for_mode(field, PhaseRewrite::Serialize)?
+            && should_skip_field_for_mode(field, PhaseRewrite::Deserialize)?))
 }
 
 fn field_has_local_difference(field: &Field) -> Result<bool, Error> {

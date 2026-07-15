@@ -146,7 +146,7 @@ InlineTuple2: export type InlineTuple2 = {
 
 Box<str>: 
 Box<String>: 
-SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
+SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A"; data?: null } | { type: "B"; data: string };
 
 KebabCase: export type KebabCase = {
 	"test-ing": string,

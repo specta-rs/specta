@@ -123,7 +123,7 @@ export type InlineTuple2 = {
 }, boolean],
 };
 
-export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
+export type SkippedFieldWithinVariant = { type: "A"; data?: null } | { type: "B"; data: string };
 
 export type KebabCase = {
 	"test-ing": string,

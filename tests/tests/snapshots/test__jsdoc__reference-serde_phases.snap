@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 171
 expression: output
 ---
 Issue374: Issue374_Serialize
@@ -72,7 +73,7 @@ InlineTuple: InlineTuple
 InlineTuple2: InlineTuple2
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: SkippedFieldWithinVariant
+SkippedFieldWithinVariant: SkippedFieldWithinVariant_Serialize
 KebabCase: KebabCase
 Issue281<'_>: Issue281
 LifetimeGenericStruct<'_, i32>: LifetimeGenericStruct<number>

@@ -51,12 +51,18 @@ fn adjacent_tagged_empty_payloads_serde_ground_truth() {
     assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"EmptyTuple"}"#).is_err());
     assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"AllSkipped"}"#).is_err());
 
-    // Newtype variant with its sole field skipped: serde collapses this to
-    // unit (verified below), unlike the multi-field `AllSkipped` case above.
+    // Newtype variant with its sole field skipped: serde's *serializer*
+    // collapses this to unit (no `c` key), unlike the multi-field
+    // `AllSkipped` case above...
     assert_eq!(
         serde_json::to_string(&AdjEmpty::NewtypeSkip(1)).unwrap(),
         r#"{"t":"NewtypeSkip"}"#
     );
+    // ...but serde's *deserializer* is asymmetric: it still requires the `c`
+    // key to be present and exactly `null`.
+    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip"}"#).is_err());
+    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip","c":null}"#).is_ok());
+    assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"NewtypeSkip","c":[]}"#).is_err());
 
     // Round trips that *do* succeed.
     assert!(serde_json::from_str::<AdjEmpty>(r#"{"t":"Unit"}"#).is_ok());
@@ -89,6 +95,46 @@ fn adjacent_tagged_empty_payloads_typescript() {
     assert!(
         ts.contains(r#""AllSkipped""#) && ts.contains("c: []"),
         "all-skipped tuple variant must have `c: []`:\n{ts}"
+    );
+    assert!(
+        ts.contains(r#"{ t: "NewtypeSkip"; c?: null }"#),
+        "collapsed newtype variant is ser/de asymmetric; unified mode must \
+         render an optional `c?: null`:\n{ts}"
+    );
+}
+
+#[test]
+fn adjacent_tagged_newtype_skip_phases() {
+    // Serialize omits `c`; deserialize requires `c: null` -- `PhasesFormat`
+    // must split the enum so each phase gets its exact shape.
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjEmpty>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains(r#"AdjEmpty_Serialize"#) && ts.contains(r#"AdjEmpty_Deserialize"#),
+        "enum must split into per-phase types:\n{ts}"
+    );
+
+    let serialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjEmpty_Serialize ="))
+        .expect("serialize type must be exported");
+    assert!(
+        serialize_ty.contains(r#"{ t: "NewtypeSkip" }"#),
+        "serialize phase must omit `c` for the collapsed newtype variant:\n{ts}"
+    );
+
+    let deserialize_ty = ts
+        .lines()
+        .find(|line| line.contains("AdjEmpty_Deserialize ="))
+        .expect("deserialize type must be exported");
+    assert!(
+        deserialize_ty.contains(r#"{ t: "NewtypeSkip"; c: null }"#),
+        "deserialize phase must require `c: null` for the collapsed newtype variant:\n{ts}"
     );
 }
 
