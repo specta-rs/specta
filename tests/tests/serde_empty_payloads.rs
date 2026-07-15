@@ -543,6 +543,73 @@ fn adjacent_tagged_specta_skip_phases_no_split() {
     );
 }
 
+// Multi-field variants hidden entirely with `#[specta(skip)]` follow the
+// hidden-field convention too: serde still transports the values
+// (`{"V":[7,8]}` externally, `{"t":"V","c":[7,8]}` adjacently -- both `"V"`
+// and `[]` are rejected on deserialize), so the export must NOT fabricate an
+// `[]` payload. It hides the payload like the pre-rewrite behavior did:
+// external renders the bare variant string, adjacent omits `c`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExtSpectaHidden {
+    V(#[specta(skip)] u8, #[specta(skip)] u8),
+    Live(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjSpectaHidden {
+    V(#[specta(skip)] u8, #[specta(skip)] u8),
+    Live(String),
+}
+
+#[test]
+fn specta_hidden_multi_field_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&ExtSpectaHidden::V(7, 8)).unwrap(),
+        r#"{"V":[7,8]}"#
+    );
+    assert!(serde_json::from_str::<ExtSpectaHidden>(r#""V""#).is_err());
+    assert!(serde_json::from_str::<ExtSpectaHidden>(r#"{"V":[]}"#).is_err());
+
+    assert_eq!(
+        serde_json::to_string(&AdjSpectaHidden::V(7, 8)).unwrap(),
+        r#"{"t":"V","c":[7,8]}"#
+    );
+    assert!(serde_json::from_str::<AdjSpectaHidden>(r#"{"t":"V","c":[]}"#).is_err());
+}
+
+#[test]
+fn specta_hidden_multi_field_external_typescript() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<ExtSpectaHidden>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains(r#""V""#) && !ts.contains("V: []"),
+        "hidden payload must collapse to the bare variant string, not fabricate `{{ V: [] }}`:\n{ts}"
+    );
+}
+
+#[test]
+fn specta_hidden_multi_field_adjacent_typescript() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjSpectaHidden>(),
+            specta_serde::Format,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        ts.contains(r#"{ t: "V" }"#) && !ts.contains("c: []"),
+        "hidden payload must omit `c`, not fabricate `c: []`:\n{ts}"
+    );
+}
+
 // A user-defined type whose path merely ENDS in `Option` must not be
 // mistaken for the std `Option`: serde's `missing_field` special case only
 // applies to the real `std`/`core` `Option`, so a skipped `wire::Option<u8>`

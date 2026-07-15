@@ -1698,7 +1698,7 @@ fn rewrite_enum_repr_for_phase(
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
                 EnumRepr::External => {
-                    transform_external_variant(serialized_name.clone(), &variant, widen_tag)?
+                    transform_external_variant(serialized_name.clone(), &variant, widen_tag, mode)?
                 }
                 EnumRepr::Internal { tag } => transform_internal_variant(
                     serialized_name.clone(),
@@ -2133,13 +2133,18 @@ fn transform_external_variant(
     serialized_name: String,
     variant: &Variant,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     // Only a genuine newtype variant (declared arity 1) collapses to a unit
     // string when its sole field is skipped. A declared-multi-field tuple
-    // variant stays a tuple variant even when skips reduce it to 0 live
-    // fields -- serde still requires (and emits) an empty array payload, so
-    // it must render as `{ Name: [] }`, not a bare string literal.
-    let collapses_to_unit = variant_collapses_to_unit(variant);
+    // variant stays a tuple variant even when *serde* skips reduce it to 0
+    // live fields -- serde still requires (and emits) an empty array payload,
+    // so it must render as `{ Name: [] }`, not a bare string literal. A
+    // payload hidden by `#[specta(skip)]` instead follows the hidden-field
+    // convention (the bare string, like the pre-rewrite behavior): serde
+    // still transports the values, so fabricating `[]` would be wrong.
+    let collapses_to_unit =
+        variant_collapses_to_unit(variant) || variant_payload_is_hidden(variant, mode)?;
 
     Ok(match &variant.fields {
         Fields::Unit => clone_variant_with_unnamed_fields(
@@ -2190,7 +2195,12 @@ fn transform_adjacent_variant(
     // `#[serde(skip)]` -> `content: []`. Only genuine unit variants omit it in
     // both phases; newtype variants collapsed to unit by a skipped sole field
     // omit it on serialize only (see below).
-    if !variant_collapses_to_unit(variant) {
+    if variant_payload_is_hidden(variant, mode)? {
+        // Hidden-field convention: serde still transports the
+        // `#[specta(skip)]`ped values under `content`, but the user asked to
+        // hide them, so `content` is omitted entirely (fabricating `[]`
+        // would claim a wire shape serde rejects).
+    } else if !variant_collapses_to_unit(variant) {
         let mut payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         // serde's adjacent deserializer routes a missing `content` key
@@ -2427,6 +2437,31 @@ fn variant_collapses_to_unit(variant: &Variant) -> bool {
         }
         Fields::Named(_) => false,
     }
+}
+
+/// Whether a tuple variant's payload is *hidden* rather than serde-skipped:
+/// zero live fields, at least one of which lacks a serde skip for the given
+/// phase (`#[specta(skip)]` or a hand-built `Field { ty: None, .. }`). serde
+/// still transports those values on the wire, so no payload shape is known
+/// to the export -- the variant follows the hidden-field convention (payload
+/// omitted) instead of fabricating an `[]` serde would reject. A genuinely
+/// empty tuple variant (`V()`) and an all-serde-skipped one really are `[]`
+/// on the wire and are NOT hidden.
+fn variant_payload_is_hidden(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
+    let Fields::Unnamed(unnamed) = &variant.fields else {
+        return Ok(false);
+    };
+    if unnamed.fields.is_empty() || unnamed_live_field_count(unnamed) != 0 {
+        return Ok(false);
+    }
+
+    for field in &unnamed.fields {
+        if !should_skip_field_for_mode(field, mode)? {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// Whether a collapsed newtype variant's sole field carries a *serde* skip
