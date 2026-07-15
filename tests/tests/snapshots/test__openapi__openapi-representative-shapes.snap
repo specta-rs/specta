@@ -28,7 +28,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
                 "additionalProperties": false,
                 "properties": {
                   "percent": {
-                    "format": "float",
                     "type": "number"
                   }
                 },
@@ -75,7 +74,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "properties": {
           "fixed": {
             "items": {
-              "format": "int32",
               "maximum": 255,
               "minimum": 0,
               "type": "integer"
@@ -86,13 +84,12 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
           },
           "id": {
             "description": " Stable identifier.",
-            "format": "uint64",
             "minimum": 0,
-            "type": "integer"
+            "type": "integer",
+            "x-specta-maximum": 18446744073709551615
           },
           "labels": {
             "additionalProperties": {
-              "format": "int32",
               "maximum": 2147483647,
               "minimum": -2147483648,
               "type": "integer"
@@ -147,7 +144,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "properties": {
           "fixed": {
             "items": {
-              "format": "int32",
               "maximum": 255,
               "minimum": 0,
               "type": "integer"
@@ -158,13 +154,12 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
           },
           "id": {
             "description": " Stable identifier.",
-            "format": "uint64",
             "minimum": 0,
-            "type": "integer"
+            "type": "integer",
+            "x-specta-maximum": 18446744073709551615
           },
           "labels": {
             "additionalProperties": {
-              "format": "int32",
               "maximum": 2147483647,
               "minimum": -2147483648,
               "type": "integer"
@@ -200,7 +195,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
             ]
           },
           "value": {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
@@ -228,13 +222,11 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
       "OverlappingUntagged": {
         "anyOf": [
           {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
           {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"

@@ -20,7 +20,6 @@ expression: schema
       "properties": {
         "chars": {
           "additionalProperties": {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
@@ -34,7 +33,6 @@ expression: schema
         },
         "enums": {
           "additionalProperties": {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"

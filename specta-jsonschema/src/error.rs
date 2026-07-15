@@ -1,4 +1,4 @@
-use std::{borrow::Cow, io};
+use std::{borrow::Cow, io, path::PathBuf};
 
 use specta::datatype::{OpaqueReference, RecursiveInlineType};
 
@@ -6,9 +6,23 @@ use specta::datatype::{OpaqueReference, RecursiveInlineType};
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// Filesystem error while writing an exported schema.
-    #[error("I/O error: {0}")]
-    Io(#[from] io::Error),
+    /// Failed to create the parent directory for an exported schema.
+    #[error("failed to create directory '{}': {source}", path.display())]
+    CreateDir {
+        /// Directory which could not be created.
+        path: PathBuf,
+        /// Source filesystem error.
+        source: io::Error,
+    },
+
+    /// Failed to write an exported schema.
+    #[error("failed to write JSON Schema to '{}': {source}", path.display())]
+    WriteFile {
+        /// File which could not be written.
+        path: PathBuf,
+        /// Source filesystem error.
+        source: io::Error,
+    },
 
     /// JSON serialization failed.
     #[error("JSON serialization error: {0}")]
@@ -66,15 +80,38 @@ pub enum Error {
         path: String,
     },
 
-    /// Two distinct types resolve to the same schema definition name.
-    #[error("schema definition name collision for {name:?}: {first} and {second}")]
+    /// The requested root definition is not present in the exported document.
+    #[error("definition '{definition}' was not found")]
+    MissingDefinition {
+        /// Requested definition key.
+        definition: String,
+    },
+
+    /// Multiple named datatypes map to the same JSON Schema definition key.
+    #[error("duplicate JSON Schema definition key '{key}' for '{first}' and '{second}'")]
     DuplicateDefinitionName {
-        /// Colliding schema definition name.
-        name: String,
+        /// Conflicting JSON Schema definition key.
+        key: String,
         /// First Rust type path.
         first: String,
         /// Second Rust type path.
         second: String,
+    },
+
+    /// A recursive generic changes its arguments on every expansion.
+    #[error("expanding recursive generic '{type_path}' at {path}")]
+    ExpandingRecursiveGeneric {
+        /// Schema path being rendered.
+        path: String,
+        /// Recursive Rust type path.
+        type_path: String,
+    },
+
+    /// Draft 7 cannot close a non-mergeable intersection with dynamic object keys.
+    #[error("cannot close Draft 7 intersection with dynamic properties at {path}")]
+    UnsupportedClosedIntersection {
+        /// Schema path being rendered.
+        path: String,
     },
 }
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedDataType, Primitive},
+    datatype::{DataType, Field, NamedDataType, Primitive, Struct},
 };
 use specta_openapi::{OpenApi, OutputFormat, SchemaMode};
 
@@ -99,6 +99,13 @@ struct StrictUnit;
 struct StrictOptionalPrimitive {
     value: Option<String>,
     nested: Option<Option<String>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct WideIntegers {
+    signed: i64,
+    unsigned: u64,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -381,17 +388,41 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert_eq!(compatible_unit["additionalProperties"], false);
     assert_eq!(compatible_unit["x-specta-type"], "null");
 
-    let flattened_error = OpenApi::default()
-        .export(
+    let flattened = OpenApi::default()
+        .export_document(
             &Types::default().register::<StrictFlattened>(),
             specta_serde::Format,
         )
-        .expect_err("OpenAPI 3.0 cannot close flattened intersections exactly");
-    assert!(
-        flattened_error
-            .to_string()
-            .contains("closed flattened intersections")
-    );
+        .expect("mergeable flattened objects are represented exactly");
+    let flattened = serde_json::to_value(flattened).unwrap();
+    let flattened = &flattened["components"]["schemas"]["StrictFlattened"];
+    assert_eq!(flattened["additionalProperties"], false);
+    assert!(flattened["properties"].get("a").is_some());
+    assert!(flattened["properties"].get("b").is_some());
+}
+
+#[test]
+fn openapi_preserves_exact_wide_integer_bounds_in_extensions() {
+    let types = Types::default().register::<WideIntegers>();
+    let error = OpenApi::default()
+        .schema_mode(SchemaMode::Strict)
+        .export_document(&types, specta_serde::Format)
+        .expect_err("OpenAPI 3.0 cannot represent every 64-bit integer bound exactly");
+    assert!(error.to_string().contains("exact 64-bit integer bounds"));
+
+    let document = OpenApi::default()
+        .schema_mode(SchemaMode::Compatible)
+        .export_document(&types, specta_serde::Format)
+        .expect("compatible mode should retain exact bounds in extensions");
+    let document = serde_json::to_value(document).unwrap();
+    let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
+
+    assert_eq!(properties["signed"]["maximum"], i64::MAX);
+    assert_eq!(properties["signed"]["minimum"], i64::MIN);
+    assert!(properties["signed"].get("x-specta-maximum").is_none());
+    assert!(properties["unsigned"].get("maximum").is_none());
+    assert_eq!(properties["unsigned"]["x-specta-maximum"], u64::MAX);
+    assert_eq!(properties["unsigned"]["minimum"], 0.0);
 }
 
 #[test]
@@ -408,6 +439,32 @@ fn openapi_rejects_component_name_collisions() {
         .export(&types, specta_serde::Format)
         .expect_err("sanitized component names must not overwrite each other");
     assert!(error.to_string().contains("definition name collision"));
+}
+
+#[test]
+fn openapi_sanitizes_escaped_definition_names_and_rewrites_refs() {
+    let mut types = Types::default();
+    let escaped = NamedDataType::new("A/B~%#é", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(Primitive::str));
+    });
+    NamedDataType::new("EscapedHolder", &mut types, |_, ndt| {
+        ndt.ty = Some(
+            Struct::named()
+                .field("value", Field::new(escaped.reference(vec![]).into()))
+                .build(),
+        );
+    });
+
+    let document = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .unwrap();
+    let document = serde_json::to_value(document).unwrap();
+    let schemas = &document["components"]["schemas"];
+    assert!(schemas.get("A_B").is_some());
+    assert_eq!(
+        schemas["EscapedHolder"]["properties"]["value"]["$ref"],
+        "#/components/schemas/A_B"
+    );
 }
 
 #[test]

@@ -8,10 +8,28 @@ expression: rendered
       "description": " A skip-reduced tuple struct's `ty: None` marker slots (kept so the\n declared arity survives for other exporters) are OFF-wire: serde emits\n `[2]` and accepts `[]`/`[2]`. The array schema must be sized over live\n elements only — one prefix item, `minItems: 0` / `maxItems: 1` on\n deserialize and `minItems: 1` on serialize — not two.",
       "oneOf": [
         {
-          "$ref": "#/$defs/JsonSkipSlotTuple_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/JsonSkipSlotTuple_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/JsonSkipSlotTuple_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/JsonSkipSlotTuple_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "JsonSkipSlotTuple"
@@ -23,7 +41,6 @@ expression: rendered
       "minItems": 0,
       "prefixItems": [
         {
-          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
@@ -39,7 +56,6 @@ expression: rendered
       "minItems": 1,
       "prefixItems": [
         {
-          "format": "int32",
           "maximum": 255,
           "minimum": 0,
           "type": "integer"

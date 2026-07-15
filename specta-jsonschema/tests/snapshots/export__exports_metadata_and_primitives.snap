@@ -17,21 +17,17 @@ expression: schema
           "type": "string"
         },
         "f32_field": {
-          "format": "float",
           "type": "number"
         },
         "f64_field": {
-          "format": "double",
           "type": "number"
         },
         "i32_field": {
-          "format": "int32",
           "maximum": 2147483647,
           "minimum": -2147483648,
           "type": "integer"
         },
         "i8_field": {
-          "format": "int32",
           "maximum": 127,
           "minimum": -128,
           "type": "integer"
@@ -40,13 +36,12 @@ expression: schema
           "type": "string"
         },
         "u16_field": {
-          "format": "int32",
           "maximum": 65535,
           "minimum": 0,
           "type": "integer"
         },
         "u64_field": {
-          "format": "uint64",
+          "maximum": 18446744073709551615,
           "minimum": 0,
           "type": "integer"
         }

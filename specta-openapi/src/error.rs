@@ -26,6 +26,17 @@ pub enum Error {
         feature: &'static str,
     },
 
+    /// Two JSON Schema definition names map to the same OpenAPI component name.
+    #[error("OpenAPI definition name collision for {name:?}: {first:?} and {second:?}")]
+    DefinitionNameCollision {
+        /// Colliding OpenAPI component name.
+        name: String,
+        /// First JSON Schema definition name.
+        first: String,
+        /// Second JSON Schema definition name.
+        second: String,
+    },
+
     /// JSON output serialization failed.
     #[error("failed to serialize OpenAPI JSON: {0}")]
     Json(#[from] serde_json::Error),

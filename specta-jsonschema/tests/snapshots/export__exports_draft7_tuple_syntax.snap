@@ -10,7 +10,6 @@ expression: schema
       "properties": {
         "map": {
           "additionalProperties": {
-            "format": "int64",
             "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
@@ -30,7 +29,6 @@ expression: schema
               "type": "string"
             },
             {
-              "format": "int64",
               "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"

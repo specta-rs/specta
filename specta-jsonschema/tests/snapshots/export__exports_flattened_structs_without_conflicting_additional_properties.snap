@@ -31,32 +31,21 @@ expression: schema
       "type": "object"
     },
     "Flattened": {
-      "allOf": [
-        {
-          "properties": {
-            "a": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "a"
-          ],
-          "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
         },
-        {
-          "properties": {
-            "b": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "b"
-          ],
-          "type": "object"
+        "b": {
+          "type": "string"
         }
+      },
+      "required": [
+        "a",
+        "b"
       ],
       "title": "Flattened",
-      "unevaluatedProperties": false
+      "type": "object"
     }
   },
   "$ref": "#/$defs/Flattened",

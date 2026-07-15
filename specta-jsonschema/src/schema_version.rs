@@ -32,7 +32,7 @@ impl SchemaVersion {
     }
 
     pub(crate) fn uses_prefix_items(self) -> bool {
-        !matches!(self, Self::Draft7)
+        matches!(self, Self::Draft202012)
     }
 
     pub(crate) fn supports_unevaluated_properties(self) -> bool {
