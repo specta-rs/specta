@@ -1646,6 +1646,8 @@ fn unnamed_fields_datatype(
             ));
         }
         fields => {
+            let optional_from = trailing_optional_run(fields.iter().map(|(field, _)| *field));
+
             s.push('[');
             for (i, (field, ty)) in fields.iter().enumerate() {
                 if i != 0 {
@@ -1667,6 +1669,9 @@ fn unnamed_fields_datatype(
                     generics,
                     force_inline,
                 )?;
+                if i >= optional_from {
+                    v.push('?');
+                }
                 s.push_str(&inner_comments(
                     field.deprecated.as_ref(),
                     &field.docs,
@@ -1680,6 +1685,24 @@ fn unnamed_fields_datatype(
     }
 
     Ok(())
+}
+
+/// The start index of the maximal all-optional TRAILING run of tuple
+/// elements, or `fields.len()` when the last element isn't optional.
+///
+/// TypeScript only allows optional tuple elements at the end, so a
+/// non-trailing `optional` flag is ignored (rendered required, the safe
+/// wider-input direction). serde can't produce one anyway: `#[serde(default)]`
+/// on an unnamed field requires every later field to be defaulted too, so
+/// optional elements always form a suffix.
+fn trailing_optional_run<'a>(fields: impl Iterator<Item = &'a Field>) -> usize {
+    let mut run_start = 0;
+    for (idx, field) in fields.enumerate() {
+        if !field.optional {
+            run_start = idx + 1;
+        }
+    }
+    run_start
 }
 
 fn struct_dt(
@@ -2084,12 +2107,24 @@ fn enum_variant_datatype(
             }))
         }
         Fields::Unnamed(obj) => {
-            let fields = obj
+            let live_fields = obj
                 .fields
                 .iter()
-                .filter_map(|field| field.ty.as_ref())
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
+                .collect::<Vec<_>>();
+            // A newtype payload renders bare, with no tuple position for an
+            // optional marker to attach to.
+            let is_newtype = obj.fields.len() == 1;
+            let optional_from = if is_newtype {
+                live_fields.len()
+            } else {
+                trailing_optional_run(live_fields.iter().map(|(field, _)| *field))
+            };
+
+            let fields = live_fields
+                .iter()
                 .enumerate()
-                .map(|(idx, ty)| {
+                .map(|(idx, (_, ty))| {
                     let mut out = String::new();
                     let mut field_location = location.clone();
                     field_location.push(idx.to_string().into());
@@ -2104,15 +2139,18 @@ fn enum_variant_datatype(
                         "",
                         generics,
                         false,
-                    )
-                    .map(|_| out)
+                    )?;
+                    if idx >= optional_from {
+                        out.push('?');
+                    }
+                    Ok(out)
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, Error>>()?;
 
             Ok(match &fields[..] {
                 [] if obj.fields.is_empty() => Some("[]".to_string()),
                 [] => None,
-                [field] if obj.fields.len() == 1 => Some(field.to_string()),
+                [field] if is_newtype => Some(field.to_string()),
                 fields => Some(format!("[{}]", fields.join(", "))),
             })
         }

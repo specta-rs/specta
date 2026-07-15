@@ -839,3 +839,68 @@ fn dead_in_both_phases_positions_do_not_split() {
         "a one-sided skip is genuinely directional and must still split: {rendered}"
     );
 }
+
+/// A trailing `#[serde(default)]` tuple element may be omitted on
+/// deserialize (`[1]` is accepted) but is always emitted on serialize.
+/// serde_derive rejects a required field after a defaulted one, so defaults
+/// always form a suffix and TypeScript's trailing `?` can express them.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct TupleDefault(u8, #[serde(default)] u8);
+
+/// Tuple-variant counterpart of [`TupleDefault`].
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum TupleVariantDefault {
+    V(u8, #[serde(default)] u8),
+}
+
+/// A newtype (single unnamed field) has no container to omit the value
+/// from — `default` is inert on the wire, so it must not split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NewtypeDefault(#[serde(default)] u8);
+
+#[test]
+fn trailing_tuple_default_renders_optional_element_per_phase() {
+    // serde_json ground truth: trailing defaulted elements may be omitted on
+    // deserialize; serialize always emits every element.
+    let v: TupleDefault = serde_json::from_str("[1]").unwrap();
+    assert!(v.0 == 1 && v.1 == 0);
+    assert!(serde_json::from_str::<TupleDefault>("[]").is_err());
+    assert_eq!(serde_json::to_string(&TupleDefault(1, 2)).unwrap(), "[1,2]");
+    let TupleVariantDefault::V(a, b) = serde_json::from_str(r#"{"V":[1]}"#).unwrap();
+    assert!(a == 1 && b == 0);
+    // Newtype: the value IS the payload; `default` cannot make it omittable.
+    assert_eq!(serde_json::to_string(&NewtypeDefault(5)).unwrap(), "5");
+    assert!(serde_json::from_str::<NewtypeDefault>("null").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<TupleDefault>()
+                .register::<TupleVariantDefault>()
+                .register::<NewtypeDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support trailing tuple defaults");
+
+    assert!(
+        rendered.contains("TupleDefault_Serialize = [number, number]"),
+        "serialize half must require every element: {rendered}"
+    );
+    assert!(
+        rendered.contains("TupleDefault_Deserialize = [number, number?]"),
+        "deserialize half must mark the defaulted suffix optional: {rendered}"
+    );
+    assert!(
+        rendered.contains("{ V: [number, number?] }"),
+        "tuple-variant deserialize half must mark the defaulted suffix optional: {rendered}"
+    );
+    assert!(
+        !rendered.contains("NewtypeDefault_Serialize"),
+        "newtype `default` is inert on the wire and must not split: {rendered}"
+    );
+
+    insta::assert_snapshot!("serde-default-phases-tuple-default", rendered);
+}

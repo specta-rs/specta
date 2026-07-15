@@ -2193,6 +2193,17 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             match non_skipped.as_slice() {
                 [] => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
                 [single] if original_unnamed_len == 1 => Some((*single).clone()),
+                // A bare `Tuple` has no `Field`s, so it cannot carry the
+                // `optional` flag a phase rewrite sets on a defaulted
+                // trailing element. Keep an unnamed struct in that case so
+                // exporters can render the trailing `?`.
+                _ if non_skipped.iter().any(|field| field.optional) => {
+                    let mut out = Struct::unnamed();
+                    for field in non_skipped {
+                        out.field_mut(field.clone());
+                    }
+                    Some(Field::new(out.build()))
+                }
                 _ => Some(Field::new(DataType::Tuple(Tuple::new(
                     non_skipped
                         .iter()
@@ -2483,6 +2494,11 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
     match fields {
         Fields::Unit => Ok(false),
         Fields::Unnamed(unnamed) => {
+            // A single unnamed field is a newtype: serde represents it as
+            // the bare inner value, leaving no container position to omit,
+            // so `#[serde(default)]` on it is inert on the wire.
+            let default_is_inert = unnamed.fields.len() == 1;
+
             unnamed
                 .fields
                 .iter()
@@ -2491,7 +2507,7 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
-                    single_field_has_local_difference(field)
+                    single_field_has_local_difference(field, default_is_inert)
                 })
         }
         Fields::Named(named) => {
@@ -2503,13 +2519,13 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool, Error> {
                         return Ok(true);
                     }
 
-                    single_field_has_local_difference(field)
+                    single_field_has_local_difference(field, false)
                 })
         }
     }
 }
 
-fn single_field_has_local_difference(field: &Field) -> Result<bool, Error> {
+fn single_field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
     // A field removed from both phases renders in neither half, so no attr
     // on it — nor anything inside its (inline) datatype — can constitute a
     // phase difference.
@@ -2517,7 +2533,7 @@ fn single_field_has_local_difference(field: &Field) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    Ok(field_has_local_difference(field)?
+    Ok(field_has_local_difference(field, default_is_inert)?
         || field
             .ty
             .as_ref()
@@ -2548,7 +2564,7 @@ fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
         .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
 }
 
-fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
+fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
     Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
@@ -2564,9 +2580,12 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
                 // both exported phases entirely. serde also never applies
                 // `default` to a `flatten` field — base-only input still
                 // fails with "missing field", so the flattened keys are
-                // equally required in both phases. An asymmetric serde skip
-                // still splits via the skip check below.
+                // equally required in both phases. The caller flags newtype
+                // fields, where the bare wire value leaves nothing to omit.
+                // An asymmetric serde skip still splits via the skip check
+                // below.
                 || (attrs.default
+                    && !default_is_inert
                     && !attrs.skip_deserializing
                     && !attrs.flatten
                     && field.ty.is_some())
