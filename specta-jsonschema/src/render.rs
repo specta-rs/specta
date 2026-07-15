@@ -47,6 +47,7 @@ pub(crate) struct Renderer<'a> {
     in_progress_types: Vec<DefinitionSource>,
     name_counts: BTreeMap<Cow<'static, str>, usize>,
     allow_additional_properties: bool,
+    number_formats: bool,
 }
 
 impl<'a> Renderer<'a> {
@@ -54,6 +55,7 @@ impl<'a> Renderer<'a> {
         schema_version: SchemaVersion,
         types: &'a Types,
         allow_additional_properties: bool,
+        number_formats: bool,
     ) -> Self {
         let mut name_counts = BTreeMap::new();
         for ndt in types.into_sorted_iter() {
@@ -69,6 +71,7 @@ impl<'a> Renderer<'a> {
             in_progress_types: Vec::new(),
             name_counts,
             allow_additional_properties,
+            number_formats,
         }
     }
 
@@ -183,7 +186,7 @@ impl<'a> Renderer<'a> {
         }
 
         match dt {
-            DataType::Primitive(primitive) => Ok(primitive_schema(primitive)),
+            DataType::Primitive(primitive) => Ok(self.primitive_schema(primitive)),
             DataType::List(list) => self.render_list(list, generics, path, depth),
             DataType::Map(map) => self.render_map(map, generics, path, depth),
             DataType::Struct(strct) => self.render_struct(strct, generics, path, depth),
@@ -507,7 +510,7 @@ impl<'a> Renderer<'a> {
         depth: usize,
     ) -> Result<Option<Value>, Error> {
         Ok(match dt {
-            DataType::Primitive(Primitive::char) => Some(primitive_schema(&Primitive::char)),
+            DataType::Primitive(Primitive::char) => Some(self.primitive_schema(&Primitive::char)),
             DataType::Primitive(Primitive::str) => None,
             DataType::Primitive(Primitive::bool) => Some(object([(
                 "enum",
@@ -1230,6 +1233,40 @@ fn default_generics(ndt: &NamedDataType) -> Generics {
         }
     }
     generics
+}
+
+impl Renderer<'_> {
+    /// A primitive's schema, with an OpenAPI-style `format` annotation when
+    /// [`number formats`](crate::JsonSchema::number_formats) are enabled.
+    fn primitive_schema(&self, primitive: &Primitive) -> Value {
+        let mut schema = primitive_schema(primitive);
+        if self.number_formats
+            && let Some(format) = number_format(primitive)
+            && let Value::Object(object) = &mut schema
+        {
+            object.insert("format".to_string(), string(format));
+        }
+        schema
+    }
+}
+
+/// The OpenAPI `format` for a numeric primitive: `int32` when every value
+/// fits a signed 32-bit integer, `int64` for wider integers (`u64` included,
+/// by the OpenAPI convention; the bounds state the exact range), and
+/// `float`/`double` for the IEEE 754 sizes. Widths OpenAPI has no name for
+/// get none.
+fn number_format(primitive: &Primitive) -> Option<&'static str> {
+    match primitive {
+        Primitive::i8 | Primitive::i16 | Primitive::i32 | Primitive::u8 | Primitive::u16 => {
+            Some("int32")
+        }
+        Primitive::i64 | Primitive::isize | Primitive::u32 | Primitive::u64 | Primitive::usize => {
+            Some("int64")
+        }
+        Primitive::f32 => Some("float"),
+        Primitive::f64 => Some("double"),
+        _ => None,
+    }
 }
 
 fn primitive_schema(primitive: &Primitive) -> Value {

@@ -849,3 +849,150 @@ fn openapi_types_parameters_from_their_extracted_type() {
     assert_eq!(parameters[1]["in"], "query");
     assert_eq!(parameters[1]["schema"]["type"], "string");
 }
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "snake_case")]
+enum PlainStringEnum {
+    /// Automatic per-location blend.
+    Auto,
+    Gfs,
+    Ecmwf,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NumericFormats {
+    small: u16,
+    lead: u32,
+    wide: i64,
+    ratio: f32,
+    value: f64,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ProblemBody {
+    title: String,
+}
+
+/// Numeric schemas carry OpenAPI formats, and plain string enums render in
+/// the compact `type: string, enum: [...]` form with variant docs retained in
+/// an extension.
+#[test]
+fn numeric_formats_and_compact_string_enums() {
+    let types = Types::default()
+        .register::<NumericFormats>()
+        .register::<PlainStringEnum>();
+    let document = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .unwrap();
+    let json = serde_json::to_value(&document).unwrap();
+    let schemas = &json["components"]["schemas"];
+
+    let numeric = &schemas["NumericFormats"]["properties"];
+    assert_eq!(numeric["small"]["format"], "int32");
+    assert_eq!(numeric["lead"]["format"], "int64");
+    assert_eq!(numeric["wide"]["format"], "int64");
+    assert_eq!(numeric["ratio"]["format"], "float");
+    assert_eq!(numeric["value"]["format"], "double");
+
+    let string_enum = &schemas["PlainStringEnum"];
+    assert_eq!(string_enum["type"], "string");
+    assert_eq!(
+        string_enum["enum"],
+        serde_json::json!(["auto", "gfs", "ecmwf"])
+    );
+    assert!(string_enum.get("oneOf").is_none());
+    assert_eq!(
+        string_enum["x-specta-enum-descriptions"]["auto"],
+        "Automatic per-location blend."
+    );
+}
+
+/// The `Param` builder covers what the bare conveniences cannot: required
+/// query parameters, descriptions, and example values.
+#[test]
+fn parameters_carry_required_description_and_example() {
+    use specta_openapi::Param;
+
+    let types = Types::default().register::<ProblemBody>();
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/v1/weather/forecast")
+                .parameter(
+                    Param::query::<f64>("lat")
+                        .required()
+                        .description("Latitude, WGS84 degrees, -90 to 90")
+                        .example(serde_json::json!(35.0)),
+                )
+                .query_param::<u32>("horizon_hours")
+                .response::<ProblemBody>(200, "ok"),
+        )
+        .export_document(&types, specta_serde::Format)
+        .unwrap();
+    let json = serde_json::to_value(&document).unwrap();
+    let parameters = &json["paths"]["/v1/weather/forecast"]["get"]["parameters"];
+
+    assert_eq!(parameters[0]["name"], "lat");
+    assert_eq!(parameters[0]["required"], true);
+    assert_eq!(
+        parameters[0]["description"],
+        "Latitude, WGS84 degrees, -90 to 90"
+    );
+    assert_eq!(parameters[0]["example"], 35.0);
+    assert_eq!(parameters[0]["schema"]["format"], "double");
+
+    // The bare convenience stays optional (openapiv3 omits `required: false`)
+    // with no annotations.
+    assert_eq!(parameters[1]["name"], "horizon_hours");
+    assert_ne!(parameters[1]["required"], serde_json::json!(true));
+    assert!(parameters[1].get("example").is_none());
+}
+
+/// Error responses can be served as `application/problem+json`, security
+/// schemes register on the document, and operations state their security
+/// alternatives, the anonymous option included.
+#[test]
+fn content_types_security_and_document_metadata() {
+    let types = Types::default().register::<ProblemBody>();
+    let document = OpenApi::default()
+        .title("Orrery API")
+        .version("1.0.0")
+        .server_described("https://api.orr.sh", "Production")
+        .contact("Orrery", "https://orreryhq.com")
+        .tag("weather", "Weather intelligence")
+        .bearer_security_scheme("api_key", "opaque")
+        .operation(
+            Operation::get("/v1/me")
+                .tag("weather")
+                .response::<ProblemBody>(200, "ok")
+                .response_as::<ProblemBody>(
+                    401,
+                    "Missing or unknown key",
+                    "application/problem+json",
+                )
+                .security([("api_key", Vec::new())])
+                .security_optional(),
+        )
+        .export_document(&types, specta_serde::Format)
+        .unwrap();
+    let json = serde_json::to_value(&document).unwrap();
+
+    assert_eq!(json["servers"][0]["url"], "https://api.orr.sh");
+    assert_eq!(json["servers"][0]["description"], "Production");
+    assert_eq!(json["info"]["contact"]["name"], "Orrery");
+    assert_eq!(json["tags"][0]["description"], "Weather intelligence");
+    assert_eq!(
+        json["components"]["securitySchemes"]["api_key"]["scheme"],
+        "bearer"
+    );
+
+    let operation = &json["paths"]["/v1/me"]["get"];
+    assert!(operation["responses"]["200"]["content"]["application/json"].is_object());
+    assert!(operation["responses"]["401"]["content"]["application/problem+json"].is_object());
+    assert_eq!(
+        operation["security"],
+        serde_json::json!([{ "api_key": [] }, {}])
+    );
+}

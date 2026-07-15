@@ -59,5 +59,5 @@ mod transform;
 
 pub use error::Error;
 pub use openapi::{OpenApi, OutputFormat, SchemaMode};
-pub use openapiv3::{Components, OpenAPI, ReferenceOr, Schema};
-pub use operation::{Method, Operation};
+pub use openapiv3::{Components, OpenAPI, ReferenceOr, Schema, SecurityScheme};
+pub use operation::{Method, Operation, Param};

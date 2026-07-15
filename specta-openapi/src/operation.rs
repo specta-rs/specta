@@ -39,7 +39,83 @@ pub(crate) struct Parameter {
     pub(crate) location: ParameterLocation,
     pub(crate) required: bool,
     pub(crate) description: Option<Cow<'static, str>>,
+    pub(crate) example: Option<serde_json::Value>,
     pub(crate) ty: Body,
+}
+
+/// A parameter under construction: [`Param::path`], [`Param::query`], or
+/// [`Param::header`] pick the location and type, and the builder methods add
+/// what the bare [`Operation`] conveniences cannot say.
+///
+/// ```rust
+/// # use specta_openapi::{Operation, Param};
+/// # use serde_json::json;
+/// let operation = Operation::get("/v1/weather/forecast")
+///     .parameter(
+///         Param::query::<f64>("lat")
+///             .required()
+///             .description("Latitude, WGS84 degrees, -90 to 90")
+///             .example(json!(35.0)),
+///     );
+/// ```
+#[derive(Debug, Clone)]
+pub struct Param(pub(crate) Parameter);
+
+impl Param {
+    /// A templated path parameter of type `T`. Path parameters are always
+    /// required.
+    pub fn path<T: Type>(name: impl Into<Cow<'static, str>>) -> Self {
+        Self(Parameter {
+            name: name.into(),
+            location: ParameterLocation::Path,
+            required: true,
+            description: None,
+            example: None,
+            ty: capture::<T>(),
+        })
+    }
+
+    /// A query parameter of type `T`, optional unless [`required`](Self::required).
+    pub fn query<T: Type>(name: impl Into<Cow<'static, str>>) -> Self {
+        Self(Parameter {
+            name: name.into(),
+            location: ParameterLocation::Query,
+            required: false,
+            description: None,
+            example: None,
+            ty: capture::<T>(),
+        })
+    }
+
+    /// A header parameter of type `T`, optional unless [`required`](Self::required).
+    pub fn header<T: Type>(name: impl Into<Cow<'static, str>>) -> Self {
+        Self(Parameter {
+            name: name.into(),
+            location: ParameterLocation::Header,
+            required: false,
+            description: None,
+            example: None,
+            ty: capture::<T>(),
+        })
+    }
+
+    /// Marks the parameter required.
+    pub fn required(mut self) -> Self {
+        self.0.required = true;
+        self
+    }
+
+    /// Sets the parameter's description.
+    pub fn description(mut self, description: impl Into<Cow<'static, str>>) -> Self {
+        self.0.description = Some(description.into());
+        self
+    }
+
+    /// Sets the parameter's example value.
+    pub fn example(mut self, example: serde_json::Value) -> Self {
+        self.0.example = Some(example);
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -54,8 +130,14 @@ pub(crate) struct Body {
 pub(crate) struct Response {
     pub(crate) status: u16,
     pub(crate) description: Cow<'static, str>,
+    pub(crate) content_type: Option<Cow<'static, str>>,
     pub(crate) body: Option<Body>,
 }
+
+/// One way a caller may satisfy an operation's security: scheme names (as
+/// registered on the document) to their required scopes. An empty requirement
+/// means the operation also works anonymously.
+pub(crate) type SecurityRequirement = Vec<(Cow<'static, str>, Vec<String>)>;
 
 /// A single endpoint: one method on one path.
 ///
@@ -85,6 +167,7 @@ pub struct Operation {
     pub(crate) parameters: Vec<Parameter>,
     pub(crate) request_body: Option<Body>,
     pub(crate) responses: Vec<Response>,
+    pub(crate) security: Vec<SecurityRequirement>,
 }
 
 impl Operation {
@@ -103,6 +186,7 @@ impl Operation {
             parameters: Vec::new(),
             request_body: None,
             responses: Vec::new(),
+            security: Vec::new(),
         }
     }
 
@@ -159,38 +243,25 @@ impl Operation {
     ///
     /// `T` is what the extractor parses the segment into, so `/users/{id}` served by a
     /// `Path<u32>` is `path_param::<u32>("id")` and exports as an integer.
-    pub fn path_param<T: Type>(mut self, name: impl Into<Cow<'static, str>>) -> Self {
-        self.parameters.push(Parameter {
-            name: name.into(),
-            location: ParameterLocation::Path,
-            required: true,
-            description: None,
-            ty: capture::<T>(),
-        });
-        self
+    pub fn path_param<T: Type>(self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.parameter(Param::path::<T>(name))
     }
 
     /// Declares an optional query parameter of type `T`.
-    pub fn query_param<T: Type>(mut self, name: impl Into<Cow<'static, str>>) -> Self {
-        self.parameters.push(Parameter {
-            name: name.into(),
-            location: ParameterLocation::Query,
-            required: false,
-            description: None,
-            ty: capture::<T>(),
-        });
-        self
+    pub fn query_param<T: Type>(self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.parameter(Param::query::<T>(name))
     }
 
     /// Declares an optional header parameter of type `T`.
-    pub fn header_param<T: Type>(mut self, name: impl Into<Cow<'static, str>>) -> Self {
-        self.parameters.push(Parameter {
-            name: name.into(),
-            location: ParameterLocation::Header,
-            required: false,
-            description: None,
-            ty: capture::<T>(),
-        });
+    pub fn header_param<T: Type>(self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.parameter(Param::header::<T>(name))
+    }
+
+    /// Declares a parameter built with [`Param`], which can say what the bare
+    /// conveniences cannot: required query parameters, descriptions, and
+    /// example values.
+    pub fn parameter(mut self, param: Param) -> Self {
+        self.parameters.push(param.0);
         self
     }
 
@@ -212,8 +283,51 @@ impl Operation {
         self.responses.push(Response {
             status,
             description: description.into(),
+            content_type: None,
             body: Some(capture::<T>()),
         });
+        self
+    }
+
+    /// Declares a response body of `T` for `status` served with a content
+    /// type other than `application/json`, such as RFC 9457's
+    /// `application/problem+json`.
+    pub fn response_as<T: Type>(
+        mut self,
+        status: u16,
+        description: impl Into<Cow<'static, str>>,
+        content_type: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        self.responses.push(Response {
+            status,
+            description: description.into(),
+            content_type: Some(content_type.into()),
+            body: Some(capture::<T>()),
+        });
+        self
+    }
+
+    /// Adds one way a caller may satisfy this operation's security: scheme
+    /// names (as registered on the document) to their required scopes. Each
+    /// call adds an alternative; a caller needs to satisfy only one.
+    pub fn security<N: Into<Cow<'static, str>>>(
+        mut self,
+        requirement: impl IntoIterator<Item = (N, Vec<String>)>,
+    ) -> Self {
+        self.security.push(
+            requirement
+                .into_iter()
+                .map(|(name, scopes)| (name.into(), scopes))
+                .collect(),
+        );
+        self
+    }
+
+    /// Also allows the operation to be called with no credentials at all: the
+    /// empty security requirement, which makes any [`security`](Self::security)
+    /// alternatives optional.
+    pub fn security_optional(mut self) -> Self {
+        self.security.push(Vec::new());
         self
     }
 
@@ -239,6 +353,7 @@ impl Operation {
         self.responses.push(Response {
             status,
             description: description.into(),
+            content_type: None,
             body: None,
         });
         self

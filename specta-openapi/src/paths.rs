@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use openapiv3::{
     MediaType, Operation as OpenApiOperation, Parameter as OpenApiParameter, ParameterData,
     ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    StatusCode,
+    SecurityRequirement, StatusCode,
 };
 
 const JSON: &str = "application/json";
@@ -60,11 +60,12 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<OpenApiOperation,
 
     let mut responses = Responses::default();
     for response in &operation.responses {
+        let content_type = response.content_type.as_deref().unwrap_or(JSON);
         responses.responses.insert(
             StatusCode::Code(response.status),
             ReferenceOr::Item(Response {
                 description: response.description.to_string(),
-                content: content_of(response.body.as_ref(), resolved)?,
+                content: content_of(response.body.as_ref(), content_type, resolved)?,
                 ..Default::default()
             }),
         );
@@ -72,7 +73,7 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<OpenApiOperation,
 
     let request_body = match &operation.request_body {
         Some(body) => Some(ReferenceOr::Item(RequestBody {
-            content: content_of(Some(body), resolved)?,
+            content: content_of(Some(body), JSON, resolved)?,
             required: true,
             ..Default::default()
         })),
@@ -91,12 +92,25 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<OpenApiOperation,
             .collect::<Result<Vec<_>, _>>()?,
         request_body,
         responses,
+        security: (!operation.security.is_empty()).then(|| {
+            operation
+                .security
+                .iter()
+                .map(|requirement| {
+                    requirement
+                        .iter()
+                        .map(|(name, scopes)| (name.to_string(), scopes.clone()))
+                        .collect::<SecurityRequirement>()
+                })
+                .collect()
+        }),
         ..Default::default()
     })
 }
 
 fn content_of(
     body: Option<&Body>,
+    content_type: &str,
     resolved: &Resolved,
 ) -> Result<IndexMap<String, MediaType>, Error> {
     let Some(body) = body else {
@@ -106,7 +120,7 @@ fn content_of(
         .get(&body.dt)
         .ok_or(Error::UnresolvedOperationTypes)?;
     Ok(IndexMap::from_iter([(
-        JSON.to_string(),
+        content_type.to_string(),
         MediaType {
             schema: Some(schema.clone()),
             ..Default::default()
@@ -128,7 +142,7 @@ fn parameter(
         required: parameter.required,
         deprecated: None,
         format: ParameterSchemaOrContent::Schema(schema.clone()),
-        example: None,
+        example: parameter.example.clone(),
         examples: IndexMap::new(),
         explode: None,
         extensions: IndexMap::new(),

@@ -11,7 +11,10 @@ pub(crate) fn components(
     format: impl Format,
     mode: SchemaMode,
 ) -> Result<Components, Error> {
-    let mut schema = specta_jsonschema::JsonSchema::default().export_value(types, format)?;
+    let mut schema = specta_jsonschema::JsonSchema::default()
+        // OpenAPI generators map numeric formats to language types.
+        .number_formats(true)
+        .export_value(types, format)?;
     let definitions = schema
         .as_object_mut()
         .and_then(|root| root.remove("$defs").or_else(|| root.remove("definitions")))
@@ -169,6 +172,8 @@ fn transform_object(
     if let Some(constant) = schema.remove("const") {
         schema.insert("enum".to_string(), Value::Array(vec![constant]));
     }
+
+    compact_string_enum(&mut schema);
 
     if schema.get("type").and_then(Value::as_str) == Some("null") {
         if mode == SchemaMode::Strict {
@@ -380,4 +385,55 @@ fn is_nullable_only(value: &Value) -> bool {
                     )
                 }))
     })
+}
+
+/// Collapses a `oneOf` whose members are all single-value string enums - the
+/// shape a plain string enum renders as - into the compact
+/// `{ "type": "string", "enum": [...] }` form generators handle best.
+/// Per-variant descriptions have no home in the compact form, so when any
+/// member carries one they are retained in `x-specta-enum-descriptions`,
+/// keyed by value.
+fn compact_string_enum(schema: &mut Map<String, Value>) {
+    let Some(Value::Array(members)) = schema.get("oneOf") else {
+        return;
+    };
+    let mut values = Vec::with_capacity(members.len());
+    let mut descriptions = Map::new();
+    for member in members {
+        let Value::Object(member) = member else {
+            return;
+        };
+        // Exactly a single string value - members are inspected before their
+        // own transform runs, so both the JSON Schema `const` form and the
+        // already-lowered single-value `enum` form appear here - with nothing
+        // but an optional description beside it.
+        let value = match (member.get("const"), member.get("enum")) {
+            (Some(Value::String(value)), None) => value,
+            (None, Some(Value::Array(constants))) => match constants.as_slice() {
+                [Value::String(value)] => value,
+                _ => return,
+            },
+            _ => return,
+        };
+        if member
+            .keys()
+            .any(|key| !matches!(key.as_str(), "const" | "enum" | "description"))
+        {
+            return;
+        }
+        if let Some(Value::String(description)) = member.get("description") {
+            // Doc comments arrive with their leading space.
+            descriptions.insert(value.clone(), Value::String(description.trim().to_string()));
+        }
+        values.push(Value::String(value.clone()));
+    }
+    schema.remove("oneOf");
+    schema.insert("type".to_string(), Value::String("string".into()));
+    schema.insert("enum".to_string(), Value::Array(values));
+    if !descriptions.is_empty() {
+        schema.insert(
+            "x-specta-enum-descriptions".to_string(),
+            Value::Object(descriptions),
+        );
+    }
 }

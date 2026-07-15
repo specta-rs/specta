@@ -1,6 +1,9 @@
 use std::{borrow::Cow, path::Path};
 
-use openapiv3::{Components, Info, OpenAPI, Paths};
+use indexmap::IndexMap;
+use openapiv3::{
+    Components, Contact, Info, OpenAPI, Paths, ReferenceOr, SecurityScheme, Server, Tag,
+};
 use specta::{Format, Types};
 
 use crate::{Error, operation::Operation, resolve::resolve, transform::components};
@@ -36,6 +39,10 @@ pub struct OpenApi {
     output_format: OutputFormat,
     schema_mode: SchemaMode,
     operations: Vec<Operation>,
+    servers: Vec<Server>,
+    tags: Vec<Tag>,
+    contact: Option<Contact>,
+    security_schemes: IndexMap<String, SecurityScheme>,
 }
 
 impl Default for OpenApi {
@@ -47,6 +54,10 @@ impl Default for OpenApi {
             output_format: OutputFormat::Json,
             schema_mode: SchemaMode::Strict,
             operations: Vec::new(),
+            servers: Vec::new(),
+            tags: Vec::new(),
+            contact: None,
+            security_schemes: IndexMap::new(),
         }
     }
 }
@@ -73,6 +84,76 @@ impl OpenApi {
     pub fn description(mut self, description: impl Into<Cow<'static, str>>) -> Self {
         self.description = Some(description.into());
         self
+    }
+
+    /// Add a server the API is reachable on, in the document's `servers` list.
+    pub fn server(mut self, url: impl Into<String>) -> Self {
+        self.servers.push(Server {
+            url: url.into(),
+            ..Default::default()
+        });
+        self
+    }
+
+    /// Add a server with a human-readable description.
+    pub fn server_described(
+        mut self,
+        url: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        self.servers.push(Server {
+            url: url.into(),
+            description: Some(description.into()),
+            ..Default::default()
+        });
+        self
+    }
+
+    /// Configure the API contact in the generated document's `info` object.
+    pub fn contact(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
+        self.contact = Some(Contact {
+            name: Some(name.into()),
+            url: Some(url.into()),
+            ..Default::default()
+        });
+        self
+    }
+
+    /// Add a tag with a description, which generators and documentation use
+    /// to group operations declared with [`Operation::tag`].
+    pub fn tag(mut self, name: impl Into<String>, description: impl Into<String>) -> Self {
+        self.tags.push(Tag {
+            name: name.into(),
+            description: Some(description.into()),
+            ..Default::default()
+        });
+        self
+    }
+
+    /// Register a security scheme under `name`, which operations reference
+    /// with [`Operation::security`]. The full [`SecurityScheme`] surface is
+    /// [`openapiv3`]'s; [`bearer_security_scheme`](Self::bearer_security_scheme)
+    /// covers the common token case.
+    pub fn security_scheme(mut self, name: impl Into<String>, scheme: SecurityScheme) -> Self {
+        self.security_schemes.insert(name.into(), scheme);
+        self
+    }
+
+    /// Register an HTTP bearer-token security scheme under `name`.
+    pub fn bearer_security_scheme(
+        self,
+        name: impl Into<String>,
+        bearer_format: impl Into<String>,
+    ) -> Self {
+        self.security_scheme(
+            name,
+            SecurityScheme::HTTP {
+                scheme: "bearer".to_string(),
+                bearer_format: Some(bearer_format.into()),
+                description: None,
+                extensions: IndexMap::new(),
+            },
+        )
     }
 
     /// Configure JSON or YAML serialization.
@@ -133,14 +214,24 @@ impl OpenApi {
             crate::paths::paths(&self.operations, &resolved)?
         };
 
+        let mut components = components;
+        for (name, scheme) in &self.security_schemes {
+            components
+                .security_schemes
+                .insert(name.clone(), ReferenceOr::Item(scheme.clone()));
+        }
+
         Ok(OpenAPI {
             openapi: "3.0.3".to_string(),
             info: Info {
                 title: self.title.to_string(),
                 description: self.description.as_ref().map(ToString::to_string),
                 version: self.version.to_string(),
+                contact: self.contact.clone(),
                 ..Default::default()
             },
+            servers: self.servers.clone(),
+            tags: self.tags.clone(),
             paths,
             components: Some(components),
             ..Default::default()
