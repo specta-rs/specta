@@ -661,6 +661,12 @@ fn render_reference(
                         path: path.join("."),
                         reference: format!("{reference:?}"),
                     })?;
+                if ndt.ty.is_none() {
+                    return Err(Error::DanglingReference {
+                        path: path.join("."),
+                        reference: rust_type_path(ndt),
+                    });
+                }
                 let mut out = exported_name(&ndt.name, &rust_type_path(ndt))?;
                 let mut rendered_arguments = Vec::new();
                 let resolved_arguments = resolve_reference_arguments(ndt, arguments);
@@ -1137,7 +1143,7 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
     Ok(out)
 }
 
-fn is_go_letter(ch: char) -> bool {
+pub(crate) fn is_go_letter(ch: char) -> bool {
     matches!(
         get_general_category(ch),
         GeneralCategory::UppercaseLetter
@@ -1148,7 +1154,7 @@ fn is_go_letter(ch: char) -> bool {
     )
 }
 
-fn is_go_decimal_digit(ch: char) -> bool {
+pub(crate) fn is_go_decimal_digit(ch: char) -> bool {
     get_general_category(ch) == GeneralCategory::DecimalNumber
 }
 
@@ -1220,7 +1226,9 @@ fn struct_tag(name: &str, optional: bool) -> String {
 fn valid_json_tag_name(name: &str) -> bool {
     !name.is_empty()
         && name.chars().all(|ch| {
-            ch.is_alphabetic() || ch.is_ascii_digit() || "!#$%&()*+-./:;<=>?@[]^_{|}~ ".contains(ch)
+            is_go_letter(ch)
+                || is_go_decimal_digit(ch)
+                || "!#$%&()*+-./:;<=>?@[]^_{|}~ ".contains(ch)
         })
 }
 

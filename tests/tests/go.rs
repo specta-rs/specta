@@ -3,7 +3,10 @@
 use std::{borrow::Cow, collections::HashMap, path::Path, process::Command};
 
 use serde::{Deserialize, Serialize};
-use specta::{Format, Type, Types, datatype::DataType};
+use specta::{
+    Format, Type, Types,
+    datatype::{DataType, NamedDataType},
+};
 use specta_go::{Go, Layout, primitives};
 use tempfile::TempDir;
 
@@ -240,6 +243,8 @@ fn go_output_is_accepted_by_go_toolchain() {
         value: String,
         #[serde(rename = "-")]
         hyphen: String,
+        #[serde(rename = "value١")]
+        decimal_digit: String,
     }
 
     #[derive(Type, Serialize, Deserialize)]
@@ -320,6 +325,10 @@ fn go_output_is_accepted_by_go_toolchain() {
     );
     assert!(
         localized_before.contains("Field2 string `json:\"-,\"`"),
+        "{localized_before}"
+    );
+    assert!(
+        localized_before.contains("Value١ string `json:\"value١\"`"),
         "{localized_before}"
     );
     assert!(
@@ -453,16 +462,16 @@ func TestOptionalCollectionsPreserveEmptyValues(t *testing.T) {
 }
 
 func TestLocalizedWireName(t *testing.T) {
-	encoded, err := json.Marshal(LocalizedWireName{Field1: "value", Field2: "hyphen"})
+	encoded, err := json.Marshal(LocalizedWireName{Field1: "value", Field2: "hyphen", Value١: "digit"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(encoded), `{"名字":"value","-":"hyphen"}`; got != want {
+	if got, want := string(encoded), `{"名字":"value","-":"hyphen","value١":"digit"}`; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
 	var decoded LocalizedWireName
-	if err := json.Unmarshal([]byte(`{"名字":"decoded","-":"dash"}`), &decoded); err != nil {
+	if err := json.Unmarshal([]byte(`{"名字":"decoded","-":"dash","value١":"number"}`), &decoded); err != nil {
 		t.Fatal(err)
 	}
 	if decoded.Field1 != "decoded" {
@@ -470,6 +479,9 @@ func TestLocalizedWireName(t *testing.T) {
 	}
 	if decoded.Field2 != "dash" {
 		t.Fatalf("decoded hyphen: %s", decoded.Field2)
+	}
+	if decoded.Value١ != "number" {
+		t.Fatalf("decoded decimal digit: %s", decoded.Value١)
 	}
 }
 "#,
@@ -559,6 +571,34 @@ fn go_reports_invalid_configuration_and_map_keys() {
             .to_string()
             .contains("package name")
     );
+    for name in ["Ⅳ", "foo²"] {
+        assert!(
+            Go::default()
+                .package_name(name)
+                .export(&Types::default(), IdentityFormat)
+                .unwrap_err()
+                .to_string()
+                .contains("package name"),
+            "{name}"
+        );
+    }
+    assert!(
+        Go::default()
+            .package_name("pkg١")
+            .export(&Types::default(), IdentityFormat)
+            .unwrap()
+            .contains("package pkg١")
+    );
+
+    let mut dangling_types = Types::default();
+    let missing = NamedDataType::new("Missing", &mut dangling_types, |_, _| {});
+    NamedDataType::new("HasMissing", &mut dangling_types, |_, ndt| {
+        ndt.ty = Some(DataType::Reference(missing.reference(Vec::new())));
+    });
+    let err = Go::default()
+        .export(&dangling_types, IdentityFormat)
+        .unwrap_err();
+    assert!(err.to_string().contains("Missing"), "{err}");
     assert!(
         Go::default()
             .package_name("_")
@@ -648,6 +688,21 @@ fn go_reports_invalid_configuration_and_map_keys() {
     let err = Go::default()
         .export(
             &Types::default().register::<InvalidTag>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(err.to_string().contains("encoding/json"), "{err}");
+
+    #[derive(Type, Serialize)]
+    #[specta(collect = false)]
+    struct InvalidLetterNumberTag {
+        #[serde(rename = "Ⅻ")]
+        value: String,
+    }
+
+    let err = Go::default()
+        .export(
+            &Types::default().register::<InvalidLetterNumberTag>(),
             specta_serde::Format,
         )
         .unwrap_err();

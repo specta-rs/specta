@@ -398,8 +398,10 @@ fn validate_package_name(name: &str) -> Result<(), Error> {
     let mut chars = name.chars();
     let valid = chars
         .next()
-        .is_some_and(|ch| ch == '_' || ch.is_alphabetic())
-        && chars.all(|ch| ch == '_' || ch.is_alphanumeric())
+        .is_some_and(|ch| ch == '_' || primitives::is_go_letter(ch))
+        && chars.all(|ch| {
+            ch == '_' || primitives::is_go_letter(ch) || primitives::is_go_decimal_digit(ch)
+        })
         && name != "_"
         && !crate::reserved_names::GO_KEYWORDS.contains(&name);
     valid
