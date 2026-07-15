@@ -372,3 +372,26 @@ fn export_for<T: Type>() -> Result<String, specta_zod::Error> {
     let types = Types::default().register::<T>();
     Zod::default().export(&types, specta_serde::Format)
 }
+
+/// A trailing `#[serde(default)]` tuple element is optional on deserialize
+/// (serde accepts `[1]`): the deserialize half must render
+/// `z.tuple([..., z.number().optional()])`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodTupleDefault(u8, #[serde(default)] u8);
+
+#[test]
+fn zod_tuple_default_phases() {
+    let rendered = Zod::default()
+        .export(
+            &Types::default().register::<ZodTupleDefault>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("Zod should support defaulted tuple elements under PhasesFormat");
+
+    insta::assert_snapshot!("zod-tuple-default-phases", rendered);
+    assert!(
+        rendered.contains("z.tuple([z.int(), z.int().optional()])"),
+        "the defaulted element must be `.optional()` in the deserialize half: {rendered}"
+    );
+}

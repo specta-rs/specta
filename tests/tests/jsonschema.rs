@@ -59,3 +59,22 @@ fn jsonschema_keeps_type_info_typescript_preserves() {
         .expect("field doc comment should become a description");
     assert_eq!(description.trim(), "Display name for the user.");
 }
+
+/// A trailing `#[serde(default)]` tuple element is optional on deserialize
+/// (serde accepts `[1]`): the deserialize half's array schema must lower
+/// `minItems` below the full arity while serialize keeps it exact.
+#[derive(Type, Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct JsonTupleDefault(u8, #[serde(default)] u8);
+
+#[test]
+fn jsonschema_tuple_default_phases() {
+    let rendered = JsonSchema::default()
+        .export(
+            &Types::default().register::<JsonTupleDefault>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("JsonSchema should support defaulted tuple elements under PhasesFormat");
+
+    insta::assert_snapshot!("jsonschema-tuple-default-phases", rendered);
+}

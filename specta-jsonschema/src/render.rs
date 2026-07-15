@@ -414,7 +414,21 @@ impl<'a> Renderer<'a> {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(self.tuple_schema(items))
+        // serde accepts sequences truncated anywhere inside the trailing run
+        // of defaulted (`optional`) elements, so those don't count toward
+        // `minItems`. A single declared field is a newtype (bare wire value,
+        // nothing to omit), so its `optional` flag is ignored — mirroring
+        // the TypeScript renderer.
+        let mut min_items = items.len();
+        if fields.len() > 1 {
+            min_items = 0;
+            for (idx, field) in fields.iter().enumerate() {
+                if !field.optional {
+                    min_items = idx + 1;
+                }
+            }
+        }
+        Ok(self.tuple_schema(items, min_items))
     }
 
     fn render_tuple(
@@ -436,10 +450,11 @@ impl<'a> Renderer<'a> {
                 self.render_datatype(ty, generics, &format!("{path}.{idx}"), depth + 1)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(self.tuple_schema(items))
+        let min_items = items.len();
+        Ok(self.tuple_schema(items, min_items))
     }
 
-    fn tuple_schema(&self, items: Vec<Value>) -> Value {
+    fn tuple_schema(&self, items: Vec<Value>, min_items: usize) -> Value {
         let mut schema = Map::new();
         schema.insert("type".to_string(), string("array"));
         if self.schema_version.uses_prefix_items() {
@@ -449,7 +464,7 @@ impl<'a> Renderer<'a> {
             schema.insert("items".to_string(), Value::Array(items.clone()));
             schema.insert("additionalItems".to_string(), Value::Bool(false));
         }
-        schema.insert("minItems".to_string(), number(items.len()));
+        schema.insert("minItems".to_string(), number(min_items));
         schema.insert("maxItems".to_string(), number(items.len()));
         Value::Object(schema)
     }
