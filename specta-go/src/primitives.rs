@@ -877,12 +877,17 @@ fn datatype_reaches(
                     return false;
                 };
                 let path = rust_type_path(ndt);
-                path == target
-                    || visited.insert(path)
-                        && ndt
-                            .ty
-                            .as_ref()
-                            .is_some_and(|dt| datatype_reaches(types, dt, target, visited))
+                if path == target {
+                    return true;
+                }
+                if !visited.insert(path) {
+                    return false;
+                }
+                let Some(mut ty) = ndt.ty.clone() else {
+                    return false;
+                };
+                substitute_generics(&mut ty, &resolve_reference_arguments(ndt, generics));
+                datatype_reaches(types, &ty, target, visited)
             }
             NamedReferenceType::Recursive(_) => true,
         },

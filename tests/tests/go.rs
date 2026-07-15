@@ -794,6 +794,24 @@ fn go_only_pointers_recursive_required_references() {
 
     #[derive(Type)]
     #[specta(collect = false)]
+    struct DefaultCycleA {
+        d: Box<DefaultCycleD>,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DefaultCycleD {
+        c: DefaultCycleC,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DefaultCycleC<T = DefaultCycleA> {
+        value: T,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
     struct AliasA(Box<AliasB>);
 
     #[derive(Type)]
@@ -846,6 +864,9 @@ fn go_only_pointers_recursive_required_references() {
         .register::<GenericB<GenericA>>()
         .register::<SafeGenericA>()
         .register::<SafeGenericB<SafeGenericA>>()
+        .register::<DefaultCycleA>()
+        .register::<DefaultCycleD>()
+        .register::<DefaultCycleC>()
         .register::<AliasA>()
         .register::<AliasB>()
         .register::<ErasedTuple>()
@@ -856,6 +877,7 @@ fn go_only_pointers_recursive_required_references() {
         .export(&generic_types, IdentityFormat)
         .unwrap();
     assert!(generic.contains("B *GenericB[GenericA]"), "{generic}");
+    assert!(generic.contains("D *DefaultCycleD"), "{generic}");
 
     assert!(
         generic.contains("B SafeGenericB[SafeGenericA]"),
