@@ -210,6 +210,8 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
         target.variant_identifier = true;
     } else if meta.path.is_ident("field_identifier") {
         target.field_identifier = true;
+    } else {
+        skip_unknown_meta(&meta)?;
     }
 
     Ok(())
@@ -250,6 +252,8 @@ fn parse_variant_meta(target: &mut VariantAttrs, meta: ParseNestedMeta<'_>) -> R
         target.other = true;
     } else if meta.path.is_ident("untagged") {
         target.untagged = true;
+    } else {
+        skip_unknown_meta(&meta)?;
     }
 
     Ok(())
@@ -287,6 +291,25 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
     } else if meta.path.is_ident("with") {
         target.has_with = true;
         parse_string_assignment(&meta)?;
+    } else {
+        skip_unknown_meta(&meta)?;
+    }
+
+    Ok(())
+}
+
+/// Consume the value attached to an unrecognized serde attribute so parsing of the surrounding
+/// attribute list can continue (e.g. `#[serde(expecting = "...", rename_all = "camelCase")]`).
+///
+/// These attributes don't affect the exported type's wire shape, so specta intentionally ignores
+/// them — just like it already does for unrecognized path-only attributes (e.g.
+/// `deny_unknown_fields`). Without this, `syn`'s `parse_nested_meta` would error with `expected
+/// `,`` on the leftover `= value` or `(...)` tokens.
+fn skip_unknown_meta(meta: &ParseNestedMeta<'_>) -> Result<()> {
+    if meta.input.peek(syn::Token![=]) {
+        meta.value()?.parse::<syn::Expr>()?;
+    } else if meta.input.peek(syn::token::Paren) {
+        meta.parse_nested_meta(|meta| skip_unknown_meta(&meta))?;
     }
 
     Ok(())
