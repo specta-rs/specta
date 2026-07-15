@@ -10,9 +10,11 @@ use crate::{Error, SchemaVersion, render::Renderer};
 #[non_exhaustive]
 pub struct JsonSchema {
     schema_version: SchemaVersion,
+    id: Option<Cow<'static, str>>,
     title: Option<Cow<'static, str>>,
     description: Option<Cow<'static, str>>,
     comment: Option<Cow<'static, str>>,
+    allow_additional_properties: bool,
 }
 
 impl JsonSchema {
@@ -24,6 +26,12 @@ impl JsonSchema {
     /// Configure the JSON Schema draft version.
     pub fn schema_version(mut self, version: SchemaVersion) -> Self {
         self.schema_version = version;
+        self
+    }
+
+    /// Configure the root schema `$id` URI.
+    pub fn id(mut self, id: impl Into<Cow<'static, str>>) -> Self {
+        self.id = Some(id.into());
         self
     }
 
@@ -45,6 +53,17 @@ impl JsonSchema {
         self
     }
 
+    /// Allow properties not declared by named structs.
+    ///
+    /// By default, exported object schemas describe exact serialized shapes and
+    /// set `additionalProperties` to `false`. Enable this when the schema is
+    /// primarily used for deserialization compatible with Serde's default of
+    /// ignoring unknown fields.
+    pub fn allow_additional_properties(mut self, allow: bool) -> Self {
+        self.allow_additional_properties = allow;
+        self
+    }
+
     /// Export the schema document as a pretty-printed JSON string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         Ok(serde_json::to_string_pretty(
@@ -59,7 +78,7 @@ impl JsonSchema {
             .map_err(|err| Error::format("type graph formatter failed", err))?;
         let types = types.as_ref();
 
-        let renderer = Renderer::new(self.schema_version, types);
+        let renderer = Renderer::new(self.schema_version, types, self.allow_additional_properties);
         let definitions = renderer.render_definitions()?;
 
         let mut root = Map::new();
@@ -67,6 +86,9 @@ impl JsonSchema {
             "$schema".to_string(),
             Value::String(self.schema_version.uri().to_string()),
         );
+        if let Some(id) = &self.id {
+            root.insert("$id".to_string(), Value::String(id.to_string()));
+        }
         if let Some(title) = &self.title {
             root.insert("title".to_string(), Value::String(title.to_string()));
         }
@@ -96,12 +118,21 @@ impl JsonSchema {
     ) -> Result<Value, Error> {
         let mut schema = self.export_value(types, format)?;
         if let Value::Object(root) = &mut schema {
+            let definition = definition.as_ref();
+            let definitions = root
+                .get(self.schema_version.definitions_key())
+                .and_then(Value::as_object);
+            if !definitions.is_some_and(|definitions| definitions.contains_key(definition)) {
+                return Err(Error::MissingDefinition {
+                    definition: definition.to_string(),
+                });
+            }
             root.insert(
                 "$ref".to_string(),
                 Value::String(format!(
                     "#/{}/{}",
                     self.schema_version.definitions_key(),
-                    definition.as_ref().replace('~', "~0").replace('/', "~1")
+                    crate::render::encode_ref_token(definition)
                 )),
             );
         }
@@ -129,11 +160,20 @@ impl JsonSchema {
         format: impl Format,
     ) -> Result<(), Error> {
         let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            std::fs::create_dir_all(parent).map_err(|source| Error::CreateDir {
+                path: parent.to_path_buf(),
+                source,
+            })?;
         }
 
-        std::fs::write(path, self.export(types, format)?)?;
+        std::fs::write(path, self.export(types, format)?).map_err(|source| Error::WriteFile {
+            path: path.to_path_buf(),
+            source,
+        })?;
         Ok(())
     }
 }

@@ -1,9 +1,12 @@
 #![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
-use std::fs;
+use std::{borrow::Cow, fs};
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
+use specta::{
+    Format, Type, Types,
+    datatype::{Field, Generic, GenericDefinition, List, NamedDataType, Primitive, Struct},
+};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
 #[derive(Type)]
@@ -81,6 +84,95 @@ struct UsesNestedGenerics {
     number: Wrapper<Nested<u32>>,
 }
 
+#[derive(Type)]
+struct GenericComposition<T> {
+    wrapped: Wrapper<T>,
+}
+
+#[derive(Type)]
+struct UsesGenericComposition {
+    value: GenericComposition<String>,
+}
+
+#[derive(Type)]
+struct Newtype(String);
+
+#[derive(Serialize, Deserialize, Type)]
+#[serde(untagged)]
+enum OverlappingUntagged {
+    Signed(i32),
+    Unsigned(u32),
+}
+
+#[derive(Type, Eq, PartialEq, std::hash::Hash)]
+struct InvalidMapKey {
+    value: String,
+}
+
+#[derive(Type)]
+struct UsesInvalidMapKey {
+    values: std::collections::HashMap<InvalidMapKey, String>,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename = "Escaped/Type~")]
+struct EscapedType {
+    value: String,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename = "Escaped #/%雪~")]
+struct UriEscapedType(String);
+
+#[derive(Type)]
+struct ReverseGenerics<Z, A> {
+    z: Z,
+    a: A,
+}
+
+#[derive(Type)]
+struct UsesReverseGenerics {
+    value: ReverseGenerics<String, u32>,
+}
+
+#[derive(Type, Serialize, Eq, PartialEq, std::hash::Hash)]
+struct NumericKey(u32);
+
+#[derive(Type, Serialize)]
+struct LexicalMapKeys {
+    numeric: std::collections::HashMap<NumericKey, String>,
+    boolean: std::collections::HashMap<bool, String>,
+}
+
+#[derive(Type)]
+enum RawNewtypeEnum {
+    Value(String),
+}
+
+#[derive(Type, Serialize)]
+#[serde(untagged)]
+enum DocumentedUntagged {
+    /// Text branch.
+    Text(String),
+    Number(u32),
+}
+
+struct IdentityFormat;
+
+impl Format for IdentityFormat {
+    fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
+    }
+
+    fn map_type(
+        &self,
+        _types: &Types,
+        ty: &specta::datatype::DataType,
+    ) -> Result<Cow<'_, specta::datatype::DataType>, specta::FormatError> {
+        Ok(Cow::Owned(ty.clone()))
+    }
+}
+
 #[derive(Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 struct SerdeUser {
@@ -124,6 +216,12 @@ struct Flattened {
 struct DocumentedFields {
     /// GitHub issue #491 regression: field docs should become JSON Schema descriptions.
     name: String,
+}
+
+#[derive(Type)]
+struct DocumentedReference {
+    /// The referenced user.
+    user: User,
 }
 
 #[test]
@@ -187,6 +285,265 @@ fn exports_generic_instantiations() {
 }
 
 #[test]
+fn substitutes_generics_inside_nested_references() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<UsesGenericComposition>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let reference = schema["$defs"]["GenericComposition<String>"]["properties"]["wrapped"]["$ref"]
+        .as_str()
+        .unwrap();
+    assert_eq!(reference, "#/$defs/Wrapper%3CString%3E");
+    assert_eq!(
+        schema["$defs"]["Wrapper<String>"]["properties"]["value"]["type"],
+        "string"
+    );
+}
+
+#[test]
+fn exports_newtype_struct_as_its_wire_value() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<Newtype>(),
+            specta_serde::Format,
+            "Newtype",
+        )
+        .unwrap();
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!("value")));
+    assert!(!validator.is_valid(&serde_json::json!(["value"])));
+}
+
+#[test]
+fn overlapping_untagged_variants_are_a_union() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<OverlappingUntagged>(),
+            specta_serde::Format,
+            "OverlappingUntagged",
+        )
+        .unwrap();
+
+    assert!(schema["$defs"]["OverlappingUntagged"]["anyOf"].is_array());
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!(1)));
+}
+
+#[test]
+fn rejects_object_map_keys() {
+    let error = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<UsesInvalidMapKey>(),
+            specta_serde::Format,
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::InvalidMapKey { .. }
+    ));
+}
+
+#[test]
+fn preserves_definition_names_and_escapes_json_pointers() {
+    let schema = JsonSchema::default()
+        .id("https://example.com/schema.json")
+        .export_ref_value(
+            &Types::default().register::<EscapedType>(),
+            specta_serde::Format,
+            "Escaped/Type~",
+        )
+        .unwrap();
+
+    assert_eq!(schema["$id"], "https://example.com/schema.json");
+    assert!(schema["$defs"].get("Escaped/Type~").is_some());
+    assert_eq!(schema["$ref"], "#/$defs/Escaped~1Type~0");
+}
+
+#[test]
+fn percent_encodes_definition_ref_fragments() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<UriEscapedType>(),
+            specta_serde::Format,
+            "Escaped #/%雪~",
+        )
+        .unwrap();
+
+    assert_eq!(schema["$ref"], "#/$defs/Escaped%20%23~1%25%E9%9B%AA~0");
+}
+
+#[test]
+fn generic_keys_follow_declaration_order() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<UsesReverseGenerics>(),
+            specta_serde::Format,
+            "UsesReverseGenerics",
+        )
+        .unwrap();
+
+    assert!(
+        schema["$defs"]
+            .get("ReverseGenerics<String, u32>")
+            .is_some()
+    );
+    assert_eq!(
+        schema["$defs"]["UsesReverseGenerics"]["properties"]["value"]["$ref"],
+        "#/$defs/ReverseGenerics%3CString%2C%20u32%3E"
+    );
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "value": { "z": "value", "a": 1 }
+    })));
+}
+
+#[test]
+fn rejects_expanding_recursive_generics() {
+    let mut types = Types::default();
+    NamedDataType::new("Grow", &mut types, |_, ndt| {
+        let generic = Generic::new("T".into());
+        ndt.generics = vec![GenericDefinition::new("T".into(), None)].into();
+        let nested = List::new(generic.clone().into()).into();
+        ndt.ty = Some(
+            Struct::named()
+                .field(
+                    "next",
+                    Field::new(ndt.reference(vec![(generic, nested)]).into()),
+                )
+                .build(),
+        );
+    });
+
+    let error = JsonSchema::default()
+        .export_value(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::ExpandingRecursiveGeneric { .. }
+    ));
+}
+
+#[test]
+fn draft201909_uses_array_items_for_tuples() {
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft201909)
+        .export_ref_value(
+            &Types::default().register::<Collections>(),
+            specta_serde::Format,
+            "Collections",
+        )
+        .unwrap();
+
+    let tuple = &schema["$defs"]["Collections"]["properties"]["tuple"];
+    assert!(tuple["items"].is_array());
+    assert_eq!(tuple["additionalItems"], false);
+    assert!(tuple.get("prefixItems").is_none());
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "tags": [], "tuple": ["value", 1], "map": {}
+    })));
+}
+
+#[test]
+fn map_keys_use_lexical_string_schemas() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<LexicalMapKeys>(),
+            specta_serde::Format,
+            "LexicalMapKeys",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({
+        "numeric": { "42": "ok" }, "boolean": { "true": "ok" }
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "numeric": { "nope": "bad" }, "boolean": {}
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "numeric": {}, "boolean": { "yes": "bad" }
+    })));
+}
+
+#[test]
+fn identity_format_preserves_external_newtype_enum_tag() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<RawNewtypeEnum>(),
+            IdentityFormat,
+            "RawNewtypeEnum",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({ "Value": "text" })));
+    assert!(!validator.is_valid(&serde_json::json!("text")));
+}
+
+#[test]
+fn untagged_variant_metadata_is_preserved() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<DocumentedUntagged>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert_eq!(
+        schema["$defs"]["DocumentedUntagged"]["anyOf"][0]["description"],
+        " Text branch."
+    );
+}
+
+#[test]
+fn can_allow_additional_struct_properties() {
+    let schema = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(
+            &Types::default().register::<User>(),
+            specta_serde::Format,
+            "User",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "id": 1, "name": "name", "email": null, "extra": true
+    })));
+}
+
+#[test]
+fn fixed_width_integer_bounds_are_exported() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<Primitives>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let properties = &schema["$defs"]["Primitives"]["properties"];
+    assert_eq!(properties["i32_field"]["minimum"], i32::MIN);
+    assert_eq!(properties["i32_field"]["maximum"], i32::MAX);
+    assert_eq!(properties["u64_field"]["maximum"], u64::MAX);
+}
+
+#[test]
+fn rejects_a_missing_root_definition() {
+    let error = JsonSchema::default()
+        .export_ref_value(&Types::default(), specta_serde::Format, "Missing")
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::MissingDefinition { definition }
+            if definition == "Missing"
+    ));
+}
+
+#[test]
 fn exports_root_ref() {
     let types = Types::default().register::<User>();
     let schema = JsonSchema::default()
@@ -230,15 +587,67 @@ fn exports_flattened_structs_without_conflicting_additional_properties() {
         .unwrap();
 
     let flattened = &schema["$defs"]["Flattened"];
-    assert_eq!(flattened["unevaluatedProperties"], false);
-    for part in flattened["allOf"].as_array().unwrap() {
-        assert!(part.get("additionalProperties").is_none());
-    }
+    assert_eq!(flattened["additionalProperties"], false);
+    assert!(flattened.get("allOf").is_none());
     insta::assert_json_snapshot!(schema);
 
     let validator = jsonschema::validator_for(&schema).unwrap();
     assert!(validator.is_valid(&serde_json::json!({ "a": "a", "b": "b" })));
     assert!(!validator.is_valid(&serde_json::json!({ "a": "a", "b": "b", "c": "c" })));
+}
+
+#[test]
+fn draft7_flattens_object_intersections() {
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .export_ref_value(
+            &Types::default().register::<Flattened>(),
+            specta_serde::Format,
+            "Flattened",
+        )
+        .unwrap();
+
+    let flattened = &schema["definitions"]["Flattened"];
+    assert_eq!(flattened["additionalProperties"], false);
+    assert!(flattened.get("allOf").is_none());
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({ "a": "a", "b": "b" })));
+    assert!(!validator.is_valid(&serde_json::json!({ "a": "a", "b": "b", "c": true })));
+}
+
+#[test]
+fn draft7_wraps_documented_refs_for_annotation_siblings() {
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .export_value(
+            &Types::default().register::<DocumentedReference>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    let user = &schema["definitions"]["DocumentedReference"]["properties"]["user"];
+    assert!(user.get("$ref").is_none());
+    assert_eq!(user["allOf"][0]["$ref"], "#/definitions/User");
+    assert_eq!(user["description"], " The referenced user.");
+}
+
+#[test]
+fn rejects_duplicate_definition_names() {
+    let mut types = Types::default();
+    NamedDataType::new("Duplicate", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Duplicate", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::i32.into());
+    });
+
+    let error = JsonSchema::default()
+        .export_value(&types, specta_serde::Format)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::DuplicateDefinitionName { .. }
+    ));
 }
 
 #[test]

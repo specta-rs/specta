@@ -23,6 +23,8 @@ expression: schema
           "type": "number"
         },
         "i32_field": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "i8_field": {
@@ -39,6 +41,7 @@ expression: schema
           "type": "integer"
         },
         "u64_field": {
+          "maximum": 18446744073709551615,
           "minimum": 0,
           "type": "integer"
         }

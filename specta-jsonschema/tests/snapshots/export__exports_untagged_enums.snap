@@ -5,7 +5,7 @@ expression: schema
 {
   "$defs": {
     "UntaggedValue": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
@@ -13,6 +13,7 @@ expression: schema
           "additionalProperties": false,
           "properties": {
             "id": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }

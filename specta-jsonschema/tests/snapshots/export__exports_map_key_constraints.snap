@@ -20,6 +20,7 @@ expression: schema
       "properties": {
         "chars": {
           "additionalProperties": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -32,11 +33,19 @@ expression: schema
         },
         "enums": {
           "additionalProperties": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
           "propertyNames": {
-            "$ref": "#/$defs/Key"
+            "oneOf": [
+              {
+                "const": "A"
+              },
+              {
+                "const": "B"
+              }
+            ]
           },
           "type": "object"
         }

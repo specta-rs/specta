@@ -35,6 +35,7 @@ expression: schema
           "additionalProperties": false,
           "properties": {
             "data": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             },
@@ -58,6 +59,7 @@ expression: schema
           "type": "string"
         },
         "userId": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }

@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsonschema.rs
-assertion_line: 79
 expression: rendered
 ---
 {
@@ -9,10 +8,28 @@ expression: rendered
       "description": " A trailing `#[serde(default)]` tuple element is optional on deserialize\n (serde accepts `[1]`): the deserialize half's array schema must lower\n `minItems` below the full arity while serialize keeps it exact.",
       "oneOf": [
         {
-          "$ref": "#/$defs/JsonTupleDefault_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/JsonTupleDefault_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/JsonTupleDefault_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/JsonTupleDefault_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "JsonTupleDefault"

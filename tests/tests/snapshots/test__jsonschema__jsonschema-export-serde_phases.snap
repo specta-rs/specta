@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsonschema.rs
-assertion_line: 17
 expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).unwrap()"
 ---
 {
@@ -15,6 +14,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "b": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -31,6 +31,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "flattened": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -44,6 +45,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "generic_flattened": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -68,7 +70,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "field": {
-          "$ref": "#/$defs/Demo_T_bool"
+          "$ref": "#/$defs/Demo%3CT%2C%20bool%3E"
         }
       },
       "required": [
@@ -77,11 +79,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "AGenericStruct",
       "type": "object"
     },
-    "AGenericStruct_u32": {
+    "AGenericStruct<u32>": {
       "additionalProperties": false,
       "properties": {
         "field": {
-          "$ref": "#/$defs/Demo_u32_bool"
+          "$ref": "#/$defs/Demo%3Cu32%2C%20bool%3E"
         }
       },
       "required": [
@@ -94,7 +96,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
-          "$ref": "#/$defs/GenericType_String"
+          "$ref": "#/$defs/GenericType%3CString%3E"
         }
       },
       "required": [
@@ -168,10 +170,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "AdjacentlyTaggedWithAlias": {
       "oneOf": [
         {
-          "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/AdjacentlyTaggedWithAlias_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "AdjacentlyTaggedWithAlias"
@@ -231,6 +251,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": false,
               "properties": {
                 "other": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -286,6 +308,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": false,
               "properties": {
                 "other": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -311,6 +335,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "b": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -333,21 +358,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "BasicEnum"
     },
     "BoxFlattened": {
-      "allOf": [
-        {
-          "properties": {
-            "a": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "a"
-          ],
-          "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         }
+      },
+      "required": [
+        "a"
       ],
       "title": "BoxFlattened",
-      "unevaluatedProperties": false
+      "type": "object"
     },
     "BoxInline": {
       "additionalProperties": false,
@@ -356,6 +379,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "a": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -375,6 +400,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -385,18 +412,10 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "BracedStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "BracedStruct",
-      "type": "array"
+      "type": "string"
     },
-    "ChainedGenericDefault_String_String": {
+    "ChainedGenericDefault<String, String>": {
       "additionalProperties": false,
       "properties": {
         "first": {
@@ -413,30 +432,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "ChainedGenericDefault",
       "type": "object"
     },
-    "ChainedGenericDefault_String_T": {
+    "ChainedGenericDefault<String, i32>": {
       "additionalProperties": false,
       "properties": {
         "first": {
           "type": "string"
         },
         "second": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "first",
-        "second"
-      ],
-      "title": "ChainedGenericDefault",
-      "type": "object"
-    },
-    "ChainedGenericDefault_String_i32": {
-      "additionalProperties": false,
-      "properties": {
-        "first": {
-          "type": "string"
-        },
-        "second": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -447,13 +451,17 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "ChainedGenericDefault",
       "type": "object"
     },
-    "ChainedGenericDefault_i32_i32": {
+    "ChainedGenericDefault<i32, i32>": {
       "additionalProperties": false,
       "properties": {
         "first": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "second": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -472,6 +480,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "description": " Some triple-slash comment\n Some more triple-slash comment",
           "properties": {
             "A": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -489,6 +499,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "properties": {
                 "a": {
                   "description": " Some triple-slash comment\n Some more triple-slash comment",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -512,6 +524,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "properties": {
         "a": {
           "description": " Some triple-slash comment\n Some more triple-slash comment",
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -544,6 +558,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "data": {
           "items": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -583,6 +598,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "data": {
           "items": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -604,22 +620,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "properties": {
         "bar": {
           "items": {
-            "$ref": "#/$defs/Generic1_u32"
+            "$ref": "#/$defs/Generic1%3Cu32%3E"
           },
           "type": "array",
           "uniqueItems": true
         },
         "baz": {
           "additionalProperties": {
-            "$ref": "#/$defs/Generic1_String"
-          },
-          "propertyNames": {
-            "type": "string"
+            "$ref": "#/$defs/Generic1%3CString%3E"
           },
           "type": "object"
         },
         "foo": {
-          "$ref": "#/$defs/Generic1_u32"
+          "$ref": "#/$defs/Generic1%3Cu32%3E"
         }
       },
       "required": [
@@ -645,7 +658,9 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "ContainerTypeOverrideToGeneric": {
       "title": "ContainerTypeOverrideToGeneric"
     },
-    "ContainerTypeOverrideToGeneric_i32": {
+    "ContainerTypeOverrideToGeneric<i32>": {
+      "maximum": 2147483647,
+      "minimum": -2147483648,
       "title": "ContainerTypeOverrideToGeneric",
       "type": "integer"
     },
@@ -658,6 +673,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "string"
         },
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       ],
@@ -677,12 +694,14 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "ContainerTypeOverrideTupleGeneric",
       "type": "array"
     },
-    "ContainerTypeOverrideTupleGeneric_i32": {
+    "ContainerTypeOverrideTupleGeneric<i32>": {
       "items": false,
       "maxItems": 2,
       "minItems": 2,
       "prefixItems": [
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -696,6 +715,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "flattened": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -719,7 +739,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Demo",
       "type": "object"
     },
-    "Demo_T_bool": {
+    "Demo<T, bool>": {
       "additionalProperties": false,
       "properties": {
         "a": {},
@@ -734,10 +754,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Demo",
       "type": "object"
     },
-    "Demo_u32_bool": {
+    "Demo<u32, bool>": {
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
@@ -752,7 +773,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Demo",
       "type": "object"
     },
-    "Demo_u8_bool": {
+    "Demo<u8, bool>": {
       "additionalProperties": false,
       "properties": {
         "a": {
@@ -775,15 +796,18 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "oneOf": [
         {
           "const": "A",
-          "deprecated": true
+          "deprecated": true,
+          "description": "Deprecated: "
         },
         {
           "const": "B",
-          "deprecated": true
+          "deprecated": true,
+          "description": "Deprecated: Nope"
         },
         {
           "const": "C",
-          "deprecated": true
+          "deprecated": true,
+          "description": "Deprecated: Nope"
         }
       ],
       "title": "DeprecatedEnumVariants"
@@ -792,18 +816,23 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
           "deprecated": true,
+          "description": "Deprecated: ",
           "type": "string"
         },
         "c": {
           "deprecated": true,
+          "description": "Deprecated: This field is cringe!",
           "type": "string"
         },
         "d": {
           "deprecated": true,
+          "description": "Deprecated: This field is cringe!",
           "type": "string"
         }
       },
@@ -828,6 +857,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "string"
         },
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       ],
@@ -837,8 +868,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "DeprecatedType": {
       "additionalProperties": false,
       "deprecated": true,
+      "description": "Deprecated: ",
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -851,8 +885,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "DeprecatedTypeWithMsg": {
       "additionalProperties": false,
       "deprecated": true,
+      "description": "Deprecated: Look at you big man using a deprecation message",
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -865,8 +902,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "DeprecatedTypeWithMsg2": {
       "additionalProperties": false,
       "deprecated": true,
+      "description": "Deprecated: Look at you big man using a deprecation message",
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1016,6 +1056,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "bbb": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1028,6 +1070,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "cccc": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1046,6 +1090,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                   "type": "string"
                 },
                 "bbbbbb": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1098,10 +1144,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "properties": {
         "a": {
           "additionalProperties": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "propertyNames": {
-            "$ref": "#/$defs/BasicEnum"
+            "oneOf": [
+              {
+                "const": "A"
+              },
+              {
+                "const": "B"
+              }
+            ]
           },
           "type": "object"
         }
@@ -1129,10 +1184,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "EnumWithMultipleVariantAliases": {
       "oneOf": [
         {
-          "$ref": "#/$defs/EnumWithMultipleVariantAliases_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/EnumWithMultipleVariantAliases_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/EnumWithMultipleVariantAliases_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/EnumWithMultipleVariantAliases_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "EnumWithMultipleVariantAliases"
@@ -1168,10 +1241,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "EnumWithVariantAlias": {
       "oneOf": [
         {
-          "$ref": "#/$defs/EnumWithVariantAlias_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/EnumWithVariantAlias_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/EnumWithVariantAlias_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/EnumWithVariantAlias_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "EnumWithVariantAlias"
@@ -1179,10 +1270,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "EnumWithVariantAliasAndRename": {
       "oneOf": [
         {
-          "$ref": "#/$defs/EnumWithVariantAliasAndRename_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/EnumWithVariantAliasAndRename_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/EnumWithVariantAliasAndRename_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/EnumWithVariantAliasAndRename_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "EnumWithVariantAliasAndRename"
@@ -1296,16 +1405,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "ExtraBracketsInUnnamedStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "ExtraBracketsInUnnamedStruct",
-      "type": "array"
+      "type": "string"
     },
     "First": {
       "additionalProperties": false,
@@ -1324,9 +1425,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1338,68 +1443,58 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "FlattenB": {
-      "allOf": [
-        {
-          "properties": {
-            "c": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "c"
-          ],
-          "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         },
-        {
-          "properties": {
-            "a": {
-              "type": "integer"
-            },
-            "b": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "a",
-            "b"
-          ],
-          "type": "object"
+        "b": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "c": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         }
+      },
+      "required": [
+        "c",
+        "a",
+        "b"
       ],
       "title": "FlattenB",
-      "unevaluatedProperties": false
+      "type": "object"
     },
     "FlattenC": {
-      "allOf": [
-        {
-          "properties": {
-            "c": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "c"
-          ],
-          "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         },
-        {
-          "properties": {
-            "a": {
-              "type": "integer"
-            },
-            "b": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "a",
-            "b"
-          ],
-          "type": "object"
+        "b": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "c": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         }
+      },
+      "required": [
+        "c",
+        "a",
+        "b"
       ],
       "title": "FlattenC",
-      "unevaluatedProperties": false
+      "type": "object"
     },
     "FlattenD": {
       "additionalProperties": false,
@@ -1408,6 +1503,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/FlattenA"
         },
         "c": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1422,37 +1519,34 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "b": {
-          "allOf": [
-            {
-              "properties": {
-                "c": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "c"
-              ],
-              "type": "object"
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
             },
-            {
-              "properties": {
-                "a": {
-                  "type": "integer"
-                },
-                "b": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "a",
-                "b"
-              ],
-              "type": "object"
+            "b": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            "c": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
             }
+          },
+          "required": [
+            "c",
+            "a",
+            "b"
           ],
-          "unevaluatedProperties": false
+          "type": "object"
         },
         "d": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1528,37 +1622,34 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "b": {
-          "allOf": [
-            {
-              "properties": {
-                "c": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "c"
-              ],
-              "type": "object"
+          "additionalProperties": false,
+          "properties": {
+            "a": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
             },
-            {
-              "properties": {
-                "a": {
-                  "type": "integer"
-                },
-                "b": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "a",
-                "b"
-              ],
-              "type": "object"
+            "b": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            "c": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
             }
+          },
+          "required": [
+            "c",
+            "a",
+            "b"
           ],
-          "unevaluatedProperties": false
+          "type": "object"
         },
         "d": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1576,6 +1667,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/FlattenB"
         },
         "d": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -1657,7 +1750,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Generic1",
       "type": "object"
     },
-    "Generic1_String": {
+    "Generic1<String>": {
       "additionalProperties": false,
       "properties": {
         "value": {
@@ -1677,7 +1770,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Generic1",
       "type": "object"
     },
-    "Generic1_Tuple_": {
+    "Generic1<Tuple_>": {
       "additionalProperties": false,
       "properties": {
         "value": {
@@ -1697,15 +1790,17 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Generic1",
       "type": "object"
     },
-    "Generic1_u32": {
+    "Generic1<u32>": {
       "additionalProperties": false,
       "properties": {
         "value": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
         "values": {
           "items": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -1811,6 +1906,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "properties": {
             "X": {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -1825,6 +1922,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "Y": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1839,6 +1938,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "Z": {
               "items": {
                 "items": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "type": "array"
@@ -1854,7 +1955,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       ],
       "title": "Generic2"
     },
-    "Generic2_Tuple__String_i32": {
+    "Generic2<Tuple_, String, i32>": {
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1899,6 +2000,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "properties": {
             "C": {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -1943,6 +2046,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                   "type": "string"
                 },
                 "c": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -1964,6 +2069,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "properties": {
             "X": {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -1978,6 +2085,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "Y": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -1992,6 +2101,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "Z": {
               "items": {
                 "items": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "type": "array"
@@ -2039,7 +2150,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericAutoBound2",
       "type": "object"
     },
-    "GenericAutoBound2_Tuple_": {
+    "GenericAutoBound2<Tuple_>": {
       "additionalProperties": false,
       "properties": {
         "value": {
@@ -2059,7 +2170,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericAutoBound2",
       "type": "object"
     },
-    "GenericAutoBound_Tuple_": {
+    "GenericAutoBound<Tuple_>": {
       "additionalProperties": false,
       "properties": {
         "value": {
@@ -2079,6 +2190,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericAutoBound",
       "type": "object"
     },
+    "GenericDefault<String>": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "GenericDefault",
+      "type": "object"
+    },
     "GenericDefaultSkipped": {
       "additionalProperties": false,
       "properties": {
@@ -2090,20 +2214,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericDefaultSkipped",
       "type": "object"
     },
-    "GenericDefaultSkippedNonType": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "value"
-      ],
-      "title": "GenericDefaultSkippedNonType",
-      "type": "object"
-    },
-    "GenericDefaultSkipped_String": {
+    "GenericDefaultSkipped<String>": {
       "additionalProperties": false,
       "properties": {
         "value": {
@@ -2116,17 +2227,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericDefaultSkipped",
       "type": "object"
     },
-    "GenericDefault_String": {
+    "GenericDefaultSkippedNonType": {
       "additionalProperties": false,
       "properties": {
         "value": {
-          "type": "string"
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
         }
       },
       "required": [
         "value"
       ],
-      "title": "GenericDefault",
+      "title": "GenericDefaultSkippedNonType",
       "type": "object"
     },
     "GenericFlattened": {
@@ -2141,36 +2254,20 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "GenericNewType1": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "items": {
-            "items": {},
-            "type": "array"
-          },
-          "type": "array"
-        }
-      ],
+      "items": {
+        "items": {},
+        "type": "array"
+      },
       "title": "GenericNewType1",
       "type": "array"
     },
-    "GenericNewType1_Tuple_": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "items": {
-            "items": {
-              "type": "null"
-            },
-            "type": "array"
-          },
-          "type": "array"
-        }
-      ],
+    "GenericNewType1<Tuple_>": {
+      "items": {
+        "items": {
+          "type": "null"
+        },
+        "type": "array"
+      },
       "title": "GenericNewType1",
       "type": "array"
     },
@@ -2178,7 +2275,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "pair": {
-          "$ref": "#/$defs/Pair_String_i32"
+          "$ref": "#/$defs/Pair%3Ci32%2C%20String%3E"
         }
       },
       "required": [
@@ -2295,7 +2392,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericStruct2",
       "type": "object"
     },
-    "GenericStruct2_Tuple_": {
+    "GenericStruct2<Tuple_>": {
       "additionalProperties": false,
       "properties": {
         "a": {
@@ -2418,7 +2515,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericStruct2",
       "type": "object"
     },
-    "GenericStruct_String": {
+    "GenericStruct<String>": {
       "additionalProperties": false,
       "properties": {
         "arg": {
@@ -2431,10 +2528,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericStruct",
       "type": "object"
     },
-    "GenericStruct_i32": {
+    "GenericStruct<i32>": {
       "additionalProperties": false,
       "properties": {
         "arg": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -2465,29 +2564,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericTuple",
       "type": "array"
     },
-    "GenericTupleStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {}
-      ],
-      "title": "GenericTupleStruct",
-      "type": "array"
-    },
-    "GenericTupleStruct_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
-      "title": "GenericTupleStruct",
-      "type": "array"
-    },
-    "GenericTuple_Tuple_": {
+    "GenericTuple<Tuple_>": {
       "items": false,
       "maxItems": 3,
       "minItems": 3,
@@ -2514,8 +2591,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericTuple",
       "type": "array"
     },
+    "GenericTupleStruct": {
+      "title": "GenericTupleStruct"
+    },
+    "GenericTupleStruct<String>": {
+      "title": "GenericTupleStruct",
+      "type": "string"
+    },
     "GenericType": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
@@ -2523,8 +2607,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       ],
       "title": "GenericType"
     },
-    "GenericType_String": {
-      "oneOf": [
+    "GenericType<String>": {
+      "anyOf": [
         {
           "type": "null"
         },
@@ -2535,19 +2619,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "GenericType"
     },
     "HasGenericAlias": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^-?(0|[1-9][0-9]*)$",
+        "type": "string"
+      },
       "title": "HasGenericAlias",
-      "type": "array"
+      "type": "object"
     },
     "InlineConstGenericContainer": {
       "additionalProperties": false,
@@ -2577,6 +2657,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             },
             "data": {
               "items": {
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2617,6 +2698,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             },
             "data": {
               "items": {
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2674,32 +2756,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InlineFlattenGenerics": {
-      "allOf": [
-        {
-          "properties": {
-            "g": {
-              "$ref": "#/$defs/InlineFlattenGenericsG_String"
-            },
-            "gi": {
-              "additionalProperties": false,
-              "properties": {
-                "t": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "t"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "g",
-            "gi"
-          ],
-          "type": "object"
+      "additionalProperties": false,
+      "properties": {
+        "g": {
+          "$ref": "#/$defs/InlineFlattenGenericsG%3CString%3E"
         },
-        {
+        "gi": {
+          "additionalProperties": false,
           "properties": {
             "t": {
               "type": "string"
@@ -2709,10 +2772,18 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "t"
           ],
           "type": "object"
+        },
+        "t": {
+          "type": "string"
         }
+      },
+      "required": [
+        "g",
+        "gi",
+        "t"
       ],
       "title": "InlineFlattenGenerics",
-      "unevaluatedProperties": false
+      "type": "object"
     },
     "InlineFlattenGenericsG": {
       "additionalProperties": false,
@@ -2725,7 +2796,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "InlineFlattenGenericsG",
       "type": "object"
     },
-    "InlineFlattenGenericsG_String": {
+    "InlineFlattenGenericsG<String>": {
       "additionalProperties": false,
       "properties": {
         "t": {
@@ -2738,7 +2809,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "InlineFlattenGenericsG",
       "type": "object"
     },
-    "InlineFlattenGenericsG_Tuple_": {
+    "InlineFlattenGenericsG<Tuple_>": {
       "additionalProperties": false,
       "properties": {
         "t": {
@@ -2803,6 +2874,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "data": {
           "items": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -2849,6 +2921,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             },
             "data": {
               "items": {
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2893,6 +2966,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             },
             "data": {
               "items": {
+                "maximum": 4294967295,
                 "minimum": 0,
                 "type": "integer"
               },
@@ -2938,6 +3012,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/SimpleStruct"
         },
         "val": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -3029,6 +3105,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "$ref": "#/$defs/SimpleStruct"
             },
             "val": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3051,6 +3129,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         {
           "properties": {
             "a": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3114,16 +3194,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InternallyTaggedHInner": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "InternallyTaggedHInner",
-      "type": "array"
+      "type": "null"
     },
     "InternallyTaggedL": {
       "const": "A",
@@ -3172,7 +3244,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InternallyTaggedMInner": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
@@ -3185,10 +3257,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "InternallyTaggedWithAlias": {
       "oneOf": [
         {
-          "$ref": "#/$defs/InternallyTaggedWithAlias_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/InternallyTaggedWithAlias_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/InternallyTaggedWithAlias_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/InternallyTaggedWithAlias_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "InternallyTaggedWithAlias"
@@ -3202,6 +3292,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "other": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "type": {
@@ -3239,6 +3331,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "other": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "type": {
@@ -3322,7 +3416,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Issue221External"
     },
     "Issue221UntaggedMixed": {
-      "oneOf": [
+      "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
@@ -3354,9 +3448,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": {
                 "type": "string"
               },
-              "propertyNames": {
-                "type": "string"
-              },
               "type": "object"
             }
           },
@@ -3369,7 +3460,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Issue221UntaggedMixed"
     },
     "Issue221UntaggedSafe": {
-      "oneOf": [
+      "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
@@ -3417,10 +3508,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "description": " https://github.com/specta-rs/specta/issues/374",
       "oneOf": [
         {
-          "$ref": "#/$defs/Issue374_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/Issue374_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/Issue374_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/Issue374_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "Issue374"
@@ -3491,12 +3600,14 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       ],
       "title": "LifetimeGenericEnum"
     },
-    "LifetimeGenericEnum_i32": {
+    "LifetimeGenericEnum<i32>": {
       "oneOf": [
         {
           "additionalProperties": false,
           "properties": {
             "Borrowed": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3509,6 +3620,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "Owned": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -3539,17 +3652,21 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "LifetimeGenericStruct",
       "type": "object"
     },
-    "LifetimeGenericStruct_i32": {
+    "LifetimeGenericStruct<i32>": {
       "additionalProperties": false,
       "properties": {
         "borrowed": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
         },
         "owned": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -3596,6 +3713,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": false,
               "properties": {
                 "progress": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 "projectName": {
@@ -3689,16 +3808,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "MacroEnum"
     },
     "MacroStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "MacroStruct",
-      "type": "array"
+      "type": "string"
     },
     "MacroStruct2": {
       "additionalProperties": false,
@@ -3714,38 +3825,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "MaybeValidKey": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {}
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
-    },
-    "MaybeValidKey_MaybeValidKey_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/MaybeValidKey_String"
-        }
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
-    },
-    "MaybeValidKey_String": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
-      "title": "MaybeValidKey",
-      "type": "array"
+      "title": "MaybeValidKey"
     },
     "MyEmptyInput": {
       "additionalProperties": false,
@@ -3771,6 +3851,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "B": {
+              "maximum": 4294967295,
               "minimum": 0,
               "type": "integer"
             }
@@ -3871,6 +3952,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "data": {
           "items": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
           },
@@ -3938,6 +4020,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "const": "b"
             },
             "value": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -4025,31 +4109,41 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Ninth"
     },
     "NonOptional": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
+      "anyOf": [
         {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string"
+        },
+        {
+          "type": "null"
         }
       ],
-      "title": "NonOptional",
-      "type": "array"
+      "title": "NonOptional"
     },
     "Optional": {
       "oneOf": [
         {
-          "$ref": "#/$defs/Optional_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/Optional_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/Optional_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/Optional_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "Optional"
@@ -4129,11 +4223,20 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "OptionalInEnum"
     },
     "OptionalOnNamedField": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
+      "anyOf": [
         {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "OptionalOnNamedField"
+    },
+    "OptionalOnTransparentNamedField": {
+      "additionalProperties": false,
+      "properties": {
+        "b": {
           "anyOf": [
             {
               "type": "string"
@@ -4142,31 +4245,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "type": "null"
             }
           ]
-        }
-      ],
-      "title": "OptionalOnNamedField",
-      "type": "array"
-    },
-    "OptionalOnTransparentNamedField": {
-      "additionalProperties": false,
-      "properties": {
-        "b": {
-          "items": false,
-          "maxItems": 1,
-          "minItems": 1,
-          "prefixItems": [
-            {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          ],
-          "type": "array"
         }
       },
       "required": [
@@ -4181,6 +4259,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "a": {
           "anyOf": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4191,6 +4271,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "b": {
           "anyOf": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4225,6 +4307,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "a": {
           "anyOf": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4235,6 +4319,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "b": {
           "anyOf": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4282,10 +4368,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Pair",
       "type": "object"
     },
-    "Pair_String_i32": {
+    "Pair<i32, String>": {
       "additionalProperties": false,
       "properties": {
         "first": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "second": {
@@ -4331,6 +4419,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "&'static [i32; 0]": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 0,
@@ -4339,6 +4429,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "&'static [i32; 1]": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 1,
@@ -4347,6 +4439,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "&'static [i32; 3]": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 3,
@@ -4355,6 +4449,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "&'static [i32]": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -4363,6 +4459,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "boolean"
         },
         "&'static i32": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "&'static str": {
@@ -4388,6 +4486,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                   "type": "string"
                 },
                 {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -4433,6 +4533,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "type": "string"
             },
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
@@ -4447,6 +4549,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "type": "string"
             },
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -4473,6 +4577,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "prefixItems": [
             {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -4534,7 +4640,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/A"
         },
         "AGenericStruct<u32>": {
-          "$ref": "#/$defs/AGenericStruct_u32"
+          "$ref": "#/$defs/AGenericStruct%3Cu32%3E"
         },
         "ActualType": {
           "$ref": "#/$defs/ActualType"
@@ -4543,7 +4649,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/AdjacentlyTagged"
         },
         "Another<bool>": {
-          "$ref": "#/$defs/Demo_u8_bool"
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "Box<String>": {
           "type": "string"
@@ -4561,16 +4667,16 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/BracedStruct"
         },
         "ChainedGenericDefault": {
-          "$ref": "#/$defs/ChainedGenericDefault_String_String"
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20String%3E"
         },
         "ChainedGenericDefault<String, String>": {
-          "$ref": "#/$defs/ChainedGenericDefault_String_String"
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20String%3E"
         },
         "ChainedGenericDefault<String, i32>": {
-          "$ref": "#/$defs/ChainedGenericDefault_String_i32"
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20i32%3E"
         },
         "ChainedGenericDefault<i32>": {
-          "$ref": "#/$defs/ChainedGenericDefault_i32_i32"
+          "$ref": "#/$defs/ChainedGenericDefault%3Ci32%2C%20i32%3E"
         },
         "CommentedEnum": {
           "$ref": "#/$defs/CommentedEnum"
@@ -4597,15 +4703,17 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/ContainerTypeOverrideStruct"
         },
         "ContainerTypeOverrideToGeneric<i32>": {
-          "$ref": "#/$defs/ContainerTypeOverrideToGeneric_i32"
+          "$ref": "#/$defs/ContainerTypeOverrideToGeneric%3Ci32%3E"
         },
         "ContainerTypeOverrideTuple": {
           "$ref": "#/$defs/ContainerTypeOverrideTuple"
         },
         "ContainerTypeOverrideTupleGeneric<i32>": {
-          "$ref": "#/$defs/ContainerTypeOverrideTupleGeneric_i32"
+          "$ref": "#/$defs/ContainerTypeOverrideTupleGeneric%3Ci32%3E"
         },
         "Cow<'static, i32>": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "Cow<'static, str>": {
@@ -4717,55 +4825,55 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/Fourth"
         },
         "FullGeneric<u8, bool>": {
-          "$ref": "#/$defs/Demo_u8_bool"
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "Generic1<()>": {
-          "$ref": "#/$defs/Generic1_Tuple_"
+          "$ref": "#/$defs/Generic1%3CTuple_%3E"
         },
         "Generic2<(), String, i32>": {
-          "$ref": "#/$defs/Generic2_Tuple__String_i32"
+          "$ref": "#/$defs/Generic2%3CTuple_%2C%20String%2C%20i32%3E"
         },
         "GenericAutoBound2<()>": {
-          "$ref": "#/$defs/GenericAutoBound2_Tuple_"
+          "$ref": "#/$defs/GenericAutoBound2%3CTuple_%3E"
         },
         "GenericAutoBound<()>": {
-          "$ref": "#/$defs/GenericAutoBound_Tuple_"
+          "$ref": "#/$defs/GenericAutoBound%3CTuple_%3E"
         },
         "GenericDefault": {
-          "$ref": "#/$defs/GenericDefault_String"
+          "$ref": "#/$defs/GenericDefault%3CString%3E"
         },
         "GenericDefaultSkipped": {
-          "$ref": "#/$defs/GenericDefaultSkipped_String"
+          "$ref": "#/$defs/GenericDefaultSkipped%3CString%3E"
         },
         "GenericDefaultSkippedNonType": {
           "$ref": "#/$defs/GenericDefaultSkippedNonType"
         },
         "GenericNewType1<()>": {
-          "$ref": "#/$defs/GenericNewType1_Tuple_"
+          "$ref": "#/$defs/GenericNewType1%3CTuple_%3E"
         },
         "GenericParameterOrderPreserved": {
           "$ref": "#/$defs/GenericParameterOrderPreserved"
         },
         "GenericStruct2<()>": {
-          "$ref": "#/$defs/GenericStruct2_Tuple_"
+          "$ref": "#/$defs/GenericStruct2%3CTuple_%3E"
         },
         "GenericStruct<String>": {
-          "$ref": "#/$defs/GenericStruct_String"
+          "$ref": "#/$defs/GenericStruct%3CString%3E"
         },
         "GenericStruct<i32>": {
-          "$ref": "#/$defs/GenericStruct_i32"
+          "$ref": "#/$defs/GenericStruct%3Ci32%3E"
         },
         "GenericTuple<()>": {
-          "$ref": "#/$defs/GenericTuple_Tuple_"
+          "$ref": "#/$defs/GenericTuple%3CTuple_%3E"
         },
         "GenericTupleStruct<String>": {
-          "$ref": "#/$defs/GenericTupleStruct_String"
+          "$ref": "#/$defs/GenericTupleStruct%3CString%3E"
         },
         "HalfGenericA<u8>": {
-          "$ref": "#/$defs/Demo_u8_bool"
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "HalfGenericB<bool>": {
-          "$ref": "#/$defs/Demo_u8_bool"
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "HasGenericAlias": {
           "$ref": "#/$defs/HasGenericAlias"
@@ -4775,16 +4883,32 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "type": "null"
           },
           "propertyNames": {
-            "$ref": "#/$defs/BasicEnum"
+            "oneOf": [
+              {
+                "const": "A"
+              },
+              {
+                "const": "B"
+              }
+            ]
           },
           "type": "object"
         },
         "HashMap<BasicEnum, i32>": {
           "additionalProperties": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "propertyNames": {
-            "$ref": "#/$defs/BasicEnum"
+            "oneOf": [
+              {
+                "const": "A"
+              },
+              {
+                "const": "B"
+              }
+            ]
           },
           "type": "object"
         },
@@ -4799,17 +4923,11 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": {
             "type": "null"
           },
-          "propertyNames": {
-            "type": "string"
-          },
           "type": "object"
         },
         "HashMap<TransparentStruct, ()>": {
           "additionalProperties": {
             "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/TransparentStruct"
           },
           "type": "object"
         },
@@ -4818,16 +4936,23 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             "type": "null"
           },
           "propertyNames": {
-            "$ref": "#/$defs/UnitVariants"
+            "oneOf": [
+              {
+                "const": "A"
+              },
+              {
+                "const": "B"
+              },
+              {
+                "const": "C"
+              }
+            ]
           },
           "type": "object"
         },
         "HashMap<UntaggedVariantsKey, ()>": {
           "additionalProperties": {
             "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/UntaggedVariantsKey"
           },
           "type": "object"
         },
@@ -4842,7 +4967,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/InlineFlattenGenerics"
         },
         "InlineFlattenGenericsG<()>": {
-          "$ref": "#/$defs/InlineFlattenGenericsG_Tuple_"
+          "$ref": "#/$defs/InlineFlattenGenericsG%3CTuple_%3E"
         },
         "InlineGenericNested<String>": {
           "items": false,
@@ -4850,15 +4975,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "minItems": 6,
           "prefixItems": [
             {
-              "items": false,
-              "maxItems": 1,
-              "minItems": 1,
-              "prefixItems": [
-                {
-                  "type": "string"
-                }
-              ],
-              "type": "array"
+              "type": "string"
             },
             {
               "items": {
@@ -4882,9 +4999,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             },
             {
               "additionalProperties": {
-                "type": "string"
-              },
-              "propertyNames": {
                 "type": "string"
               },
               "type": "object"
@@ -4943,15 +5057,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "array"
         },
         "InlineGenericNewtype<String>": {
-          "items": false,
-          "maxItems": 1,
-          "minItems": 1,
-          "prefixItems": [
-            {
-              "type": "string"
-            }
-          ],
-          "type": "array"
+          "type": "string"
         },
         "InlineOptionalType": {
           "$ref": "#/$defs/InlineOptionalType"
@@ -5014,10 +5120,10 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/KebabCase"
         },
         "LifetimeGenericEnum<'_, i32>": {
-          "$ref": "#/$defs/LifetimeGenericEnum_i32"
+          "$ref": "#/$defs/LifetimeGenericEnum%3Ci32%3E"
         },
         "LifetimeGenericStruct<'_, i32>": {
-          "$ref": "#/$defs/LifetimeGenericStruct_i32"
+          "$ref": "#/$defs/LifetimeGenericStruct%3Ci32%3E"
         },
         "LoadProjectEvent": {
           "$ref": "#/$defs/LoadProjectEvent"
@@ -5033,11 +5139,9 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "MapA<u32>": {
           "additionalProperties": {
+            "maximum": 4294967295,
             "minimum": 0,
             "type": "integer"
-          },
-          "propertyNames": {
-            "type": "string"
           },
           "type": "object"
         },
@@ -5045,14 +5149,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": {
             "type": "string"
           },
+          "propertyNames": {
+            "pattern": "^(0|[1-9][0-9]*)$",
+            "type": "string"
+          },
           "type": "object"
         },
         "MapC<u32>": {
           "additionalProperties": {
-            "$ref": "#/$defs/AGenericStruct_u32"
-          },
-          "propertyNames": {
-            "type": "string"
+            "$ref": "#/$defs/AGenericStruct%3Cu32%3E"
           },
           "type": "object"
         },
@@ -5078,7 +5183,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/Ninth"
         },
         "NonGeneric": {
-          "$ref": "#/$defs/Demo_u8_bool"
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "NonOptional": {
           "$ref": "#/$defs/NonOptional"
@@ -5102,6 +5207,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                     {
                       "anyOf": [
                         {
+                          "maximum": 2147483647,
+                          "minimum": -2147483648,
                           "type": "integer"
                         },
                         {
@@ -5169,6 +5276,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "anyOf": [
             {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -5182,6 +5291,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "anyOf": [
             {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -5194,6 +5305,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "Option<i32>": {
           "anyOf": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -5223,10 +5336,10 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "null"
         },
         "Range<i32>": {
-          "$ref": "#/$defs/Range_i32"
+          "$ref": "#/$defs/Range%3Ci32%3E"
         },
         "RangeInclusive<i32>": {
-          "$ref": "#/$defs/RangeInclusive_i32"
+          "$ref": "#/$defs/RangeInclusive%3Ci32%3E"
         },
         "Recursive": {
           "$ref": "#/$defs/Recursive"
@@ -5265,7 +5378,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/RenamedVariantWithSkippedPayload"
         },
         "Result<String, i32>": {
-          "$ref": "#/$defs/Result_i32_String"
+          "$ref": "#/$defs/Result%3CString%2C%20i32%3E"
         },
         "Second": {
           "$ref": "#/$defs/Second"
@@ -5430,6 +5543,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "items": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               {
@@ -5447,6 +5562,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "Vec<i32>": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -5489,6 +5606,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         },
         "[i32; 3]": {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "maxItems": 3,
@@ -5515,6 +5634,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "integer"
         },
         "i32": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "i8": {
@@ -5531,6 +5652,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "integer"
         },
         "u32": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         },
@@ -5809,6 +5931,27 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Range",
       "type": "object"
     },
+    "Range<i32>": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "start": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "Range",
+      "type": "object"
+    },
     "RangeInclusive": {
       "additionalProperties": false,
       "properties": {
@@ -5822,13 +5965,17 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "RangeInclusive",
       "type": "object"
     },
-    "RangeInclusive_i32": {
+    "RangeInclusive<i32>": {
       "additionalProperties": false,
       "properties": {
         "end": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "start": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -5837,23 +5984,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "end"
       ],
       "title": "RangeInclusive",
-      "type": "object"
-    },
-    "Range_i32": {
-      "additionalProperties": false,
-      "properties": {
-        "end": {
-          "type": "integer"
-        },
-        "start": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "start",
-        "end"
-      ],
-      "title": "Range",
       "type": "object"
     },
     "Recursive": {
@@ -5907,9 +6037,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": {
             "$ref": "#/$defs/RecursiveMapValue"
           },
-          "propertyNames": {
-            "type": "string"
-          },
           "type": "object"
         }
       },
@@ -5920,46 +6047,19 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "RecursiveTransparent": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/RecursiveInline"
-        }
-      ],
-      "title": "RecursiveTransparent",
-      "type": "array"
+      "$ref": "#/$defs/RecursiveInline",
+      "title": "RecursiveTransparent"
     },
     "RefStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/TestEnum"
-        }
-      ],
-      "title": "RefStruct",
-      "type": "array"
+      "$ref": "#/$defs/TestEnum",
+      "title": "RefStruct"
     },
     "Regular": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "type": "string"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "Regular",
-      "type": "array"
+      "type": "object"
     },
     "Rename": {
       "oneOf": [
@@ -5976,6 +6076,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a/b": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6061,10 +6163,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Result",
       "type": "object"
     },
-    "Result_i32_String": {
+    "Result<String, i32>": {
       "additionalProperties": false,
       "properties": {
         "err": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "ok": {
@@ -6082,6 +6186,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6112,6 +6218,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "b": {
@@ -6123,12 +6231,16 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "minItems": 3,
           "prefixItems": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
               "type": "string"
             },
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
@@ -6169,6 +6281,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "description": " Some single-line comment",
           "properties": {
             "A": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -6186,6 +6300,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "properties": {
                 "a": {
                   "description": " Some single-line comment",
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -6224,6 +6340,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "b": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6256,6 +6374,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": false,
               "properties": {
                 "b": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -6283,6 +6403,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6306,6 +6428,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "minItems": 1,
               "prefixItems": [
                 {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -6409,6 +6533,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6436,12 +6562,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "type": "string"
             },
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           ],
           "type": "array"
         },
         "u32_ident": {
+          "maximum": 4294967295,
           "minimum": 0,
           "type": "integer"
         }
@@ -6488,10 +6617,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructPhaseSpecificRename": {
       "oneOf": [
         {
-          "$ref": "#/$defs/StructPhaseSpecificRenameSerialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/StructPhaseSpecificRenameSerialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/StructPhaseSpecificRenameDeserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/StructPhaseSpecificRenameDeserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "StructPhaseSpecificRename"
@@ -6534,9 +6681,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "A": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         "B": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         }
       },
@@ -6550,10 +6701,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithAlias": {
       "oneOf": [
         {
-          "$ref": "#/$defs/StructWithAlias_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/StructWithAlias_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/StructWithAlias_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/StructWithAlias_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "StructWithAlias"
@@ -6561,10 +6730,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithAliasAndRename": {
       "oneOf": [
         {
-          "$ref": "#/$defs/StructWithAliasAndRename_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/StructWithAliasAndRename_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/StructWithAliasAndRename_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/StructWithAliasAndRename_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "StructWithAliasAndRename"
@@ -6666,10 +6853,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "StructWithMultipleAliases": {
       "oneOf": [
         {
-          "$ref": "#/$defs/StructWithMultipleAliases_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/StructWithMultipleAliases_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/StructWithMultipleAliases_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/StructWithMultipleAliases_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "StructWithMultipleAliases"
@@ -6776,7 +6981,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "Tenth": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
@@ -6811,6 +7016,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "Single": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -6828,9 +7035,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "minItems": 2,
               "prefixItems": [
                 {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 },
                 {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               ],
@@ -6849,6 +7060,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "additionalProperties": false,
               "properties": {
                 "a": {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
                   "type": "integer"
                 }
               },
@@ -6867,42 +7080,28 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "TestEnum"
     },
     "Third": {
-      "allOf": [
-        {
-          "properties": {
-            "b": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "propertyNames": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "c": {
-              "$ref": "#/$defs/First"
-            }
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "string"
+        },
+        "b": {
+          "additionalProperties": {
+            "type": "string"
           },
-          "required": [
-            "b",
-            "c"
-          ],
           "type": "object"
         },
-        {
-          "properties": {
-            "a": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "a"
-          ],
-          "type": "object"
+        "c": {
+          "$ref": "#/$defs/First"
         }
+      },
+      "required": [
+        "b",
+        "c",
+        "a"
       ],
       "title": "Third",
-      "unevaluatedProperties": false
+      "type": "object"
     },
     "ToBeFlattened": {
       "additionalProperties": false,
@@ -6918,40 +7117,16 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "TransparentStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentStruct",
-      "type": "array"
+      "type": "string"
     },
     "TransparentType": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "$ref": "#/$defs/TransparentTypeInner"
-        }
-      ],
-      "title": "TransparentType",
-      "type": "array"
+      "$ref": "#/$defs/TransparentTypeInner",
+      "title": "TransparentType"
     },
     "TransparentType2": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "TransparentType2",
-      "type": "array"
+      "type": "null"
     },
     "TransparentTypeInner": {
       "additionalProperties": false,
@@ -6967,52 +7142,20 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "TransparentTypeWithOverride": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentTypeWithOverride",
-      "type": "array"
+      "type": "string"
     },
     "TransparentWithSkip": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "TransparentWithSkip",
-      "type": "array"
+      "type": "null"
     },
     "TransparentWithSkip2": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentWithSkip2",
-      "type": "array"
+      "type": "string"
     },
     "TransparentWithSkip3": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TransparentWithSkip3",
-      "type": "array"
+      "type": "string"
     },
     "TupleNested": {
       "items": false,
@@ -7021,6 +7164,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "prefixItems": [
         {
           "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
             "type": "integer"
           },
           "type": "array"
@@ -7032,12 +7177,16 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "prefixItems": [
             {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
             },
             {
               "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
                 "type": "integer"
               },
               "type": "array"
@@ -7048,6 +7197,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         {
           "items": {
             "items": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             "type": "array"
@@ -7061,28 +7212,14 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "array"
     },
     "TupleStruct": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TupleStruct",
-      "type": "array"
+      "type": "string"
     },
     "TupleStruct1": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "integer"
-        }
-      ],
+      "maximum": 2147483647,
+      "minimum": -2147483648,
       "title": "TupleStruct1",
-      "type": "array"
+      "type": "integer"
     },
     "TupleStruct3": {
       "items": false,
@@ -7090,6 +7227,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "minItems": 3,
       "prefixItems": [
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -7103,16 +7242,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "array"
     },
     "TupleStructWithRep": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "string"
-        }
-      ],
       "title": "TupleStructWithRep",
-      "type": "array"
+      "type": "string"
     },
     "Type": false,
     "Unit1": {
@@ -7134,16 +7265,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "array"
     },
     "Unit4": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "type": "null"
-        }
-      ],
       "title": "Unit4",
-      "type": "array"
+      "type": "null"
     },
     "Unit5": {
       "const": "A",
@@ -7192,11 +7315,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UnitVariants"
     },
     "UntaggedVariants": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -7234,11 +7359,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UntaggedVariants"
     },
     "UntaggedVariantsKey": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -7250,11 +7377,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UntaggedVariantsKey"
     },
     "UntaggedVariantsWithDuplicateBranches": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "null"
         },
         {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
           "type": "integer"
         },
         {
@@ -7264,7 +7393,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UntaggedVariantsWithDuplicateBranches"
     },
     "UntaggedVariantsWithoutValue": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string"
         },
@@ -7274,6 +7403,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "minItems": 2,
           "prefixItems": [
             {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             },
             {
@@ -7293,16 +7424,34 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "UntaggedWithAlias": {
       "oneOf": [
         {
-          "$ref": "#/$defs/UntaggedWithAlias_Serialize"
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/UntaggedWithAlias_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
         },
         {
-          "$ref": "#/$defs/UntaggedWithAlias_Deserialize"
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/UntaggedWithAlias_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
         }
       ],
       "title": "UntaggedWithAlias"
     },
     "UntaggedWithAlias_Deserialize": {
-      "oneOf": [
+      "anyOf": [
         {
           "allOf": [
             {
@@ -7340,6 +7489,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "other": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -7352,7 +7503,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UntaggedWithAlias_Deserialize"
     },
     "UntaggedWithAlias_Serialize": {
-      "oneOf": [
+      "anyOf": [
         {
           "additionalProperties": false,
           "properties": {
@@ -7369,6 +7520,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "additionalProperties": false,
           "properties": {
             "other": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
               "type": "integer"
             }
           },
@@ -7381,40 +7534,18 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "UntaggedWithAlias_Serialize"
     },
     "ValidMaybeValidKey": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/MaybeValidKey_String"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "ValidMaybeValidKey",
-      "type": "array"
+      "type": "object"
     },
     "ValidMaybeValidKeyNested": {
-      "items": false,
-      "maxItems": 1,
-      "minItems": 1,
-      "prefixItems": [
-        {
-          "additionalProperties": {
-            "type": "null"
-          },
-          "propertyNames": {
-            "$ref": "#/$defs/MaybeValidKey_MaybeValidKey_String"
-          },
-          "type": "object"
-        }
-      ],
+      "additionalProperties": {
+        "type": "null"
+      },
       "title": "ValidMaybeValidKeyNested",
-      "type": "array"
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema"
