@@ -24,6 +24,7 @@ mod kotlin;
 mod layouts;
 mod legacy_impls;
 mod macro_doc_attrs;
+mod macro_structured_deprecated;
 mod maybe_undefined;
 mod openapi;
 mod python;

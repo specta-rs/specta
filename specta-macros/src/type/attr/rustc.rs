@@ -107,7 +107,9 @@ fn parse_deprecated_string_attr(
 }
 
 pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> TokenStream {
-    let since = since.map(|v| quote!(#v.into())).unwrap_or(quote!(None));
+    let since = since
+        .map(|v| quote!(Some(#v.into())))
+        .unwrap_or(quote!(None));
 
     let note = match note {
         Some(note) => quote!(Some(#note.into())),
