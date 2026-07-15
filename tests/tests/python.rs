@@ -83,6 +83,14 @@ mod duplicate_b {
     }
 }
 
+mod namespace_dunder {
+    #[derive(specta::Type)]
+    #[specta(collect = false)]
+    pub struct Secret {
+        pub value: String,
+    }
+}
+
 mod files_layout {
     #[derive(specta::Type)]
     #[specta(collect = false)]
@@ -595,6 +603,40 @@ fn python_reports_name_collisions() {
         .export_to(temp.path().join("bindings"), &types, IdentityFormat)
         .unwrap_err();
     assert!(error.to_string().contains("duplicate exported Python name"));
+}
+
+#[test]
+fn python_rejects_names_mangled_by_namespace_classes() {
+    let mut types = Types::default().register::<namespace_dunder::Secret>();
+    types.iter_mut(|datatype| datatype.name = "__Secret".into());
+
+    let error = Python::default()
+        .layout(Layout::Namespaces)
+        .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("not a valid Python identifier"));
+
+    Python::default().export(&types, IdentityFormat).unwrap();
+}
+
+#[test]
+fn python_rejects_normalized_generic_parameter_collisions() {
+    let mut types = Types::default();
+    specta::datatype::NamedDataType::new("Pair", &mut types, |_, datatype| {
+        datatype.generics = vec![
+            specta::datatype::GenericDefinition::new("T".into(), None),
+            specta::datatype::GenericDefinition::new("Ｔ".into(), None),
+        ]
+        .into();
+        datatype.ty = Some(specta::datatype::Struct::unit().into());
+    });
+
+    let error = Python::default()
+        .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("duplicate exported Python name"));
+    assert!(error.to_string().contains("generic parameter T"));
+    assert!(error.to_string().contains("generic parameter Ｔ"));
 }
 
 #[test]

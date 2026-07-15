@@ -269,12 +269,25 @@ fn write_generic_parameters(
     if generics.is_empty() {
         return Ok(());
     }
+
+    let mut seen = BTreeMap::<String, &str>::new();
+    for generic in generics {
+        validate_identifier(&generic.name, "generic parameter")?;
+        let normalized = normalized_identifier(&generic.name);
+        if let Some(first) = seen.insert(normalized.clone(), &generic.name) {
+            return Err(Error::duplicate_name(
+                normalized,
+                format!("generic parameter {first}"),
+                format!("generic parameter {}", generic.name),
+            ));
+        }
+    }
+
     out.push('[');
     for (index, generic) in generics.iter().enumerate() {
         if index != 0 {
             out.push_str(", ");
         }
-        validate_identifier(&generic.name, "generic parameter")?;
         out.push_str(&generic.name);
         if let Some(default) = &generic.default {
             let scoped_generics = generics[..index]
@@ -998,6 +1011,11 @@ pub(crate) fn is_identifier(name: &str) -> bool {
 pub(crate) fn normalized_identifier(name: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
     name.nfkc().collect()
+}
+
+pub(crate) fn is_dunder_mangled(name: &str) -> bool {
+    let normalized = normalized_identifier(name);
+    normalized.starts_with("__") && !normalized.ends_with("__")
 }
 
 fn is_reserved(name: &str) -> bool {

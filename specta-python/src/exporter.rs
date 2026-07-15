@@ -206,14 +206,29 @@ fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
         let rust_path = rust_type_path(ndt);
         primitives::validate_identifier(&exported, &rust_path)
             .map_err(|error| error.with_named_datatype(ndt))?;
+        if exporter.layout == Layout::Namespaces
+            && !ndt.module_path.is_empty()
+            && primitives::is_dunder_mangled(&exported)
+        {
+            return Err(Error::invalid_name(rust_path.clone(), exported).with_named_datatype(ndt));
+        }
         if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
-            for segment in ndt
+            for (index, segment) in ndt
                 .module_path
                 .split("::")
                 .filter(|segment| !segment.is_empty())
+                .enumerate()
             {
                 primitives::validate_identifier(segment, &rust_path)
                     .map_err(|error| error.with_named_datatype(ndt))?;
+                if exporter.layout == Layout::Namespaces
+                    && index != 0
+                    && primitives::is_dunder_mangled(segment)
+                {
+                    return Err(
+                        Error::invalid_name(rust_path.clone(), segment).with_named_datatype(ndt)
+                    );
+                }
             }
         }
         let collision_key = match exporter.layout {
