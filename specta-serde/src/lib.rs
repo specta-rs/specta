@@ -945,6 +945,7 @@ fn rewrite_datatype_for_phase(
         DataType::Enum(e) => {
             filter_enum_variants_for_phase(e, mode)?;
             let container_attrs = SerdeContainerAttrs::from_attributes(&e.attributes)?;
+            let repr = EnumRepr::from_attrs(&e.attributes)?;
 
             for (variant_name, variant) in &mut e.variants {
                 let rename_rule =
@@ -971,9 +972,13 @@ fn rewrite_datatype_for_phase(
                         && named.fields.iter().any(|(_, field)| field_has_aliases(field)));
 
                 let lowered = if has_flattened_aliases {
-                    let mut strct = Struct::unit();
-                    std::mem::swap(&mut strct.fields, &mut variant.fields);
-                    lower_flattened_struct(&mut strct, mode)?
+                    if matches!(&repr, EnumRepr::Internal { .. }) {
+                        None
+                    } else {
+                        let mut strct = Struct::unit();
+                        std::mem::swap(&mut strct.fields, &mut variant.fields);
+                        lower_flattened_struct(&mut strct, mode)?
+                    }
                 } else {
                     lower_field_aliases_for_phase(&mut variant.fields, mode)?
                 };
@@ -1103,9 +1108,11 @@ fn lower_flattened_struct(
                 // it can become a union branch instead of being merged
                 // unconditionally into the intersection - see
                 // `flatten_intersection_with_optionals` for why.
-                match strip_nullable(ty) {
-                    (inner, true) => optional.push(inner),
-                    (ty, false) => mandatory.push(ty),
+                let (ty, was_nullable) = strip_nullable(ty);
+                if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER) || was_nullable {
+                    optional.push(ty);
+                } else {
+                    mandatory.push(ty);
                 }
             }
         } else {
@@ -1142,8 +1149,8 @@ fn strip_nullable(mut ty: DataType) -> (DataType, bool) {
     (ty, was_nullable)
 }
 
-/// Builds the `DataType` for a flattened intersection where some parts came
-/// from `#[serde(flatten)]`-ed `Option<T>` fields.
+/// Builds the `DataType` for a flattened intersection where some parts can be
+/// absent because they are `Option<T>` or use `skip_serializing_if`.
 ///
 /// Serde contributes nothing for a flattened `Option<T>` field when it's
 /// `None`, and merges `T`'s fields when it's `Some`. Naively intersecting the
@@ -1440,6 +1447,9 @@ fn rewrite_field_for_phase(
             && matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize)
         {
             field.optional = true;
+            if attrs.flatten {
+                field.attributes.insert(CONDITIONAL_OMISSION_MARKER, true);
+            }
 
             if mode == PhaseRewrite::Serialize
                 && attrs.skip_serializing_if.as_deref() == Some("Option::is_none")
@@ -1762,6 +1772,11 @@ const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
 /// live-fields-only retain for unnamed structs.
 const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_payload";
 
+/// Marks flattened fields whose payload may be absent from serialization.
+/// `Field::optional` cannot carry this distinction because serde defaults can
+/// also set it, while defaults do not make flattened payloads optional.
+const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
+
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
@@ -1834,6 +1849,7 @@ fn rewrite_enum_repr_for_phase(
                     &variant,
                     original_types,
                     widen_tag,
+                    mode,
                 )?,
                 EnumRepr::Adjacent { tag, content } => {
                     if tag == content {
@@ -2394,6 +2410,7 @@ fn transform_internal_variant(
     variant: &Variant,
     original_types: &Types,
     widen_tag: bool,
+    mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
@@ -2429,9 +2446,13 @@ fn transform_internal_variant(
                             // a flattened `Option<T>` field needs to become a
                             // union branch rather than an unconditional
                             // intersection part.
-                            match strip_nullable(ty) {
-                                (inner, true) => optional_parts.push(inner),
-                                (ty, false) => mandatory_parts.push(ty),
+                            let (ty, was_nullable) = strip_nullable(ty);
+                            if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER)
+                                || was_nullable
+                            {
+                                optional_parts.push(ty);
+                            } else {
+                                mandatory_parts.push(ty);
                             }
                         }
                     } else {
@@ -2441,7 +2462,13 @@ fn transform_internal_variant(
                 let mut mandatory = Vec::with_capacity(mandatory_parts.len() + 2);
                 mandatory.push(named_fields_datatype(fields));
                 if !leftover.is_empty() {
-                    mandatory.push(named_fields_datatype(leftover));
+                    let DataType::Struct(mut leftover) = named_fields_datatype(leftover) else {
+                        unreachable!("named_fields_datatype always builds a struct")
+                    };
+                    mandatory.push(
+                        lower_field_aliases_for_phase(&mut leftover.fields, mode)?
+                            .unwrap_or(DataType::Struct(leftover)),
+                    );
                 }
                 mandatory.extend(mandatory_parts);
                 return Ok(clone_variant_with_unnamed_fields(
