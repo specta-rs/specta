@@ -2373,17 +2373,20 @@ fn escape_xml(value: &str) -> String {
 }
 
 fn escape_csharp_string(value: &str) -> String {
-    value
-        .chars()
-        .flat_map(|ch| match ch {
-            '\\' => "\\\\".chars().collect::<Vec<_>>(),
-            '"' => "\\\"".chars().collect(),
-            '\n' => "\\n".chars().collect(),
-            '\r' => "\\r".chars().collect(),
-            '\t' => "\\t".chars().collect(),
-            ch => vec![ch],
-        })
-        .collect()
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\u{2028}' | '\u{2029}' => escaped.push_str(&format!("\\u{:04X}", ch as u32)),
+            ch if ch.is_control() => escaped.push_str(&format!("\\u{:04X}", ch as u32)),
+            ch => escaped.push(ch),
+        }
+    }
+    escaped
 }
 
 fn is_keyword(name: &str) -> bool {

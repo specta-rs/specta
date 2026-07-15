@@ -88,6 +88,13 @@ struct KeywordFields {
     kebab: i32,
 }
 
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct CSharpStringEscapes {
+    #[serde(rename = "control\u{0085}line\u{2028}paragraph\u{2029}end")]
+    value: String,
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct ContainingNameCollision {
@@ -632,6 +639,19 @@ fn generic_parameters_do_not_collide_with_union_variants() {
 
     assert!(output.contains("abstract record GenericVariantCollision<T>"));
     assert!(output.contains("record T2 : GenericVariantCollision<T>"));
+}
+
+#[test]
+fn csharp_string_literals_escape_all_line_separators() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<CSharpStringEscapes>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(output.contains(r#"control\u0085line\u2028paragraph\u2029end"#));
+    assert!(!output.contains(['\u{0085}', '\u{2028}', '\u{2029}']));
 }
 
 #[test]
