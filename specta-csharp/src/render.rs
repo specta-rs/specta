@@ -730,6 +730,12 @@ fn render_datatype_with_inline_overrides(
                     let ndt = types
                         .get(reference)
                         .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
+                    if ndt.ty.is_none() {
+                        return Err(Error::HiddenReference {
+                            path: path.into(),
+                            name: rust_path(ndt),
+                        });
+                    }
                     if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                         && is_non_object_struct(&strct.fields)
                     {
@@ -951,9 +957,6 @@ fn render_property(
         rendered
     };
     out.push_str(&rendered_type);
-    if field.optional && !rendered_type.ends_with('?') {
-        out.push('?');
-    }
     out.push(' ');
     out.push_str(property);
     out.push_str(" { get; init; }\n");

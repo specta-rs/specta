@@ -51,6 +51,15 @@ struct Response<T> {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct DefaultedNonNullableFields {
+    #[serde(default)]
+    count: u32,
+    #[serde(default)]
+    label: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename_all = "snake_case")]
 enum Status {
     InProgress,
@@ -666,6 +675,36 @@ fn references_to_non_emitted_named_types_are_rejected() {
         CSharp::new().export(&types, IdentityFormat),
         Err(Error::HiddenReference { .. })
     ));
+}
+
+#[test]
+fn inline_overrides_reject_references_to_non_emitted_named_types() {
+    let mut types = Types::default().register::<MultiInlineFields>();
+    types.iter_mut(|ndt| {
+        if ndt.name == "WireNewtype" {
+            ndt.ty = None;
+        }
+    });
+
+    assert!(matches!(
+        CSharp::new().export(&types, IdentityFormat),
+        Err(Error::HiddenReference { .. })
+    ));
+}
+
+#[test]
+fn serde_defaults_do_not_make_non_nullable_fields_nullable() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<DefaultedNonNullableFields>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(output.contains("public uint Count { get; init; }"));
+    assert!(output.contains("public string Label { get; init; }"));
+    assert!(!output.contains("uint? Count"));
+    assert!(!output.contains("string? Label"));
 }
 
 #[test]
