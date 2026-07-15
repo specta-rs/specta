@@ -28,6 +28,13 @@ struct StructWithBigInt {
     a: i128,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ProtoField {
+    #[serde(rename = "__proto__")]
+    prototype: String,
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct StructWithStructWithBigInt {
@@ -292,6 +299,13 @@ fn zod_define_map_key_uses_a_valid_typescript_property_key() {
 }
 
 #[test]
+fn zod_emits_proto_as_a_computed_object_key() {
+    let out = export_for::<ProtoField>().unwrap();
+    assert!(out.contains("[\"__proto__\"]: z.string()"), "{out}");
+    assert!(!out.contains("\n  __proto__: z.string()"), "{out}");
+}
+
+#[test]
 fn zod_rejects_non_json_map_keys() {
     #[derive(Type)]
     #[specta(collect = false)]
@@ -534,6 +548,40 @@ fn zod_layout_files_qualifies_root_types_from_modules() {
     assert!(module.contains("import * as $root from \"./index\";"));
     assert!(module.contains("export type UsesRoot = $root.RootReference;"));
     assert!(module.contains("$root.RootReferenceSchema"));
+}
+
+#[test]
+fn zod_layout_files_preserves_a_top_level_index_module() {
+    let temp = temp_dir();
+    let path = temp.path().join("zod-index-module");
+    let mut types = Types::default();
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+        ndt.module_path = "index".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
+    });
+    NamedDataType::new("ChildUsesIndex", &mut types, |_, ndt| {
+        ndt.module_path = "index::child".into();
+        ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
+    });
+
+    Zod::default()
+        .layout(Layout::Files)
+        .with_raw("export const runtime = true;")
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+
+    let root = std::fs::read_to_string(path.join("index.ts")).unwrap();
+    let index = std::fs::read_to_string(path.join("$index.ts")).unwrap();
+    let other = std::fs::read_to_string(path.join("other.ts")).unwrap();
+    let child = std::fs::read_to_string(path.join("$index/child.ts")).unwrap();
+    assert!(root.contains("export const runtime = true;"), "{root}");
+    assert!(index.contains("export type IndexType = string"), "{index}");
+    assert!(other.contains("from \"./$index\""), "{other}");
+    assert!(child.contains("from \"../$index\""), "{child}");
 }
 
 #[test]

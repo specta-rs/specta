@@ -67,6 +67,12 @@ struct OptionalFlatten {
     inner: Option<OptionalFlattenInner>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+struct ProtoField {
+    #[serde(rename = "__proto__")]
+    prototype: String,
+}
+
 #[derive(Type)]
 #[allow(dead_code)]
 struct OpaqueTypes {
@@ -143,6 +149,7 @@ fn main() {
                 .register::<WireTypes>()
                 .register::<DefinedMapKey>()
                 .register::<OptionalFlatten>()
+                .register::<ProtoField>()
                 .register::<OpaqueTypes>()
                 .register::<ExternalEnum>()
                 .register::<UntaggedMatchingField>()
@@ -178,6 +185,16 @@ fn main() {
             parent_type.reference(vec![]),
         ));
     });
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+        ndt.module_path = "index".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+        ndt.module_path = "other".into();
+        ndt.ty = Some(specta::datatype::DataType::Reference(
+            index_type.reference(vec![]),
+        ));
+    });
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("zod-typecheck/generated");
     std::fs::create_dir_all(&out).unwrap();
 
@@ -210,6 +227,7 @@ fn main() {
         .unwrap();
     Zod::default()
         .layout(Layout::Files)
+        .with_raw("export const runtime = true;")
         .export_to(out.join("files"), &types, specta_serde::Format)
         .unwrap();
 }

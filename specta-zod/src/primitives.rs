@@ -1666,7 +1666,11 @@ fn validate_type_name(name: &str, path: String) -> Result<(), Error> {
 }
 
 fn sanitise_key(field_name: &str) -> String {
-    if is_identifier(field_name) {
+    if field_name == "__proto__" {
+        // `__proto__: value` is prototype-setter syntax in JavaScript object
+        // literals, so it must be emitted as a computed own property.
+        "[\"__proto__\"]".to_string()
+    } else if is_identifier(field_name) {
         field_name.to_string()
     } else {
         format!("\"{}\"", escape_string(field_name))

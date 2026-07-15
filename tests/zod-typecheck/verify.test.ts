@@ -4,6 +4,7 @@ import {
   ExternalEnumSchema,
   GenericSchema,
   OptionalFlattenSchema,
+  ProtoFieldSchema,
   RecursiveSchema,
   UntaggedMatchingFieldSchema,
   WireTypesSchema,
@@ -30,6 +31,8 @@ test("generated schemas validate representative wire values", () => {
   expect(UntaggedMatchingFieldSchema.safeParse({ Variant: "value", extra: true }).success).toBe(true);
   expect(UntaggedMatchingFieldSchema.safeParse({ extra: true }).success).toBe(true);
   expect(OptionalFlattenSchema.parse({ id: "id", inner: "kept" })).toEqual({ id: "id", inner: "kept" });
+  expect(ProtoFieldSchema.safeParse(JSON.parse('{"__proto__":"value"}')).success).toBe(true);
+  expect(ProtoFieldSchema.safeParse({}).success).toBe(false);
 });
 
 test("generated schemas reject invalid primitive wire values", () => {

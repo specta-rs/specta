@@ -259,7 +259,15 @@ impl Zod {
                     continue;
                 }
 
-                let mut path = path.join(name);
+                // `index.ts` is reserved for root types and framework runtime.
+                // Escape a top-level Rust `index` module, including its subtree,
+                // so it cannot be silently overwritten by that root file.
+                let file_name = if module.module_path == "index" {
+                    "$index"
+                } else {
+                    name
+                };
+                let mut path = path.join(file_name);
                 let mut out = render_file_header(exporter);
                 let has_types = export(exporter, types, module, &mut out, &path, files)?;
                 if has_types {
@@ -1034,11 +1042,21 @@ fn module_import_block(from_module_path: &str, import_paths: &BTreeSet<String>) 
 }
 
 fn module_import_path(from_module_path: &str, to_module_path: &str) -> String {
-    fn module_file_segments(module_path: &str) -> Vec<&str> {
+    fn module_file_segments(module_path: &str) -> Vec<String> {
         if module_path.is_empty() {
-            vec!["index"]
+            vec!["index".to_string()]
         } else {
-            module_path.split("::").collect()
+            module_path
+                .split("::")
+                .enumerate()
+                .map(|(index, segment)| {
+                    if index == 0 && segment == "index" {
+                        "$index".to_string()
+                    } else {
+                        segment.to_string()
+                    }
+                })
+                .collect()
         }
     }
 
@@ -1058,7 +1076,7 @@ fn module_import_path(from_module_path: &str, to_module_path: &str) -> String {
         "..",
         from_dir_segments.len().saturating_sub(shared),
     ));
-    relative_parts.extend(to_file_segments.iter().skip(shared).copied());
+    relative_parts.extend(to_file_segments.iter().skip(shared).map(String::as_str));
 
     if relative_parts
         .first()
