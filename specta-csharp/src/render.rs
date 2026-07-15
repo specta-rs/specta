@@ -57,7 +57,7 @@ pub(crate) fn export_to(
     let mut files = Vec::new();
     let mut case_folded_paths = HashMap::new();
     for ndt in types.into_sorted_iter().filter(|ndt| is_emitted_named(ndt)) {
-        let module = module_segments(&ndt.module_path);
+        let module = module_segments(ndt);
         let mut file_path = module
             .iter()
             .fold(path.to_path_buf(), |path, segment| path.join(segment));
@@ -202,10 +202,7 @@ fn render_namespaces(
 ) -> Result<String, Error> {
     let mut groups: BTreeMap<Vec<String>, Vec<&NamedDataType>> = BTreeMap::new();
     for ndt in ndts {
-        groups
-            .entry(module_segments(&ndt.module_path))
-            .or_default()
-            .push(ndt);
+        groups.entry(module_segments(ndt)).or_default().push(ndt);
     }
 
     let mut out = file_header(exporter);
@@ -1139,6 +1136,15 @@ fn render_union(
     out.push_str("{\n");
     let indent = format!("{base}{}", exporter.indent);
     let mut used = record_reserved_names(name);
+    used.extend(
+        generics
+            .trim_start_matches('<')
+            .trim_end_matches('>')
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string),
+    );
     let reserved_type_names = match exporter.layout {
         Layout::FlatFile | Layout::ModulePrefixedName => types
             .into_unsorted_iter()
@@ -1894,10 +1900,7 @@ fn opaque_name(name: &str) -> Option<&'static str> {
 fn reference_name(out: &mut String, exporter: &CSharp, ndt: &NamedDataType) {
     match exporter.layout {
         Layout::Namespaces | Layout::Files => {
-            let namespace = joined_namespace(
-                exporter.namespace.as_ref(),
-                &module_segments(&ndt.module_path),
-            );
+            let namespace = joined_namespace(exporter.namespace.as_ref(), &module_segments(ndt));
             if !namespace.is_empty() {
                 out.push_str("global::");
                 out.push_str(&namespace);
@@ -2069,13 +2072,13 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
     if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
         let mut namespaces = HashSet::new();
         for ndt in &ndts {
-            let module = module_segments(&ndt.module_path);
+            let module = module_segments(ndt);
             for length in 1..=module.len() {
                 namespaces.insert(module[..length].to_vec());
             }
         }
         for ndt in &ndts {
-            let mut declaration = module_segments(&ndt.module_path);
+            let mut declaration = module_segments(ndt);
             declaration.push(exported_name(exporter, ndt));
             if namespaces.contains(&declaration) {
                 return Err(Error::DuplicateTypeName {
@@ -2092,7 +2095,7 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
         let name = exported_name(exporter, ndt);
         identifier(&name, &rust_path(ndt))?;
         let scope = match exporter.layout {
-            Layout::Namespaces | Layout::Files => module_segments(&ndt.module_path),
+            Layout::Namespaces | Layout::Files => module_segments(ndt),
             Layout::FlatFile | Layout::ModulePrefixedName => Vec::new(),
         };
         let path = rust_path(ndt);
@@ -2112,7 +2115,7 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
             let converter_path = format!("generated JSON converter for {path}");
             if let Some(first) = scopes
                 .entry(match exporter.layout {
-                    Layout::Namespaces | Layout::Files => module_segments(&ndt.module_path),
+                    Layout::Namespaces | Layout::Files => module_segments(ndt),
                     Layout::FlatFile | Layout::ModulePrefixedName => Vec::new(),
                 })
                 .or_default()
@@ -2163,7 +2166,7 @@ fn validate_module_path(module: &str) -> Result<(), Error> {
 
 fn exported_name(exporter: &CSharp, ndt: &NamedDataType) -> String {
     if exporter.layout == Layout::ModulePrefixedName {
-        let mut segments = module_segments(&ndt.module_path);
+        let mut segments = module_segments(ndt);
         segments.push(pascal_case(&ndt.name));
         segments.join("_")
     } else {
@@ -2298,15 +2301,24 @@ fn pascal_case(name: &str) -> String {
     out
 }
 
-fn module_segments(module: &str) -> Vec<String> {
-    if module == "virtual" {
+fn module_segments(ndt: &NamedDataType) -> Vec<String> {
+    if ndt.module_path == "virtual" && !location_has_module_path(ndt.location.file()) {
         return Vec::new();
     }
-    module
+    ndt.module_path
         .split("::")
         .filter(|part| !part.is_empty())
         .map(pascal_case)
         .collect()
+}
+
+fn location_has_module_path(file: &str) -> bool {
+    let normalized = file.replace('\\', "/");
+    ["src/", "tests/"].into_iter().any(|prefix| {
+        normalized
+            .strip_prefix(prefix)
+            .is_some_and(|path| path.ends_with(".rs"))
+    })
 }
 
 fn joined_namespace(root: &str, module: &[String]) -> String {

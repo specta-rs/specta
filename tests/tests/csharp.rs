@@ -74,6 +74,12 @@ enum Event<T> {
     Failed { message: String, retryable: bool },
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+enum GenericVariantCollision<T> {
+    T(T),
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct KeywordFields {
@@ -606,6 +612,26 @@ fn real_virtual_module_segments_are_preserved() {
         .export(&types, IdentityFormat)
         .unwrap();
     assert!(output.contains("namespace Specta.Generated.Foo.Virtual"));
+
+    types.iter_mut(|ndt| ndt.module_path = "virtual".into());
+    let output = CSharp::new()
+        .layout(Layout::Namespaces)
+        .export(&types, IdentityFormat)
+        .unwrap();
+    assert!(output.contains("namespace Specta.Generated.Virtual"));
+}
+
+#[test]
+fn generic_parameters_do_not_collide_with_union_variants() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<GenericVariantCollision<String>>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("abstract record GenericVariantCollision<T>"));
+    assert!(output.contains("record T2 : GenericVariantCollision<T>"));
 }
 
 #[test]
@@ -1045,6 +1071,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<VariantCollisions>()
         .register::<RecordVariantCollisions>()
         .register::<GenericMemberCollision<String>>()
+        .register::<GenericVariantCollision<String>>()
         .register::<DefaultedNonNullableFields>();
     let types = types.register::<NonObjectWireShapes>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();
