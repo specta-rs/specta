@@ -608,6 +608,17 @@ struct UnderscoreGeneric<T_Value> {
     value: T_Value,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct T;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericNameCollision<T> {
+    concrete: self::T,
+    value: T,
+}
+
 #[test]
 fn normalized_generic_names_are_used_consistently() {
     let temp = temp_dir();
@@ -622,6 +633,26 @@ fn normalized_generic_names_are_used_consistently() {
     let source = std::fs::read_to_string(&path).unwrap();
     assert!(source.contains("UnderscoreGeneric<TValue>"));
     assert!(source.contains("TValue value"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn generic_names_do_not_capture_named_type_references() {
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default()
+                .register::<T>()
+                .register::<GenericNameCollision<String>>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("GenericNameCollision<TType>"));
+    assert!(source.contains("T concrete"));
+    assert!(source.contains("TType value"));
     compile_java(temp.path(), &[&path]);
 }
 

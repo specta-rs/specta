@@ -216,12 +216,8 @@ fn declaration(
 ) -> Result<String, Error> {
     let name = rendered_type_name(java, ndt)?;
     let visibility = "public ";
-    let generics = generic_definitions(ndt)?;
-    let generic_scope = ndt
-        .generics
-        .iter()
-        .map(|generic| generic.reference())
-        .collect::<Vec<_>>();
+    let generic_scope = generic_bindings(java, types, ndt)?;
+    let generics = generic_definitions(&generic_scope);
     let ctx = Context {
         java,
         types,
@@ -578,8 +574,8 @@ fn field_datatype(
     let generic_names = ctx
         .generic_scope
         .iter()
-        .map(generic_identifier)
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|generic| generic.identifier.as_str())
+        .collect::<Vec<_>>();
     let generics = if generic_names.is_empty() {
         String::new()
     } else {
@@ -668,7 +664,7 @@ fn field_datatype(
 struct Context<'a> {
     java: &'a Java,
     types: &'a Types,
-    generic_scope: &'a [Generic],
+    generic_scope: &'a [GenericBinding],
     current_module: &'a str,
     qualified_references: bool,
 }
@@ -702,9 +698,8 @@ fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Erro
         DataType::Generic(generic) => ctx
             .generic_scope
             .iter()
-            .find(|candidate| candidate.reference() == *generic)
-            .map(generic_identifier)
-            .transpose()?
+            .find(|candidate| candidate.reference == *generic)
+            .map(|candidate| candidate.identifier.clone())
             .ok_or_else(|| {
                 Error::unsupported(path, "generic is not declared by the containing type")
             })?,
@@ -780,21 +775,65 @@ fn primitive_type(primitive: &Primitive) -> &'static str {
     }
 }
 
-fn generic_definitions(ndt: &NamedDataType) -> Result<String, Error> {
-    if ndt.generics.is_empty() {
-        return Ok(String::new());
-    }
-    let names = ndt
+struct GenericBinding {
+    reference: Generic,
+    identifier: String,
+}
+
+fn generic_bindings(
+    java: &Java,
+    types: &Types,
+    ndt: &NamedDataType,
+) -> Result<Vec<GenericBinding>, Error> {
+    let base_names = ndt
         .generics
         .iter()
         .map(|generic| type_identifier(&generic.name, "generic parameter"))
         .collect::<Result<Vec<_>, _>>()?;
-    validate_names(names.iter().cloned().map(Ok), &rust_path(ndt))?;
-    Ok(format!("<{}>", names.join(", ")))
+    validate_names(base_names.iter().cloned().map(Ok), &rust_path(ndt))?;
+
+    let mut occupied = types
+        .into_sorted_iter()
+        .filter(|datatype| datatype.ty.is_some())
+        .map(|datatype| rendered_type_name(java, datatype))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    occupied.insert(class_name(java)?);
+
+    Ok(ndt
+        .generics
+        .iter()
+        .zip(base_names)
+        .map(|(generic, base)| {
+            let mut identifier = base.clone();
+            if occupied.contains(&identifier) {
+                identifier = format!("{base}Type");
+                let mut suffix = 2;
+                while occupied.contains(&identifier) {
+                    identifier = format!("{base}Type{suffix}");
+                    suffix += 1;
+                }
+            }
+            occupied.insert(identifier.clone());
+            GenericBinding {
+                reference: generic.reference(),
+                identifier,
+            }
+        })
+        .collect())
 }
 
-fn generic_identifier(generic: &Generic) -> Result<String, Error> {
-    type_identifier(generic.name(), "generic parameter")
+fn generic_definitions(generics: &[GenericBinding]) -> String {
+    if generics.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<{}>",
+        generics
+            .iter()
+            .map(|generic| generic.identifier.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 fn validate_nested_declarations(
