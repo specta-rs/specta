@@ -226,9 +226,10 @@ impl specta::Format for Format {
 /// deserialize shapes.
 ///
 /// Use this when serde metadata makes the wire format directional, such as
-/// asymmetric renames, directional skips, `#[serde(with = ...)]`-style codecs,
-/// `#[serde(into = ...)]`/`#[serde(from = ...)]`, or explicit [`Phased`]
-/// overrides.
+/// asymmetric renames, directional skips, `#[serde(default)]` (fields may be
+/// omitted on deserialize but are always emitted on serialize),
+/// `#[serde(with = ...)]`-style codecs, `#[serde(into = ...)]`/`#[serde(from = ...)]`,
+/// or explicit [`Phased`] overrides.
 ///
 /// Exporters should pass this formatter to Specta's formatting hook, for
 /// example

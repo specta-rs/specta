@@ -52,6 +52,79 @@ struct WithDefaultAndSkipIf {
     a: Option<i32>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct Wrapper<T> {
+    inner: T,
+}
+
+/// A `#[serde(default)]`-only type must force a split of every dependent,
+/// with each half referencing the matching half — including through generic
+/// instantiation, which exercises the reference-generics rewrite path.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct GenericParent {
+    w: Wrapper<WithFieldDefault>,
+}
+
+/// Flatten lowers to an intersection; each phase of the parent must
+/// intersect with the matching phase of the flattened `default`-split type.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenParent {
+    #[serde(flatten)]
+    inner: WithFieldDefault,
+    own: bool,
+}
+
+/// Container references through `Vec<T>` and `HashMap<K, V>` values must
+/// also be redirected to the matching phase half.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct CollectionParent {
+    list: Vec<WithFieldDefault>,
+    map: std::collections::HashMap<String, WithFieldDefault>,
+}
+
+/// Enum variant payloads referencing a `default`-split type must also be
+/// redirected per phase.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumParent {
+    Payload(WithFieldDefault),
+    Nothing,
+}
+
+/// Container-level `#[serde(default)]` combined with an `Option<T>` field:
+/// serialize must be `a: number | null` (always emitted, nullable),
+/// deserialize `a?: number | null`.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct ContainerDefaultWithOption {
+    a: Option<i32>,
+}
+
+/// serde accepts container `#[serde(default)]` on a zero-field struct with
+/// named-field syntax; both directions are `{}` so a split would only emit a
+/// redundant identical pair.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct EmptyWithDefault {}
+
+/// `#[serde(default)]` on a struct-variant field goes through the same
+/// field-level local-difference check as struct fields and must split the
+/// enum.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantFieldDefault {
+    A {
+        #[serde(default)]
+        x: i32,
+    },
+}
+
 fn named_field_optional(dt: &DataType, types: &Types, field_name: &str) -> bool {
     let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
         panic!("expected named reference, got {dt:?}");
@@ -216,4 +289,116 @@ fn default_with_skip_serializing_if_shape_is_unchanged() {
         .expect("PhasesFormat should support `default` + `skip_serializing_if`");
 
     insta::assert_snapshot!("serde-default-phases-default-with-skip-if", rendered);
+}
+
+/// Split propagation through generic instantiation: `GenericParent_Serialize`
+/// must reference `Wrapper<WithFieldDefault_Serialize>` (and likewise for
+/// deserialize). `Wrapper` itself has no directional difference and must not
+/// split.
+#[test]
+fn default_split_propagates_through_generic_instantiation() {
+    let rendered = Typescript::default()
+        .export(&Types::default().register::<GenericParent>(), PhasesFormat)
+        .expect("PhasesFormat should propagate `default` splits through generics");
+
+    assert!(
+        rendered.contains("Wrapper<WithFieldDefault_Serialize>"),
+        "serialize half must instantiate the serialize shape: {rendered}"
+    );
+    assert!(
+        rendered.contains("Wrapper<WithFieldDefault_Deserialize>"),
+        "deserialize half must instantiate the deserialize shape: {rendered}"
+    );
+    assert!(
+        !rendered.contains("Wrapper_Serialize"),
+        "`Wrapper` has no directional difference of its own and must not split: {rendered}"
+    );
+
+    insta::assert_snapshot!("serde-default-phases-generic-propagation", rendered);
+}
+
+/// Split propagation through `#[serde(flatten)]`: each phase of the parent
+/// must merge in the matching phase shape of the flattened type.
+#[test]
+fn default_split_propagates_through_flatten() {
+    let rendered = Typescript::default()
+        .export(&Types::default().register::<FlattenParent>(), PhasesFormat)
+        .expect("PhasesFormat should propagate `default` splits through flatten");
+
+    insta::assert_snapshot!("serde-default-phases-flatten-propagation", rendered);
+}
+
+/// Split propagation through `Vec<T>`, `HashMap<K, V>` values, and enum
+/// variant payloads.
+#[test]
+fn default_split_propagates_through_collections_and_enum_payloads() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<CollectionParent>()
+                .register::<EnumParent>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should propagate `default` splits through collections");
+
+    assert!(
+        rendered.contains("WithFieldDefault_Serialize[]"),
+        "Vec element in the serialize half must use the serialize shape: {rendered}"
+    );
+    insta::assert_snapshot!("serde-default-phases-collection-propagation", rendered);
+}
+
+/// Container-level `#[serde(default)]` with an `Option<T>` field: the field
+/// is always emitted (as `T | null`) on serialize but may be omitted on
+/// deserialize.
+#[test]
+fn container_default_with_option_field_renders_expected_shapes() {
+    // serde_json ground truth first.
+    let none = ContainerDefaultWithOption { a: None };
+    assert_eq!(serde_json::to_string(&none).unwrap(), r#"{"a":null}"#);
+    let deserialized: ContainerDefaultWithOption = serde_json::from_str("{}").unwrap();
+    assert_eq!(deserialized.a, None);
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ContainerDefaultWithOption>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support container `default` with `Option<T>` fields");
+
+    insta::assert_snapshot!("serde-default-phases-container-default-option", rendered);
+}
+
+/// The zero-field guard: container `#[serde(default)]` on an empty struct has
+/// no field to widen, so the type must not split into a byte-identical pair.
+#[test]
+fn container_default_on_zero_field_struct_does_not_split() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<EmptyWithDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept container `default` on empty structs");
+
+    assert!(
+        !rendered.contains("EmptyWithDefault_Serialize"),
+        "an empty struct with container `default` must not split: {rendered}"
+    );
+    // serde_json ground truth: both directions are `{}`.
+    assert_eq!(serde_json::to_string(&EmptyWithDefault {}).unwrap(), "{}");
+    let EmptyWithDefault {} = serde_json::from_str("{}").unwrap();
+}
+
+/// `#[serde(default)]` on a struct-variant field must split the containing
+/// enum: required on serialize, optional on deserialize.
+#[test]
+fn variant_field_default_splits_enum() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<VariantFieldDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support `#[serde(default)]` on variant fields");
+
+    insta::assert_snapshot!("serde-default-phases-variant-field-default", rendered);
 }
