@@ -1037,7 +1037,7 @@ export type SkipVariant3 = { A: {
 	a: string,
 } };
 
-export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
+export type SkippedFieldWithinVariant = { type: "A"; data?: null } | { type: "B"; data: string };
 
 export type SpectaSkipNonTypeField = {
 	a: number,
@@ -1183,7 +1183,7 @@ export type Unit4 = null;
 
 export type Unit5 = "A";
 
-export type Unit6 = { A: null };
+export type Unit6 = { A: [] };
 
 export type Unit7 = { A: Record<string, never> };
 

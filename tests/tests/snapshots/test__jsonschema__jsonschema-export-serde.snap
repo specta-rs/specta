@@ -5920,6 +5920,9 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         {
           "additionalProperties": false,
           "properties": {
+            "data": {
+              "type": "null"
+            },
             "type": {
               "const": "A"
             }
@@ -6453,7 +6456,11 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "A": {
-          "type": "null"
+          "items": false,
+          "maxItems": 0,
+          "minItems": 0,
+          "prefixItems": [],
+          "type": "array"
         }
       },
       "required": [
