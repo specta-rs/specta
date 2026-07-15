@@ -43,17 +43,18 @@ pub struct RustCAttr {
 
 impl RustCAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let doc = attrs.extract_if(.., |attr| attr.key == "doc").try_fold(
-            String::new(),
-            |mut s, doc| {
+        let doc = attrs
+            .extract_if(.., |attr| {
+                attr.key == "doc" && matches!(attr.value, Some(AttributeValue::Lit(Lit::Str(_))))
+            })
+            .try_fold(String::new(), |mut s, doc| {
                 let doc = doc.parse_string()?;
                 if !s.is_empty() {
                     s.push('\n');
                 }
                 s.push_str(&doc);
                 Ok(s) as syn::Result<_>
-            },
-        )?;
+            })?;
 
         let mut deprecated = None;
         if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
@@ -106,7 +107,9 @@ fn parse_deprecated_string_attr(
 }
 
 pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> TokenStream {
-    let since = since.map(|v| quote!(#v.into())).unwrap_or(quote!(None));
+    let since = since
+        .map(|v| quote!(Some(#v.into())))
+        .unwrap_or(quote!(None));
 
     let note = match note {
         Some(note) => quote!(Some(#note.into())),

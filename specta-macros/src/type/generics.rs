@@ -145,12 +145,19 @@ pub fn used_type_params(
             }
             Data::Enum(data) => {
                 for variant in &data.variants {
-                    if variant_is_skipped(variant, skip_attrs)? {
+                    let mut attrs = parse_attrs_with_filter(&variant.attrs, skip_attrs)?;
+                    let attrs = VariantAttr::from_attrs(&mut attrs)?;
+
+                    if attrs.skip {
                         continue;
                     }
 
-                    for field in &variant.fields {
-                        visit_field_type(&mut visitor, field, skip_attrs)?;
+                    if let Some(ty) = &attrs.r#type {
+                        visitor.visit_type(ty);
+                    } else {
+                        for field in &variant.fields {
+                            visit_field_type(&mut visitor, field, skip_attrs)?;
+                        }
                     }
                 }
             }
@@ -186,11 +193,6 @@ fn visit_field_type(
     }
 
     Ok(())
-}
-
-fn variant_is_skipped(variant: &syn::Variant, skip_attrs: &[String]) -> syn::Result<bool> {
-    let mut attrs = parse_attrs_with_filter(&variant.attrs, skip_attrs)?;
-    Ok(VariantAttr::from_attrs(&mut attrs)?.skip)
 }
 
 pub fn add_type_to_where_clause(
