@@ -932,12 +932,10 @@ fn render_property(
 ) -> Result<(), Error> {
     xml_docs(out, indent, &field.docs);
     obsolete(out, indent, field.deprecated.as_ref());
-    if property.trim_start_matches('@') != wire_name {
-        out.push_str(indent);
-        out.push_str("[global::System.Text.Json.Serialization.JsonPropertyName(\"");
-        out.push_str(&escape_csharp_string(wire_name));
-        out.push_str("\")]\n");
-    }
+    out.push_str(indent);
+    out.push_str("[global::System.Text.Json.Serialization.JsonPropertyName(\"");
+    out.push_str(&escape_csharp_string(wire_name));
+    out.push_str("\")]\n");
     out.push_str(indent);
     out.push_str("public ");
     if !field.optional {

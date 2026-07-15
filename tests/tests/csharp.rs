@@ -384,6 +384,7 @@ fn declaration_collisions_are_disambiguated() {
 
     assert!(output.contains("bool ContainingNameCollision2"));
     assert!(output.contains("bool GetType2"));
+    assert!(output.contains("JsonPropertyName(\"get_type\")"));
     assert!(output.contains("bool Clone2"));
     assert!(output.contains("bool EqualityContract2"));
     assert!(output.contains("bool PrintMembers2"));
