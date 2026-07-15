@@ -5,7 +5,7 @@
 
 use std::{
     borrow::Cow,
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet, hash_map::Entry},
 };
 
 use specta::{
@@ -2127,161 +2127,403 @@ fn enum_variant_datatype(
 /// are treated as "the same" if they share a Rust path, mirroring the
 /// identity `rust_type_path` already uses for name-collision detection
 /// elsewhere in this module.
+///
+/// Generic arguments are deliberately ignored: TypeScript's alias-cycle
+/// check (TS2456) is declaration-level, so `GenP<T>` referencing `GenQ<T>`
+/// referencing `GenP<U>` back is a cycle no matter how the parameters are
+/// instantiated along the way.
 type AliasId = (Cow<'static, str>, Cow<'static, str>);
 
 fn alias_id(ndt: &NamedDataType) -> AliasId {
     (ndt.module_path.clone(), ndt.name.clone())
 }
 
-/// If `variant` is a newtype-style variant whose sole live field renders as
-/// a *bare* reference to another named export - no `{}`/`[]` wrapper around
-/// it - returns that export. This is the shape a `#[serde(untagged)]`
-/// newtype variant takes, since serde adds no wire structure around it: the
-/// variant's TypeScript rendering is exactly its field's rendering.
+/// Renames from a cycle member's generic parameter names to the names those
+/// parameters have on the type being exported, so the member's variants can
+/// be merged into that type's body without leaving dangling parameters
+/// (`GenQ<U>` in a cycle with `GenP<T>` says `U` where `GenP`'s body must
+/// say `T`).
+type GenericRenames = HashMap<Cow<'static, str>, Cow<'static, str>>;
+
+/// An alias-transparent hop from one named export to another: a position
+/// whose TypeScript rendering is the *bare* referenced name (possibly
+/// `| null`), with no `{}`/`[]`/tuple wrapper deferring alias resolution
+/// around it.
 ///
-/// This is also exactly the "alias-transparent" hop that makes TypeScript's
-/// alias resolution eager: `type X = Y` requires resolving `Y` immediately,
-/// so a cycle through only this shape of hop is what produces the illegal
-/// `type X = X | ...` (TS2456), whereas a cycle through `{ field: X }` or
-/// `X[]` does not, because object/array types defer resolution.
-fn transparent_variant_target<'a>(
+/// This is exactly the shape that makes TypeScript's alias resolution
+/// eager: `type X = Y` requires resolving `Y` immediately, so a cycle
+/// through only this shape of hop is what produces the illegal
+/// `type X = X | ...` (TS2456), whereas a cycle through `{ field: X }`,
+/// `X[]`, or `[X]` does not, because object/array/tuple types defer
+/// resolution.
+struct TransparentHop<'a> {
+    target: &'a NamedDataType,
+    /// Generic arguments applied to `target` at the reference site.
+    args: &'a [(GenericReference, DataType)],
+    /// Whether the hop passes through [`DataType::Nullable`], rendering as
+    /// `Target | null`. A union member is still resolved eagerly, so this is
+    /// just as much a cycle - but dropping such a back edge must keep the
+    /// `null` branch, because an `Option` chain bottoms out at `None`.
+    nullable: bool,
+}
+
+/// Returns the alias-transparent hop `dt` renders as, if any: a bare
+/// [`Reference::Named`], optionally wrapped in [`DataType::Nullable`]
+/// (which renders as `| null` - still an eagerly-resolved position).
+fn transparent_reference<'a>(types: &'a Types, dt: &'a DataType) -> Option<TransparentHop<'a>> {
+    match dt {
+        DataType::Reference(Reference::Named(r)) => match &r.inner {
+            NamedReferenceType::Reference { generics, .. } => Some(TransparentHop {
+                target: types.get(r)?,
+                args: generics,
+                nullable: false,
+            }),
+            _ => None,
+        },
+        DataType::Nullable(inner) => Some(TransparentHop {
+            nullable: true,
+            ..transparent_reference(types, inner)?
+        }),
+        _ => None,
+    }
+}
+
+/// If `variant`'s rendering is exactly a transparent hop - the shape a
+/// `#[serde(untagged)]` newtype variant takes, since serde adds no wire
+/// structure around it - returns that hop.
+///
+/// The variant must have exactly one field *total*, mirroring the
+/// `obj.fields.len() == 1` bare-rendering rule in [`enum_variant_datatype`]:
+/// a skipped extra field makes the renderer emit a `[T]` one-tuple
+/// (matching serde's one-element seq), which is a deferred position and
+/// therefore not transparent.
+fn transparent_variant_hop<'a>(
     types: &'a Types,
-    variant: &Variant,
-) -> Option<&'a NamedDataType> {
+    variant: &'a Variant,
+) -> Option<TransparentHop<'a>> {
     let Fields::Unnamed(unnamed) = &variant.fields else {
         return None;
     };
-
-    let mut live_fields = unnamed.fields.iter().filter(|field| field.ty.is_some());
-    let field = live_fields.next()?;
-    if live_fields.next().is_some() {
+    let [field] = unnamed.fields.as_slice() else {
         return None;
-    }
+    };
+    transparent_reference(types, field.ty.as_ref()?)
+}
 
-    match field.ty.as_ref()? {
-        DataType::Reference(Reference::Named(r)) => match &r.inner {
-            NamedReferenceType::Reference { .. } => types.get(r),
-            _ => None,
-        },
+/// Returns the transparent hop of a named export whose *own body* renders as
+/// a bare reference - a plain alias body (e.g. what `#[serde(transparent)]`
+/// rewrites to) or a newtype tuple struct, both exported as
+/// `export type W = Inner;`. Such exports continue an alias cycle without
+/// contributing union members of their own.
+///
+/// Unlike enum variants, [`struct_dt`] pre-filters skipped fields, so a
+/// struct renders bare whenever exactly one *live* field remains.
+fn transparent_export_hop<'a>(
+    types: &'a Types,
+    ndt: &'a NamedDataType,
+) -> Option<TransparentHop<'a>> {
+    match ndt.ty.as_ref()? {
+        DataType::Struct(s) => {
+            let Fields::Unnamed(unnamed) = &s.fields else {
+                return None;
+            };
+            let mut live = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+            let ty = live.next()?;
+            if live.next().is_some() {
+                return None;
+            }
+            transparent_reference(types, ty)
+        }
+        dt => transparent_reference(types, dt),
+    }
+}
+
+/// A named export participating in the alias-transparent reference graph.
+struct AliasNode<'a> {
+    ndt: &'a NamedDataType,
+    /// Renames from this node's generic parameter names into `root`'s, or
+    /// `None` when no such renaming exists (the node is reached with
+    /// something other than a plain forwarding of `root`'s parameters).
+    /// Merging bails out if a kept variant of such a node uses a parameter.
+    renames: Option<GenericRenames>,
+    /// Outgoing alias-transparent edges.
+    edges: Vec<AliasEdge>,
+}
+
+struct AliasEdge {
+    target: AliasId,
+    nullable: bool,
+}
+
+fn node_enum(ndt: &NamedDataType) -> Option<&Enum> {
+    match ndt.ty.as_ref() {
+        Some(DataType::Enum(e)) => Some(e),
         _ => None,
     }
+}
+
+fn node_hops<'a>(types: &'a Types, ndt: &'a NamedDataType) -> Vec<TransparentHop<'a>> {
+    match node_enum(ndt) {
+        Some(enm) => enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .filter_map(|(_, variant)| transparent_variant_hop(types, variant))
+            .collect(),
+        None => transparent_export_hop(types, ndt).into_iter().collect(),
+    }
+}
+
+/// Composes the source node's renames with the generic arguments applied at
+/// a reference site, producing the target node's renames: each target
+/// parameter must be instantiated with a plain (possibly renamed) `root`
+/// parameter. Anything else - a concrete type, an expression over
+/// parameters - returns `None`. Serde can't serialize such
+/// polymorphically-recursive shapes anyway (they'd require infinite
+/// monomorphization), but dynamically built [`Types`] can express them, so
+/// merging must bail out rather than guess.
+fn compose_generic_renames(
+    source: Option<&GenericRenames>,
+    args: &[(GenericReference, DataType)],
+) -> Option<GenericRenames> {
+    let source = source?;
+    args.iter()
+        .map(|(param, arg)| match arg {
+            DataType::Generic(g) => Some((param.name().clone(), source.get(g.name())?.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Rewrites every generic parameter reference in `variant` (a cycle member's
+/// variant being merged into the exported root type) from the member's
+/// parameter names to the root's, per `renames`. Returns `false` when a
+/// parameter has no rename - the caller must then abandon collapsing rather
+/// than emit a dangling parameter name.
+fn rename_variant_generics(variant: &mut Variant, renames: Option<&GenericRenames>) -> bool {
+    fn walk_fields(fields: &mut Fields, renames: &GenericRenames) -> bool {
+        match fields {
+            Fields::Unit => true,
+            Fields::Unnamed(unnamed) => unnamed
+                .fields
+                .iter_mut()
+                .filter_map(|field| field.ty.as_mut())
+                .all(|ty| walk(ty, renames)),
+            Fields::Named(named) => named
+                .fields
+                .iter_mut()
+                .filter_map(|(_, field)| field.ty.as_mut())
+                .all(|ty| walk(ty, renames)),
+        }
+    }
+
+    fn walk(dt: &mut DataType, renames: &GenericRenames) -> bool {
+        match dt {
+            DataType::Generic(g) => match renames.get(g.name()) {
+                Some(name) => {
+                    *g = GenericReference::new(name.clone());
+                    true
+                }
+                None => false,
+            },
+            DataType::Primitive(_) => true,
+            DataType::List(list) => walk(&mut list.ty, renames),
+            DataType::Map(map) => {
+                walk(map.key_ty_mut(), renames) && walk(map.value_ty_mut(), renames)
+            }
+            DataType::Struct(s) => walk_fields(&mut s.fields, renames),
+            DataType::Enum(e) => e
+                .variants
+                .iter_mut()
+                .all(|(_, variant)| walk_fields(&mut variant.fields, renames)),
+            DataType::Tuple(t) => t.elements.iter_mut().all(|ty| walk(ty, renames)),
+            DataType::Nullable(inner) => walk(inner, renames),
+            DataType::Intersection(parts) => parts.iter_mut().all(|ty| walk(ty, renames)),
+            DataType::Reference(Reference::Named(r)) => match &mut r.inner {
+                NamedReferenceType::Reference { generics, .. } => {
+                    generics.iter_mut().all(|(_, dt)| walk(dt, renames))
+                }
+                NamedReferenceType::Inline { dt, .. } => walk(dt, renames),
+                NamedReferenceType::Recursive(_) => true,
+            },
+            DataType::Reference(Reference::Opaque(_)) => true,
+        }
+    }
+
+    let empty = GenericRenames::new();
+    walk_fields(&mut variant.fields, renames.unwrap_or(&empty))
 }
 
 /// Detects whether `root` is part of an alias-transparent reference cycle -
 /// i.e. whether naively rendering its variants would produce a TypeScript
 /// alias that circularly references itself, directly or through other
-/// untagged enums (`type Rec = Rec | ...`, or `type RecA = RecB | ...;
-/// type RecB = RecA | ...`).
+/// untagged enums or passthrough exports (`type Rec = Rec | ...`, or
+/// `type RecA = RecB | ...; type RecB = RecA | ...`).
 ///
-/// Every untagged newtype variant serializes as exactly its inner value, so
-/// the wire-level value set of an enum in such a cycle is precisely the
-/// union of the *non-cyclic* branches reachable from anywhere in the cycle:
-/// any finite value must eventually bottom out at one of them, since the
-/// recursive branches never add wire structure of their own. Returns the
-/// merged, cycle-free variant list to render in `root`'s place, or `None`
-/// if `root` isn't part of such a cycle - in which case its rendering must
-/// be left completely untouched.
+/// Every transparent hop serializes as exactly its inner value, so the
+/// wire-level value set of an enum in such a cycle is precisely the union
+/// of the *non-cyclic* branches reachable from anywhere in the cycle (plus
+/// `null` if any cyclic branch passes through an `Option`): any finite
+/// value must eventually bottom out at one of them, since the recursive
+/// branches never add wire structure of their own. Returns the merged,
+/// cycle-free variant list to render in `root`'s place, or `None` if
+/// `root` isn't part of such a cycle - in which case its rendering must be
+/// left completely untouched.
 ///
 /// Regression test for https://github.com/specta-rs/specta/pull/517#discussion_r3584346217:
 /// exporting `#[serde(untagged)] enum Rec { A(Box<Rec>), B(Map) }` used to
 /// emit `export type Rec = Rec | Map;`, which `tsc` rejects.
 fn collapse_untagged_alias_cycle(types: &Types, root: &NamedDataType) -> Option<Enum> {
-    let DataType::Enum(root_enum) = root.ty.as_ref()? else {
-        return None;
-    };
+    // Only enum exports assemble a union that can be collapsed. Passthrough
+    // exports inside a cycle (see `transparent_export_hop`) keep their bare
+    // alias body, which becomes legal once every enum in the cycle is
+    // collapsed and the chain of aliases stops looping.
+    node_enum(root)?;
     let root_id = alias_id(root);
 
-    // Discover every named export reachable from `root` via alias-transparent
-    // hops, and the edges between them. This set is closed under the edge
-    // relation (we only stop descending at non-enum or already-seen nodes),
-    // so checking whether some member can reach back to `root` never needs
-    // to look outside of it.
-    let mut enums: HashMap<AliasId, &Enum> = HashMap::new();
-    enums.insert(root_id.clone(), root_enum);
-    let mut edges: HashMap<AliasId, Vec<AliasId>> = HashMap::new();
-    let mut frontier = vec![root_id.clone()];
-    while let Some(id) = frontier.pop() {
-        let enm = enums[&id];
-        let mut targets = Vec::new();
-        for (_, variant) in &enm.variants {
-            if variant.skip {
-                continue;
-            }
-            let Some(target) = transparent_variant_target(types, variant) else {
-                continue;
-            };
-            let target_id = alias_id(target);
-            targets.push(target_id.clone());
+    // Phase 1: discover the alias-transparent reference graph reachable from
+    // `root`, in deterministic discovery order (`root` first), propagating
+    // generic renames along each edge. The discovered set is closed under
+    // the edge relation (descent only stops at nodes with no transparent
+    // continuation), so cycle membership never needs to look outside it.
+    let mut order: Vec<AliasId> = vec![root_id.clone()];
+    let mut nodes: HashMap<AliasId, AliasNode<'_>> = HashMap::new();
+    nodes.insert(
+        root_id.clone(),
+        AliasNode {
+            ndt: root,
+            renames: Some(
+                root.generics
+                    .iter()
+                    .map(|g| (g.name.clone(), g.name.clone()))
+                    .collect(),
+            ),
+            edges: Vec::new(),
+        },
+    );
 
-            if !enums.contains_key(&target_id)
-                && let Some(DataType::Enum(target_enum)) = target.ty.as_ref()
-            {
-                enums.insert(target_id.clone(), target_enum);
-                frontier.push(target_id);
+    let mut cursor = 0;
+    while cursor < order.len() {
+        let id = order[cursor].clone();
+        cursor += 1;
+
+        let ndt = nodes[&id].ndt;
+        let source_renames = nodes[&id].renames.clone();
+
+        let mut edges = Vec::new();
+        for hop in node_hops(types, ndt) {
+            let target_id = alias_id(hop.target);
+            let hop_renames = compose_generic_renames(source_renames.as_ref(), hop.args);
+            edges.push(AliasEdge {
+                target: target_id.clone(),
+                nullable: hop.nullable,
+            });
+
+            match nodes.entry(target_id.clone()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(AliasNode {
+                        ndt: hop.target,
+                        renames: hop_renames,
+                        edges: Vec::new(),
+                    });
+                    order.push(target_id);
+                }
+                Entry::Occupied(mut entry) => {
+                    // Reached along a second path: unless both paths agree
+                    // on the renames, no single renaming is valid.
+                    if entry.get().renames != hop_renames {
+                        entry.get_mut().renames = None;
+                    }
+                }
             }
         }
-        edges.insert(id, targets);
+        nodes
+            .get_mut(&id)
+            .expect("node was inserted before being visited")
+            .edges = edges;
     }
 
-    // A node is part of `root`'s cycle iff it can reach `root` again by
-    // following the same edges - i.e. it's mutually reachable with `root`,
-    // which is exactly strongly-connected-component membership.
-    let in_cycle: HashSet<AliasId> = enums
-        .keys()
-        .filter(|id| **id == root_id || alias_reaches(&edges, id, &root_id))
-        .cloned()
-        .collect();
-
-    let has_direct_self_loop = edges
-        .get(&root_id)
-        .is_some_and(|targets| targets.contains(&root_id));
-    if in_cycle.len() <= 1 && !has_direct_self_loop {
+    // Phase 2: `root`'s strongly-connected component. Every discovered node
+    // is reachable from `root`, so the members of `root`'s cycle are exactly
+    // the nodes that can reach `root` back - found by walking the reversed
+    // edges from `root`. `root` itself shows up iff some cycle through it
+    // exists at all.
+    let mut reverse: HashMap<&AliasId, Vec<&AliasId>> = HashMap::new();
+    for (id, node) in &nodes {
+        for edge in &node.edges {
+            reverse.entry(&edge.target).or_default().push(id);
+        }
+    }
+    let mut in_cycle: HashSet<AliasId> = HashSet::new();
+    let mut frontier = vec![&root_id];
+    while let Some(id) = frontier.pop() {
+        for &source in reverse.get(id).into_iter().flatten() {
+            if in_cycle.insert(source.clone()) {
+                frontier.push(source);
+            }
+        }
+    }
+    if !in_cycle.contains(&root_id) {
         return None;
     }
 
-    let mut variants = Vec::with_capacity(in_cycle.len());
-    for id in &in_cycle {
-        let enm = enums[id];
+    // Phase 3: merge. The collapsed union is every cycle member's
+    // non-back-edge variants, in discovery order (`root`'s own variants
+    // first) so the output is deterministic; `push_union` dedupes identical
+    // renderings.
+    let mut variants = Vec::new();
+    let mut needs_null = false;
+    for id in &order {
+        if !in_cycle.contains(id) {
+            continue;
+        }
+        let node = &nodes[id];
+        let Some(enm) = node_enum(node.ndt) else {
+            // Passthrough member: its entire body is a back edge into the
+            // cycle, contributing nothing but a possible `null` remnant.
+            needs_null |= node.edges.iter().any(|edge| edge.nullable);
+            continue;
+        };
+
         for (name, variant) in &enm.variants {
             if variant.skip {
                 continue;
             }
-
-            let is_back_edge = transparent_variant_target(types, variant)
-                .is_some_and(|target| in_cycle.contains(&alias_id(target)));
-            if !is_back_edge {
-                variants.push((name.clone(), variant.clone()));
+            if let Some(hop) = transparent_variant_hop(types, variant)
+                && in_cycle.contains(&alias_id(hop.target))
+            {
+                // Back edge: dropping it is sound because it adds no wire
+                // structure of its own - except a `Nullable` hop, whose
+                // `None` case is a real `null` wire value to keep.
+                needs_null |= hop.nullable;
+                continue;
             }
+
+            let mut variant = variant.clone();
+            if !rename_variant_generics(&mut variant, node.renames.as_ref()) {
+                // A kept variant uses a generic parameter that has no valid
+                // rename into `root`'s parameters; give up on collapsing
+                // rather than emit a dangling parameter name.
+                return None;
+            }
+            variants.push((name.clone(), variant));
         }
+    }
+
+    if needs_null {
+        // The same `null`-rendering empty-tuple shape `specta-serde` uses
+        // for untagged unit variants.
+        variants.push((
+            Cow::Borrowed("null"),
+            Variant::unnamed()
+                .field(Field::new(DataType::Tuple(Tuple::new(vec![]))))
+                .build(),
+        ));
     }
 
     let mut collapsed = Enum::default();
     collapsed.variants = variants;
     Some(collapsed)
-}
-
-/// Whether `target` is reachable from `start` by following `edges`.
-fn alias_reaches(
-    edges: &HashMap<AliasId, Vec<AliasId>>,
-    start: &AliasId,
-    target: &AliasId,
-) -> bool {
-    let mut seen = HashSet::new();
-    let mut frontier = vec![start.clone()];
-    while let Some(id) = frontier.pop() {
-        let Some(next_ids) = edges.get(&id) else {
-            continue;
-        };
-        for next in next_ids {
-            if next == target {
-                return true;
-            }
-            if seen.insert(next.clone()) {
-                frontier.push(next.clone());
-            }
-        }
-    }
-    false
 }
 
 /// Returns the [`DataType`] to render as `ndt`'s own top-level export body,

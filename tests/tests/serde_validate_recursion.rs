@@ -232,3 +232,335 @@ fn untagged_enum_referencing_different_recursive_type_non_cyclically_is_unaffect
 
     insta::assert_snapshot!("serde-validate-recursion-wraps-tree-non-cyclic", ts);
 }
+
+/// Shorthand for the exports below, which all register a single root type.
+fn export<T: Type>() -> String {
+    Typescript::default()
+        .export(&Types::default().register::<T>(), specta_serde::Format)
+        .expect("export should succeed")
+}
+
+/// A mutual cycle where the two members have *different* terminal branches.
+/// A `DiffA` value can be `DiffA::A(Box<DiffB::B(42)>)`, whose wire value is
+/// just `42`, so `DiffA`'s static type must include `DiffB`'s terminals too:
+/// both aliases collapse to the union of *all* terminals in the cycle, each
+/// listing its own terminals first (merge order is discovery order, so the
+/// output is deterministic).
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum DiffA {
+    A(Box<DiffB>),
+    B(HashMap<String, String>),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum DiffB {
+    A(Box<DiffA>),
+    B(u32),
+}
+
+#[test]
+fn mutual_cycle_with_different_terminals_merges_all_terminals() {
+    // serde ground truth: a `DiffA` value's wire form can be a bare number.
+    let json = serde_json::to_string(&DiffA::A(Box::new(DiffB::B(42)))).unwrap();
+    assert_eq!(json, "42");
+
+    let ts = export::<DiffA>();
+    assert!(
+        ts.contains("export type DiffA = { [key in string]: string } | number;"),
+        "DiffA must union its own terminal with DiffB's: {ts}"
+    );
+    assert!(
+        ts.contains("export type DiffB = number | { [key in string]: string };"),
+        "DiffB must union its own terminal with DiffA's: {ts}"
+    );
+}
+
+/// A cycle member referenced from *outside* the cycle (a struct field) must
+/// still resolve to the collapsed alias - the field keeps referencing
+/// `DiffB` by name and `DiffB`'s own export is the collapsed union.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct HoldsDiffB {
+    x: DiffB,
+}
+
+#[test]
+fn cycle_member_referenced_from_outside_the_cycle_stays_a_named_reference() {
+    let ts = export::<HoldsDiffB>();
+    assert!(ts.contains("x: DiffB"), "field must reference DiffB: {ts}");
+    assert!(
+        ts.contains("export type DiffB = number | { [key in string]: string };"),
+        "DiffB's standalone export must still be collapsed: {ts}"
+    );
+}
+
+/// Three-cycles collapse the same way as two-cycles: every member unions
+/// every terminal reachable in the cycle, its own first.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Tri1 {
+    Next(Box<Tri2>),
+    T(String),
+}
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Tri2 {
+    Next(Box<Tri3>),
+    T(u32),
+}
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Tri3 {
+    Next(Box<Tri1>),
+    T(bool),
+}
+
+#[test]
+fn three_cycle_merges_all_terminals_deterministically() {
+    let ts = export::<Tri1>();
+    assert!(
+        ts.contains("export type Tri1 = string | number | boolean;"),
+        "{ts}"
+    );
+    assert!(
+        ts.contains("export type Tri2 = number | boolean | string;"),
+        "{ts}"
+    );
+    assert!(
+        ts.contains("export type Tri3 = boolean | string | number;"),
+        "{ts}"
+    );
+}
+
+/// A cycle that passes through a *tagged* enum is not alias-transparent:
+/// the tag adds wire structure, `ExtBack` renders as an object
+/// (`{ V: ThroughExt }`) which defers alias resolution, and the recursion
+/// is legal TypeScript. Nothing may be collapsed.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum ThroughExt {
+    X(Box<ExtBack>),
+    Y(u32),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum ExtBack {
+    V(Box<ThroughExt>),
+}
+
+#[test]
+fn cycle_through_externally_tagged_enum_is_not_collapsed() {
+    let ts = export::<ThroughExt>();
+    assert!(
+        ts.contains("export type ThroughExt = ExtBack | number;"),
+        "the tagged branch must be kept as a reference: {ts}"
+    );
+    assert!(
+        ts.contains("export type ExtBack = { V: ThroughExt };"),
+        "the tagged enum must keep its object shape: {ts}"
+    );
+}
+
+/// Self-recursive *generic* untagged enums collapse with the parameter kept
+/// intact.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum GenRec<T> {
+    A(Box<GenRec<T>>),
+    B(T),
+}
+
+#[test]
+fn generic_self_recursive_untagged_enum_collapses_keeping_the_parameter() {
+    let ts = export::<GenRec<u32>>();
+    assert!(ts.contains("export type GenRec<T> = T;"), "{ts}");
+}
+
+/// A generic *mutual* cycle whose members name their parameter differently:
+/// merging `GenP`'s `Y(T)` into `GenQ`'s body must rename `T` to `U` (and
+/// vice versa), not emit a dangling parameter (`tsc` TS2304).
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum GenP<T> {
+    X(Box<GenQ<T>>),
+    Y(T),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum GenQ<U> {
+    X(Box<GenP<U>>),
+    Z(String),
+}
+
+#[test]
+fn generic_mutual_cycle_renames_parameters_instead_of_dangling() {
+    let ts = export::<GenP<u32>>();
+    assert!(ts.contains("export type GenP<T> = T | string;"), "{ts}");
+    assert!(ts.contains("export type GenQ<U> = string | U;"), "{ts}");
+    assert!(
+        !ts.contains("= string | T") && !ts.contains("GenQ<U> = T"),
+        "GenQ's body must not leak GenP's parameter name: {ts}"
+    );
+}
+
+/// An untagged enum whose *only* branch is cyclic has no terminal: no finite
+/// value of it can ever be serialized, so the precise type is `never`
+/// (rather than a panic or an empty union).
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum NoTerminal {
+    A(Box<NoTerminal>),
+}
+
+#[test]
+fn untagged_cycle_without_terminals_collapses_to_never() {
+    let ts = export::<NoTerminal>();
+    assert!(ts.contains("export type NoTerminal = never;"), "{ts}");
+}
+
+/// Variant-level `#[serde(untagged)]` (PR #512) produces the same
+/// alias-transparent newtype shape inside an otherwise externally-tagged
+/// enum, so the same collapse applies to it.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum MixedRec {
+    V(i32),
+    #[serde(untagged)]
+    U(Box<MixedRec>),
+}
+
+#[test]
+fn variant_level_untagged_self_cycle_collapses() {
+    let ts = export::<MixedRec>();
+    assert!(ts.contains("export type MixedRec = { V: number };"), "{ts}");
+}
+
+/// A cycle that hops through a *newtype struct* is still alias-transparent:
+/// `NtWrap` exports as the bare alias `type NtWrap = ViaNewtype`, so the
+/// naive rendering is a two-alias cycle `tsc` rejects. The enum collapses;
+/// the passthrough struct keeps its bare alias body, which is legal once
+/// the enum it points at no longer loops.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum ViaNewtype {
+    X(Box<NtWrap>),
+    Y(u32),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NtWrap(Box<ViaNewtype>);
+
+#[test]
+fn cycle_through_newtype_struct_collapses() {
+    let ts = export::<ViaNewtype>();
+    assert!(ts.contains("export type ViaNewtype = number;"), "{ts}");
+    assert!(ts.contains("export type NtWrap = ViaNewtype;"), "{ts}");
+}
+
+/// Same through a `#[serde(transparent)]` struct.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum ViaTransparent {
+    X(Box<TransWrap>),
+    Y(u32),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransWrap {
+    inner: Box<ViaTransparent>,
+}
+
+#[test]
+fn cycle_through_serde_transparent_struct_collapses() {
+    let ts = export::<ViaTransparent>();
+    assert!(ts.contains("export type ViaTransparent = number;"), "{ts}");
+    assert!(
+        ts.contains("export type TransWrap = ViaTransparent;"),
+        "{ts}"
+    );
+}
+
+/// A recursive branch with an extra *skipped* field is NOT transparent:
+/// serde serializes the remaining field as a one-element seq and the
+/// exporter renders `[SkipRec]` - a tuple, which TypeScript resolves
+/// lazily, so the recursion is legal and the branch must be kept.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum SkipRec {
+    A(Box<SkipRec>, #[serde(skip)] String),
+    B(u32),
+}
+
+#[test]
+fn recursive_branch_with_skipped_extra_field_is_kept_as_a_tuple() {
+    // serde ground truth: the skipped field leaves a one-element seq.
+    let json = serde_json::to_string(&SkipRec::A(Box::new(SkipRec::B(1)), String::new())).unwrap();
+    assert_eq!(json, "[1]");
+
+    let ts = export::<SkipRec>();
+    assert!(
+        ts.contains("export type SkipRec = [SkipRec] | number;"),
+        "{ts}"
+    );
+}
+
+/// A self-reference through `Option` is still an eager alias position
+/// (`OptRec | null` is a union member), so it must collapse - but dropping
+/// the branch has to keep `null`, because `A(None)` really serializes as
+/// `null`.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum OptRec {
+    A(Option<Box<OptRec>>),
+    B(u32),
+}
+
+#[test]
+fn cycle_through_option_collapses_but_keeps_null() {
+    // serde ground truth: the `None` case is a real `null` wire value.
+    assert_eq!(serde_json::to_string(&OptRec::A(None)).unwrap(), "null");
+
+    let ts = export::<OptRec>();
+    assert!(ts.contains("export type OptRec = number | null;"), "{ts}");
+}
+
+/// Recursive branches that go through deferred structure (`Vec`) are legal
+/// TypeScript and must survive the collapse of their transparent siblings.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum ListRec {
+    A(Box<ListRec>),
+    B(Vec<ListRec>),
+    C(u32),
+}
+
+#[test]
+fn deferred_recursive_branches_survive_the_collapse() {
+    let ts = export::<ListRec>();
+    assert!(
+        ts.contains("export type ListRec = ListRec[] | number;"),
+        "{ts}"
+    );
+}
