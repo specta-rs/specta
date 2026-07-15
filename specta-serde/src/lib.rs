@@ -2776,26 +2776,40 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
     let effective_deserialize = deserialize_rename.as_deref().unwrap_or(original_name);
     let renames_differ = effective_serialize != effective_deserialize;
 
-    let rename = match mode {
-        PhaseRewrite::Serialize => serialize_rename,
-        _ => deserialize_rename,
-    };
-
-    // When the effective container rename differs between phases the renames
-    // are phase-specific names authored by the user, so use them verbatim --
-    // unless this phase's name is the original one, which the phased wrapper
-    // type already occupies. Otherwise (no rename, a no-op rename, or the
-    // same rename on both sides) the name alone can't distinguish the phases,
-    // so append the phase suffix.
-    if renames_differ
-        && let Some(rename) = &rename
-        && rename != original_name
-    {
-        return Ok(rename.clone());
+    // A rename is an *authored* phase-specific name when the effective names
+    // differ and it isn't the original name (which the phased wrapper type
+    // already occupies). Authored names are the user's explicit export names
+    // and are used verbatim; anything else gets a generated `_{suffix}` name.
+    fn authored<'a>(
+        rename: &'a Option<String>,
+        renames_differ: bool,
+        original_name: &str,
+    ) -> Option<&'a str> {
+        rename
+            .as_deref()
+            .filter(|rename| renames_differ && *rename != original_name)
     }
 
-    let base_name = rename.unwrap_or_else(|| original_name.to_string());
-    Ok(format!("{base_name}_{suffix}"))
+    let (rename, other_rename) = match mode {
+        PhaseRewrite::Serialize => (&serialize_rename, &deserialize_rename),
+        _ => (&deserialize_rename, &serialize_rename),
+    };
+
+    if let Some(rename) = authored(rename, renames_differ, original_name) {
+        return Ok(rename.to_string());
+    }
+
+    let base_name = rename.as_deref().unwrap_or(original_name);
+    let mut name = format!("{base_name}_{suffix}");
+    // The sibling phase's authored name may equal this generated name (e.g.
+    // `rename(serialize = "Foo_Deserialize")` on `Foo`). The authored name
+    // wins verbatim, so disambiguate the generated one by appending its phase
+    // suffix again; the result can't collide with the authored name (it
+    // strictly extends it) or the wrapper's original name.
+    if authored(other_rename, renames_differ, original_name) == Some(name.as_str()) {
+        name = format!("{name}_{suffix}");
+    }
+    Ok(name)
 }
 
 fn renamed_type_name_for_phase(

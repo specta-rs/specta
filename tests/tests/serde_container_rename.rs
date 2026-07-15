@@ -293,6 +293,59 @@ fn noop_one_sided_rename_is_treated_as_symmetric() {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(rename(serialize = "StructSuffixClash_Deserialize"))]
+struct StructSuffixClash {
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename(serialize = "EnumSuffixClash_Deserialize"))]
+enum EnumSuffixClash {
+    A,
+    B(String),
+}
+
+/// Adversarial case: an authored one-sided rename that equals the fallback
+/// name generated for the *other* phase (`rename(serialize =
+/// "Foo_Deserialize")` on `Foo`). The authored name is the user's explicit
+/// wire/export name, so it is honored verbatim; the generated sibling name is
+/// ours to pick, so it is disambiguated by appending its phase suffix again
+/// (`Foo_Deserialize_Deserialize`) instead of colliding.
+/// <https://github.com/specta-rs/specta/pull/525#discussion_r3584832948>
+#[test]
+fn authored_rename_clashing_with_generated_suffix_is_disambiguated() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<StructSuffixClash>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("struct export should succeed");
+    assert!(
+        ts.contains("export type StructSuffixClash_Deserialize = ")
+            && ts.contains("export type StructSuffixClash_Deserialize_Deserialize = "),
+        "expected authored serialize name plus disambiguated deserialize name, got:\n{ts}"
+    );
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<EnumSuffixClash>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("enum export should succeed");
+    assert!(
+        ts.contains("export type EnumSuffixClash_Deserialize = ")
+            && ts.contains("export type EnumSuffixClash_Deserialize_Deserialize = "),
+        "expected authored serialize name plus disambiguated deserialize name, got:\n{ts}"
+    );
+    assert!(
+        ts.contains("export type EnumSuffixClash = EnumSuffixClash_Deserialize | EnumSuffixClash_Deserialize_Deserialize;"),
+        "expected the phased wrapper to reference both disambiguated phases, got:\n{ts}"
+    );
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename = "RenamedSymmetricSplitStruct")]
 struct SymmetricRenameSplitStruct {
     a: String,
