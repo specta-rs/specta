@@ -34,6 +34,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             ndt.name.to_string(),
             mode,
             true,
+            None,
         )?;
     }
 
@@ -52,6 +53,7 @@ pub(crate) fn validate_datatype_for_mode(
         "<top-level>".to_string(),
         mode,
         true,
+        None,
     )
 }
 
@@ -67,6 +69,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
         "<top-level>".to_string(),
         mode,
         false,
+        None,
     )
 }
 
@@ -77,6 +80,7 @@ fn inner(
     path: String,
     mode: ApplyMode,
     follow_named_references: bool,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(
@@ -86,6 +90,7 @@ fn inner(
             path,
             mode,
             follow_named_references,
+            env,
         )?,
         DataType::Map(map) => {
             inner(
@@ -95,6 +100,7 @@ fn inner(
                 format!("{path}.<map_key>"),
                 mode,
                 follow_named_references,
+                env,
             )?;
             inner(
                 map.value_ty(),
@@ -103,6 +109,7 @@ fn inner(
                 format!("{path}.<map_value>"),
                 mode,
                 follow_named_references,
+                env,
             )?;
         }
         DataType::List(list) => {
@@ -113,6 +120,7 @@ fn inner(
                 format!("{path}.<list_item>"),
                 mode,
                 follow_named_references,
+                env,
             )?;
         }
         DataType::Struct(strct) => {
@@ -122,6 +130,7 @@ fn inner(
                 checked_references,
                 &path,
                 mode,
+                env,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
                 if attrs.variant_identifier || attrs.field_identifier {
@@ -177,6 +186,7 @@ fn inner(
                             format!("{path}[{idx}]"),
                             mode,
                             follow_named_references,
+                            env,
                         )?;
                     }
                 }
@@ -194,6 +204,7 @@ fn inner(
                             &format!("{path}.{name}"),
                             mode,
                             FlattenDirections::LIVE,
+                            env,
                         )?;
                     }
                     for (name, (_, ty)) in named
@@ -208,13 +219,21 @@ fn inner(
                             format!("{path}.{name}"),
                             mode,
                             follow_named_references,
+                            env,
                         )?;
                     }
                 }
             }
         }
         DataType::Enum(enm) => {
-            validate_container_attributes(&enm.attributes, types, checked_references, &path, mode)?;
+            validate_container_attributes(
+                &enm.attributes,
+                types,
+                checked_references,
+                &path,
+                mode,
+                env,
+            )?;
             if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
             {
@@ -246,6 +265,7 @@ fn inner(
                                 &path,
                                 mode,
                                 variant_directions,
+                                env,
                             )?;
                         }
                         for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
@@ -258,6 +278,7 @@ fn inner(
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
                                 follow_named_references,
+                                env,
                             )?;
                         }
                     }
@@ -293,6 +314,7 @@ fn inner(
                                 format!("{path}::{variant_name}[{idx}]"),
                                 mode,
                                 follow_named_references,
+                                env,
                             )?;
                         }
                     }
@@ -308,6 +330,7 @@ fn inner(
                     format!("{path}[{idx}]"),
                     mode,
                     follow_named_references,
+                    env,
                 )?;
             }
         }
@@ -320,6 +343,7 @@ fn inner(
                     format!("{path}.<intersection_{idx}>"),
                     mode,
                     follow_named_references,
+                    env,
                 )?;
             }
         }
@@ -338,6 +362,7 @@ fn inner(
                             format!("{path}.<generic>"),
                             mode,
                             follow_named_references,
+                            env,
                         )?;
                     }
                 }
@@ -352,6 +377,24 @@ fn inner(
                             .get(reference)
                             .map(|ndt| ndt.name.to_string())
                             .unwrap_or_else(|| path.clone());
+                        // A resolved definition's `Generic` placeholders are
+                        // bound by *this* reference's concrete arguments,
+                        // which were written in the current scope - hence a
+                        // new frame with `parent: env`. Inline datatypes were
+                        // written at the use site, so they keep the current
+                        // scope. (Note the `checked_references` guard above
+                        // is keyed on the syntactic reference: the same
+                        // reference reached under a different substitution is
+                        // skipped, trading a sliver of strictness for
+                        // guaranteed termination.)
+                        let reference_frame = match &reference.inner {
+                            NamedReferenceType::Reference { generics, .. } => Some(GenericEnv {
+                                map: generics,
+                                parent: env,
+                            }),
+                            NamedReferenceType::Inline { .. }
+                            | NamedReferenceType::Recursive(_) => None,
+                        };
                         inner(
                             ty,
                             types,
@@ -359,6 +402,7 @@ fn inner(
                             name,
                             mode,
                             follow_named_references,
+                            reference_frame.as_ref().or(env),
                         )?;
                     }
                 }
@@ -379,6 +423,7 @@ fn inner(
                         format!("{path}.<phased_serialize>"),
                         mode,
                         follow_named_references,
+                        env,
                     )?;
                     inner(
                         &phased.deserialize,
@@ -387,6 +432,7 @@ fn inner(
                         format!("{path}.<phased_deserialize>"),
                         mode,
                         follow_named_references,
+                        env,
                     )?;
                 }
             }
@@ -462,6 +508,7 @@ fn validate_container_attributes(
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     if let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)?
         && parsed.from.is_some()
@@ -487,6 +534,7 @@ fn validate_container_attributes(
                     format!("{path}.{suffix}"),
                     mode,
                     true,
+                    env,
                 )?;
             }
         }
@@ -596,6 +644,7 @@ fn validate_flatten_field(
     path: &str,
     mode: ApplyMode,
     container: FlattenDirections,
+    env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(());
@@ -629,7 +678,7 @@ fn validate_flatten_field(
         return Ok(());
     }
 
-    validate_flatten_target(ty, types, path, &mut HashSet::new(), None, directions)
+    validate_flatten_target(ty, types, path, &mut HashSet::new(), env, directions)
 }
 
 /// Which directions of a flattened field actually hit the wire. A direction
@@ -685,9 +734,11 @@ impl FlattenDirections {
 /// Lexically scoped substitution environment for resolving
 /// [`DataType::Generic`] placeholders while checking a flatten target.
 ///
-/// Each time [`validate_flatten_target`] follows a named reference that
-/// carries concrete generic arguments, it pushes a new frame mapping the
-/// definition's parameters to those arguments. The arguments themselves were
+/// Each time the main [`inner`] walk or [`validate_flatten_target`] follows a
+/// named reference that carries concrete generic arguments, it pushes a new
+/// frame mapping the definition's parameters to those arguments (so a flatten
+/// field declared *inside* a generic definition is checked against each
+/// instantiation it's reached through). The arguments themselves were
 /// written one scope up, so when a placeholder resolves to an argument, the
 /// argument is validated against this frame's `parent`. Substitution is lazy
 /// (no datatype is ever rewritten), which keeps the `seen` keys syntactic and

@@ -1490,6 +1490,113 @@ fn flatten_of_phased_override_with_map_and_struct_phases_is_accepted() {
         .expect("both phases are map/struct-shaped, so the flatten is valid in both directions");
 }
 
+// A flatten field *declared inside* a generic definition is unknowable at the
+// definition (`FlattenGeneric`'s own walk accepts the bare placeholder - see
+// `flatten_of_generic_parameter_is_accepted`), but a reference to it carries
+// concrete arguments, so the referencing type's walk must substitute them and
+// reject non-object instantiations. serde_json ground truth below.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct UsesWrapVecInvalid {
+    w: FlattenGeneric<Vec<u8>>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct UsesWrapStructValid {
+    w: FlattenGeneric<Inner>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct UsesWrapMapValid {
+    w: FlattenGeneric<HashMap<String, String>>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct UsesWrapNestedVecInvalid {
+    w: FlattenGeneric<FlattenGeneric<Vec<u8>>>,
+}
+
+#[test]
+fn serde_json_confirms_generic_flatten_instantiations() {
+    let err = serde_json::to_string(&UsesWrapVecInvalid {
+        w: FlattenGeneric { a: 1, t: vec![1u8] },
+    })
+    .expect_err("flattening the Vec instantiation fails at runtime");
+    assert!(
+        err.to_string().contains("can only flatten structs and maps"),
+        "unexpected serde_json error: {err}"
+    );
+
+    assert_eq!(
+        serde_json::to_string(&UsesWrapStructValid {
+            w: FlattenGeneric {
+                a: 1,
+                t: Inner { b: 2 },
+            },
+        })
+        .unwrap(),
+        r#"{"w":{"a":1,"b":2}}"#
+    );
+}
+
+#[test]
+fn flatten_of_generic_instantiated_with_vec_through_reference_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<UsesWrapVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "the reference carries the concrete Vec<u8> argument for the definition's \
+             flattened T",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_generic_instantiated_with_struct_through_reference_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<UsesWrapStructValid>(),
+            specta_serde::Format,
+        )
+        .expect("a struct-shaped instantiation is valid serde usage");
+}
+
+#[test]
+fn flatten_of_generic_instantiated_with_map_through_reference_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<UsesWrapMapValid>(),
+            specta_serde::Format,
+        )
+        .expect("a map-shaped instantiation is valid serde usage");
+}
+
+#[test]
+fn flatten_of_nested_generic_instantiation_over_vec_is_rejected() {
+    // The inner `FlattenGeneric<Vec<u8>>` appears as a generic *argument*;
+    // the walk must not false-skip it behind the outer instantiation.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<UsesWrapNestedVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err("the inner instantiation flattens a Vec");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
