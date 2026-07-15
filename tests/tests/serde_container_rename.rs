@@ -222,6 +222,77 @@ fn enum_one_sided_rename_requires_phases_format() {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(rename(serialize = "StructRenameNoop"))]
+struct StructRenameNoop {
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename(serialize = "EnumRenameNoop"))]
+enum EnumRenameNoop {
+    A,
+    B(String),
+}
+
+/// A one-sided container rename whose value equals the type's own name is an
+/// effective no-op: validation already compares *effective* names (defaulting
+/// the missing side to the type's name), so the unified `Format` accepts it.
+/// `PhasesFormat` must treat it the same way — symmetric — and produce the
+/// standard `_Serialize`/`_Deserialize` suffixed names instead of taking the
+/// authored-distinct-names path, which would collide with the phased wrapper
+/// type that keeps the original name.
+/// <https://github.com/specta-rs/specta/pull/525#discussion_r3584794131>
+#[test]
+fn noop_one_sided_rename_is_treated_as_symmetric() {
+    for (name, unified, phased) in [
+        (
+            "struct",
+            Typescript::default().export(
+                &Types::default().register::<StructRenameNoop>(),
+                specta_serde::Format,
+            ),
+            Typescript::default().export(
+                &Types::default().register::<StructRenameNoop>(),
+                specta_serde::PhasesFormat,
+            ),
+        ),
+        (
+            "enum",
+            Typescript::default().export(
+                &Types::default().register::<EnumRenameNoop>(),
+                specta_serde::Format,
+            ),
+            Typescript::default().export(
+                &Types::default().register::<EnumRenameNoop>(),
+                specta_serde::PhasesFormat,
+            ),
+        ),
+    ] {
+        let unified = unified
+            .unwrap_or_else(|err| panic!("no-op {name} rename should export under Format: {err}"));
+        assert!(
+            unified.contains(&format!(
+                "export type {}RenameNoop = ",
+                if name == "struct" { "Struct" } else { "Enum" }
+            )),
+            "expected unified export under the original name, got:\n{unified}"
+        );
+
+        let phased = phased.unwrap_or_else(|err| {
+            panic!("no-op {name} rename should export under PhasesFormat: {err}")
+        });
+        let prefix = if name == "struct" { "Struct" } else { "Enum" };
+        assert!(
+            phased.contains(&format!("export type {prefix}RenameNoop_Serialize = "))
+                && phased.contains(&format!("export type {prefix}RenameNoop_Deserialize = ")),
+            "expected suffixed phase names for no-op {name} rename, got:\n{phased}"
+        );
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename = "RenamedSymmetricSplitStruct")]
 struct SymmetricRenameSplitStruct {
     a: String,

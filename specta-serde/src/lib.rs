@@ -2766,22 +2766,35 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
     };
     let serialize_rename = rename_for(PhaseRewrite::Serialize)?;
     let deserialize_rename = rename_for(PhaseRewrite::Deserialize)?;
-    let renames_differ = serialize_rename != deserialize_rename;
+
+    // Compare *effective* names, defaulting a missing side to the type's own
+    // name, mirroring `validate_container_attributes`: a one-sided rename
+    // equal to the original name (e.g. `rename(serialize = "Foo")` on `Foo`)
+    // is a no-op, not an authored phase-specific name.
+    let original_name = original.name.as_ref();
+    let effective_serialize = serialize_rename.as_deref().unwrap_or(original_name);
+    let effective_deserialize = deserialize_rename.as_deref().unwrap_or(original_name);
+    let renames_differ = effective_serialize != effective_deserialize;
 
     let rename = match mode {
         PhaseRewrite::Serialize => serialize_rename,
         _ => deserialize_rename,
     };
 
-    // When the container rename itself differs between phases the renames are
-    // already phase-specific names authored by the user, so use them verbatim.
-    // Otherwise (no rename, or the same rename on both sides) the name alone
-    // can't distinguish the phases, so append the phase suffix.
-    if renames_differ && let Some(rename) = rename {
-        return Ok(rename);
+    // When the effective container rename differs between phases the renames
+    // are phase-specific names authored by the user, so use them verbatim --
+    // unless this phase's name is the original one, which the phased wrapper
+    // type already occupies. Otherwise (no rename, a no-op rename, or the
+    // same rename on both sides) the name alone can't distinguish the phases,
+    // so append the phase suffix.
+    if renames_differ
+        && let Some(rename) = &rename
+        && rename != original_name
+    {
+        return Ok(rename.clone());
     }
 
-    let base_name = rename.unwrap_or_else(|| original.name.to_string());
+    let base_name = rename.unwrap_or_else(|| original_name.to_string());
     Ok(format!("{base_name}_{suffix}"))
 }
 
