@@ -478,6 +478,116 @@ fn flatten_of_one_side_skipped_vec_is_rejected() {
     );
 }
 
+#[test]
+fn flatten_of_one_side_skipped_vec_is_accepted_under_unified_format() {
+    // Unified mode drops any field skipped in either direction
+    // (`should_skip_field_for_mode` in lib.rs: `Unified => skip_serializing
+    // || skip_deserializing`), so the field never flattens in the unified
+    // output and its shape must not be validated - this exported fine on
+    // main before flatten validation existed.
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenSkipSerializingVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect("unified mode drops one-side-skipped fields entirely");
+}
+
+// A one-sided skip also means only the *live* phase's shape matters for a
+// `specta_serde::Phased` override: `PhasesFormat` removes the field from the
+// skipped phase before flatten lowering, so a sequence shape on the skipped
+// side is unreachable.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedSkippedSequenceSideValid {
+    a: i32,
+    #[serde(flatten, skip_serializing, default)]
+    #[specta(type = specta_serde::Phased<Vec<String>, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedLiveSequenceSideInvalid {
+    a: i32,
+    #[serde(flatten, skip_serializing, default)]
+    #[specta(type = specta_serde::Phased<Inner, Vec<String>>)]
+    v: HashMap<String, String>,
+}
+
+#[test]
+fn flatten_of_phased_override_with_skipped_sequence_phase_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedSkippedSequenceSideValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the Vec is the serialize shape, but serialization is skipped, so only the \
+             struct-shaped deserialize side ever flattens",
+        );
+}
+
+#[test]
+fn flatten_of_phased_override_with_live_sequence_phase_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedLiveSequenceSideInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the live deserialize side is the Vec, which still flattens and fails");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// Same principle for container conversions: a skipped direction's wire shape
+// (or its raw fallback) is unreachable. `IntoOnlyId` has a serialize-only
+// conversion to a struct wire; with deserialization skipped, the raw u32
+// newtype never deserializes, so the flatten is valid (ground-truthed below).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenIntoOnlySkipDeserializeValid {
+    a: i32,
+    #[serde(flatten, skip_deserializing, default)]
+    v: IntoOnlyId,
+}
+
+impl Default for IntoOnlyId {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+#[test]
+fn serde_json_confirms_into_only_with_skipped_deserialize_flattens_fine() {
+    assert_eq!(
+        serde_json::to_string(&FlattenIntoOnlySkipDeserializeValid {
+            a: 1,
+            v: IntoOnlyId(7),
+        })
+        .unwrap(),
+        r#"{"a":1,"id":"7"}"#
+    );
+    let back: FlattenIntoOnlySkipDeserializeValid = serde_json::from_str(r#"{"a":1}"#).unwrap();
+    assert_eq!(back.v.0, 0);
+}
+
+#[test]
+fn flatten_of_into_only_conversion_with_skipped_deserialize_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenIntoOnlySkipDeserializeValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the live serialize side flattens the struct wire; the raw u32 shape only exists on \
+             the skipped deserialize side",
+        );
+}
+
 // `#[serde(transparent)]` selects the single non-skipped field as the wire
 // shape, ignoring `#[serde(skip)]`-ed siblings (ground-truthed: the wrapper
 // below serializes as `[1,2]`, and flattening it fails at runtime with "can
@@ -821,11 +931,11 @@ fn flatten_of_converted_struct_with_vec_wire_is_rejected() {
 // One-sided conversion: `into` only affects serialization; without `from`,
 // deserialization still uses the raw declared shape. The flatten target must
 // therefore be valid in *both* directions - here the deserialize direction is
-// the raw newtype over u64, which serde can't flatten a map into.
+// the raw newtype over u32, which serde can't flatten a map into.
 #[derive(Type, Serialize, Deserialize, Clone)]
 #[specta(collect = false)]
 #[serde(into = "ConversionWire")]
-struct IntoOnlyId(u64);
+struct IntoOnlyId(u32);
 
 impl From<IntoOnlyId> for ConversionWire {
     fn from(value: IntoOnlyId) -> Self {
@@ -851,7 +961,7 @@ fn flatten_of_into_only_conversion_still_checks_raw_deserialize_shape() {
             specta_serde::PhasesFormat,
         )
         .expect_err(
-            "serialize-wire is a struct, but deserialization uses the raw u64 newtype, which \
+            "serialize-wire is a struct, but deserialization uses the raw u32 newtype, which \
              can't be flattened",
         );
 

@@ -187,7 +187,7 @@ fn inner(
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
                         validate_field_attributes(field, format!("{path}.{name}"), mode)?;
-                        validate_flatten_field(field, ty, types, &format!("{path}.{name}"))?;
+                        validate_flatten_field(field, ty, types, &format!("{path}.{name}"), mode)?;
                     }
                     for (name, (_, ty)) in named
                         .fields
@@ -231,7 +231,7 @@ fn inner(
                         {
                             let path = format!("{path}::{variant_name}.{name}");
                             validate_field_attributes(field, path.clone(), mode)?;
-                            validate_flatten_field(field, ty, types, &path)?;
+                            validate_flatten_field(field, ty, types, &path, mode)?;
                         }
                         for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
                             field.ty.as_ref().map(|ty| (name, (field, ty)))
@@ -579,6 +579,7 @@ fn validate_flatten_field(
     ty: &DataType,
     types: &Types,
     path: &str,
+    mode: ApplyMode,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(());
@@ -588,17 +589,38 @@ fn validate_flatten_field(
         return Ok(());
     }
 
-    // A field skipped in both directions never hits the wire, so its shape
-    // can't cause a flatten error however non-flattenable it is (verified
-    // against serde_json 1.x). Full `#[serde(skip)]` erases the field's type
-    // entirely and never reaches this check; the pair of one-sided skips is
-    // just as dead at runtime. A field skipped in only *one* direction still
-    // flattens in the other, so it must stay validated.
-    if serde_attrs.skip_serializing && serde_attrs.skip_deserializing {
+    // A skipped direction never flattens, so its shape can't cause a flatten
+    // error however non-flattenable it is (verified against serde_json 1.x).
+    // Full `#[serde(skip)]` erases the field's type entirely and never
+    // reaches this check; one-sided skips keep the type but kill their
+    // direction. Under `PhasesFormat` the skipped phase drops the field
+    // before flatten lowering; unified mode drops the field for a skip in
+    // *either* direction (see `should_skip_field_for_mode` in `lib.rs`), so
+    // any skip means nothing flattens there.
+    let directions = FlattenDirections {
+        serialize: !serde_attrs.skip_serializing,
+        deserialize: !serde_attrs.skip_deserializing,
+    };
+
+    let live = match mode {
+        ApplyMode::Unified => directions.serialize && directions.deserialize,
+        ApplyMode::Phases => directions.serialize || directions.deserialize,
+    };
+    if !live {
         return Ok(());
     }
 
-    validate_flatten_target(ty, types, path, &mut HashSet::new(), None)
+    validate_flatten_target(ty, types, path, &mut HashSet::new(), None, directions)
+}
+
+/// Which directions of a flattened field actually hit the wire. A direction
+/// killed by a one-sided serde skip doesn't need a flattenable shape, which
+/// matters wherever the two directions' shapes can diverge: explicit
+/// [`PhasedTy`] overrides and container conversion targets.
+#[derive(Clone, Copy)]
+struct FlattenDirections {
+    serialize: bool,
+    deserialize: bool,
 }
 
 /// Lexically scoped substitution environment for resolving
@@ -629,6 +651,7 @@ fn validate_flatten_target(
     path: &str,
     seen: &mut HashSet<Reference>,
     env: Option<&GenericEnv<'_>>,
+    directions: FlattenDirections,
 ) -> Result<(), Error> {
     match ty {
         // Maps merge directly.
@@ -648,8 +671,8 @@ fn validate_flatten_target(
             if let Some((serialize_wire, deserialize_wire)) =
                 conversion_wire_targets(attrs.as_ref())
             {
-                for wire in [serialize_wire, deserialize_wire].into_iter().flatten() {
-                    validate_flatten_target(wire, types, path, seen, env)?;
+                for wire in live_wire_targets(serialize_wire, deserialize_wire, directions) {
+                    validate_flatten_target(wire, types, path, seen, env, directions)?;
                 }
             }
 
@@ -663,7 +686,9 @@ fn validate_flatten_target(
         DataType::Intersection(_) => Ok(()),
         // A flattened `Option<T>` (including nested `Option<Option<T>>`)
         // contributes nothing when absent and validates as `T` when present.
-        DataType::Nullable(inner) => validate_flatten_target(inner, types, path, seen, env),
+        DataType::Nullable(inner) => {
+            validate_flatten_target(inner, types, path, seen, env, directions)
+        }
         // `()` and other zero-element tuples serialize as nothing, so
         // flattening one is a harmless no-op (verified against serde_json).
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
@@ -672,19 +697,23 @@ fn validate_flatten_target(
 
             // `#[serde(into/from/try_from)]` substitute the serde *wire* type
             // for the declared shape, per direction, so the wire types are
-            // what serde actually flattens. A direction without a conversion
-            // keeps the declared shape, so only skip the declared-shape
-            // checks below when both directions are covered. (Unified mode
-            // separately rejects one-sided conversions during the rewrite -
-            // see `select_conversion_target` in lib.rs - which this mirrors.)
+            // what serde actually flattens - and only for directions that are
+            // actually live. A live direction without a conversion keeps the
+            // declared shape, so only skip the declared-shape checks below
+            // when every live direction is covered by a wire type. (Unified
+            // mode separately rejects one-sided conversions during the
+            // rewrite - see `select_conversion_target` in lib.rs - which this
+            // mirrors.)
             if let Some((serialize_wire, deserialize_wire)) =
                 conversion_wire_targets(attrs.as_ref())
             {
-                for wire in [serialize_wire, deserialize_wire].into_iter().flatten() {
-                    validate_flatten_target(wire, types, path, seen, env)?;
+                for wire in live_wire_targets(serialize_wire, deserialize_wire, directions) {
+                    validate_flatten_target(wire, types, path, seen, env, directions)?;
                 }
 
-                if serialize_wire.is_some() && deserialize_wire.is_some() {
+                let serialize_covered = !directions.serialize || serialize_wire.is_some();
+                let deserialize_covered = !directions.deserialize || deserialize_wire.is_some();
+                if serialize_covered && deserialize_covered {
                     return Ok(());
                 }
             }
@@ -710,7 +739,7 @@ fn validate_flatten_target(
                 return match inner_fields.as_slice() {
                     // Not exactly one live field: leave it be rather than
                     // false-positive on a shape we can't confidently resolve.
-                    [only] => validate_flatten_target(only, types, path, seen, env),
+                    [only] => validate_flatten_target(only, types, path, seen, env, directions),
                     _ => Ok(()),
                 };
             }
@@ -723,7 +752,7 @@ fn validate_flatten_target(
                     // the inner value (no `#[serde(transparent)]` needed), so
                     // the flatten target is the inner value's shape.
                     [single] => match &single.ty {
-                        Some(ty) => validate_flatten_target(ty, types, path, seen, env),
+                        Some(ty) => validate_flatten_target(ty, types, path, seen, env, directions),
                         // The field is skipped, so its type is unknowable
                         // here (serde still delegates to it when
                         // serializing); don't false-positive.
@@ -749,7 +778,7 @@ fn validate_flatten_target(
                 // Inline datatypes were written at the use site, so they
                 // resolve generic placeholders against the current scope.
                 NamedReferenceType::Inline { dt, .. } => {
-                    validate_flatten_target(dt, types, path, seen, env)
+                    validate_flatten_target(dt, types, path, seen, env, directions)
                 }
                 // The resolved definition's placeholders resolve against this
                 // reference's concrete arguments, which themselves were
@@ -767,6 +796,7 @@ fn validate_flatten_target(
                                 map: generics,
                                 parent: env,
                             }),
+                            directions,
                         )
                     }),
                 // A recursive-inline marker is a cycle we've already checked.
@@ -784,21 +814,48 @@ fn validate_flatten_target(
         // struct/map-shaped, so rejecting it would be a false positive.
         DataType::Generic(generic) => {
             match env.and_then(|env| env.map.iter().find(|(param, _)| param == generic)) {
-                Some((_, arg)) => {
-                    validate_flatten_target(arg, types, path, seen, env.and_then(|env| env.parent))
-                }
+                Some((_, arg)) => validate_flatten_target(
+                    arg,
+                    types,
+                    path,
+                    seen,
+                    env.and_then(|env| env.parent),
+                    directions,
+                ),
                 None => Ok(()),
             }
         }
         DataType::Reference(Reference::Opaque(reference)) => {
             // An explicit `specta_serde::Phased<Serialize, Deserialize>`
             // override is stored as an opaque reference wrapping both phase
-            // shapes; serde still has to flatten the real value in both
-            // directions, so each phase must be a valid flatten target.
+            // shapes; each *live* phase must be a valid flatten target. A
+            // phase killed by a one-sided skip never flattens (`PhasesFormat`
+            // drops the field from that phase before flatten lowering), so
+            // its shape is unreachable and must not be validated.
             match reference.downcast_ref::<PhasedTy>() {
                 Some(phased) => {
-                    validate_flatten_target(&phased.serialize, types, path, seen, env)?;
-                    validate_flatten_target(&phased.deserialize, types, path, seen, env)
+                    if directions.serialize {
+                        validate_flatten_target(
+                            &phased.serialize,
+                            types,
+                            path,
+                            seen,
+                            env,
+                            directions,
+                        )?;
+                    }
+                    if directions.deserialize {
+                        validate_flatten_target(
+                            &phased.deserialize,
+                            types,
+                            path,
+                            seen,
+                            env,
+                            directions,
+                        )?;
+                    }
+
+                    Ok(())
                 }
                 // Any other opaque reference is exporter-specific; its shape
                 // is unknowable here, so don't false-positive on it.
@@ -812,6 +869,22 @@ fn validate_flatten_target(
             ))
         }
     }
+}
+
+/// The conversion wire types that can actually be reached given which of the
+/// flattened field's directions are live: a skipped direction's wire shape
+/// never flattens, so it must not be validated.
+fn live_wire_targets<'a>(
+    serialize_wire: Option<&'a DataType>,
+    deserialize_wire: Option<&'a DataType>,
+    directions: FlattenDirections,
+) -> impl Iterator<Item = &'a DataType> {
+    directions
+        .serialize
+        .then_some(serialize_wire)
+        .flatten()
+        .into_iter()
+        .chain(directions.deserialize.then_some(deserialize_wire).flatten())
 }
 
 /// The serde wire types substituted by container conversions, as
