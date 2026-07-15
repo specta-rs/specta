@@ -1232,10 +1232,14 @@ fn rewrite_fields_for_phase(
         Fields::Unnamed(unnamed) => {
             for field in &mut unnamed.fields {
                 if should_skip_field_for_mode(field, mode)? {
-                    if preserve_skipped_unnamed_fields {
-                        *field = skipped_field_marker(field);
-                    }
-
+                    // Always demote to a `ty: None` marker: an explicit
+                    // `skip_serializing, skip_deserializing` pair keeps
+                    // `field.ty` populated (unlike bare `#[serde(skip)]`,
+                    // which the macro erases), and the retain below keys on
+                    // `ty`, so a populated skipped field would otherwise
+                    // stay in the exported tuple even though serde never
+                    // puts it on the wire.
+                    *field = skipped_field_marker(field);
                     continue;
                 }
 

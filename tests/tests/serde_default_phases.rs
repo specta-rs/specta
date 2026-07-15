@@ -1187,3 +1187,85 @@ fn skip_reduced_tuple_variant_keeps_arity_with_optional_payload() {
         "the default-free control keeps its sequence shape: {rendered}"
     );
 }
+
+/// The explicit `skip_serializing, skip_deserializing` pair on an UNNAMED
+/// field keeps `field.ty` populated (unlike bare `#[serde(skip)]`, which the
+/// macro erases), but serde still never puts the element on the wire —
+/// `TPair(1, 9)` serializes to `[1]` and `[1,9]` is rejected. The exported
+/// shape must drop it exactly like the bare spelling, not retain it as a
+/// required element (or leak a reference to a split child through it).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct PairSkipTuple(
+    u8,
+    #[serde(skip_serializing, skip_deserializing)] WithFieldDefault,
+);
+
+/// Bare-skip spelling of the same shape: both must export identically.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct BareSkipTuple(u8, #[serde(skip)] WithFieldDefault);
+
+/// Variant counterpart (the marker-preserving path): the pair-skipped slot
+/// keeps the declared arity but never renders.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum PairSkipVariant {
+    V(u8, #[serde(skip_serializing, skip_deserializing)] u8),
+}
+
+#[test]
+fn pair_skipped_unnamed_field_is_dropped_from_export() {
+    // serde_json ground truth.
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct TPair(u8, #[serde(skip_serializing, skip_deserializing)] u8);
+    assert_eq!(serde_json::to_string(&TPair(1, 9)).unwrap(), "[1]");
+    let v: TPair = serde_json::from_str("[1]").unwrap();
+    assert!(v.0 == 1 && v.1 == 0);
+    assert!(serde_json::from_str::<TPair>("[1,9]").is_err());
+    assert_eq!(
+        serde_json::to_string(&PairSkipVariant::V(1, 9)).unwrap(),
+        r#"{"V":[1]}"#
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<PairSkipTuple>()
+                .register::<BareSkipTuple>()
+                .register::<PairSkipVariant>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept pair-skipped unnamed fields");
+
+    assert!(
+        !rendered.contains("PairSkipTuple_Serialize"),
+        "the pair-skipped element never reaches the wire, so the tuple must \
+         not split: {rendered}"
+    );
+    let pair_shape = rendered
+        .lines()
+        .find(|line| line.starts_with("export type PairSkipTuple "))
+        .expect("PairSkipTuple should be exported");
+    let bare_shape = rendered
+        .lines()
+        .find(|line| line.starts_with("export type BareSkipTuple "))
+        .expect("BareSkipTuple should be exported");
+    assert!(
+        !pair_shape.contains("WithFieldDefault"),
+        "a split child behind a pair-skipped element must not leak into the \
+         exported shape: {pair_shape}"
+    );
+    assert_eq!(
+        pair_shape.trim_start_matches("export type PairSkipTuple"),
+        bare_shape.trim_start_matches("export type BareSkipTuple"),
+        "explicit-pair and bare `skip` spellings must export identically: {rendered}"
+    );
+    assert!(
+        rendered.contains("PairSkipVariant = { V: [number] }"),
+        "the variant payload keeps its sequence shape without the skipped \
+         slot: {rendered}"
+    );
+    // The child itself is still exported and split.
+    assert!(rendered.contains("WithFieldDefault_Serialize"));
+}
