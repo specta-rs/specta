@@ -37,6 +37,39 @@ pub enum Error {
         second: String,
     },
 
+    /// An operation references a type that is not in the exported collection.
+    #[error(
+        "operation references type {type_name:?}, which is not registered in the exported collection"
+    )]
+    UnregisteredOperationType {
+        /// Name of the unregistered type.
+        type_name: String,
+    },
+
+    /// Two operations describe the same method and path.
+    #[error("duplicate operation {method} {path:?}")]
+    DuplicateOperation {
+        /// HTTP method.
+        method: String,
+        /// Templated path.
+        path: String,
+    },
+
+    /// An operation declares no responses.
+    #[error("operation {path:?} declares no responses")]
+    OperationWithoutResponses {
+        /// Templated path.
+        path: String,
+    },
+
+    /// An operation's types could not be resolved to components.
+    ///
+    /// Component names are obtained by asking the exporter what it names each referenced type. This
+    /// means it did not answer, and is raised rather than emitting a `$ref` that resolves to
+    /// nothing.
+    #[error("could not resolve operation types to exported components")]
+    UnresolvedOperationTypes,
+
     /// JSON output serialization failed.
     #[error("failed to serialize OpenAPI JSON: {0}")]
     Json(#[from] serde_json::Error),

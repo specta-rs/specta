@@ -5,7 +5,7 @@ use specta::{
     Type, Types,
     datatype::{DataType, Field, NamedDataType, Primitive, Struct},
 };
-use specta_openapi::{OpenApi, OutputFormat, SchemaMode};
+use specta_openapi::{OpenApi, Operation, OutputFormat, SchemaMode};
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -499,5 +499,255 @@ fn openapi_supports_yaml_export_to_and_document_merging() {
             .add_to_document(&mut document, &types, specta_serde::Format)
             .is_err(),
         "duplicate component names should never be overwritten"
+    );
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Recipe {
+    slug: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NewRecipe {
+    slug: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ApiError {
+    message: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Wrapper<T> {
+    value: T,
+}
+
+mod other {
+    use specta::Type;
+
+    // Same name as the outer `Recipe`, which is what makes the exporter disambiguate both by
+    // module path.
+    #[derive(Type)]
+    #[specta(collect = false)]
+    pub struct Recipe {
+        pub id: u32,
+    }
+}
+
+fn recipe_types() -> Types {
+    Types::default()
+        .register::<Recipe>()
+        .register::<NewRecipe>()
+        .register::<ApiError>()
+}
+
+#[test]
+fn openapi_exports_operations_into_paths() {
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/recipes/{slug}")
+                .summary("Fetch one recipe")
+                .operation_id("getRecipe")
+                .tag("recipes")
+                .path_param("slug")
+                .response::<Recipe>(200, "The recipe")
+                .response::<ApiError>(404, "No such recipe"),
+        )
+        .operation(
+            Operation::post("/recipes")
+                .request_body::<NewRecipe>()
+                .response::<Recipe>(201, "The created recipe")
+                .empty_response(204, "Nothing to do"),
+        )
+        .export_document(&recipe_types(), specta_serde::Format)
+        .expect("operations should export");
+    let value = serde_json::to_value(&document).unwrap();
+
+    let get = &value["paths"]["/recipes/{slug}"]["get"];
+    assert_eq!(get["summary"], "Fetch one recipe");
+    assert_eq!(get["operationId"], "getRecipe");
+    assert_eq!(get["tags"][0], "recipes");
+    assert_eq!(get["parameters"][0]["name"], "slug");
+    assert_eq!(get["parameters"][0]["in"], "path");
+    assert_eq!(get["parameters"][0]["required"], true);
+    assert_eq!(
+        get["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Recipe"
+    );
+    assert_eq!(
+        get["responses"]["404"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/ApiError"
+    );
+
+    let post = &value["paths"]["/recipes"]["post"];
+    assert_eq!(
+        post["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/NewRecipe"
+    );
+    assert_eq!(
+        post["responses"]["201"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Recipe"
+    );
+    // A response with no body carries no content at all.
+    assert!(post["responses"]["204"].get("content").is_none());
+
+    // Every `$ref` an operation emits resolves to a component that was exported.
+    let schemas = document.components.as_ref().unwrap();
+    for reference in collect_refs(&value["paths"]) {
+        let name = reference.trim_start_matches("#/components/schemas/");
+        assert!(
+            schemas.schemas.contains_key(name),
+            "operation $ref {reference:?} does not resolve"
+        );
+    }
+}
+
+fn collect_refs(value: &serde_json::Value) -> Vec<String> {
+    let mut refs = Vec::new();
+    fn walk(value: &serde_json::Value, refs: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                for (key, value) in map {
+                    match (key.as_str(), value.as_str()) {
+                        ("$ref", Some(reference)) => refs.push(reference.to_string()),
+                        _ => walk(value, refs),
+                    }
+                }
+            }
+            serde_json::Value::Array(items) => items.iter().for_each(|item| walk(item, refs)),
+            _ => {}
+        }
+    }
+    walk(value, &mut refs);
+    refs
+}
+
+/// Operation names are resolved by reproducing the JSON Schema exporter's naming, which
+/// disambiguates by module path only when two definitions share a name. This pins the reproduction
+/// against the real thing for both the plain and the disambiguated case.
+#[test]
+fn openapi_resolves_operations_against_disambiguated_component_names() {
+    let types = Types::default()
+        .register::<Recipe>()
+        .register::<other::Recipe>();
+
+    let document = OpenApi::default()
+        .operation(Operation::get("/a").response::<Recipe>(200, "outer"))
+        .operation(Operation::get("/b").response::<other::Recipe>(200, "inner"))
+        .export_document(&types, specta_serde::Format)
+        .expect("colliding names should still resolve");
+    let value = serde_json::to_value(&document).unwrap();
+
+    let schemas = document.components.as_ref().unwrap();
+    let refs = collect_refs(&value["paths"]);
+    assert_eq!(refs.len(), 2);
+    for reference in &refs {
+        let name = reference.trim_start_matches("#/components/schemas/");
+        assert!(
+            schemas.schemas.contains_key(name),
+            "disambiguated $ref {reference:?} does not resolve"
+        );
+    }
+    // Both were disambiguated, so the two operations cannot have landed on one component.
+    assert_ne!(refs[0], refs[1]);
+}
+
+#[test]
+fn openapi_rejects_operations_it_cannot_resolve() {
+    // A type absent from the exported collection.
+    let unregistered = OpenApi::default()
+        .operation(Operation::get("/a").response::<Recipe>(200, "ok"))
+        .export_document(
+            &Types::default().register::<ApiError>(),
+            specta_serde::Format,
+        )
+        .expect_err("an unexported type must not produce a dangling $ref");
+    assert!(unregistered.to_string().contains("Recipe"));
+
+    // The same method and path twice.
+    let duplicate = OpenApi::default()
+        .operation(Operation::get("/a").response::<Recipe>(200, "ok"))
+        .operation(Operation::get("/a").response::<Recipe>(200, "ok"))
+        .export_document(&recipe_types(), specta_serde::Format)
+        .expect_err("one method and path describes one operation");
+    assert!(duplicate.to_string().contains("duplicate operation"));
+
+    // An operation that says nothing about what it returns.
+    let empty = OpenApi::default()
+        .operation(Operation::get("/a"))
+        .export_document(&recipe_types(), specta_serde::Format)
+        .expect_err("an operation must declare at least one response");
+    assert!(empty.to_string().contains("declares no responses"));
+}
+
+/// Generic instantiations are exported one component per instantiation, with the arguments folded
+/// into the name and then sanitised. Operations resolve to those components by asking the exporter
+/// rather than reproducing the naming, so an `ApiResponse<T>`-shaped API is describable.
+#[test]
+fn openapi_resolves_generic_operation_types() {
+    let types = Types::default()
+        .register::<Wrapper<String>>()
+        .register::<Wrapper<Recipe>>();
+
+    let document = OpenApi::default()
+        .operation(Operation::get("/text").response::<Wrapper<String>>(200, "wrapped text"))
+        .operation(Operation::get("/recipe").response::<Wrapper<Recipe>>(200, "wrapped recipe"))
+        .export_document(&types, specta_serde::Format)
+        .expect("generic instantiations should resolve");
+    let value = serde_json::to_value(&document).unwrap();
+
+    // Each instantiation is its own component, so the two operations must not collapse onto one.
+    let text =
+        value["paths"]["/text"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+            ["$ref"]
+            .as_str()
+            .unwrap()
+            .to_string();
+    let recipe = value["paths"]["/recipe"]["get"]["responses"]["200"]["content"]
+        ["application/json"]["schema"]["$ref"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(text, recipe);
+
+    let schemas = document.components.as_ref().unwrap();
+    for reference in [&text, &recipe] {
+        let name = reference.trim_start_matches("#/components/schemas/");
+        assert!(
+            schemas.schemas.contains_key(name),
+            "generic $ref {reference:?} does not resolve"
+        );
+    }
+}
+
+/// The probe used to ask the exporter for component names must not appear in the output, nor change
+/// what the document would otherwise contain.
+#[test]
+fn openapi_resolution_probe_does_not_leak_into_the_document() {
+    let types = recipe_types();
+    let with_operations = OpenApi::default()
+        .operation(Operation::get("/recipes/{slug}").response::<Recipe>(200, "The recipe"))
+        .export_document(&types, specta_serde::Format)
+        .expect("operations should export");
+    let without_operations = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .expect("types should export");
+
+    let components = with_operations.components.as_ref().unwrap();
+    assert!(
+        components
+            .schemas
+            .keys()
+            .all(|name| !name.contains("probe")),
+        "the probe leaked into the components"
+    );
+    assert_eq!(
+        serde_json::to_value(&components).unwrap(),
+        serde_json::to_value(without_operations.components.as_ref().unwrap()).unwrap(),
+        "describing operations changed the exported components"
     );
 }
