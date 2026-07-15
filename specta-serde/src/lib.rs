@@ -331,11 +331,6 @@ impl specta::Format for PhasesFormat {
                 return Err(Box::new(err));
             }
 
-            rewrite_named_type_for_phase(
-                &mut generated_types_for_phase.serialize,
-                PhaseRewrite::Serialize,
-            )?;
-
             if let Some(ty) = generated_types_for_phase.deserialize.ty.as_mut()
                 && let Err(err) = rewrite_datatype_for_phase(
                     ty,
@@ -351,11 +346,6 @@ impl specta::Format for PhasesFormat {
             if let Some(err) = rewrite_err {
                 return Err(Box::new(err));
             }
-
-            rewrite_named_type_for_phase(
-                &mut generated_types_for_phase.deserialize,
-                PhaseRewrite::Deserialize,
-            )?;
 
             generated.insert(key, generated_types_for_phase);
         }
@@ -2620,14 +2610,32 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
         PhaseRewrite::Unified => return Ok(original.name.to_string()),
     };
 
-    let base_name = original
-        .ty
-        .as_ref()
-        .map(|ty| renamed_type_name_for_phase(ty, mode, original.name.as_ref()))
-        .transpose()?
-        .flatten()
-        .unwrap_or_else(|| original.name.to_string());
+    let rename_for = |phase: PhaseRewrite| {
+        original
+            .ty
+            .as_ref()
+            .map(|ty| renamed_type_name_for_phase(ty, phase, original.name.as_ref()))
+            .transpose()
+            .map(Option::flatten)
+    };
+    let serialize_rename = rename_for(PhaseRewrite::Serialize)?;
+    let deserialize_rename = rename_for(PhaseRewrite::Deserialize)?;
+    let renames_differ = serialize_rename != deserialize_rename;
 
+    let rename = match mode {
+        PhaseRewrite::Serialize => serialize_rename,
+        _ => deserialize_rename,
+    };
+
+    // When the container rename itself differs between phases the renames are
+    // already phase-specific names authored by the user, so use them verbatim.
+    // Otherwise (no rename, or the same rename on both sides) the name alone
+    // can't distinguish the phases, so append the phase suffix.
+    if renames_differ && let Some(rename) = rename {
+        return Ok(rename);
+    }
+
+    let base_name = rename.unwrap_or_else(|| original.name.to_string());
     Ok(format!("{base_name}_{suffix}"))
 }
 

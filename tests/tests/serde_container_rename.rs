@@ -5,7 +5,9 @@
 //! ever inspected `DataType::Struct`). These tests pin down that enums and
 //! structs behave identically for container renames: plain `rename`,
 //! two-sided `rename(serialize = ..., deserialize = ...)`, one-sided/differing
-//! renames (which require `PhasesFormat`), generics, and name collisions.
+//! renames (which require `PhasesFormat`), symmetric renames on types that
+//! split for unrelated reasons, references to renamed enums, generics, and
+//! name collisions.
 
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
@@ -123,12 +125,14 @@ fn struct_phase_specific_rename_splits_under_phases_format() {
         )
         .expect("export should succeed");
 
+    // Differing phase renames are used verbatim (no `_Serialize`/`_Deserialize`
+    // suffix): the user already authored a distinct name per phase.
     assert!(
-        ts.contains("StructPhaseSpecificRenameSerializeControl"),
+        ts.contains("export type StructPhaseSpecificRenameSerializeControl = "),
         "expected serialize-phase renamed name, got:\n{ts}"
     );
     assert!(
-        ts.contains("StructPhaseSpecificRenameDeserializeControl"),
+        ts.contains("export type StructPhaseSpecificRenameDeserializeControl = "),
         "expected deserialize-phase renamed name, got:\n{ts}"
     );
 }
@@ -164,13 +168,117 @@ fn enum_phase_specific_rename_splits_under_phases_format() {
         )
         .expect("export should succeed");
 
+    // Exactly like structs, differing phase renames are used verbatim (no
+    // `_Serialize`/`_Deserialize` suffix).
     assert!(
-        ts.contains("EnumPhaseSpecificRenameSerialize"),
+        ts.contains("export type EnumPhaseSpecificRenameSerialize = "),
         "expected serialize-phase renamed name, got:\n{ts}"
     );
     assert!(
-        ts.contains("EnumPhaseSpecificRenameDeserialize"),
+        ts.contains("export type EnumPhaseSpecificRenameDeserialize = "),
         "expected deserialize-phase renamed name, got:\n{ts}"
+    );
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "RenamedSymmetricSplitStruct")]
+struct SymmetricRenameSplitStruct {
+    a: String,
+    #[serde(skip_serializing)]
+    b: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged, rename = "RenamedSymmetricSplitUntagged")]
+enum SymmetricRenameSplitUntaggedEnum {
+    A(String),
+    #[serde(skip_serializing)]
+    B(i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "RenamedSymmetricSplitTagged")]
+enum SymmetricRenameSplitTaggedEnum {
+    A,
+    #[serde(skip_serializing)]
+    B(String),
+}
+
+/// A symmetric container rename on a type that splits for an unrelated reason
+/// (here a directional skip) must keep the phase suffix on the *renamed* base
+/// name; the rename alone can't distinguish the two phases.
+#[test]
+fn symmetric_rename_on_split_types_keeps_phase_suffix() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<SymmetricRenameSplitStruct>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("struct export should succeed");
+    assert!(
+        ts.contains("export type RenamedSymmetricSplitStruct_Serialize = ")
+            && ts.contains("export type RenamedSymmetricSplitStruct_Deserialize = "),
+        "expected suffixed renamed struct names, got:\n{ts}"
+    );
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<SymmetricRenameSplitUntaggedEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("untagged enum export should succeed");
+    assert!(
+        ts.contains("export type RenamedSymmetricSplitUntagged_Serialize = ")
+            && ts.contains("export type RenamedSymmetricSplitUntagged_Deserialize = "),
+        "expected suffixed renamed untagged enum names, got:\n{ts}"
+    );
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<SymmetricRenameSplitTaggedEnum>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("tagged enum export should succeed");
+    assert!(
+        ts.contains("export type RenamedSymmetricSplitTagged_Serialize = ")
+            && ts.contains("export type RenamedSymmetricSplitTagged_Deserialize = "),
+        "expected suffixed renamed tagged enum names, got:\n{ts}"
+    );
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "ReferencedEnumNew")]
+enum ReferencedEnum {
+    A,
+    B(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ReferencingStruct {
+    field: ReferencedEnum,
+    opt: Option<ReferencedEnum>,
+}
+
+/// References from other types must resolve to the *renamed* enum name.
+#[test]
+fn references_use_renamed_enum_name() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<ReferencedEnum>()
+                .register::<ReferencingStruct>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        ts.contains("field: ReferencedEnumNew,") && ts.contains("opt: ReferencedEnumNew | null,"),
+        "expected references to use the renamed enum name, got:\n{ts}"
     );
 }
 
