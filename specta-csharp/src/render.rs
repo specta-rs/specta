@@ -686,6 +686,7 @@ fn render_datatype_with_inline_overrides(
                     Fields::Named(_) => unreachable!(),
                 };
                 match fields.as_slice() {
+                    [] if preserve_tuple_shape => out.push_str("global::System.ValueTuple"),
                     [] => out.push_str("object?"),
                     [field] if preserve_tuple_shape => {
                         out.push_str("global::System.ValueTuple<");
@@ -788,6 +789,7 @@ fn render_datatype_with_inline_overrides(
                             Fields::Named(_) => unreachable!(),
                         };
                         match fields.as_slice() {
+                            [] if preserve_tuple_shape => out.push_str("global::System.ValueTuple"),
                             [] => out.push_str("object?"),
                             [field] if preserve_tuple_shape => {
                                 out.push_str("global::System.ValueTuple<");
@@ -1612,6 +1614,7 @@ fn render_non_object_struct_inner(
         Fields::Named(_) => unreachable!("named fields have an object wire shape"),
     };
     match fields.as_slice() {
+        [] if preserve_tuple_shape => out.push_str("global::System.ValueTuple"),
         [] => out.push_str("object?"),
         [field] if preserve_tuple_shape => {
             out.push_str("global::System.ValueTuple<");

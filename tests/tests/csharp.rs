@@ -338,6 +338,10 @@ struct WireSkippedTuple(#[serde(skip)] (), String);
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct WireAllSkippedTuple(#[serde(skip)] (), #[serde(skip)] u8);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct WireSkippedGenericTuple<T>(#[serde(skip)] (), T);
 
 #[derive(Type, Serialize, Deserialize)]
@@ -362,6 +366,7 @@ struct NonObjectWireShapes {
     id: WireNewtype,
     tuple: WireTuple,
     skipped_tuple: WireSkippedTuple,
+    all_skipped_tuple: WireAllSkippedTuple,
     skipped_generic_tuple: WireSkippedGenericTuple<u8>,
     generic: WireGeneric<u8>,
     nested_generic: WireGeneric<Option<u8>>,
@@ -871,6 +876,12 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
             .unwrap(),
         "global::System.ValueTuple<string>"
     );
+    let all_skipped_tuple = WireAllSkippedTuple::definition(&mut definition_types);
+    assert_eq!(
+        specta_csharp::primitives::datatype(&CSharp::new(), &definition_types, &all_skipped_tuple,)
+            .unwrap(),
+        "global::System.ValueTuple"
+    );
 
     let output = CSharp::new()
         .export(
@@ -887,6 +898,7 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
         output.contains("global::System.ValueTuple<string> SkippedTuple"),
         "{output}"
     );
+    assert!(output.contains("global::System.ValueTuple AllSkippedTuple"));
     assert!(output.contains("global::System.ValueTuple<byte> SkippedGenericTuple"));
     assert!(output.contains("byte? Generic"));
     assert!(output.contains("byte? NestedGeneric"));
