@@ -727,13 +727,10 @@ fn validate_internally_tag_variant(
     }
 }
 
-// `seen` tracks named references already on the current recursion path so that
-// cyclic (self- or mutually-recursive) untagged enums terminate instead of
-// looping forever. A reference already on the path is assumed valid (its
-// validation is already in progress further up the stack); it is removed
-// again once the recursion through it completes so the same type reached via
-// two different, non-cyclic paths is still fully validated. This mirrors the
-// `seen` discipline in `internal_tag_payload_compatibility` (lib.rs).
+// `seen` tracks named references on the current recursion path so cyclic
+// (self- or mutually-recursive) untagged payloads terminate; a reference
+// already on the path is being validated further up the stack. Mirrors
+// `internal_tag_payload_compatibility` in `lib.rs`.
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
     types: &Types,
@@ -744,39 +741,24 @@ fn validate_internally_tag_enum_datatype(
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
-        DataType::Reference(Reference::Named(reference))
-            if matches!(reference.inner, NamedReferenceType::Inline { .. }) =>
-        {
-            let key = Reference::Named(reference.clone());
-            if !seen.insert(key.clone()) {
-                return Ok(());
-            }
-
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)?;
-            }
-            seen.remove(&key);
-
-            Ok(())
-        }
-        DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
-            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string(), seen),
-            EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
-        },
-        DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
             let key = Reference::Named(reference.clone());
             if !seen.insert(key.clone()) {
                 return Ok(());
             }
 
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)?;
-            }
+            let result = named_reference_ty(reference, types).map_or(Ok(()), |ty| {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)
+            });
             seen.remove(&key);
 
-            Ok(())
+            result
         }
+        DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
+            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string(), seen),
+            EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
+        },
+        DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Opaque(_))
         | DataType::Generic(_)
         | DataType::Intersection(_)

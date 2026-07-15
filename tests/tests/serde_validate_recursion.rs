@@ -1,18 +1,9 @@
-// Regression test for a hang in `validate_internally_tag_enum_datatype`
-// (specta-serde/src/validate.rs).
-//
-// Internally-tagged enums with an untagged-enum payload are validated by
-// recursively descending through the payload's variants and any named
-// references they contain, looking for a shape that can be merged with the
-// internal tag. That recursion previously had no visited set, so a
-// self-recursive or mutually-recursive untagged enum reachable from an
-// internally-tagged enum's payload caused unbounded recursion and the
-// exporting process would never return.
-//
-// `serde_json` itself has no trouble serializing this shape at runtime (an
-// internally-tagged enum whose payload is an untagged enum that recurses
-// through itself), so the export is expected to succeed rather than fail
-// validation.
+// Regression tests for https://github.com/specta-rs/specta/pull/517:
+// `validate_internally_tag_enum_datatype` (specta-serde/src/validate.rs)
+// recursed through named references without a visited set, so a self- or
+// mutually-recursive untagged enum used as an internally-tagged enum's
+// payload hung the export forever. serde_json serializes these shapes fine
+// at runtime, so the export must succeed rather than error.
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -60,16 +51,9 @@ enum TagMutual {
     Y(RecA),
 }
 
-/// Runs `f` on a background thread and panics if it doesn't complete within
-/// `timeout`.
-///
-/// A regression of the bug this test guards against hangs forever instead of
-/// failing an assertion, which would otherwise hang the test binary (and CI)
-/// indefinitely. Running the risky call on its own thread and racing it
-/// against a bounded `recv_timeout` turns that hang into a normal test
-/// failure. The spawned thread is intentionally leaked on timeout - there's
-/// no way to cancel it, but the process exits shortly after the test fails
-/// anyway.
+/// Runs `f` on a background thread, panicking if it doesn't finish within
+/// `timeout`, so a recursion regression fails the test instead of hanging
+/// CI. The thread is leaked on timeout; the process exits shortly after.
 fn with_timeout<T: Send + 'static>(timeout: Duration, f: impl FnOnce() -> T + Send + 'static) -> T {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
