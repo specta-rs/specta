@@ -143,8 +143,8 @@ Unit5: /**
 	*/
 
 Unit6: /**
-	* @typedef {{ A: null }} Unit6
-	* @property {{ A: null }} A
+	* @typedef {{ A: [] }} Unit6
+	* @property {{ A: [] }} A
 	*/
 
 Unit7: /**

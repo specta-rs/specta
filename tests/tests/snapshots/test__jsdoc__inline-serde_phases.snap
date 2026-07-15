@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
+assertion_line: 191
 expression: output
 ---
 Issue374: {
@@ -102,7 +103,7 @@ Unit2: Record<string, never>
 Unit3: []
 Unit4: null
 Unit5: "A"
-Unit6: { A: null }
+Unit6: { A: [] }
 Unit7: { A: Record<string, never> }
 SimpleStruct: {
 	a: number,

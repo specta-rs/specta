@@ -37,8 +37,8 @@ expression: output
 	* @typedef {"A"} Unit5
 	* @property {"A"} A
 	*
-	* @typedef {{ A: null }} Unit6
-	* @property {{ A: null }} A
+	* @typedef {{ A: [] }} Unit6
+	* @property {{ A: [] }} A
 	*
 	* @typedef {{ A: Record<string, never> }} Unit7
 	* @property {{ A: Record<string, never> }} A

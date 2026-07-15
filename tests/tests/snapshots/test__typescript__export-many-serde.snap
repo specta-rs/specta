@@ -1,6 +1,6 @@
 ---
 source: tests/tests/typescript.rs
-assertion_line: 1011
+assertion_line: 1068
 expression: output
 ---
 export type Range<T> = {
@@ -28,7 +28,7 @@ export type Unit4 = null;
 
 export type Unit5 = "A";
 
-export type Unit6 = { A: null };
+export type Unit6 = { A: [] };
 
 export type Unit7 = { A: Record<string, never> };
 

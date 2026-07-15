@@ -856,6 +856,11 @@ fn rewrite_datatype_for_phase(
                 container_name.unwrap_or("<anonymous struct>"),
             )?;
 
+            let original_unnamed_arity = match &s.fields {
+                Fields::Unnamed(unnamed) => Some(unnamed.fields.len()),
+                Fields::Unit | Fields::Named(_) => None,
+            };
+
             rewrite_fields_for_phase(
                 &mut s.fields,
                 mode,
@@ -866,6 +871,33 @@ fn rewrite_datatype_for_phase(
                 container_default,
                 false,
             )?;
+
+            // A declared-multi-field tuple struct stays an array even when
+            // `#[serde(skip)]` reduces it to exactly one live field: serde
+            // still serializes it as `[value]`, not a bare `value`. The
+            // latter is only correct for a *genuine* single-field (newtype)
+            // struct, which `Fields::Unnamed` already renders bare by
+            // design. Rewriting the live field(s) into a `DataType::Tuple`
+            // forces array rendering regardless of the live count.
+            let live_unnamed_types = match (original_unnamed_arity, &s.fields) {
+                (Some(arity), Fields::Unnamed(unnamed))
+                    if arity > 1 && unnamed.fields.len() == 1 =>
+                {
+                    Some(
+                        unnamed
+                            .fields
+                            .iter()
+                            .filter_map(|f| f.ty.clone())
+                            .collect::<Vec<_>>(),
+                    )
+                }
+                _ => None,
+            };
+            if let Some(live_unnamed_types) = live_unnamed_types {
+                *ty = DataType::Tuple(Tuple::new(live_unnamed_types));
+                return Ok(());
+            }
+
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
             if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
                 *ty = intersection;
@@ -1320,14 +1352,6 @@ fn unnamed_live_fields(unnamed: &UnnamedFields) -> impl Iterator<Item = &Field> 
 
 fn unnamed_live_field_count(unnamed: &UnnamedFields) -> usize {
     unnamed_live_fields(unnamed).count()
-}
-
-fn unnamed_has_effective_payload(unnamed: &UnnamedFields) -> bool {
-    unnamed_live_field_count(unnamed) != 0
-}
-
-fn unnamed_fields_all_skipped(unnamed: &UnnamedFields) -> bool {
-    !unnamed.fields.is_empty() && !unnamed_has_effective_payload(unnamed)
 }
 
 fn rewrite_enum_repr_for_phase(
@@ -1840,10 +1864,12 @@ fn transform_external_variant(
     variant: &Variant,
     widen_tag: bool,
 ) -> Result<Variant, Error> {
-    let skipped_only_unnamed = match &variant.fields {
-        Fields::Unnamed(unnamed) => unnamed_fields_all_skipped(unnamed),
-        Fields::Unit | Fields::Named(_) => false,
-    };
+    // Only a genuine newtype variant (declared arity 1) collapses to a unit
+    // string when its sole field is skipped. A declared-multi-field tuple
+    // variant stays a tuple variant even when skips reduce it to 0 live
+    // fields -- serde still requires (and emits) an empty array payload, so
+    // it must render as `{ Name: [] }`, not a bare string literal.
+    let collapses_to_unit = variant_collapses_to_unit(variant);
 
     Ok(match &variant.fields {
         Fields::Unit => clone_variant_with_unnamed_fields(
@@ -1854,7 +1880,7 @@ fn transform_external_variant(
                 string_literal_datatype(serialized_name)
             })],
         ),
-        _ if skipped_only_unnamed => clone_variant_with_unnamed_fields(
+        _ if collapses_to_unit => clone_variant_with_unnamed_fields(
             variant,
             vec![Field::new(if widen_tag {
                 DataType::Primitive(Primitive::str)
@@ -1887,7 +1913,12 @@ fn transform_adjacent_variant(
         }),
     )];
 
-    if variant_has_effective_payload(variant) {
+    // Every non-unit variant kind carries a `content` key, even when the
+    // payload itself is empty: `Foo {}` -> `content: {}`, `Foo()` -> `content:
+    // []`, and a declared-multi-field tuple reduced to 0 live fields by
+    // `#[serde(skip)]` -> `content: []`. Only genuine unit variants (and
+    // newtype variants collapsed to unit by a skipped sole field) omit it.
+    if !variant_collapses_to_unit(variant) {
         let payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         fields.push((Cow::Owned(content.to_string()), payload));
@@ -2041,11 +2072,31 @@ fn is_generated_string_literal_datatype(ty: &DataType) -> bool {
     }
 }
 
-fn variant_has_effective_payload(variant: &Variant) -> bool {
+/// A variant/struct whose declared arity collapses to serde's unit
+/// representation: genuine unit fields, and newtype (declared arity 1)
+/// unnamed fields whose sole field has been skipped. Every other shape
+/// (including empty tuples/structs and multi-field tuples reduced to 0 or 1
+/// live fields by `#[serde(skip)]`) still serializes with a payload -- an
+/// empty tuple variant serializes as `[]`, an empty struct variant as `{}`,
+/// and a declared-multi-field tuple stays a sequence even when skips reduce
+/// it to 0 or 1 live fields.
+fn variant_collapses_to_unit(variant: &Variant) -> bool {
     match &variant.fields {
-        Fields::Unit => false,
-        Fields::Named(named) => !&named.fields.is_empty(),
-        Fields::Unnamed(unnamed) => unnamed_has_effective_payload(unnamed),
+        Fields::Unit => true,
+        Fields::Unnamed(unnamed) => {
+            unnamed.fields.len() == 1 && unnamed_live_field_count(unnamed) == 0
+        }
+        Fields::Named(_) => false,
+    }
+}
+
+/// A [`DataType`] that always renders as an empty array (`[]`), as opposed to
+/// `DataType::Tuple(Tuple::new(vec![]))`, which renders as `null` because it
+/// also represents Rust's unit type `()`.
+fn empty_array_datatype() -> DataType {
+    match Struct::unnamed().build() {
+        DataType::Struct(s) => DataType::Struct(s),
+        _ => unreachable!("Struct::unnamed always builds a struct"),
     }
 }
 
@@ -2065,7 +2116,7 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             let non_skipped = unnamed_live_fields(unnamed).collect::<Vec<_>>();
 
             match non_skipped.as_slice() {
-                [] => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
+                [] => Some(Field::new(empty_array_datatype())),
                 [single] if original_unnamed_len == 1 => Some((*single).clone()),
                 _ => Some(Field::new(DataType::Tuple(Tuple::new(
                     non_skipped

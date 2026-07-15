@@ -1054,7 +1054,7 @@ export type Unit4 = null;
 
 export type Unit5 = "A";
 
-export type Unit6 = { A: null };
+export type Unit6 = { A: [] };
 
 export type Unit7 = { A: Record<string, never> };
 
