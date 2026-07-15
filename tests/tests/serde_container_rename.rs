@@ -182,6 +182,48 @@ fn enum_phase_specific_rename_splits_under_phases_format() {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(rename(serialize = "EnumOneSidedRenameWire"))]
+enum EnumOneSidedRename {
+    A,
+    B(String),
+}
+
+/// A *one-sided* container rename on an enum must be rejected under the
+/// unified `Format`, exactly like structs: the exported name would only match
+/// one direction of the wire format. Under `PhasesFormat` it splits, using the
+/// serialize rename verbatim and the suffixed original name for deserialize.
+///
+/// The unified-mode rejection is implemented by #518's centralized asymmetry
+/// validation (<https://github.com/specta-rs/specta/pull/518>), which covers
+/// both structs and enums; ignored until that lands so this branch stays
+/// green standalone. Raised in
+/// <https://github.com/specta-rs/specta/pull/525#discussion_r3584444653>.
+#[test]
+#[ignore = "unified-mode rejection requires #518 (fix/serde-unified-one-sided-attrs)"]
+fn enum_one_sided_rename_requires_phases_format() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<EnumOneSidedRename>(),
+            specta_serde::Format,
+        )
+        .expect_err("one-sided enum container rename must be rejected under Format");
+    assert!(err.to_string().contains("EnumOneSidedRename"));
+
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<EnumOneSidedRename>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("export should succeed");
+    assert!(
+        ts.contains("export type EnumOneSidedRenameWire = ")
+            && ts.contains("export type EnumOneSidedRename_Deserialize = "),
+        "expected per-phase names for one-sided enum rename, got:\n{ts}"
+    );
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename = "RenamedSymmetricSplitStruct")]
 struct SymmetricRenameSplitStruct {
     a: String,
