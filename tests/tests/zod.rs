@@ -1,4 +1,4 @@
-use std::{iter, path::Path};
+use std::{borrow::Cow, collections::HashMap, iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
@@ -7,7 +7,7 @@ use specta::{
 };
 use specta_typescript::Typescript;
 use specta_util::Remapper;
-use specta_zod::{Layout, Zod, define, primitives};
+use specta_zod::{Any, Layout, Never, Unknown, Zod, define, primitives};
 use tempfile::TempDir;
 
 macro_rules! for_bigint_types {
@@ -92,6 +92,7 @@ enum InvalidInternallyTaggedEnum {
 mod testing {
     use super::*;
 
+    /// This documentation mentions test$zod$testing.Testing verbatim.
     #[derive(Type)]
     pub struct Testing {
         b: testing2::Testing,
@@ -105,6 +106,20 @@ mod testing {
             c: String,
         }
     }
+}
+
+mod r#type {
+    use super::*;
+
+    #[derive(Type)]
+    pub struct KeywordModule {
+        value: String,
+    }
+}
+
+#[derive(Type)]
+struct UsesKeywordModule {
+    value: r#type::KeywordModule,
 }
 
 fn inline_for<T: Type>(zod: &Zod) -> Result<String, specta_zod::Error> {
@@ -138,7 +153,8 @@ fn zod_export_smoke() {
 
     assert!(out.contains("import { z } from \"zod\";"));
     assert!(out.contains("export const DemoSchema"));
-    assert!(out.contains("export type Demo = z.infer<typeof DemoSchema>;"));
+    assert!(out.contains("export type Demo ="));
+    assert!(out.contains("DemoSchema: z.ZodType<Demo>"));
 }
 
 #[test]
@@ -174,6 +190,18 @@ fn zod_bigint_forbidden_by_default() {
 }
 
 #[test]
+fn zod_wrappers_serde_roundtrip() {
+    for value in [
+        serde_json::to_value(serde_json::from_str::<Any<String>>(r#""value""#).unwrap()).unwrap(),
+        serde_json::to_value(serde_json::from_str::<Unknown<String>>(r#""value""#).unwrap())
+            .unwrap(),
+        serde_json::to_value(serde_json::from_str::<Never<String>>(r#""value""#).unwrap()).unwrap(),
+    ] {
+        assert_eq!(value, serde_json::json!("value"));
+    }
+}
+
+#[test]
 fn zod_bigint_override_via_define() {
     // `specta_zod::define` is the escape hatch for the forbidden bigint
     // primitives: remap them to a Zod schema of your choosing, mirroring the
@@ -189,11 +217,18 @@ fn zod_bigint_override_via_define() {
 
 #[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct MapWithBigIntKey {
+        values: HashMap<usize, String>,
+    }
+
     for err in [
         export_for::<StructWithBigInt>(),
         export_for::<StructWithStructWithBigInt>(),
         export_for::<StructWithOptionWithStructWithBigInt>(),
         export_for::<EnumWithInlineStructWithBigInt>(),
+        export_for::<MapWithBigIntKey>(),
     ] {
         let err = err.expect_err("bigint export should be rejected by default");
         assert!(
@@ -202,6 +237,9 @@ fn zod_bigint_errors_propagate_from_nested_types() {
             "unexpected error: {err}"
         );
     }
+
+    assert!(inline_for::<HashMap<usize, String>>(&Zod::default()).is_err());
+    assert!(inline_for::<HashMap<isize, String>>(&Zod::default()).is_err());
 }
 
 #[test]
@@ -234,6 +272,81 @@ fn zod_layout_files_export_to() {
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
     assert!(output.contains(".ts"));
     assert!(output.contains("import { z } from \"zod\";"));
+    assert!(output.contains("test$zod$testing.Testing verbatim"));
+}
+
+#[test]
+fn zod_layout_namespaces() {
+    let types = Types::default().register::<Testing>().register::<Another>();
+    let rendered = Zod::default()
+        .layout(Layout::Namespaces)
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    insta::assert_snapshot!("zod-layout-namespaces", rendered);
+    assert!(rendered.contains("namespace $s$"));
+    assert!(rendered.contains("export namespace testing"));
+    assert!(rendered.contains("testing.TestingSchema)"));
+    assert!(rendered.contains("export import test = $s$.test;"));
+}
+
+#[test]
+fn zod_layout_namespaces_reexports_root_schema() {
+    let mut types = Types::default();
+    NamedDataType::new("Root", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let rendered = Zod::default()
+        .layout(Layout::Namespaces)
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(rendered.contains("export import Root = $s$.Root;"));
+    assert!(rendered.contains("export import RootSchema = $s$.RootSchema;"));
+}
+
+#[test]
+fn zod_layout_sanitises_reserved_module_identifiers() {
+    let types = Types::default().register::<UsesKeywordModule>();
+    let rendered = Zod::default()
+        .layout(Layout::Namespaces)
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(rendered.contains("export namespace $type"));
+    assert!(rendered.contains(".$type.KeywordModule"));
+    assert!(!rendered.contains("namespace type"));
+}
+
+#[test]
+fn zod_layout_namespaces_rejects_module_type_collisions() {
+    let mut types = Types::default().register::<Testing>();
+    NamedDataType::new("test", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let err = Zod::default()
+        .layout(Layout::Namespaces)
+        .export(&types, specta_serde::Format)
+        .unwrap_err();
+    assert!(err.to_string().contains("namespace exports"));
+}
+
+#[test]
+fn zod_with_raw_exports_to_files_index() {
+    let temp = temp_dir();
+    let path = temp.path().join("zod-layout-files-raw");
+    Zod::default()
+        .layout(Layout::Files)
+        .with_raw("export const first = 1;")
+        .with_raw("export const second = 2;")
+        .export_to(&path, &Types::default(), specta_serde::Format)
+        .unwrap();
+
+    let index = std::fs::read_to_string(path.join("index.ts")).unwrap();
+    assert!(index.contains("export const first = 1;\nexport const second = 2;"));
 }
 
 #[test]
@@ -249,10 +362,10 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_empty_named_shapes_are_strict() {
     let empty_struct = export_for::<EmptyStruct>().unwrap();
-    assert!(empty_struct.contains("z.strictObject({})"));
+    assert!(empty_struct.contains("z.object({})"));
 
     let empty_variant = export_for::<EmptyNamedVariant>().unwrap();
-    assert!(empty_variant.contains("z.strictObject({})"));
+    assert!(empty_variant.contains("z.strictObject({"));
 }
 
 #[test]
@@ -345,8 +458,44 @@ fn zod_integers_use_z_int() {
 
     let out = export_for::<Ints>().unwrap();
     assert!(out.contains("signed: z.int()"));
+    assert!(out.contains("signed: z.int().min(-2147483648).max(2147483647)"));
     assert!(out.contains("unsigned: z.int()"));
-    assert!(out.contains("floating: z.number()"));
+    assert!(out.contains("unsigned: z.int().min(0).max(255)"));
+    assert!(out.contains("floating: z.number().nullable()"));
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ZodIntegerKey(i32);
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum ZodFiniteKey {
+    First,
+    Second,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ZodWireTypes {
+    character: char,
+    integer_keys: HashMap<i32, String>,
+    boolean_keys: HashMap<bool, String>,
+    newtype_keys: HashMap<ZodIntegerKey, String>,
+    enum_keys: HashMap<ZodFiniteKey, String>,
+}
+
+#[test]
+fn zod_char_and_json_map_key_wire_schemas() {
+    let rendered = export_for::<ZodWireTypes>().unwrap();
+    assert!(rendered.contains("[...value].length === 1"));
+    assert!(rendered.contains(
+        r"z.record(z.string().regex(/^-?\d+$/).refine((value) => Number(value) >= -2147483648 && Number(value) <= 2147483647), z.string())"
+    ));
+    assert!(rendered.contains(r#"z.partialRecord(z.enum(["true", "false"]), z.string())"#));
+    assert!(rendered.contains(
+        r#"z.partialRecord(z.union([z.literal("First"), z.literal("Second")]), z.string())"#
+    ));
 }
 
 #[test]
@@ -391,7 +540,7 @@ fn zod_tuple_default_phases() {
 
     insta::assert_snapshot!("zod-tuple-default-phases", rendered);
     assert!(
-        rendered.contains("z.tuple([z.int(), z.int().optional()])"),
+        rendered.contains("z.int().min(0).max(255).optional()"),
         "the defaulted element must be `.optional()` in the deserialize half: {rendered}"
     );
 }
@@ -401,6 +550,12 @@ fn zod_tuple_default_phases() {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct ZodSkipSlotTuple(#[serde(skip)] u8, #[serde(default)] u8);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ZodTupleVariantDefault {
+    Value(u8, #[serde(default)] u8),
+}
 
 #[test]
 fn zod_skip_slot_tuple_phases() {
@@ -412,11 +567,163 @@ fn zod_skip_slot_tuple_phases() {
         .expect("Zod should support skip-reduced defaulted tuple structs");
 
     assert!(
-        rendered.contains("ZodSkipSlotTuple_DeserializeSchema = z.tuple([z.int().optional()])"),
+        rendered.contains("ZodSkipSlotTuple_DeserializeSchema: z.ZodType<ZodSkipSlotTuple_Deserialize> = z.tuple([z.int().min(0).max(255).optional()])"),
         "only the live element is sized, and it is optional on deserialize: {rendered}"
     );
     assert!(
-        rendered.contains("ZodSkipSlotTuple_SerializeSchema = z.tuple([z.int()])"),
+        rendered.contains("ZodSkipSlotTuple_SerializeSchema: z.ZodType<ZodSkipSlotTuple_Serialize> = z.tuple([z.int().min(0).max(255)])"),
         "serialize keeps the single live element required: {rendered}"
+    );
+}
+
+#[test]
+fn zod_tuple_variant_default_phases() {
+    let rendered = Zod::default()
+        .export(
+            &Types::default().register::<ZodTupleVariantDefault>(),
+            specta_serde::PhasesFormat,
+        )
+        .unwrap();
+
+    assert!(
+        rendered.contains("z.int().min(0).max(255).optional()"),
+        "the trailing defaulted variant field must be optional: {rendered}"
+    );
+}
+
+/// Top-level documentation containing a terminator: */ still remains valid.
+#[deprecated(note = "Use the replacement instead")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodCoverage<T = String> {
+    /// Field documentation.
+    #[deprecated(note = "Use `renamed` instead")]
+    #[serde(rename = "quote\"slash\\line\nseparator")]
+    renamed: String,
+    generic: T,
+    optional: Option<bool>,
+    tuple: (i32, String),
+    list: Vec<f64>,
+    map: HashMap<String, u16>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ZodGenericDefaults<T = String, U = T> {
+    first: T,
+    second: U,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodFlattenInner {
+    inner: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodFlattenOuter {
+    outer: bool,
+    #[serde(flatten)]
+    inner: ZodFlattenInner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ZodOptionalFlatten {
+    id: String,
+    #[serde(flatten)]
+    inner: Option<ZodFlattenInner>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ZodEnumCoverage {
+    /// Unit documentation.
+    Unit,
+    Newtype(String),
+    Tuple(i32, bool),
+    Named {
+        /// Nested field documentation.
+        value: String,
+    },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct AForwardReference {
+    later: ZLaterReference,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ZLaterReference {
+    value: String,
+}
+
+#[test]
+#[allow(deprecated)]
+fn zod_datatype_generics_comments_and_escaping() {
+    let types = Types::default()
+        .register::<ZodCoverage>()
+        .register::<ZodGenericDefaults>()
+        .register::<ZodEnumCoverage>()
+        .register::<ZodFlattenOuter>()
+        .register::<ZodOptionalFlatten>()
+        .register::<ZodWireTypes>()
+        .register::<AForwardReference>();
+    let rendered = Zod::default().export(&types, specta_serde::Format).unwrap();
+
+    insta::assert_snapshot!("zod-parity-coverage", rendered);
+    assert!(rendered.contains("export type ZodCoverage<T = string>"));
+    assert!(rendered.contains("@deprecated Use the replacement instead"));
+    assert!(rendered.contains("Field documentation."));
+    assert!(rendered.contains(r#""quote\"slash\\line\nseparator""#));
+    assert!(rendered.contains("generic: T"));
+    assert!(rendered.contains(
+        "export function ZodCoverageSchema<T extends z.ZodType>(T: T): z.ZodType<ZodCoverage<z.output<T>>>;"
+    ));
+    assert!(rendered.contains(
+        "export function ZodGenericDefaultsSchema<T extends z.ZodType, U extends z.ZodType>(T: T, U: U): z.ZodType<ZodGenericDefaults<z.output<T>, z.output<U>>>;"
+    ));
+    assert!(rendered.contains("z.array(z.number().nullable())"));
+    assert!(rendered.contains("z.record(z.string(), z.int().min(0).max(65535))"));
+    assert!(rendered.contains("z.lazy(() => ZLaterReferenceSchema)"));
+    assert!(rendered.contains("ZodFlattenOuterSchema"));
+    assert!(rendered.contains(".and("));
+    assert!(rendered.contains("ZodOptionalFlattenSchema"));
+}
+
+#[test]
+fn zod_header_raw_runtime_and_manual_rendering() {
+    let types = Types::default().register::<Another>();
+    let rendered = Zod::default()
+        .header("// custom header")
+        .with_raw("")
+        .with_raw("export const raw = true;")
+        .framework_runtime(|mut exporter| {
+            let types = exporter.render_types()?;
+            Ok(Cow::Owned(format!("export const runtime = true;\n{types}")))
+        })
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(rendered.starts_with("// custom header\nimport { z } from \"zod\";"));
+    assert!(rendered.contains("export const runtime = true;"));
+    assert!(rendered.contains("AnotherSchema"));
+    assert!(rendered.contains("export const raw = true;"));
+    assert!(
+        rendered.find("export const runtime = true;").unwrap()
+            < rendered.find("export const raw = true;").unwrap()
+    );
+    assert_eq!(rendered.matches("export const AnotherSchema").count(), 1);
+}
+
+#[test]
+fn zod_nested_errors_include_the_field_path() {
+    let err = export_for::<StructWithBigInt>().unwrap_err().to_string();
+    assert!(
+        err.contains("StructWithBigInt.a"),
+        "unexpected error: {err}"
     );
 }

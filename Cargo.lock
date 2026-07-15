@@ -2289,7 +2289,6 @@ dependencies = [
  "specta-serde",
  "specta-typescript",
  "specta-util",
- "thiserror",
 ]
 
 [[package]]

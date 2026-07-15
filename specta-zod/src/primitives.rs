@@ -9,6 +9,7 @@ use specta::{
         NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
 };
+use specta_typescript::{Layout as TypescriptLayout, Typescript};
 
 use crate::{Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES};
 
@@ -89,7 +90,7 @@ fn export_single_internal(
     } else {
         format!("{}::{}", ndt.module_path, ndt.name)
     };
-    validate_type_name(&base_name, name_path)?;
+    validate_type_name(&base_name, name_path.clone())?;
     let schema_name = format!("{base_name}Schema");
 
     let Some(ty) = &ndt.ty else {
@@ -99,6 +100,68 @@ fn export_single_internal(
     type_render_stack.push((ndt.module_path.clone(), ndt.name.clone()));
 
     let result = (|| {
+        let typescript = Typescript::default().layout(match exporter.layout {
+            Layout::Namespaces => TypescriptLayout::Namespaces,
+            Layout::FlatFile => TypescriptLayout::FlatFile,
+            Layout::ModulePrefixedName => TypescriptLayout::ModulePrefixedName,
+            Layout::Files => TypescriptLayout::Files,
+        });
+        let mut type_alias =
+            specta_typescript::primitives::export(&typescript, types, std::iter::once(ndt), indent)
+                .map_err(|source| {
+                    Error::framework("failed to render the inferred TypeScript type", source)
+                })?;
+        if exporter.layout == Layout::Files {
+            let current_alias = if ndt.module_path.is_empty() {
+                "$root".to_string()
+            } else {
+                ndt.module_path.split("::").collect::<Vec<_>>().join("$")
+            };
+            type_alias = replace_typescript_code(&type_alias, &format!("{current_alias}."), "");
+            let sanitized_current_alias = crate::zod::module_alias(&ndt.module_path);
+            if current_alias != sanitized_current_alias {
+                type_alias = replace_typescript_code(
+                    &type_alias,
+                    &format!("{sanitized_current_alias}."),
+                    "",
+                );
+            }
+            for module_path in types
+                .into_unsorted_iter()
+                .map(|ndt| ndt.module_path.as_ref())
+                .filter(|path| !path.is_empty() && *path != ndt.module_path.as_ref())
+                .collect::<std::collections::BTreeSet<_>>()
+            {
+                let raw = module_path.split("::").collect::<Vec<_>>().join("$");
+                let sanitized = crate::zod::module_alias(module_path);
+                if raw != sanitized {
+                    type_alias = replace_typescript_code(
+                        &type_alias,
+                        &format!("{raw}."),
+                        &format!("{sanitized}."),
+                    );
+                }
+            }
+        } else if exporter.layout == Layout::Namespaces {
+            let module_paths = types
+                .into_unsorted_iter()
+                .map(|ndt| ndt.module_path.as_ref())
+                .filter(|path| !path.is_empty())
+                .collect::<std::collections::BTreeSet<_>>();
+            for module_path in module_paths {
+                let raw = module_path.split("::").collect::<Vec<_>>().join(".");
+                let sanitized = crate::zod::namespace_module_path(module_path);
+                if raw != sanitized {
+                    type_alias = replace_typescript_code(
+                        &type_alias,
+                        &format!("$s$.{raw}."),
+                        &format!("$s$.{sanitized}."),
+                    );
+                }
+            }
+        }
+        s.push_str(&type_alias);
+
         if ndt.generics.is_empty() {
             let mut schema_expr = String::new();
             datatype(
@@ -111,28 +174,42 @@ fn export_single_internal(
                 false,
                 type_render_stack,
             )?;
+            let schema_expr = indent_continuations(&schema_expr, indent);
 
-            writeln!(s, "{indent}export const {schema_name} = {schema_expr};")?;
             writeln!(
                 s,
-                "{indent}export type {base_name} = z.infer<typeof {schema_name}>;"
+                "{indent}export const {schema_name}: z.ZodType<{base_name}> = {schema_expr};"
             )?;
             return Ok(());
         }
 
-        let generic_names = ndt
-            .generics
-            .iter()
-            .map(|generic| generic.name.as_ref().to_string())
-            .collect::<Vec<_>>();
+        let mut generic_params = Vec::with_capacity(ndt.generics.len());
+        let mut fn_params = Vec::with_capacity(ndt.generics.len());
+        let mut first_default = None;
+        for generic in ndt.generics.iter() {
+            let name = generic.name.as_ref();
+            validate_type_name(name, format!("{name_path}.<generic {name}>"))?;
 
-        let generic_params = generic_names
-            .iter()
-            .map(|name| format!("{name} extends z.ZodType"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let fn_params = generic_names.join(", ");
+            if let Some(default) = &generic.default {
+                first_default.get_or_insert(fn_params.len());
+                let mut default_schema = String::new();
+                datatype(
+                    &mut default_schema,
+                    exporter,
+                    types,
+                    default,
+                    vec![ndt.name.clone(), format!("<generic {name} default>").into()],
+                    &[],
+                    false,
+                    type_render_stack,
+                )?;
+                generic_params.push(format!("{name} extends z.ZodType"));
+                fn_params.push(format!("{name}: z.ZodType = {default_schema}"));
+            } else {
+                generic_params.push(format!("{name} extends z.ZodType"));
+                fn_params.push(format!("{name}: z.ZodType"));
+            }
+        }
 
         let mut schema_expr = String::new();
         datatype(
@@ -145,29 +222,147 @@ fn export_single_internal(
             false,
             type_render_stack,
         )?;
+        let schema_expr = indent_continuations(&schema_expr, indent);
 
-        writeln!(
-            s,
-            "{indent}export const {schema_name} = <{generic_params}>({fn_params}) => {schema_expr};"
-        )?;
-
-        let alias_params = generic_names.join(", ");
-        let infer_args = generic_names
-            .iter()
-            .map(|name| format!("z.ZodType<{name}>"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        writeln!(
-            s,
-            "{indent}export type {base_name}<{alias_params}> = z.infer<ReturnType<typeof {schema_name}<{infer_args}>>>;"
-        )?;
+        if let Some(first_default) = first_default {
+            for argument_count in first_default..=ndt.generics.len() {
+                let generics = generic_params[..argument_count].join(", ");
+                let params = ndt.generics[..argument_count]
+                    .iter()
+                    .map(|generic| {
+                        let name = generic.name.as_ref();
+                        format!("{name}: {name}")
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let type_arguments = ndt.generics[..argument_count]
+                    .iter()
+                    .map(|generic| format!("z.output<{}>", generic.name))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let type_arguments = if type_arguments.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{type_arguments}>")
+                };
+                let generics = if generics.is_empty() {
+                    String::new()
+                } else {
+                    format!("<{generics}>")
+                };
+                writeln!(
+                    s,
+                    "{indent}export function {schema_name}{generics}({params}): z.ZodType<{base_name}{type_arguments}>;"
+                )?;
+            }
+            writeln!(
+                s,
+                "{indent}export function {schema_name}({}): z.ZodType<any> {{\n{indent}\treturn {schema_expr};\n{indent}}}",
+                fn_params.join(", ")
+            )?;
+        } else {
+            let generic_params = generic_params.join(", ");
+            let fn_params = ndt
+                .generics
+                .iter()
+                .map(|generic| {
+                    let name = generic.name.as_ref();
+                    format!("{name}: {name}")
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            writeln!(
+                s,
+                "{indent}export const {schema_name} = <{generic_params}>({fn_params}) => {schema_expr};"
+            )?;
+        }
 
         Ok(())
     })();
 
     type_render_stack.pop();
     result
+}
+
+fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
+    if indent.is_empty() || !value.contains('\n') {
+        Cow::Borrowed(value)
+    } else {
+        Cow::Owned(value.replace('\n', &format!("\n{indent}")))
+    }
+}
+
+fn replace_typescript_code(input: &str, from: &str, to: &str) -> String {
+    #[derive(Clone, Copy)]
+    enum State {
+        Code,
+        SingleQuote,
+        DoubleQuote,
+        Template,
+        LineComment,
+        BlockComment,
+    }
+
+    let bytes = input.as_bytes();
+    let mut state = State::Code;
+    let mut index = 0;
+    let mut copied_to = 0;
+    let mut output = String::with_capacity(input.len());
+
+    while index < bytes.len() {
+        if matches!(state, State::Code)
+            && input.is_char_boundary(index)
+            && input[index..].starts_with(from)
+            && input[..index]
+                .chars()
+                .next_back()
+                .is_none_or(|ch| !(ch.is_alphanumeric() || matches!(ch, '_' | '$')))
+        {
+            output.push_str(&input[copied_to..index]);
+            output.push_str(to);
+            index += from.len();
+            copied_to = index;
+            continue;
+        }
+
+        let byte = bytes[index];
+        match state {
+            State::Code => match (byte, bytes.get(index + 1).copied()) {
+                (b'/', Some(b'/')) => {
+                    state = State::LineComment;
+                    index += 1;
+                }
+                (b'/', Some(b'*')) => {
+                    state = State::BlockComment;
+                    index += 1;
+                }
+                (b'\'', _) => state = State::SingleQuote,
+                (b'"', _) => state = State::DoubleQuote,
+                (b'`', _) => state = State::Template,
+                _ => {}
+            },
+            State::SingleQuote | State::DoubleQuote | State::Template => {
+                if byte == b'\\' {
+                    index += 1;
+                } else if matches!(state, State::SingleQuote) && byte == b'\''
+                    || matches!(state, State::DoubleQuote) && byte == b'"'
+                    || matches!(state, State::Template) && byte == b'`'
+                {
+                    state = State::Code;
+                }
+            }
+            State::LineComment if byte == b'\n' => state = State::Code,
+            State::BlockComment if byte == b'*' && bytes.get(index + 1) == Some(&b'/') => {
+                state = State::Code;
+                index += 1;
+            }
+            State::LineComment | State::BlockComment => {}
+        }
+        index += 1;
+    }
+
+    output.push_str(&input[copied_to..]);
+    output
 }
 
 /// Generate an inline Zod expression for a [`DataType`].
@@ -314,6 +509,10 @@ fn datatype(
         }
         DataType::Generic(g) => generic_dt(s, g),
         DataType::Intersection(intersection) => {
+            if intersection.is_empty() {
+                s.push_str("z.unknown()");
+                return Ok(());
+            }
             let mut parts = Vec::with_capacity(intersection.len());
             for ty in intersection {
                 let mut part = String::new();
@@ -343,13 +542,20 @@ fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'sta
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 => "z.int()",
-        f16 | f32 | f64 | f128 => "z.number()",
-        usize | isize | i64 | u64 | i128 | u128 => {
+        i8 => "z.int().min(-128).max(127)",
+        i16 => "z.int().min(-32768).max(32767)",
+        i32 => "z.int().min(-2147483648).max(2147483647)",
+        u8 => "z.int().min(0).max(255)",
+        u16 => "z.int().min(0).max(65535)",
+        u32 => "z.int().min(0).max(4294967295)",
+        // JSON serializers encode non-finite floats as `null`.
+        f16 | f32 | f64 => "z.number().nullable()",
+        usize | isize | i64 | u64 | i128 | u128 | f128 => {
             return Err(Error::bigint_forbidden(location.join(".")));
         }
         Primitive::bool => "z.boolean()",
-        str | char => "z.string()",
+        str => "z.string()",
+        char => "z.string().refine((value) => [...value].length === 1)",
     })
 }
 
@@ -400,14 +606,13 @@ fn map_dt(
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let mut key = String::new();
-    datatype(
+    map_key_datatype(
         &mut key,
         exporter,
         types,
         m.key_ty(),
-        location.clone(),
+        child_location(&location, "<key>"),
         generics,
-        false,
         type_render_stack,
     )?;
     let mut value = String::new();
@@ -416,13 +621,238 @@ fn map_dt(
         exporter,
         types,
         m.value_ty(),
-        location,
+        child_location(&location, "<value>"),
         generics,
         false,
         type_render_stack,
     )?;
 
-    write!(s, "z.record({key}, {value})")?;
+    let constructor = if map_key_is_finite(m.key_ty(), types) {
+        "z.partialRecord"
+    } else {
+        "z.record"
+    };
+    write!(s, "{constructor}({key}, {value})")?;
+    Ok(())
+}
+
+fn map_key_is_finite(dt: &DataType, types: &Types) -> bool {
+    match dt {
+        DataType::Primitive(Primitive::bool) => true,
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .all(|(_, variant)| match &variant.fields {
+                Fields::Unit => true,
+                Fields::Unnamed(fields) => {
+                    let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                    fields.next().is_some_and(|dt| map_key_is_finite(dt, types))
+                        && fields.next().is_none()
+                }
+                Fields::Named(_) => false,
+            }),
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(fields) => {
+                let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                fields.next().is_some_and(|dt| map_key_is_finite(dt, types))
+                    && fields.next().is_none()
+            }
+            _ => false,
+        },
+        DataType::Reference(Reference::Named(reference)) => types
+            .get(reference)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .is_some_and(|dt| map_key_is_finite(dt, types)),
+        _ => false,
+    }
+}
+
+fn map_key_datatype(
+    s: &mut String,
+    exporter: &Zod,
+    types: &Types,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    generics: &[(GenericReference, DataType)],
+    type_render_stack: &mut TypeRenderStack,
+) -> Result<(), Error> {
+    match dt {
+        DataType::Primitive(Primitive::str) => s.push_str("z.string()"),
+        DataType::Primitive(Primitive::char) => {
+            s.push_str("z.string().refine((value) => [...value].length === 1)")
+        }
+        DataType::Primitive(Primitive::bool) => s.push_str(r#"z.enum(["true", "false"])"#),
+        DataType::Primitive(Primitive::i8) => s.push_str(
+            r"z.string().regex(/^-?\d+$/).refine((value) => Number(value) >= -128 && Number(value) <= 127)",
+        ),
+        DataType::Primitive(Primitive::i16) => s.push_str(
+            r"z.string().regex(/^-?\d+$/).refine((value) => Number(value) >= -32768 && Number(value) <= 32767)",
+        ),
+        DataType::Primitive(Primitive::i32) => s.push_str(
+            r"z.string().regex(/^-?\d+$/).refine((value) => Number(value) >= -2147483648 && Number(value) <= 2147483647)",
+        ),
+        DataType::Primitive(Primitive::isize | Primitive::usize) => {
+            return Err(Error::bigint_forbidden(location.join(".")));
+        }
+        DataType::Primitive(Primitive::u8) => s.push_str(
+            r"z.string().regex(/^\d+$/).refine((value) => Number(value) <= 255)",
+        ),
+        DataType::Primitive(Primitive::u16) => s.push_str(
+            r"z.string().regex(/^\d+$/).refine((value) => Number(value) <= 65535)",
+        ),
+        DataType::Primitive(Primitive::u32) => s.push_str(
+            r"z.string().regex(/^\d+$/).refine((value) => Number(value) <= 4294967295)",
+        ),
+        DataType::Primitive(Primitive::f16 | Primitive::f32 | Primitive::f64) => {
+            s.push_str(
+                r"z.string().regex(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/).refine((value) => Number.isFinite(Number(value)))",
+            )
+        }
+        DataType::Struct(strct) => {
+            let Fields::Unnamed(fields) = &strct.fields else {
+                return datatype(
+                    s,
+                    exporter,
+                    types,
+                    dt,
+                    location,
+                    generics,
+                    false,
+                    type_render_stack,
+                );
+            };
+            let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+            let Some(field) = fields.next() else {
+                return datatype(
+                    s,
+                    exporter,
+                    types,
+                    dt,
+                    location,
+                    generics,
+                    false,
+                    type_render_stack,
+                );
+            };
+            if fields.next().is_some() {
+                return datatype(
+                    s,
+                    exporter,
+                    types,
+                    dt,
+                    location,
+                    generics,
+                    false,
+                    type_render_stack,
+                );
+            }
+            map_key_datatype(
+                s,
+                exporter,
+                types,
+                field,
+                location,
+                generics,
+                type_render_stack,
+            )?;
+        }
+        DataType::Enum(enm) => {
+            let mut variants = Vec::new();
+            for (name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
+                let mut rendered = String::new();
+                match &variant.fields {
+                    Fields::Unit => write!(rendered, "z.literal(\"{}\")", escape_string(name))?,
+                    Fields::Unnamed(fields) => {
+                        let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                        let Some(field) = fields.next() else {
+                            continue;
+                        };
+                        if fields.next().is_some() {
+                            return datatype(
+                                s,
+                                exporter,
+                                types,
+                                dt,
+                                location,
+                                generics,
+                                false,
+                                type_render_stack,
+                            );
+                        }
+                        map_key_datatype(
+                            &mut rendered,
+                            exporter,
+                            types,
+                            field,
+                            child_location(&location, name.to_string()),
+                            generics,
+                            type_render_stack,
+                        )?;
+                    }
+                    Fields::Named(_) => {
+                        return datatype(
+                            s,
+                            exporter,
+                            types,
+                            dt,
+                            location,
+                            generics,
+                            false,
+                            type_render_stack,
+                        );
+                    }
+                }
+                variants.push(rendered);
+            }
+            match variants.as_slice() {
+                [] => s.push_str("z.never()"),
+                [variant] => s.push_str(variant),
+                variants => write!(s, "z.union([{}])", variants.join(", "))?,
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            crate::references::track_nr(reference);
+            let ty = named_reference_ty(types, reference)?;
+            let reference_generics = named_reference_generics(reference)?;
+            map_key_datatype(
+                s,
+                exporter,
+                types,
+                ty,
+                location,
+                reference_generics,
+                type_render_stack,
+            )?;
+        }
+        DataType::Generic(generic) => {
+            if let Some((_, dt)) = generics.iter().find(|(candidate, _)| candidate == generic)
+                && !matches!(dt, DataType::Generic(candidate) if candidate == generic)
+            {
+                map_key_datatype(
+                    s,
+                    exporter,
+                    types,
+                    dt,
+                    location,
+                    generics,
+                    type_render_stack,
+                )?;
+            } else {
+                generic_dt(s, generic);
+            }
+        }
+        _ => datatype(
+            s,
+            exporter,
+            types,
+            dt,
+            location,
+            generics,
+            false,
+            type_render_stack,
+        )?,
+    }
     Ok(())
 }
 
@@ -448,7 +878,7 @@ fn tuple_dt(
                     exporter,
                     types,
                     dt,
-                    location.clone(),
+                    child_location(&location, i.to_string()),
                     generics,
                     false,
                     type_render_stack,
@@ -514,7 +944,7 @@ fn struct_dt(
                             exporter,
                             types,
                             ty,
-                            location.clone(),
+                            child_location(&location, i.to_string()),
                             generics,
                             false,
                             type_render_stack,
@@ -535,7 +965,7 @@ fn struct_dt(
                 .collect::<Vec<_>>();
 
             if all_fields.is_empty() {
-                s.push_str("z.strictObject({})");
+                s.push_str("z.object({})");
                 return Ok(());
             }
 
@@ -551,7 +981,7 @@ fn struct_dt(
                     exporter,
                     types,
                     ty,
-                    location.clone(),
+                    child_location(&location, name.to_string()),
                     generics,
                     false,
                     type_render_stack,
@@ -588,12 +1018,17 @@ fn enum_dt(
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| {
+            let strict_object = matches!(&variant.fields, Fields::Named(named) if
+                named.fields.iter().filter(|(_, field)| field.ty.is_some()).count() == 1
+                    && named.fields.iter().any(|(field_name, field)|
+                        field.ty.is_some() && field_name.as_ref() == name.as_ref()));
             enum_variant_dt(
                 exporter,
                 types,
                 name.as_ref(),
                 variant,
-                location.clone(),
+                strict_object,
+                child_location(&location, name.to_string()),
                 generics,
                 type_render_stack,
             )
@@ -624,6 +1059,7 @@ fn enum_variant_dt(
     types: &Types,
     name: &str,
     variant: &specta::datatype::Variant,
+    strict_object: bool,
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
@@ -635,30 +1071,17 @@ fn enum_variant_dt(
                 return Ok(Some("z.strictObject({})".to_string()));
             }
 
-            let mut schema = String::from("z.object({");
+            let mut schema = if strict_object {
+                String::from("z.strictObject({")
+            } else {
+                String::from("z.object({")
+            };
             let mut has_field = false;
-            let mut flattened_sections = Vec::new();
 
             for (field_name, field) in &named.fields {
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
-
-                if false {
-                    let mut value = String::new();
-                    datatype_with_inline_attr(
-                        &mut value,
-                        exporter,
-                        types,
-                        ty,
-                        location.clone(),
-                        generics,
-                        false,
-                        type_render_stack,
-                    )?;
-                    flattened_sections.push(value);
-                    continue;
-                }
 
                 has_field = true;
                 let mut value = String::new();
@@ -667,7 +1090,7 @@ fn enum_variant_dt(
                     exporter,
                     types,
                     ty,
-                    location.clone(),
+                    child_location(&location, field_name.to_string()),
                     generics,
                     false,
                     type_render_stack,
@@ -686,18 +1109,7 @@ fn enum_variant_dt(
             }
             schema.push_str("})");
 
-            if flattened_sections.is_empty() {
-                return Ok(Some(schema));
-            }
-
-            let mut sections = vec![schema];
-            sections.extend(flattened_sections);
-            let mut out = String::new();
-            out.push_str(&sections.join(".and("));
-            for _ in 1..sections.len() {
-                out.push(')');
-            }
-            Ok(Some(out))
+            Ok(Some(schema))
         }
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
@@ -729,6 +1141,13 @@ fn enum_variant_dt(
                     Some(out)
                 }
                 fields => {
+                    let mut optional_from = 0;
+                    for (i, (field, _)) in fields.iter().enumerate() {
+                        if !field.optional {
+                            optional_from = i + 1;
+                        }
+                    }
+
                     let mut out = String::from("z.tuple([");
                     for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
@@ -740,12 +1159,15 @@ fn enum_variant_dt(
                             exporter,
                             types,
                             ty,
-                            location.clone(),
+                            child_location(&location, i.to_string()),
                             generics,
                             false,
                             type_render_stack,
                         )?;
                         out.push_str(&item);
+                        if i >= optional_from {
+                            out.push_str(".optional()");
+                        }
                     }
                     out.push_str("])");
                     Some(out)
@@ -828,6 +1250,20 @@ fn reference_named_dt(
     crate::references::track_nr(r);
 
     let schema_name = match exporter.layout {
+        Layout::Namespaces => {
+            let mut name = String::from("$s$");
+            for segment in crate::zod::namespace_module_path(&ndt.module_path)
+                .split('.')
+                .filter(|segment| !segment.is_empty())
+            {
+                name.push('.');
+                name.push_str(segment);
+            }
+            name.push('.');
+            name.push_str(&ndt.name);
+            name.push_str("Schema");
+            name
+        }
         Layout::FlatFile => format!("{}Schema", ndt.name),
         Layout::ModulePrefixedName => {
             let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
@@ -848,10 +1284,6 @@ fn reference_named_dt(
             }
         }
     };
-
-    let should_lazy = type_render_stack
-        .iter()
-        .any(|(module, name)| module == &ndt.module_path && name == &ndt.name);
 
     let mut reference_expr = schema_name;
     let reference_generics = match &r.inner {
@@ -890,18 +1322,16 @@ fn reference_named_dt(
         reference_expr.push(')');
     }
 
-    if should_lazy {
-        write!(s, "z.lazy(() => {reference_expr})")?;
-    } else {
-        s.push_str(&reference_expr);
-    }
+    // Declarations are sorted, so this reference may target a schema whose
+    // initializer has not run yet. Laziness also handles recursive references.
+    write!(s, "z.lazy(() => {reference_expr})")?;
 
     Ok(())
 }
 
 fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
-        Layout::FlatFile | Layout::Files => ndt.name.clone(),
+        Layout::Namespaces | Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             if !s.is_empty() {
@@ -923,10 +1353,10 @@ fn validate_type_name(name: &str, path: String) -> Result<(), Error> {
         return Err(Error::invalid_name(path, name.to_string()));
     };
 
-    if !(first.is_ascii_alphabetic() || first == '_' || first == '$') {
+    if !(first.is_alphabetic() || first == '_') {
         return Err(Error::invalid_name(path, name.to_string()));
     }
-    if chars.any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')) {
+    if chars.any(|ch| !(ch.is_alphanumeric() || ch == '_')) {
         return Err(Error::invalid_name(path, name.to_string()));
     }
 
@@ -941,6 +1371,15 @@ fn sanitise_key(field_name: &str) -> String {
     }
 }
 
+fn child_location(
+    location: &[Cow<'static, str>],
+    child: impl Into<Cow<'static, str>>,
+) -> Vec<Cow<'static, str>> {
+    let mut location = location.to_vec();
+    location.push(child.into());
+    location
+}
+
 fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
@@ -952,10 +1391,9 @@ fn is_identifier(name: &str) -> bool {
 }
 
 fn escape_string(value: &str) -> Cow<'_, str> {
-    if !value
-        .chars()
-        .any(|ch| ch == '"' || ch == '\\' || ch == '\n' || ch == '\r' || ch == '\t')
-    {
+    if !value.chars().any(|ch| {
+        ch == '"' || ch == '\\' || ch == '\u{2028}' || ch == '\u{2029}' || ch.is_control()
+    }) {
         return Cow::Borrowed(value);
     }
 
@@ -967,9 +1405,40 @@ fn escape_string(value: &str) -> Cow<'_, str> {
             '\n' => escaped.push_str(r#"\n"#),
             '\r' => escaped.push_str(r#"\r"#),
             '\t' => escaped.push_str(r#"\t"#),
+            '\u{2028}' => escaped.push_str(r#"\u2028"#),
+            '\u{2029}' => escaped.push_str(r#"\u2029"#),
+            ch if ch.is_control() => push_unicode_escape(&mut escaped, ch),
             _ => escaped.push(ch),
         }
     }
 
     Cow::Owned(escaped)
+}
+
+fn push_unicode_escape(s: &mut String, ch: char) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let value = ch as u32;
+
+    s.push_str(r#"\u"#);
+    s.push(HEX[((value >> 12) & 0xF) as usize] as char);
+    s.push(HEX[((value >> 8) & 0xF) as usize] as char);
+    s.push(HEX[((value >> 4) & 0xF) as usize] as char);
+    s.push(HEX[(value & 0xF) as usize] as char);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::replace_typescript_code;
+
+    #[test]
+    fn typescript_alias_replacement_respects_tokens_and_literals() {
+        assert_eq!(
+            replace_typescript_code(
+                r#"foo.Type | myfoo.Type | "foo.Type" /* foo.Type */"#,
+                "foo.",
+                "",
+            ),
+            r#"Type | myfoo.Type | "foo.Type" /* foo.Type */"#
+        );
+    }
 }

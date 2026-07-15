@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "paths": {
+      "zod": ["./node_modules/zod"]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "es2022",
+    "types": ["bun"]
+  },
+  "include": [
+    "verify.test.ts",
+    "generated/*.ts",
+    "generated/files/*.ts"
+  ]
+}

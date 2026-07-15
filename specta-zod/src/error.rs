@@ -30,6 +30,7 @@ enum ErrorKind {
         first: String,
         second: String,
     },
+    DuplicateExportName(String),
     Io(io::Error),
     ReadDir {
         path: PathBuf,
@@ -107,6 +108,12 @@ impl Error {
                 first: format_location(first),
                 second: format_location(second),
             },
+        }
+    }
+
+    pub(crate) fn duplicate_export_name(name: String) -> Self {
+        Self {
+            kind: ErrorKind::DuplicateExportName(name),
         }
     }
 
@@ -189,7 +196,7 @@ impl fmt::Display for Error {
         match &self.kind {
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
-                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128, f128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,
@@ -206,6 +213,10 @@ impl fmt::Display for Error {
             } => write!(
                 f,
                 "Detected multiple types with the same name: {name:?} at {first} and {second}"
+            ),
+            ErrorKind::DuplicateExportName(name) => write!(
+                f,
+                "Detected multiple namespace exports with the name {name:?}"
             ),
             ErrorKind::Io(err) => write!(f, "IO error: {err}"),
             ErrorKind::ReadDir { path, source } => {
