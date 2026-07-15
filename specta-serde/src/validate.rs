@@ -1869,13 +1869,6 @@ fn validate_other_variant(
         return Ok(());
     }
 
-    if mode == ApplyMode::Unified && declared_deserializes {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`#[serde(other)]` requires `PhasesFormat` because a shared tag type cannot exclude known variants soundly",
-        ));
-    }
-
     if !matches!(
         repr,
         EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }
@@ -1901,7 +1894,41 @@ fn validate_other_variant(
         ));
     }
 
+    if mode == ApplyMode::Unified
+        && declared_deserializes
+        && !externally_tagged_unit_enum(enm, repr)?
+    {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(other)]` requires `PhasesFormat` because a shared tag type cannot exclude known variants soundly",
+        ));
+    }
+
     Ok(())
+}
+
+fn externally_tagged_unit_enum(enm: &Enum, repr: &EnumRepr) -> Result<bool, Error> {
+    if !matches!(repr, EnumRepr::External) {
+        return Ok(false);
+    }
+
+    for (_, variant) in &enm.variants {
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if attrs
+            .as_ref()
+            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
+        {
+            continue;
+        }
+
+        if !matches!(variant.fields, Fields::Unit)
+            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+        {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
 
 fn validate_internally_tag_enum(
