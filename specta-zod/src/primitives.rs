@@ -185,6 +185,20 @@ fn export_single_internal(
                 }
             }
         }
+        if type_alias
+            .lines()
+            .any(|line| line.len() != line.trim_end().len())
+        {
+            let had_trailing_newline = type_alias.ends_with('\n');
+            type_alias = type_alias
+                .lines()
+                .map(str::trim_end)
+                .collect::<Vec<_>>()
+                .join("\n");
+            if had_trailing_newline {
+                type_alias.push('\n');
+            }
+        }
         s.push_str(&type_alias);
 
         if ndt.generics.is_empty() {

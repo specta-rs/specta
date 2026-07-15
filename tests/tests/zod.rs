@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
-    Type, Types,
+    Format, Type, Types,
     datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::Typescript;
@@ -976,6 +976,134 @@ fn zod_header_raw_runtime_and_manual_rendering() {
             < rendered.find("export const raw = true;").unwrap()
     );
     assert_eq!(rendered.matches("export const AnotherSchema").count(), 1);
+}
+
+#[test]
+fn zod_framework_export_formats_generic_named_datatypes() {
+    let types = Types::default().register::<ZodGenericDefaults>();
+    let rendered = Zod::default()
+        .framework_runtime(|exporter| {
+            let generic_defaults = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "ZodGenericDefaults");
+            Ok(Cow::Owned(exporter.export(generic_defaults, "")?))
+        })
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(rendered.contains("export type ZodGenericDefaults<T = string, U = T>"));
+    assert!(rendered.contains("first: T"));
+}
+
+#[test]
+fn zod_framework_inline_formats_inline_named_reference_children() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Child {
+        value: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Parent {
+        #[specta(inline)]
+        child: Child,
+    }
+
+    struct StringsAsBooleans;
+
+    impl Format for StringsAsBooleans {
+        fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+            Ok(Cow::Owned(types.clone()))
+        }
+
+        fn map_type(
+            &'_ self,
+            _: &Types,
+            dt: &DataType,
+        ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+            Ok(Cow::Owned(
+                if matches!(dt, DataType::Primitive(Primitive::str)) {
+                    DataType::Primitive(Primitive::bool)
+                } else {
+                    dt.clone()
+                },
+            ))
+        }
+    }
+
+    let mut types = Types::default();
+    let parent = Parent::definition(&mut types);
+    let DataType::Reference(Reference::Named(parent)) = parent else {
+        panic!("expected a named parent reference");
+    };
+    let parent = types.get(&parent).unwrap().ty.as_ref().unwrap();
+    let DataType::Struct(parent) = parent else {
+        panic!("expected a parent struct");
+    };
+    let specta::datatype::Fields::Named(fields) = &parent.fields else {
+        panic!("expected named parent fields");
+    };
+    let inline_child = fields.fields[0].1.ty.clone().unwrap();
+
+    let rendered = Zod::default()
+        .framework_runtime(move |exporter| {
+            Ok(Cow::Owned(format!(
+                "export const mapped = {};",
+                exporter.inline(&inline_child)?
+            )))
+        })
+        .export(&types, StringsAsBooleans)
+        .unwrap();
+
+    assert!(
+        rendered.contains("export const mapped = z.object({\n\tvalue: z.boolean(),\n});"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn zod_files_framework_runtime_deduplicates_body_imports() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct FrameworkRoot {
+        child: testing::Testing,
+    }
+
+    let mut types = Types::default().register::<FrameworkRoot>();
+    types.iter_mut(|ndt| {
+        if ndt.name == "FrameworkRoot" {
+            ndt.module_path = Cow::Borrowed("");
+        }
+    });
+    let DataType::Reference(reference) = testing::Testing::definition(&mut types) else {
+        panic!("expected a module reference");
+    };
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    Zod::default()
+        .layout(Layout::Files)
+        .framework_runtime(move |mut exporter| {
+            let reference = exporter.reference(&reference)?;
+            let types = exporter.render_types()?;
+            Ok(Cow::Owned(format!(
+                "{types}\nexport const runtime = {reference};"
+            )))
+        })
+        .export_to(temp.path(), &types, specta_serde::Format)
+        .unwrap();
+
+    let index = std::fs::read_to_string(temp.path().join("index.ts")).unwrap();
+    assert_eq!(
+        index
+            .matches("import * as test$zod$testing from \"./test/zod/testing\";")
+            .count(),
+        1,
+        "{index}"
+    );
 }
 
 #[test]

@@ -22,7 +22,8 @@ workspace = true
 [features]
 default = []
 
-# Implement `serde::Serialize` for Zod-specific wrapper types (Any, Unknown, Never)
+# Implement `serde::Serialize` and `serde::Deserialize` for Zod-specific wrapper types
+# (Any, Unknown, Never)
 serde = ["dep:serde"]
 
 [dependencies]

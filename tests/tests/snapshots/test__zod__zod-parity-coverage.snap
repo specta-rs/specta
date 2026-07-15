@@ -47,7 +47,7 @@ export function ZodCoverageSchema(T: z.ZodType = z.string()): z.ZodType<any> {
 });
 }
 
-export type ZodEnumCoverage = 
+export type ZodEnumCoverage =
 /**  Unit documentation. */
 "Unit" | ({ Newtype: string }) & { Named?: never; Tuple?: never } | ({ Tuple: [number, boolean] }) & { Named?: never; Newtype?: never } | ({ Named: {
 	/**  Nested field documentation. */

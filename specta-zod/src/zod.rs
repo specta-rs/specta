@@ -335,6 +335,13 @@ impl Zod {
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
 
+                    let import_paths = import_paths
+                        .into_iter()
+                        .filter(|module_path| {
+                            !body.contains(&module_import_statement("", module_path))
+                        })
+                        .collect::<BTreeSet<_>>();
+
                     if !import_paths.is_empty() {
                         out.push('\n');
                         out.push_str(&module_import_block("", &import_paths));
@@ -396,6 +403,69 @@ fn map_datatype_format(
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
+    if matches!(dt, DataType::Generic(_)) {
+        return Ok(dt.clone());
+    }
+
+    fn contains_generic_reference(dt: &DataType) -> bool {
+        match dt {
+            DataType::Primitive(_) => false,
+            DataType::List(list) => contains_generic_reference(&list.ty),
+            DataType::Map(map) => {
+                contains_generic_reference(map.key_ty())
+                    || contains_generic_reference(map.value_ty())
+            }
+            DataType::Nullable(inner) => contains_generic_reference(inner),
+            DataType::Struct(strct) => fields_contain_generic(&strct.fields),
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .any(|(_, variant)| fields_contain_generic(&variant.fields)),
+            DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
+            DataType::Intersection(types) => types.iter().any(contains_generic_reference),
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                specta::datatype::NamedReferenceType::Reference { generics, .. } => generics
+                    .iter()
+                    .any(|(_, generic)| contains_generic_reference(generic)),
+                specta::datatype::NamedReferenceType::Inline { .. }
+                | specta::datatype::NamedReferenceType::Recursive(_) => false,
+            },
+            DataType::Generic(_) => true,
+            DataType::Reference(Reference::Opaque(_)) => false,
+        }
+    }
+
+    fn fields_contain_generic(fields: &Fields) -> bool {
+        match fields {
+            Fields::Unit => false,
+            Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .any(contains_generic_reference),
+            Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .any(contains_generic_reference),
+        }
+    }
+
+    if contains_generic_reference(dt) {
+        let Some(format) = format else {
+            return map_datatype_format_children(None, types, dt.clone());
+        };
+
+        return match format.map_type(types, dt) {
+            Ok(Cow::Borrowed(dt)) => map_datatype_format_children(Some(format), types, dt.clone()),
+            Ok(Cow::Owned(dt)) => map_datatype_format_children(Some(format), types, dt),
+            Err(err) if is_unresolved_generic_format_error(err.as_ref()) => {
+                map_datatype_format_children(Some(format), types, dt.clone())
+            }
+            Err(err) => Err(Error::format("datatype formatter failed", err)),
+        };
+    }
+
     let Some(format) = format else {
         return Ok(dt.clone());
     };
@@ -408,6 +478,12 @@ fn map_datatype_format(
         Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone()),
         Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt),
     }
+}
+
+fn is_unresolved_generic_format_error(err: &(dyn std::error::Error + 'static)) -> bool {
+    // `Format` erases its concrete error type, so matching the formatter's stable
+    // message is the narrowest fallback available before child substitution.
+    err.to_string().contains("Unresolved generic reference")
 }
 
 fn map_datatype_format_children(
@@ -446,6 +522,10 @@ fn map_datatype_format_children(
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
+            if let specta::datatype::NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                **dt = map_datatype_format(format, types, dt)?;
+            }
+
             if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
                 &mut reference.inner
             {
@@ -494,8 +574,8 @@ fn map_named_datatype_format(
     let mut mapped = ndt.clone();
     mapped.ty = ndt
         .ty
-        .as_ref()
-        .map(|ty| map_datatype_format(format, types, ty))
+        .clone()
+        .map(|ty| map_datatype_format_children(format, types, ty))
         .transpose()?;
     Ok(mapped)
 }
