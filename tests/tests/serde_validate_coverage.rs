@@ -588,6 +588,104 @@ fn flatten_of_into_only_conversion_with_skipped_deserialize_is_accepted() {
         );
 }
 
+// Each side of a `Phased<S, D>` override is only ever exported/rewritten for
+// its own phase, so S must only satisfy the *serialize* direction and D the
+// *deserialize* direction. `IntoOnlyId`'s serialize wire is a struct (its raw
+// u32 shape only matters when it deserializes - which S never does), and
+// `FromOnlyVecWire`'s Vec wire is deserialize-only (its raw shape is a named
+// struct, which is what the serialize phase flattens).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedIntoOnlySerializeSideValid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<IntoOnlyId, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedFromOnlySerializeSideValid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<FromOnlyVecWire, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedVecSerializeWireInvalid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<VecWire, Inner>)]
+    v: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenPhasedFromOnlyDeserializeSideInvalid {
+    a: i32,
+    #[serde(flatten)]
+    #[specta(type = specta_serde::Phased<Inner, FromOnlyVecWire>)]
+    v: HashMap<String, String>,
+}
+
+#[test]
+fn flatten_of_phased_with_into_only_serialize_shape_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedIntoOnlySerializeSideValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the serialize phase flattens IntoOnlyId's struct wire; its raw u32 deserialize \
+             shape is unreachable because the deserialize phase uses Inner",
+        );
+}
+
+#[test]
+fn flatten_of_phased_with_from_only_serialize_shape_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedFromOnlySerializeSideValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the serialize phase flattens FromOnlyVecWire's raw named-field struct; its Vec \
+             from-wire only exists on the deserialize side, which uses Inner",
+        );
+}
+
+#[test]
+fn flatten_of_phased_with_vec_serialize_wire_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedVecSerializeWireInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("VecWire's serialize wire is a Vec, and the serialize phase is live");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_phased_with_from_only_vec_deserialize_shape_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenPhasedFromOnlyDeserializeSideInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the deserialize phase flattens FromOnlyVecWire's Vec from-wire");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 // Variant-level skips gate flattened fields the same way field-level skips
 // do: `PhasesFormat` drops a one-side-skipped variant from that phase
 // (`filter_enum_variants_for_phase`), so a phase in which the variant doesn't

@@ -876,7 +876,11 @@ fn validate_flatten_target(
             // shapes; each *live* phase must be a valid flatten target. A
             // phase killed by a one-sided skip never flattens (`PhasesFormat`
             // drops the field from that phase before flatten lowering), so
-            // its shape is unreachable and must not be validated.
+            // its shape is unreachable and must not be validated. Each side
+            // is also only ever exported/rewritten *for its own phase*, so it
+            // is validated in that direction alone: e.g. the serialize
+            // shape's deserialize-facing details (a raw shape behind an
+            // `into`-only conversion, a `from` wire) are unreachable.
             match reference.downcast_ref::<PhasedTy>() {
                 Some(phased) => {
                     if directions.serialize {
@@ -886,7 +890,10 @@ fn validate_flatten_target(
                             path,
                             seen,
                             env,
-                            directions,
+                            FlattenDirections {
+                                serialize: true,
+                                deserialize: false,
+                            },
                         )?;
                     }
                     if directions.deserialize {
@@ -896,7 +903,10 @@ fn validate_flatten_target(
                             path,
                             seen,
                             env,
-                            directions,
+                            FlattenDirections {
+                                serialize: false,
+                                deserialize: true,
+                            },
                         )?;
                     }
 
