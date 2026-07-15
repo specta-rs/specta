@@ -6149,13 +6149,13 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/EmptyStructWithTag"
         },
         "Enum": {
-          "$ref": "#/$defs/Enum"
+          "$ref": "#/$defs/EnumNew"
         },
         "Enum2": {
-          "$ref": "#/$defs/Enum2"
+          "$ref": "#/$defs/Enum2New"
         },
         "Enum3": {
-          "$ref": "#/$defs/Enum3"
+          "$ref": "#/$defs/Enum3New"
         },
         "EnumMacroAttributes": {
           "$ref": "#/$defs/EnumMacroAttributes"

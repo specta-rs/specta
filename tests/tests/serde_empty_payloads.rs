@@ -396,19 +396,14 @@ fn tuple_struct_skipped_field_swift() {
 
 // A container `#[serde(rename = "...")]` must survive the declared-arity
 // rewrite. The rewrite replaces the `DataType::Struct` (which carries the
-// container attributes) with a bare `DataType::Tuple` before
-// `rewrite_named_type_for_phase` reads the rename, so on this branch the
-// rename is lost. PR #525 (fix/serde-enum-container-rename) reorders both
-// `map_types` drivers to compute the container rename BEFORE
-// `rewrite_datatype_for_phase` runs, which fixes this for every
-// shape-changing rewrite (verified against a scratch merge of that branch).
+// container attributes) with a bare `DataType::Tuple`, so the rename must be
+// computed before the shape-changing rewrite runs (#525).
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "Wire")]
 struct RenamedTupleSkip(String, #[serde(skip)] String);
 
 #[test]
-#[ignore = "container rename for shape-rewritten types requires #525 (fix/serde-enum-container-rename)"]
 fn tuple_struct_skipped_field_container_rename() {
     let ts = Typescript::default()
         .export(
