@@ -368,6 +368,38 @@ fn python_flatten_uses_omitted_generic_defaults() {
 }
 
 #[test]
+fn python_flatten_substitutes_generics_inside_inline_references() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Inner<T> {
+        value: T,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Flattened<T> {
+        #[specta(inline)]
+        inner: Inner<T>,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Outer {
+        outer: bool,
+        #[serde(flatten)]
+        flattened: Flattened<String>,
+    }
+
+    let output = Python::default()
+        .export(&Types::default().register::<Outer>(), specta_serde::Format)
+        .unwrap();
+    assert!(
+        output.contains("\"value\": _specta_builtins.str"),
+        "{output}"
+    );
+}
+
+#[test]
 fn python_rejects_debug_constant_name() {
     #[allow(non_camel_case_types)]
     #[derive(Type)]

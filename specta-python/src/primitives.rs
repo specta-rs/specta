@@ -822,17 +822,18 @@ fn substitute_generics(datatype: &mut DataType, generics: &[(Generic, DataType)]
                 substitute_generics(part, generics);
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            if let NamedReferenceType::Reference {
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Reference {
                 generics: reference_generics,
                 ..
-            } = &mut reference.inner
-            {
+            } => {
                 for (_, ty) in reference_generics {
                     substitute_generics(ty, generics);
                 }
             }
-        }
+            NamedReferenceType::Inline { dt, .. } => substitute_generics(dt, generics),
+            NamedReferenceType::Recursive(_) => {}
+        },
         DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
     }
 }
