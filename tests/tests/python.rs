@@ -664,6 +664,50 @@ fn python_rejects_normalized_generic_parameter_collisions() {
 }
 
 #[test]
+fn python_rejects_identifiers_with_invalid_original_characters() {
+    let mut types = Types::default().register::<namespace_dunder::Secret>();
+    types.iter_mut(|datatype| datatype.name = "℡".into());
+
+    let error = Python::default()
+        .export(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("not a valid Python identifier"));
+}
+
+#[test]
+#[allow(deprecated)]
+fn python_comments_every_deprecation_note_line() {
+    #[deprecated(note = "use Replacement\nremove soon")]
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Old {
+        #[deprecated(note = "use new_field\nremove old_field")]
+        old_field: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum OldEnum {
+        #[deprecated(note = "use New\nremove Old")]
+        Old,
+    }
+
+    let output = Python::default()
+        .export(
+            &Types::default().register::<Old>().register::<OldEnum>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    assert!(output.contains("# Deprecated: use Replacement\n# Deprecated: remove soon\n"));
+    assert!(output.contains("# Deprecated: use new_field\n"));
+    assert!(output.contains("# Deprecated: remove old_field\n"));
+    assert!(output.contains("# Variant Old is deprecated: use New\n"));
+    assert!(output.contains("# Variant Old is deprecated: remove Old\n"));
+    assert!(!output.contains("\nremove soon\n"));
+    assert!(!output.contains("\nremove old_field\n"));
+}
+
+#[test]
 fn python_reports_unsupported_opaque_references() {
     #[derive(PartialEq, Eq, Hash)]
     struct Unsupported;

@@ -192,20 +192,7 @@ fn member_comments(out: &mut String, indent: &str, datatype: &DataType) {
             out.push('\n');
         }
         if let Some(deprecated) = &field.deprecated {
-            out.push_str(indent);
-            out.push_str("# ");
-            out.push_str(label);
-            out.push_str(" is deprecated");
-            if let Some(note) = deprecated
-                .note
-                .as_deref()
-                .map(str::trim)
-                .filter(|note| !note.is_empty())
-            {
-                out.push_str(": ");
-                out.push_str(note);
-            }
-            out.push('\n');
+            deprecated_comments(out, indent, &format!("{label} is deprecated"), deprecated);
         }
     }
 
@@ -238,20 +225,12 @@ fn member_comments(out: &mut String, indent: &str, datatype: &DataType) {
                     out.push('\n');
                 }
                 if let Some(deprecated) = &variant.deprecated {
-                    out.push_str(indent);
-                    out.push_str("# Variant ");
-                    out.push_str(name);
-                    out.push_str(" is deprecated");
-                    if let Some(note) = deprecated
-                        .note
-                        .as_deref()
-                        .map(str::trim)
-                        .filter(|note| !note.is_empty())
-                    {
-                        out.push_str(": ");
-                        out.push_str(note);
-                    }
-                    out.push('\n');
+                    deprecated_comments(
+                        out,
+                        indent,
+                        &format!("Variant {name} is deprecated"),
+                        deprecated,
+                    );
                 }
                 fields(out, indent, &variant.fields);
             }
@@ -983,24 +962,35 @@ fn comments(out: &mut String, indent: &str, docs: &str, deprecated: Option<&Depr
         out.push('\n');
     }
     if let Some(deprecated) = deprecated {
-        out.push_str(indent);
-        out.push_str("# Deprecated");
-        if let Some(note) = deprecated
-            .note
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
+        deprecated_comments(out, indent, "Deprecated", deprecated);
+    }
+}
+
+fn deprecated_comments(out: &mut String, indent: &str, label: &str, deprecated: &Deprecated) {
+    let note = deprecated
+        .note
+        .as_deref()
+        .map(str::trim)
+        .filter(|note| !note.is_empty());
+    if let Some(note) = note {
+        for line in note.lines() {
+            out.push_str(indent);
+            out.push_str("# ");
+            out.push_str(label);
             out.push_str(": ");
-            out.push_str(note);
+            out.push_str(line);
+            out.push('\n');
         }
+    } else {
+        out.push_str(indent);
+        out.push_str("# ");
+        out.push_str(label);
         out.push('\n');
     }
 }
 
 pub(crate) fn is_identifier(name: &str) -> bool {
-    let normalized = normalized_identifier(name);
-    let mut chars = normalized.chars();
+    let mut chars = name.chars();
     let Some(first) = chars.next() else {
         return false;
     };
