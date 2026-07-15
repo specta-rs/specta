@@ -1002,6 +1002,74 @@ fn zod_recursive_named_references_in_intersections_remain_lazy() {
 }
 
 #[test]
+fn zod_inline_recursive_generics_keep_schema_arguments() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct GenericNode<T> {
+        value: T,
+        #[specta(inline)]
+        children: Vec<GenericNode<T>>,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct ConcreteHolder {
+        #[specta(inline)]
+        node: GenericNode<i32>,
+    }
+
+    let mut types = Types::default();
+    let holder = ConcreteHolder::definition(&mut types);
+    let ty = types
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "GenericNode")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("generic node definition should be registered");
+    let rendered = primitives::inline(&Zod::default(), &types, ty).unwrap();
+    assert!(
+        rendered.contains("z.lazy(() => GenericNodeSchema(T))"),
+        "{rendered}"
+    );
+
+    let DataType::Reference(Reference::Named(holder)) = holder else {
+        panic!("holder definition should be a named reference");
+    };
+    let ty = types
+        .get(&holder)
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("holder definition should be registered");
+    let rendered = primitives::inline(&Zod::default(), &types, ty).unwrap();
+    assert!(
+        rendered
+            .contains("z.lazy(() => GenericNodeSchema(z.int().min(-2147483648).max(2147483647)))"),
+        "{rendered}"
+    );
+    assert!(!rendered.contains("GenericNodeSchema(T)"), "{rendered}");
+}
+
+#[test]
+fn zod_map_key_validation_ignores_skipped_variants() {
+    #[derive(Type, Serialize, Deserialize, Eq, Hash, PartialEq)]
+    #[specta(collect = false)]
+    enum SkippedKey {
+        Visible,
+        #[specta(skip)]
+        #[serde(skip)]
+        Hidden(String),
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct SkippedKeyMap {
+        values: HashMap<SkippedKey, String>,
+    }
+
+    let rendered = export_for::<SkippedKeyMap>().unwrap();
+    assert!(rendered.contains("z.literal(\"Visible\")"), "{rendered}");
+    assert!(!rendered.contains("Hidden"), "{rendered}");
+}
+
+#[test]
 fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", &mut types, |_, ndt| {

@@ -34,7 +34,8 @@ fn validate_map_key_inner(
         DataType::Enum(enm) => {
             let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
             let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
-            for (variant_name, variant) in &enm.variants {
+            for (variant_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip)
+            {
                 match &variant.fields {
                     Fields::Unit
                         if !untagged

@@ -60,7 +60,13 @@ pub enum NamedReferenceType {
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct RecursiveInlineType {
+    inner: Arc<RecursiveInlineTypeInner>,
+}
+
+#[derive(PartialEq, Eq, Hash)]
+struct RecursiveInlineTypeInner {
     cycle: Vec<RecursiveInlineFrame>,
+    generics: Vec<(Generic, DataType)>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -70,18 +76,28 @@ pub(crate) struct RecursiveInlineFrame {
 }
 
 impl RecursiveInlineType {
-    pub(crate) fn from_cycle(cycle: Vec<RecursiveInlineFrame>) -> Self {
-        Self { cycle }
+    pub(crate) fn from_cycle(
+        cycle: Vec<RecursiveInlineFrame>,
+        generics: Vec<(Generic, DataType)>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(RecursiveInlineTypeInner { cycle, generics }),
+        }
+    }
+
+    /// Concrete generic arguments for the recursive named reference use site.
+    pub fn generics(&self) -> &[(Generic, DataType)] {
+        &self.inner.generics
     }
 
     fn last_frame(&self) -> Option<&RecursiveInlineFrame> {
-        self.cycle.last()
+        self.inner.cycle.last()
     }
 }
 
 impl fmt::Debug for RecursiveInlineType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (idx, ty) in self.cycle.iter().enumerate() {
+        for (idx, ty) in self.inner.cycle.iter().enumerate() {
             if idx != 0 {
                 f.write_str(" -> ")?;
             }

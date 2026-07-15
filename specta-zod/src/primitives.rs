@@ -2056,7 +2056,7 @@ fn reference_named_dt(
 
     let mut reference_expr = schema_name;
     let reference_generics = match &r.inner {
-        NamedReferenceType::Recursive(_) => &[],
+        NamedReferenceType::Recursive(recursive) => recursive.generics(),
         _ => named_reference_generics(r)?,
     };
     if !reference_generics.is_empty() {
