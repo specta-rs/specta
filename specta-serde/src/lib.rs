@@ -149,9 +149,9 @@ pub enum Phase {
 ///
 /// When a single safe type can contain both directions, this formatter widens
 /// the shared shape. For example, conditional serialization makes a field
-/// optional, aliases add accepted names, and `#[serde(other)]` widens its tag.
-/// Use [`PhasesFormat`] when consumers need exact directional shapes or when
-/// the two directions cannot be safely unified.
+/// optional and aliases add accepted names. Use [`PhasesFormat`] when consumers
+/// need exact directional shapes or when the two directions cannot be safely
+/// unified.
 pub struct Format;
 
 impl specta::Format for Format {
@@ -960,8 +960,20 @@ fn rewrite_datatype_for_phase(
                     true,
                 )?;
 
-                if let Some(aliases) = lower_field_aliases_for_phase(&mut variant.fields, mode)? {
-                    variant.fields = Variant::unnamed().field(Field::new(aliases)).build().fields;
+                let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
+                    if named.fields.iter().any(|(_, field)| field_is_flattened(field))
+                        && named.fields.iter().any(|(_, field)| field_has_aliases(field)));
+
+                let lowered = if has_flattened_aliases {
+                    let mut strct = Struct::unit();
+                    std::mem::swap(&mut strct.fields, &mut variant.fields);
+                    lower_flattened_struct(&mut strct, mode)?
+                } else {
+                    lower_field_aliases_for_phase(&mut variant.fields, mode)?
+                };
+
+                if let Some(lowered) = lowered {
+                    variant.fields = Variant::unnamed().field(Field::new(lowered)).build().fields;
                 }
             }
 

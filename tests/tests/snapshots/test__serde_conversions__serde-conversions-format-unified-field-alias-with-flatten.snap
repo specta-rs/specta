@@ -12,3 +12,11 @@ export type FieldAliasWithFlatten = ({
 export type FlattenedAliasInner = {
 	nested: boolean,
 };
+
+export type InternalFieldAliasWithFlatten = {
+	kind: "Value",
+} & ({
+	value: string,
+} | {
+	old_value: string,
+}) & FlattenedAliasInner;

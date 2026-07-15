@@ -99,6 +99,56 @@ enum TupleVariantSkipSerializingIfOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct NonTrailingTupleSkipSerializingIf(
+    #[serde(skip_serializing_if = "std::ops::Not::not")] bool,
+    u32,
+);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct IndependentlyOmittedTupleSuffix(
+    u32,
+    #[serde(skip_serializing_if = "std::ops::Not::not")] bool,
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ConditionalThenSerializeSkipped(
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+    #[serde(skip_serializing)] u32,
+);
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(from = "Wire", into = "Wire")]
+struct ConvertedConditionalTuple(
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+    u32,
+);
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(from = "Wire", into = "Wire")]
+enum ConvertedConditionalEnum {
+    Value(
+        #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+        u32,
+    ),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SerializeSkippedConditionalVariant {
+    #[serde(skip_serializing)]
+    Value(
+        #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+        u32,
+    ),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FieldAlias {
     #[serde(alias = "old_value")]
     value: String,
@@ -124,6 +174,18 @@ struct FieldAliasWithFlatten {
     value: String,
     #[serde(flatten)]
     inner: FlattenedAliasInner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InternalFieldAliasWithFlatten {
+    Value {
+        #[serde(alias = "old_value")]
+        value: String,
+        #[serde(flatten)]
+        inner: FlattenedAliasInner,
+    },
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -252,6 +314,30 @@ impl From<Symmetric> for Wire {
 impl From<Wire> for Symmetric {
     fn from(value: Wire) -> Self {
         Self { value: value.value }
+    }
+}
+
+impl From<ConvertedConditionalTuple> for Wire {
+    fn from(_: ConvertedConditionalTuple) -> Self {
+        Self { value: 0 }
+    }
+}
+
+impl From<Wire> for ConvertedConditionalTuple {
+    fn from(_: Wire) -> Self {
+        Self(None, 0)
+    }
+}
+
+impl From<ConvertedConditionalEnum> for Wire {
+    fn from(_: ConvertedConditionalEnum) -> Self {
+        Self { value: 0 }
+    }
+}
+
+impl From<Wire> for ConvertedConditionalEnum {
+    fn from(_: Wire) -> Self {
+        Self::Value(None, 0)
     }
 }
 
@@ -473,6 +559,59 @@ fn tuple_variant_skip_serializing_if_unifies_and_splits_owner() {
 }
 
 #[test]
+fn format_rejects_non_trailing_tuple_skip_serializing_if() {
+    for format in [
+        &specta_serde::Format as &dyn specta::Format,
+        &specta_serde::PhasesFormat,
+    ] {
+        for types in [
+            Types::default().register::<NonTrailingTupleSkipSerializingIf>(),
+            Types::default().register::<IndependentlyOmittedTupleSuffix>(),
+        ] {
+            let err = Typescript::default()
+                .export(&types, format)
+                .expect_err("tuple omission before the final live field is not representable");
+
+            assert!(err.to_string().contains("final live field"));
+        }
+    }
+}
+
+#[test]
+fn phases_accepts_conditional_omission_before_serialize_skipped_items() {
+    Typescript::default()
+        .export(
+            &Types::default()
+                .register::<ConditionalThenSerializeSkipped>()
+                .register::<SerializeSkippedConditionalVariant>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("serialize-skipped items do not occupy tuple positions");
+}
+
+#[test]
+fn conversions_hide_declared_tuple_conditional_omission() {
+    for format in [
+        &specta_serde::Format as &dyn specta::Format,
+        &specta_serde::PhasesFormat,
+    ] {
+        Typescript::default()
+            .export(
+                &Types::default().register::<ConvertedConditionalTuple>(),
+                format,
+            )
+            .expect("container conversions replace the declared tuple wire shape");
+
+        Typescript::default()
+            .export(
+                &Types::default().register::<ConvertedConditionalEnum>(),
+                format,
+            )
+            .expect("container conversions replace the declared enum wire shape");
+    }
+}
+
+#[test]
 fn format_unifies_aliases() {
     let field = Typescript::default()
         .export(
@@ -496,7 +635,9 @@ fn format_unifies_aliases() {
 fn format_unifies_aliases_with_flattened_fields() {
     let rendered = Typescript::default()
         .export(
-            &Types::default().register::<FieldAliasWithFlatten>(),
+            &Types::default()
+                .register::<FieldAliasWithFlatten>()
+                .register::<InternalFieldAliasWithFlatten>(),
             specta_serde::Format,
         )
         .expect("Format should preserve flattened fields while widening aliases");

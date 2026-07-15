@@ -1,6 +1,6 @@
 // Regression test for https://github.com/specta-rs/specta/issues/131
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_typescript::Typescript;
 
@@ -33,19 +33,65 @@ enum ExternalOther {
     Other,
 }
 
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+enum SkippedOther {
+    Known,
+    #[serde(other, skip)]
+    Other,
+}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(from = "String", into = "String")]
+enum ConvertedOther {
+    Known,
+    #[serde(other)]
+    Other,
+}
+
+impl From<ConvertedOther> for String {
+    fn from(_: ConvertedOther) -> Self {
+        "known".to_string()
+    }
+}
+
+impl From<String> for ConvertedOther {
+    fn from(_: String) -> Self {
+        Self::Known
+    }
+}
+
 #[test]
-fn serde_other_unified_format_widens_deserialize_tag() {
-    let ts = Typescript::default()
+fn serde_other_requires_phases_format() {
+    let err = Typescript::default()
         .export(
-            &Types::default()
-                .register::<InternalOther>()
-                .register::<AdjacentOther>()
-                .register::<ExternalOther>(),
+            &Types::default().register::<InternalOther>(),
             specta_serde::Format,
         )
-        .expect("unified typescript export should succeed");
+        .expect_err("unified export cannot soundly exclude known tags");
 
-    insta::assert_snapshot!("serde-other-unified-internal-tag-typescript", ts);
+    assert!(err.to_string().contains("requires `PhasesFormat`"));
+}
+
+#[test]
+fn skipped_serde_other_does_not_require_phases() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<SkippedOther>(),
+            specta_serde::Format,
+        )
+        .expect("a skipped fallback variant does not widen the wire shape");
+}
+
+#[test]
+fn conversions_hide_serde_other() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<ConvertedOther>(),
+            specta_serde::Format,
+        )
+        .expect("container conversions replace the declared enum tags");
 }
 
 #[test]
