@@ -1,6 +1,6 @@
 use super::DataType;
 
-/// Rust built-in primitive type.
+/// A primitive scalar datatype.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Primitive {
@@ -36,6 +36,8 @@ pub enum Primitive {
     f64,
     /// [`f128`] primitive (nightly-only).
     f128,
+    /// A finite number whose range and precision are not statically known.
+    number,
     /// [`bool`] primitive.
     bool,
     /// [`char`] primitive.

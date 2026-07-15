@@ -1503,6 +1503,7 @@ fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'sta
     use Primitive::*;
 
     Ok(match p {
+        number => return Err(Error::unsafe_number_forbidden(location.join("."))),
         i8 | i16 | i32 | u8 | u16 | u32 => "number",
         // `null` comes from `NaN`, `Infinity` and `-Infinity`. Is done by JS APIs and Serde JSON.
         f16 | f32 | f64 /* this looks wrong but `f64` is the direct equivalent of `number` */ => "number | null",

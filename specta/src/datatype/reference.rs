@@ -220,6 +220,7 @@ fn render_recursive_inline_map(types: &Types, map: &Map) -> Cow<'static, str> {
 
 fn primitive_type_name(primitive: &Primitive) -> &'static str {
     match primitive {
+        Primitive::number => "number",
         Primitive::i8 => "i8",
         Primitive::i16 => "i16",
         Primitive::i32 => "i32",

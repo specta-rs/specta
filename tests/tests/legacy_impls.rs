@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{Type, Types, datatype::Primitive};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 use specta_util::Remapper;
 
@@ -134,8 +134,7 @@ fn serde_json_value_does_not_recurse_when_exported() {
     }
 
     let types = Remapper::new()
-        .rule(Primitive::i64.into(), Primitive::f64.into())
-        .rule(Primitive::u64.into(), Primitive::f64.into())
+        .dangerous_bigints_as_number()
         .remap_types(Types::default().register::<CoapBody>());
 
     insta::assert_snapshot!(
@@ -143,6 +142,35 @@ fn serde_json_value_does_not_recurse_when_exported() {
         Typescript::default()
             .export(&types, specta_serde::Format)
             .expect("serde_json::Value should export without inline recursion")
+    );
+}
+
+// https://github.com/specta-rs/specta/issues/500
+#[test]
+fn serde_json_number_exports_as_number_when_precision_loss_is_explicit() {
+    #[derive(Type)]
+    struct HasJsonNumber {
+        value: serde_json::Number,
+    }
+
+    let types = Types::default().register::<HasJsonNumber>();
+    let err = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect_err("unknown JSON number precision must require an explicit remap");
+    assert!(
+        err.to_string()
+            .contains("range and precision are not known"),
+        "unexpected error: {err}"
+    );
+
+    let types = Remapper::new()
+        .dangerous_bigints_as_number()
+        .remap_types(types);
+
+    insta::assert_snapshot!(
+        Typescript::default()
+            .export(&types, specta_serde::Format)
+            .unwrap()
     );
 }
 
@@ -158,6 +186,9 @@ fn legacy_impl_bigint_errors() {
     assert!(
         err.to_string()
             .contains("forbids exporting BigInt-style types")
+            || err
+                .to_string()
+                .contains("range and precision are not known")
             || err
                 .to_string()
                 .contains("Detected multiple types with the same name"),
@@ -177,6 +208,10 @@ fn legacy_impl_individual_bigint_errors() {
                 if err
                     .to_string()
                     .contains("forbids exporting BigInt-style types") => {}
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("range and precision are not known") => {}
             Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
         }
     }

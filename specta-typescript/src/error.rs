@@ -39,6 +39,13 @@ use crate::Layout;
 ///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
 ///     - Refer to discussion around this on [#481](https://github.com/specta-rs/specta/issues/481).
 ///
+/// ## Unknown-precision numbers
+///
+/// Some types, including `serde_json::Number`, are finite but can exceed both
+/// JavaScript's safe integer range and Rust's built-in integer ranges. Specta rejects
+/// these by default for the same precision-safety reason. Use
+/// `Remapper::dangerous_bigints_as_number` only when accepting that loss explicitly.
+///
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,
@@ -75,6 +82,10 @@ enum ErrorKind {
     },
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
+        path: String,
+    },
+    /// Attempted to export a number whose precision cannot be guaranteed.
+    UnsafeNumberForbidden {
         path: String,
     },
     /// A type's name conflicts with a reserved keyword in Typescript.
@@ -270,6 +281,10 @@ impl Error {
         Self::new(ErrorKind::BigIntForbidden { path })
     }
 
+    pub(crate) fn unsafe_number_forbidden(path: String) -> Self {
+        Self::new(ErrorKind::UnsafeNumberForbidden { path })
+    }
+
     pub(crate) fn invalid_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
         Self::new(ErrorKind::InvalidName {
             path,
@@ -380,6 +395,10 @@ impl fmt::Display for Error {
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
                 "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
+            ),
+            ErrorKind::UnsafeNumberForbidden { path } => write!(
+                f,
+                "Attempted to export {path:?} but its range and precision are not known to fit in a JavaScript number. Apply an explicit remap if precision loss is acceptable. See {BIGINT_DOCS_URL} for a full explanation."
             ),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,

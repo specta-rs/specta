@@ -641,6 +641,11 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 /// Convert primitive types to Swift.
 fn primitive_to_swift(primitive: &Primitive) -> Result<String, Error> {
     Ok(match primitive {
+        Primitive::number => {
+            return Err(Error::UnsupportedType(
+                "Swift cannot represent a number with unknown range and precision".to_string(),
+            ));
+        }
         Primitive::i8 => "Int8".to_string(),
         Primitive::i16 => "Int16".to_string(),
         Primitive::i32 => "Int32".to_string(),

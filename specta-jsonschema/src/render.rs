@@ -748,7 +748,9 @@ fn primitive_schema(primitive: &Primitive) -> Value {
         Primitive::u32 => integer(Some(0), None, None),
         Primitive::u64 => integer(Some(0), None, None),
         Primitive::u128 | Primitive::usize => integer(Some(0), None, None),
-        Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => number_schema(None),
+        Primitive::number | Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => {
+            number_schema(None)
+        }
     }
 }
 

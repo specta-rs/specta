@@ -270,7 +270,8 @@ fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType
 fn primitive_is_valid_key(primitive: Primitive) -> bool {
     matches!(
         primitive,
-        Primitive::bool
+        Primitive::number
+            | Primitive::bool
             | Primitive::i8
             | Primitive::i16
             | Primitive::i32

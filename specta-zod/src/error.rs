@@ -17,6 +17,9 @@ enum ErrorKind {
     BigIntForbidden {
         path: String,
     },
+    UnsafeNumberForbidden {
+        path: String,
+    },
     InvalidName {
         path: String,
         name: Cow<'static, str>,
@@ -75,6 +78,12 @@ impl Error {
     pub(crate) fn bigint_forbidden(path: String) -> Self {
         Self {
             kind: ErrorKind::BigIntForbidden { path },
+        }
+    }
+
+    pub(crate) fn unsafe_number_forbidden(path: String) -> Self {
+        Self {
+            kind: ErrorKind::UnsafeNumberForbidden { path },
         }
     }
 
@@ -190,6 +199,10 @@ impl fmt::Display for Error {
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
                 "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. Remap them to a Zod schema such as `specta_zod::define(\"z.bigint()\")` to override this."
+            ),
+            ErrorKind::UnsafeNumberForbidden { path } => write!(
+                f,
+                "Attempted to export {path:?} but its range and precision are not known to fit in a JavaScript number. Apply an explicit remap if precision loss is acceptable."
             ),
             ErrorKind::InvalidName { path, name } => write!(
                 f,

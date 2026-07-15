@@ -343,6 +343,7 @@ fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'sta
     use Primitive::*;
 
     Ok(match p {
+        number => return Err(Error::unsafe_number_forbidden(location.join("."))),
         i8 | i16 | i32 | u8 | u16 | u32 => "z.int()",
         f16 | f32 | f64 | f128 => "z.number()",
         usize | isize | i64 | u64 | i128 | u128 => {
