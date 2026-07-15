@@ -293,6 +293,16 @@ fn zod_define_map_key_uses_a_valid_typescript_property_key() {
 
 #[test]
 fn zod_rejects_non_json_map_keys() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct NamedKey {
+        value: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveKey(Box<RecursiveKey>);
+
     fn assert_invalid<K: Type>(reason: &str) {
         let mut types = Types::default();
         let dt = HashMap::<K, String>::definition(&mut types);
@@ -306,6 +316,12 @@ fn zod_rejects_non_json_map_keys() {
     assert_invalid::<(String, String)>("tuple keys are not supported");
     assert_invalid::<Option<String>>("nullable keys are not supported");
     assert_invalid::<Vec<String>>("collection, map, and nullable keys are not supported");
+    assert_invalid::<HashMap<String, String>>(
+        "collection, map, and nullable keys are not supported",
+    );
+    assert_invalid::<NamedKey>("struct keys must serialize as a newtype struct");
+    assert_invalid::<RecursiveKey>("recursive map key reference cycle detected");
+    assert_invalid::<Any>("opaque references cannot be validated");
 }
 
 #[test]
