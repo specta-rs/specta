@@ -649,6 +649,20 @@ impl FlattenDirections {
         deserialize: true,
     };
 
+    /// Only the serialize direction is reachable (an `into` conversion wire,
+    /// or a `Phased` override's serialize side).
+    const SERIALIZE_ONLY: Self = Self {
+        serialize: true,
+        deserialize: false,
+    };
+
+    /// Only the deserialize direction is reachable (a `from`/`try_from`
+    /// conversion wire, or a `Phased` override's deserialize side).
+    const DESERIALIZE_ONLY: Self = Self {
+        serialize: false,
+        deserialize: true,
+    };
+
     /// The directions in which an enum variant exists on the wire: a fully
     /// skipped variant exists in neither, and a one-sided variant skip drops
     /// it from that phase (`filter_enum_variants_for_phase` in `lib.rs`).
@@ -716,9 +730,15 @@ fn validate_flatten_target(
             if let Some((serialize_wire, deserialize_wire)) =
                 conversion_wire_targets(attrs.as_ref())
             {
-                for wire in live_wire_targets(serialize_wire, deserialize_wire, directions) {
-                    validate_flatten_target(wire, types, path, seen, env, directions)?;
-                }
+                validate_conversion_wires(
+                    serialize_wire,
+                    deserialize_wire,
+                    types,
+                    path,
+                    seen,
+                    env,
+                    directions,
+                )?;
             }
 
             Ok(())
@@ -744,24 +764,30 @@ fn validate_flatten_target(
             // for the declared shape, per direction, so the wire types are
             // what serde actually flattens - and only for directions that are
             // actually live. A live direction without a conversion keeps the
-            // declared shape, so only skip the declared-shape checks below
-            // when every live direction is covered by a wire type. (Unified
-            // mode separately rejects one-sided conversions during the
-            // rewrite - see `select_conversion_target` in lib.rs - which this
-            // mirrors.)
-            if let Some((serialize_wire, deserialize_wire)) =
-                conversion_wire_targets(attrs.as_ref())
-            {
-                for wire in live_wire_targets(serialize_wire, deserialize_wire, directions) {
-                    validate_flatten_target(wire, types, path, seen, env, directions)?;
-                }
+            // declared shape, so the declared-shape checks below run for
+            // exactly the remaining uncovered live directions. (Unified mode
+            // separately rejects one-sided conversions during the rewrite -
+            // see `select_conversion_target` in lib.rs - which this mirrors.)
+            let directions = match conversion_wire_targets(attrs.as_ref()) {
+                Some((serialize_wire, deserialize_wire)) => {
+                    let remaining = validate_conversion_wires(
+                        serialize_wire,
+                        deserialize_wire,
+                        types,
+                        path,
+                        seen,
+                        env,
+                        directions,
+                    )?;
 
-                let serialize_covered = !directions.serialize || serialize_wire.is_some();
-                let deserialize_covered = !directions.deserialize || deserialize_wire.is_some();
-                if serialize_covered && deserialize_covered {
-                    return Ok(());
+                    if !remaining.serialize && !remaining.deserialize {
+                        return Ok(());
+                    }
+
+                    remaining
                 }
-            }
+                None => directions,
+            };
 
             // `#[serde(transparent)]` structs delegate (de)serialization
             // straight to their single non-skipped field, so serde sees that
@@ -890,10 +916,7 @@ fn validate_flatten_target(
                             path,
                             seen,
                             env,
-                            FlattenDirections {
-                                serialize: true,
-                                deserialize: false,
-                            },
+                            FlattenDirections::SERIALIZE_ONLY,
                         )?;
                     }
                     if directions.deserialize {
@@ -903,10 +926,7 @@ fn validate_flatten_target(
                             path,
                             seen,
                             env,
-                            FlattenDirections {
-                                serialize: false,
-                                deserialize: true,
-                            },
+                            FlattenDirections::DESERIALIZE_ONLY,
                         )?;
                     }
 
@@ -926,20 +946,52 @@ fn validate_flatten_target(
     }
 }
 
-/// The conversion wire types that can actually be reached given which of the
-/// flattened field's directions are live: a skipped direction's wire shape
-/// never flattens, so it must not be validated.
-fn live_wire_targets<'a>(
-    serialize_wire: Option<&'a DataType>,
-    deserialize_wire: Option<&'a DataType>,
+/// Validates the reachable conversion wire types, each in its own direction
+/// only: an `into` wire is only ever serialized and a `from`/`try_from` wire
+/// only ever deserialized (`select_conversion_target` in `lib.rs` picks by
+/// phase), so e.g. a serialize wire's own deserialize-only conversions are
+/// unreachable. A wire for a direction that isn't live is skipped entirely.
+///
+/// Returns the live directions left *uncovered* by a wire - the ones the
+/// caller's declared shape still serves.
+fn validate_conversion_wires(
+    serialize_wire: Option<&DataType>,
+    deserialize_wire: Option<&DataType>,
+    types: &Types,
+    path: &str,
+    seen: &mut HashSet<Reference>,
+    env: Option<&GenericEnv<'_>>,
     directions: FlattenDirections,
-) -> impl Iterator<Item = &'a DataType> {
-    directions
-        .serialize
-        .then_some(serialize_wire)
-        .flatten()
-        .into_iter()
-        .chain(directions.deserialize.then_some(deserialize_wire).flatten())
+) -> Result<FlattenDirections, Error> {
+    if directions.serialize
+        && let Some(wire) = serialize_wire
+    {
+        validate_flatten_target(
+            wire,
+            types,
+            path,
+            seen,
+            env,
+            FlattenDirections::SERIALIZE_ONLY,
+        )?;
+    }
+    if directions.deserialize
+        && let Some(wire) = deserialize_wire
+    {
+        validate_flatten_target(
+            wire,
+            types,
+            path,
+            seen,
+            env,
+            FlattenDirections::DESERIALIZE_ONLY,
+        )?;
+    }
+
+    Ok(FlattenDirections {
+        serialize: directions.serialize && serialize_wire.is_none(),
+        deserialize: directions.deserialize && deserialize_wire.is_none(),
+    })
 }
 
 /// The serde wire types substituted by container conversions, as

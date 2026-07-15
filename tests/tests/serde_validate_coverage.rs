@@ -686,6 +686,156 @@ fn flatten_of_phased_with_from_only_vec_deserialize_shape_is_rejected() {
     );
 }
 
+// The same per-phase rule applies one level deeper, to conversion wires
+// themselves: in `PhasesFormat` an `into` wire is only ever serialized and a
+// `from`/`try_from` wire only ever deserialized (`select_conversion_target`
+// picks by phase), so each wire type only needs to satisfy its own direction.
+// `NestedWireId` serializes via `FromOnlyVecWire` - whose own `from = Vec`
+// conversion is deserialize-only and therefore unreachable here - and
+// deserializes via `ConversionWire` (a struct).
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "FromOnlyVecWire", from = "ConversionWire")]
+struct NestedWireId(u32);
+
+impl From<NestedWireId> for FromOnlyVecWire {
+    fn from(value: NestedWireId) -> Self {
+        Self {
+            x: value.0.to_string(),
+        }
+    }
+}
+
+impl From<ConversionWire> for NestedWireId {
+    fn from(value: ConversionWire) -> Self {
+        Self(value.id.parse().unwrap_or_default())
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenNestedWireValid {
+    a: i32,
+    #[serde(flatten)]
+    v: NestedWireId,
+}
+
+#[test]
+fn serde_json_confirms_nested_conversion_wires_flatten_per_phase() {
+    assert_eq!(
+        serde_json::to_string(&FlattenNestedWireValid {
+            a: 1,
+            v: NestedWireId(7),
+        })
+        .unwrap(),
+        r#"{"a":1,"x":"7"}"#
+    );
+    let back: FlattenNestedWireValid = serde_json::from_str(r#"{"a":1,"id":"9"}"#).unwrap();
+    assert_eq!(back.v.0, 9);
+}
+
+#[test]
+fn flatten_of_conversion_with_nested_deserialize_only_wire_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNestedWireValid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect(
+            "the into-wire is only serialized, so its own deserialize-only Vec from-wire is \
+             unreachable",
+        );
+}
+
+// Controls: a wire whose *own* direction's shape is invalid must stay
+// rejected on both sides.
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "VecWire", from = "ConversionWire")]
+struct BadSerializeWireId(u32);
+
+impl From<BadSerializeWireId> for VecWire {
+    fn from(value: BadSerializeWireId) -> Self {
+        Self {
+            x: value.0.to_string(),
+        }
+    }
+}
+
+impl From<ConversionWire> for BadSerializeWireId {
+    fn from(value: ConversionWire) -> Self {
+        Self(value.id.parse().unwrap_or_default())
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenBadSerializeWireInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: BadSerializeWireId,
+}
+
+#[derive(Type, Serialize, Deserialize, Clone)]
+#[specta(collect = false)]
+#[serde(into = "ConversionWire", from = "FromOnlyVecWire")]
+struct BadDeserializeWireId(u32);
+
+impl From<BadDeserializeWireId> for ConversionWire {
+    fn from(value: BadDeserializeWireId) -> Self {
+        Self {
+            id: value.0.to_string(),
+        }
+    }
+}
+
+impl From<FromOnlyVecWire> for BadDeserializeWireId {
+    fn from(value: FromOnlyVecWire) -> Self {
+        Self(value.x.parse().unwrap_or_default())
+    }
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenBadDeserializeWireInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: BadDeserializeWireId,
+}
+
+#[test]
+fn flatten_of_conversion_with_vec_serialize_side_of_wire_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenBadSerializeWireInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("VecWire's own serialize side is its Vec into-wire, which is reachable");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_conversion_with_vec_deserialize_side_of_wire_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenBadDeserializeWireInvalid>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err(
+            "FromOnlyVecWire's own deserialize side is its Vec from-wire, which is reachable \
+             when it is used as the outer from target",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
 // Variant-level skips gate flattened fields the same way field-level skips
 // do: `PhasesFormat` drops a one-side-skipped variant from that phase
 // (`filter_enum_variants_for_phase`), so a phase in which the variant doesn't
