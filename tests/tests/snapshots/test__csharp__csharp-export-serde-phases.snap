@@ -52,12 +52,12 @@ public abstract record Response<T>
     public sealed record Serialize : Response<T>
     {
         [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-        public required ResponseSerialize<T> Item1 { get; init; }
+        public required global::ResponseSerialize<T> Item1 { get; init; }
     }
     public sealed record Deserialize : Response<T>
     {
         [global::System.Text.Json.Serialization.JsonPropertyName("0")]
-        public required ResponseDeserialize<T> Item1 { get; init; }
+        public required global::ResponseDeserialize<T> Item1 { get; init; }
     }
 }
 

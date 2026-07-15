@@ -503,6 +503,7 @@ fn render_field_property(
                 if enm
                     .variants
                     .iter()
+                    .filter(|(_, variant)| !variant.skip)
                     .all(|(_, variant)| matches!(variant.fields, Fields::Unit)) =>
             {
                 render_simple_enum(out, exporter, indent, name, "", enm, path)?;
@@ -1456,6 +1457,7 @@ fn reference_name(out: &mut String, exporter: &CSharp, ndt: &NamedDataType) {
             out.push_str(&exported_name(exporter, ndt));
         }
         Layout::FlatFile | Layout::ModulePrefixedName => {
+            out.push_str("global::");
             out.push_str(&exported_name(exporter, ndt))
         }
     }

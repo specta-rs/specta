@@ -103,6 +103,41 @@ struct InlineFields {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct FooValue {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineFoo {
+    value: bool,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineNameShadowing {
+    #[specta(inline)]
+    foo: InlineFoo,
+    top_level: FooValue,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum InlineEnumWithSkippedPayload {
+    Visible,
+    #[specta(skip)]
+    Hidden(String),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineSkippedEnumOwner {
+    #[specta(inline)]
+    state: InlineEnumWithSkippedPayload,
+}
+
+#[derive(Type)]
 #[specta(collect = false, inline)]
 struct AlwaysInlineA {
     value: String,
@@ -315,6 +350,34 @@ fn inline_fields_preserve_their_wrapper_properties() {
     assert!(output.contains("HiddenValue Hidden"));
     assert!(output.contains("record HiddenGenericValue"));
     assert!(output.contains("HiddenGenericValue HiddenGeneric"));
+}
+
+#[test]
+fn flat_references_are_not_shadowed_by_inline_helpers() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<InlineNameShadowing>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("record FooValue"));
+    assert!(output.contains("global::FooValue TopLevel"));
+}
+
+#[test]
+fn skipped_payload_variants_do_not_change_inline_enum_kind() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<InlineSkippedEnumOwner>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("enum StateValue"));
+    assert!(output.contains("Visible,"));
+    assert!(!output.contains("Hidden"));
+    assert!(!output.contains("abstract record StateValue"));
 }
 
 #[test]
