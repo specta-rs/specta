@@ -68,6 +68,10 @@ pub fn construct_field_with_variant_skip(
         .as_ref()
         .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
 
+    let serde_newtype_skip_ignored = attrs
+        .serde_newtype_skip_ignored
+        .then(|| quote!(field.attributes.insert("specta:serde_newtype_skip_ignored", true);));
+
     // Whether a field was declared as `Option<T>` matters to consumers
     // beyond the exported datatype: e.g. serde deserializes a missing value
     // into an `Option` as `None` (both for skipped fields and for newtype
@@ -94,6 +98,7 @@ pub fn construct_field_with_variant_skip(
         #field_docs
         #runtime_attrs
         #type_overridden_attribute
+        #serde_newtype_skip_ignored
         #nullable_attribute
         #field_ty
         field
