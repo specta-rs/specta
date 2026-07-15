@@ -1006,6 +1006,17 @@ fn render_simple_enum(
         );
     }
     let wire_string = is_rewritten_string_enum(enm);
+    if wire_string {
+        let mut wire_names = HashSet::new();
+        for (wire_name, _) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
+            if !wire_names.insert(wire_name) {
+                return Err(Error::DuplicateEnumWireName {
+                    path: path.to_string(),
+                    name: wire_name.to_string(),
+                });
+            }
+        }
+    }
     let converter = format!("__Specta{name}JsonConverter");
     if wire_string {
         out.push_str(base);

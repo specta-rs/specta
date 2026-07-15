@@ -85,6 +85,15 @@ enum Status {
     Complete,
 }
 
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum DuplicateEnumWireNames {
+    #[serde(rename = "same")]
+    First,
+    #[serde(rename = "same")]
+    Second,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum Event<T> {
@@ -535,6 +544,17 @@ fn duplicate_generic_parameters_are_rejected() {
     assert!(matches!(
         CSharp::new().export(&types, IdentityFormat),
         Err(Error::InvalidName { .. })
+    ));
+}
+
+#[test]
+fn duplicate_enum_wire_names_are_rejected() {
+    assert!(matches!(
+        CSharp::new().export(
+            &Types::default().register::<DuplicateEnumWireNames>(),
+            specta_serde::Format,
+        ),
+        Err(Error::DuplicateEnumWireName { name, .. }) if name == "same"
     ));
 }
 

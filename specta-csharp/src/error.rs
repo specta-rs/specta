@@ -31,6 +31,13 @@ pub enum Error {
         /// Second Rust type path.
         second: String,
     },
+    /// Two enum variants produce the same serialized string.
+    DuplicateEnumWireName {
+        /// Rust path of the enum.
+        path: String,
+        /// Colliding serialized variant name.
+        name: String,
+    },
     /// A named reference was not present in the supplied type collection.
     DanglingReference {
         /// Export location where the reference occurred.
@@ -129,6 +136,12 @@ impl fmt::Display for Error {
                 f,
                 "C# type name '{name}' is produced by both {first} and {second}"
             ),
+            Self::DuplicateEnumWireName { path, name } => {
+                write!(
+                    f,
+                    "enum '{path}' has duplicate serialized variant name '{name}'"
+                )
+            }
             Self::DanglingReference { path } => {
                 write!(
                     f,
