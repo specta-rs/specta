@@ -2535,6 +2535,14 @@ fn collect_dependencies(
         DataType::Enum(e) => {
             collect_conversion_dependencies(&e.attributes, types, deps)?;
             for (_, variant) in &e.variants {
+                // A variant skipped in both phases never appears in either
+                // half, so its payload cannot tie the enum to a phase split.
+                if SerdeVariantAttrs::from_attributes(&variant.attributes)?
+                    .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
+                {
+                    continue;
+                }
+
                 collect_fields_dependencies(&variant.fields, types, deps)?;
             }
         }
@@ -2613,18 +2621,41 @@ fn collect_fields_dependencies(
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in &unnamed.fields {
-                if let Some(ty) = field.ty.as_ref() {
-                    collect_dependencies(ty, types, deps)?;
-                }
+                collect_field_dependencies(field, types, deps)?;
             }
         }
         Fields::Named(named) => {
             for (_, field) in &named.fields {
-                if let Some(ty) = field.ty.as_ref() {
-                    collect_dependencies(ty, types, deps)?;
-                }
+                collect_field_dependencies(field, types, deps)?;
             }
         }
+    }
+
+    Ok(())
+}
+
+fn collect_field_dependencies(
+    field: &Field,
+    types: &Types,
+    deps: &mut HashSet<TypeIdentity>,
+) -> Result<(), Error> {
+    // A field removed from BOTH phases renders identically — that is, not
+    // at all — in both halves, so it cannot tie its container to a
+    // referenced type's phase split. The flag pair catches an explicit
+    // `#[serde(skip_serializing, skip_deserializing)]`; hidden fields
+    // (`#[specta(skip)]`, and bare `#[serde(skip)]` which the specta macro
+    // special-cases the same way) have `ty: None` and are covered by the
+    // `ty` check below. A one-sided skip keeps the field in one phase, so
+    // it must still propagate (and its skip asymmetry splits the container
+    // regardless).
+    if SerdeFieldAttrs::from_attributes(&field.attributes)?
+        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
+    {
+        return Ok(());
+    }
+
+    if let Some(ty) = field.ty.as_ref() {
+        collect_dependencies(ty, types, deps)?;
     }
 
     Ok(())

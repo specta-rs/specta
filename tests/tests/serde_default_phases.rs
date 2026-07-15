@@ -13,7 +13,7 @@ use specta::{Format as _, Type, Types, datatype::DataType};
 use specta_serde::{Phase, PhasesFormat, select_phase_datatype};
 use specta_typescript::Typescript;
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Serialize, Deserialize, Default)]
 #[specta(collect = false)]
 struct WithFieldDefault {
     #[serde(default)]
@@ -212,6 +212,43 @@ struct HiddenDefaultParent {
 struct AllHidden {
     #[specta(skip)]
     cache: i32,
+}
+
+/// A split source referenced ONLY behind a field skipped in both serde
+/// phases: the field is removed from both halves, so the split must not
+/// cascade into this container (contrast the live-field dependents above,
+/// e.g. [`SkippedDefaultParent`]/[`CollectionParent`], which must split).
+///
+/// The skip pair is spelled out because the specta macro special-cases a
+/// bare `#[serde(skip)]` on fields/variants into `ty: None` (the referenced
+/// type is then never even collected); the explicit pair keeps the reference
+/// in the datatype, exercising the dependency-walk filter.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipChildParent {
+    #[serde(skip_serializing, skip_deserializing)]
+    child: WithFieldDefault,
+    a: i32,
+}
+
+/// Nothing to inherit: [`SkipChildParent`] doesn't split, so neither does a
+/// type referencing it.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipChildGrandparent {
+    parent: SkipChildParent,
+}
+
+/// Variant counterpart: a both-phase-skipped variant's payload never appears
+/// in either half, so it must not tie the enum to the payload's split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipVariantEnum {
+    #[serde(skip_serializing, skip_deserializing)]
+    Hidden(WithFieldDefault),
+    Visible {
+        x: i32,
+    },
 }
 
 fn named_field_optional(dt: &DataType, types: &Types, field_name: &str) -> bool {
@@ -595,4 +632,39 @@ fn default_on_specta_hidden_field_does_not_split() {
         !rendered.contains("cache"),
         "`#[specta(skip)]` fields must stay out of the exported shape: {rendered}"
     );
+}
+
+/// Split propagation must not travel through fields or variants removed in
+/// BOTH phases: the split source still splits on its own, but a container
+/// referencing it only behind `#[serde(skip)]` renders identically in both
+/// halves and must stay unsplit (as must its own dependents). Live-field
+/// dependents splitting is pinned by the propagation tests above as the
+/// control.
+#[test]
+fn split_does_not_propagate_through_both_phase_skipped_positions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<SkipChildGrandparent>()
+                .register::<SkipVariantEnum>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept split sources behind skipped fields");
+
+    assert!(
+        rendered.contains("WithFieldDefault_Serialize"),
+        "the split source itself is genuinely directional and must still split: {rendered}"
+    );
+    for split_name in [
+        "SkipChildParent_Serialize",
+        "SkipChildGrandparent_Serialize",
+        "SkipVariantEnum_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "a reference behind a both-phase-skipped field/variant renders \
+             identically in both halves and must not cascade the split \
+             (found `{split_name}`): {rendered}"
+        );
+    }
 }
