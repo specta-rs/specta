@@ -251,6 +251,45 @@ fn symmetric_rename_on_split_types_keeps_phase_suffix() {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlattenedInner {
+    x: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "RenamedFlattenedStruct")]
+struct FlattenedStructRename {
+    a: String,
+    #[serde(flatten)]
+    inner: FlattenedInner,
+}
+
+/// The container rename must be read from the pre-rewrite attributes: lowering
+/// a flattened struct replaces the `DataType::Struct` with an `Intersection`,
+/// which used to silently drop the rename when it was computed afterwards.
+#[test]
+fn struct_container_rename_survives_flatten_lowering() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<FlattenedInner>()
+                .register::<FlattenedStructRename>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    assert!(
+        ts.contains("export type RenamedFlattenedStruct = "),
+        "expected flattened struct container rename to be honored, got:\n{ts}"
+    );
+    assert!(
+        !ts.contains("FlattenedStructRename"),
+        "the original (un-renamed) struct name should not appear, got:\n{ts}"
+    );
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename = "ReferencedEnumNew")]
 enum ReferencedEnum {
     A,
