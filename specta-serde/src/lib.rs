@@ -1838,7 +1838,7 @@ fn rewrite_enum_repr_for_phase(
         }
 
         let hidden_external_payload =
-            matches!(repr, EnumRepr::External) && variant_payload_is_hidden(&variant, mode)?;
+            matches!(repr, EnumRepr::External) && variant_has_hidden_wire_field(&variant, mode)?;
         if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
             let mut transformed_variant = transform_untagged_variant(&variant)?;
             // Clear attributes like the other transformed variants below, so
@@ -2657,6 +2657,31 @@ fn variant_payload_is_hidden(variant: &Variant, mode: PhaseRewrite) -> Result<bo
     Ok(false)
 }
 
+/// Whether any variant field is hidden from Specta but remains present on
+/// serde's wire in this phase. Contextual internally tagged lowering must
+/// reject these fields because their datatype is unavailable.
+fn variant_has_hidden_wire_field(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
+    fn fields_have_hidden_wire_field<'a>(
+        fields: impl IntoIterator<Item = &'a Field>,
+        mode: PhaseRewrite,
+    ) -> Result<bool, Error> {
+        for field in fields {
+            if field.ty.is_none() && !should_skip_field_for_mode(field, mode)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    match &variant.fields {
+        Fields::Unit => Ok(false),
+        Fields::Unnamed(unnamed) => fields_have_hidden_wire_field(&unnamed.fields, mode),
+        Fields::Named(named) => {
+            fields_have_hidden_wire_field(named.fields.iter().map(|(_, field)| field), mode)
+        }
+    }
+}
+
 /// Whether a collapsed newtype variant's sole field carries a *serde* skip
 /// for the given phase, as opposed to being hidden by `#[specta(skip)]` (or a
 /// hand-built `Field { ty: None, .. }`), which serde knows nothing about.
@@ -3363,6 +3388,9 @@ pub(crate) fn internal_tag_payload_requires_contextual_rewrite_for_mode(
                     {
                         continue;
                     }
+                    if variant_has_hidden_wire_field(variant, mode)? {
+                        return Ok(true);
+                    }
                     if attrs.as_ref().is_some_and(|attrs| attrs.other) {
                         return Ok(true);
                     }
@@ -3551,7 +3579,7 @@ fn external_enum_requires_contextual_rewrite(
         {
             return Ok(true);
         }
-        if variant_payload_is_hidden(variant, mode)? {
+        if variant_has_hidden_wire_field(variant, mode)? {
             return Ok(true);
         }
 
@@ -3630,7 +3658,7 @@ fn external_enum_tagged_payload_datatype(
                 clone_variant_with_unnamed_fields(&variant, vec![Field::new(payload)]).fields;
         }
 
-        if variant_payload_is_hidden(&variant, mode)? {
+        if variant_has_hidden_wire_field(&variant, mode)? {
             return Err(Error::invalid_internally_tagged_variant(
                 variant_name.clone(),
                 "a payload hidden only from Specta cannot be represented inside an internal tag",

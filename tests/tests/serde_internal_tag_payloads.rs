@@ -229,6 +229,30 @@ enum ExternalPartiallyHiddenTuplePayloadWrapper {
     Value(ExternalPartiallyHiddenTuplePayload),
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalHiddenNamedVariantPayload {
+    Struct {
+        #[specta(skip)]
+        secret: i32,
+        visible: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum ExternalHiddenNamedVariantPayloadWrapper {
+    Value(ExternalHiddenNamedVariantPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InlineExternalHiddenNamedVariantPayloadWrapper {
+    Value(#[specta(inline)] ExternalHiddenNamedVariantPayload),
+}
+
 #[derive(Debug, PartialEq, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind")]
@@ -1121,7 +1145,11 @@ fn specta_hidden_newtype_payloads_are_rejected() {
         Types::default().register::<InlineExternalUntaggedHiddenPayloadWrapper>(),
         Types::default().register::<ExternalHiddenTuplePayloadWrapper>(),
         Types::default().register::<ExternalPartiallyHiddenTuplePayloadWrapper>(),
+        Types::default().register::<ExternalHiddenNamedVariantPayloadWrapper>(),
+        Types::default().register::<InlineExternalHiddenNamedVariantPayloadWrapper>(),
         Types::default().register::<GenericPayload<HiddenNamed>>(),
+        Types::default().register::<GenericPayload<ExternalPartiallyHiddenTuplePayload>>(),
+        Types::default().register::<GenericPayload<ExternalHiddenNamedVariantPayload>>(),
     ] {
         assert!(
             specta_serde::Format.map_types(&types).is_err(),
