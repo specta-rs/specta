@@ -592,7 +592,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
     validate_other_variant(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
-        validate_internally_tag_enum(enm, types, path)?;
+        validate_internally_tag_enum(enm, types, path, &mut HashSet::new())?;
     }
 
     Ok(())
@@ -676,9 +676,14 @@ fn validate_other_variant(
     Ok(())
 }
 
-fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<(), Error> {
+fn validate_internally_tag_enum(
+    enm: &Enum,
+    types: &Types,
+    path: String,
+    seen: &mut HashSet<Reference>,
+) -> Result<(), Error> {
     for (variant_name, variant) in &enm.variants {
-        validate_internally_tag_variant(enm, variant_name, variant, types, &path)?;
+        validate_internally_tag_variant(enm, variant_name, variant, types, &path, seen)?;
     }
 
     Ok(())
@@ -690,6 +695,7 @@ fn validate_internally_tag_variant(
     variant: &Variant,
     types: &Types,
     path: &str,
+    seen: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     let _ = enm;
     if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
@@ -716,41 +722,43 @@ fn validate_internally_tag_variant(
                 ));
             }
 
-            validate_internally_tag_enum_datatype(first_field, types, path, variant_name)
+            validate_internally_tag_enum_datatype(first_field, types, path, variant_name, seen)
         }
     }
 }
 
+// `seen` tracks named references on the current recursion path so cyclic
+// (self- or mutually-recursive) untagged payloads terminate; a reference
+// already on the path is being validated further up the stack. Mirrors
+// `internal_tag_payload_compatibility` in `lib.rs`.
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
     types: &Types,
     path: &str,
     variant_name: &str,
+    seen: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
-        DataType::Reference(Reference::Named(reference))
-            if matches!(reference.inner, NamedReferenceType::Inline { .. }) =>
-        {
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+        DataType::Reference(Reference::Named(reference)) => {
+            let key = Reference::Named(reference.clone());
+            if !seen.insert(key.clone()) {
+                return Ok(());
             }
 
-            Ok(())
+            let result = named_reference_ty(reference, types).map_or(Ok(()), |ty| {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)
+            });
+            seen.remove(&key);
+
+            result
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
-            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
+            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string(), seen),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
-        DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
-            }
-
-            Ok(())
-        }
         DataType::Reference(Reference::Opaque(_))
         | DataType::Generic(_)
         | DataType::Intersection(_)
