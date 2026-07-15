@@ -205,6 +205,23 @@ mod alias_collision {
         pub(super) b: String,
     }
 
+    #[derive(Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    pub(super) enum VariantAliasCollision {
+        #[serde(alias = "B")]
+        A(u32),
+        B(String),
+    }
+
+    #[derive(Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    pub(super) enum SharedVariantAlias {
+        #[serde(alias = "legacy")]
+        A(u32),
+        #[serde(alias = "legacy")]
+        B(String),
+    }
+
     #[derive(Clone, Debug, Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     #[serde(from = "Wire", into = "Wire")]
@@ -225,6 +242,15 @@ mod alias_collision {
             #[serde(default)]
             b: String,
         },
+    }
+
+    #[derive(Clone, Debug, Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(from = "Wire", into = "Wire")]
+    pub(super) enum ConvertedVariantAliasCollision {
+        #[serde(alias = "B")]
+        A(u32),
+        B(String),
     }
 
     impl From<ConvertedFieldAliasCollision> for Wire {
@@ -254,6 +280,18 @@ mod alias_collision {
                 a: 0,
                 b: String::new(),
             }
+        }
+    }
+
+    impl From<ConvertedVariantAliasCollision> for Wire {
+        fn from(_: ConvertedVariantAliasCollision) -> Self {
+            Self { value: 0 }
+        }
+    }
+
+    impl From<Wire> for ConvertedVariantAliasCollision {
+        fn from(_: Wire) -> Self {
+            Self::A(0)
         }
     }
 }
@@ -810,6 +848,17 @@ fn format_rejects_alias_colliding_with_live_key() {
     assert_eq!(parsed.a, 1);
     assert!(parsed.b.is_empty());
 
+    let parsed: alias_collision::VariantAliasCollision =
+        serde_json::from_str(r#"{"B":1}"#).unwrap();
+    assert!(matches!(
+        parsed,
+        alias_collision::VariantAliasCollision::A(1)
+    ));
+
+    let parsed: alias_collision::SharedVariantAlias =
+        serde_json::from_str(r#"{"legacy":1}"#).unwrap();
+    assert!(matches!(parsed, alias_collision::SharedVariantAlias::A(1)));
+
     for (types, collision) in [
         (
             Types::default().register::<alias_collision::FieldAliasCollision>(),
@@ -818,6 +867,14 @@ fn format_rejects_alias_colliding_with_live_key() {
         (
             Types::default().register::<alias_collision::SharedFieldAlias>(),
             "field alias `legacy` collides with a key already accepted by `a`",
+        ),
+        (
+            Types::default().register::<alias_collision::VariantAliasCollision>(),
+            "variant alias `B` collides with a name already accepted by `B`",
+        ),
+        (
+            Types::default().register::<alias_collision::SharedVariantAlias>(),
+            "variant alias `legacy` collides with a name already accepted by `A`",
         ),
     ] {
         let err = Typescript::default()
@@ -833,7 +890,8 @@ fn format_rejects_alias_colliding_with_live_key() {
         .export(
             &Types::default()
                 .register::<alias_collision::ConvertedFieldAliasCollision>()
-                .register::<alias_collision::ConvertedVariantFieldAliasCollision>(),
+                .register::<alias_collision::ConvertedVariantFieldAliasCollision>()
+                .register::<alias_collision::ConvertedVariantAliasCollision>(),
             specta_serde::Format,
         )
         .expect("container conversions replace the colliding declared fields");

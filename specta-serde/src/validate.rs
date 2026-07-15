@@ -317,6 +317,15 @@ fn inner(
                 mode,
                 declared_directions.deserialize,
             )?;
+            if variant_names_emitted {
+                validate_variant_aliases(
+                    enm,
+                    &container_attrs,
+                    &path,
+                    declared_directions.deserialize,
+                    mode,
+                )?;
+            }
 
             for (variant_name, variant) in &enm.variants {
                 let variant_is_rendered = variant_is_rendered(variant)?;
@@ -898,6 +907,58 @@ fn validate_variant_key(
             Some(serialize_name),
             Some(deserialize_name),
         ));
+    }
+
+    Ok(())
+}
+
+fn validate_variant_aliases(
+    enm: &Enum,
+    container_attrs: &Option<SerdeContainerAttrs>,
+    path: &str,
+    declared_deserialize_live: bool,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    if mode != ApplyMode::Unified || !declared_deserialize_live {
+        return Ok(());
+    }
+
+    let mut occupied_deserialize_names = HashMap::new();
+    for (name, variant) in &enm.variants {
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if !FlattenDirections::for_variant(variant)?.deserialize
+            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+        {
+            continue;
+        }
+
+        occupied_deserialize_names.insert(
+            serialized_variant_name(name, variant, container_attrs, PhaseRewrite::Deserialize)?,
+            name.as_ref(),
+        );
+    }
+
+    for (name, variant) in &enm.variants {
+        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        if !FlattenDirections::for_variant(variant)?.deserialize
+            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+        {
+            continue;
+        }
+
+        for alias in attrs.into_iter().flat_map(|attrs| attrs.aliases) {
+            if let Some(owner) = occupied_deserialize_names.get(alias.as_str())
+                && *owner != name.as_ref()
+            {
+                return Err(Error::invalid_phased_type_usage(
+                    format!("{path}::{name}"),
+                    format!(
+                        "variant alias `{alias}` collides with a name already accepted by `{owner}`; unified alias lowering cannot represent serde's name precedence safely"
+                    ),
+                ));
+            }
+            occupied_deserialize_names.insert(alias, name.as_ref());
+        }
     }
 
     Ok(())
