@@ -112,6 +112,18 @@ enum GenericSkippedVariant<T> {
     Value(T),
 }
 
+#[derive(Type, Serialize)]
+#[specta(inline, collect = false)]
+enum InlineLiteralPayload {
+    Only,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum CarriesInlineLiteral {
+    Value(InlineLiteralPayload),
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct InnerPayload {
@@ -195,6 +207,28 @@ fn kotlin_rejects_non_exportable_named_references() {
             .to_string()
             .contains("does not have an exportable definition")
     );
+}
+
+#[test]
+fn kotlin_rejects_recursive_aliases_and_preserves_literal_payloads() {
+    let mut recursive = Types::default();
+    specta::datatype::NamedDataType::new("RecursiveAlias", &mut recursive, |_, datatype| {
+        let reference = datatype.reference(vec![]);
+        datatype.ty = Some(DataType::Reference(reference));
+    });
+    let error = Kotlin::default()
+        .export(&recursive, IdentityFormat)
+        .expect_err("recursive Kotlin aliases must be rejected");
+    assert!(error.to_string().contains("recursive Kotlin typealiases"));
+
+    let output = Kotlin::default()
+        .export(
+            &Types::default().register::<CarriesInlineLiteral>(),
+            specta_serde::Format,
+        )
+        .expect("a real inline literal payload must survive Serde normalization");
+    assert!(output.contains("public data class Value("), "{output}");
+    assert!(output.contains("public val value:"), "{output}");
 }
 
 #[test]
@@ -491,9 +525,10 @@ fn kotlin_exports_shared_type_corpus() {
     exporter
         .export(&types, IdentityFormat)
         .expect("the raw shared datatype corpus should export to Kotlin");
-    exporter
+    let error = exporter
         .export(&types, specta_serde::Format)
-        .expect("the Serde shared datatype corpus should export to Kotlin");
+        .expect_err("the Serde corpus contains a recursive alias Kotlin must reject");
+    assert!(error.to_string().contains("recursive Kotlin typealiases"));
 
     let (phased_types, _) = crate::types_phased();
     exporter

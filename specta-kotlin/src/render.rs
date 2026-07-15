@@ -130,6 +130,12 @@ fn render_named(
             &ndt.name,
         ),
         _ => {
+            if contains_named_reference(types, &ty, ndt) {
+                return Err(Error::UnsupportedType {
+                    path: ndt.name.to_string(),
+                    reason: "recursive Kotlin typealiases are not supported",
+                });
+            }
             out.push_str("public typealias ");
             out.push_str(&name);
             out.push_str(&generic_declaration(&generics));
@@ -144,6 +150,62 @@ fn render_named(
             )?);
             Ok(())
         }
+    }
+}
+
+fn contains_named_reference(types: &Types, dt: &DataType, target: &NamedDataType) -> bool {
+    match dt {
+        DataType::Primitive(_)
+        | DataType::Generic(_)
+        | DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::List(list) => contains_named_reference(types, &list.ty, target),
+        DataType::Map(map) => {
+            contains_named_reference(types, map.key_ty(), target)
+                || contains_named_reference(types, map.value_ty(), target)
+        }
+        DataType::Nullable(inner) => contains_named_reference(types, inner, target),
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter()
+            .any(|ty| contains_named_reference(types, ty, target)),
+        DataType::Struct(strct) => fields_contain_named_reference(types, &strct.fields, target),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain_named_reference(types, &variant.fields, target)),
+        DataType::Reference(Reference::Named(reference)) => {
+            types.get(reference).is_some_and(|ndt| ndt == target)
+                || match &reference.inner {
+                    NamedReferenceType::Reference { generics, .. } => generics
+                        .iter()
+                        .any(|(_, ty)| contains_named_reference(types, ty, target)),
+                    NamedReferenceType::Inline { dt, .. } => {
+                        contains_named_reference(types, dt, target)
+                    }
+                    NamedReferenceType::Recursive(_) => false,
+                }
+        }
+        DataType::Intersection(types_) => types_
+            .iter()
+            .any(|ty| contains_named_reference(types, ty, target)),
+    }
+}
+
+fn fields_contain_named_reference(types: &Types, fields: &Fields, target: &NamedDataType) -> bool {
+    match fields {
+        Fields::Named(fields) => fields.fields.iter().any(|(_, field)| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|ty| contains_named_reference(types, ty, target))
+        }),
+        Fields::Unnamed(fields) => fields.fields.iter().any(|field| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|ty| contains_named_reference(types, ty, target))
+        }),
+        Fields::Unit => false,
     }
 }
 
@@ -975,7 +1037,7 @@ fn normalized_variant_fields(variant_name: &str, fields: &Fields, serde_rewritte
     let Some((field_name, field, payload)) = payload else {
         return fields.clone();
     };
-    if literal_enum_value(payload).is_some() {
+    if field_name.is_none() && literal_enum_value(payload).is_some() {
         return Fields::Unit;
     }
     if field_name.is_some_and(|name| name.eq_ignore_ascii_case(variant_name)) {
