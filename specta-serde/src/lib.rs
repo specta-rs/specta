@@ -2985,6 +2985,12 @@ fn internal_tag_payload_compatibility(
                 let mut is_effectively_empty = true;
                 let mut rewritten = enm.clone();
                 filter_enum_variants_for_phase(&mut rewritten, mode)?;
+                if rewritten.variants.is_empty() {
+                    return Ok(Some(InternalTagPayloadCompatibility {
+                        is_effectively_empty: false,
+                        replacement: Some(DataType::Enum(rewritten)),
+                    }));
+                }
                 let mut changed = rewritten.variants.len() != enm.variants.len();
                 let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
                 for (variant_name, rewritten_variant) in &mut rewritten.variants {

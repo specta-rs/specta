@@ -380,6 +380,14 @@ enum UntaggedAttributedMapPayload {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedSerializeImpossible {
+    #[serde(skip_serializing)]
+    Live { value: i32 },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "kind")]
 enum UntaggedExternalPayloadWrapper {
     Value(UntaggedExternalPayload),
@@ -404,6 +412,13 @@ enum UntaggedMapPayloadWithSkippedScalarWrapper {
 #[serde(tag = "kind")]
 enum UntaggedAttributedMapPayloadWrapper {
     Value(UntaggedAttributedMapPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum UntaggedSerializeImpossibleWrapper {
+    Value(UntaggedSerializeImpossible),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -1007,6 +1022,38 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         assert!(!contains_named_field(wrapper, "value", |_| true));
         assert!(!contains_named_field(wrapper, "inner", |_| true));
     }
+
+    let mapped = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<UntaggedSerializeImpossibleWrapper>())
+        .expect("a phase with no live inner variants should map to an impossible payload")
+        .into_owned();
+    let serialize = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "UntaggedSerializeImpossibleWrapper_Serialize")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped impossible serialize wrapper should exist");
+    assert!(
+        contains_empty_enum(serialize),
+        "the outer serialize variant must be impossible: {serialize:#?}"
+    );
+    let deserialize = mapped
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "UntaggedSerializeImpossibleWrapper_Deserialize")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped live deserialize wrapper should exist");
+    let payload_reference = find_external_reference(deserialize)
+        .expect("deserialize wrapper should reference its live generated payload");
+    let payload = mapped
+        .get(payload_reference)
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("referenced deserialize payload should exist");
+    assert!(
+        contains_named_field(payload, "value", |ty| matches!(
+            ty,
+            DataType::Primitive(specta::datatype::Primitive::i32)
+        )),
+        "the referenced deserialize map variant must remain live: {payload:#?}"
+    );
 }
 
 #[test]
@@ -1214,5 +1261,107 @@ fn contains_string_primitive(ty: &DataType) -> bool {
             contains_string_primitive(map.key_ty()) || contains_string_primitive(map.value_ty())
         }
         DataType::Primitive(_) | DataType::Reference(_) | DataType::Generic(_) => false,
+    }
+}
+
+fn contains_empty_enum(ty: &DataType) -> bool {
+    match ty {
+        DataType::Enum(enm) => {
+            enm.variants.is_empty()
+                || enm
+                    .variants
+                    .iter()
+                    .any(|(_, variant)| match &variant.fields {
+                        specta::datatype::Fields::Named(fields) => fields
+                            .fields
+                            .iter()
+                            .any(|(_, field)| field.ty.as_ref().is_some_and(contains_empty_enum)),
+                        specta::datatype::Fields::Unnamed(fields) => fields
+                            .fields
+                            .iter()
+                            .any(|field| field.ty.as_ref().is_some_and(contains_empty_enum)),
+                        specta::datatype::Fields::Unit => false,
+                    })
+        }
+        DataType::Struct(strct) => match &strct.fields {
+            specta::datatype::Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .any(|(_, field)| field.ty.as_ref().is_some_and(contains_empty_enum)),
+            specta::datatype::Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .any(|field| field.ty.as_ref().is_some_and(contains_empty_enum)),
+            specta::datatype::Fields::Unit => false,
+        },
+        DataType::Intersection(parts)
+        | DataType::Tuple(specta::datatype::Tuple {
+            elements: parts, ..
+        }) => parts.iter().any(contains_empty_enum),
+        DataType::Nullable(ty) => contains_empty_enum(ty),
+        DataType::List(list) => contains_empty_enum(&list.ty),
+        DataType::Map(map) => {
+            contains_empty_enum(map.key_ty()) || contains_empty_enum(map.value_ty())
+        }
+        DataType::Reference(specta::datatype::Reference::Named(reference)) => {
+            match &reference.inner {
+                specta::datatype::NamedReferenceType::Inline { dt, .. } => contains_empty_enum(dt),
+                specta::datatype::NamedReferenceType::Reference { .. }
+                | specta::datatype::NamedReferenceType::Recursive(_) => false,
+            }
+        }
+        DataType::Primitive(_)
+        | DataType::Reference(specta::datatype::Reference::Opaque(_))
+        | DataType::Generic(_) => false,
+    }
+}
+
+fn find_external_reference(ty: &DataType) -> Option<&specta::datatype::NamedReference> {
+    match ty {
+        DataType::Reference(specta::datatype::Reference::Named(reference)) => {
+            match &reference.inner {
+                specta::datatype::NamedReferenceType::Reference { .. }
+                | specta::datatype::NamedReferenceType::Recursive(_) => Some(reference),
+                specta::datatype::NamedReferenceType::Inline { dt, .. } => {
+                    find_external_reference(dt)
+                }
+            }
+        }
+        DataType::Struct(strct) => match &strct.fields {
+            specta::datatype::Fields::Named(fields) => fields
+                .fields
+                .iter()
+                .find_map(|(_, field)| field.ty.as_ref().and_then(find_external_reference)),
+            specta::datatype::Fields::Unnamed(fields) => fields
+                .fields
+                .iter()
+                .find_map(|field| field.ty.as_ref().and_then(find_external_reference)),
+            specta::datatype::Fields::Unit => None,
+        },
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .find_map(|(_, variant)| match &variant.fields {
+                specta::datatype::Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .find_map(|(_, field)| field.ty.as_ref().and_then(find_external_reference)),
+                specta::datatype::Fields::Unnamed(fields) => fields
+                    .fields
+                    .iter()
+                    .find_map(|field| field.ty.as_ref().and_then(find_external_reference)),
+                specta::datatype::Fields::Unit => None,
+            }),
+        DataType::Intersection(parts)
+        | DataType::Tuple(specta::datatype::Tuple {
+            elements: parts, ..
+        }) => parts.iter().find_map(find_external_reference),
+        DataType::Nullable(ty) => find_external_reference(ty),
+        DataType::List(list) => find_external_reference(&list.ty),
+        DataType::Map(map) => find_external_reference(map.key_ty())
+            .or_else(|| find_external_reference(map.value_ty())),
+        DataType::Primitive(_)
+        | DataType::Reference(specta::datatype::Reference::Opaque(_))
+        | DataType::Generic(_) => None,
     }
 }
