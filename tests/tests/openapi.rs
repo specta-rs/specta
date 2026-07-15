@@ -84,6 +84,12 @@ struct EnumMap(HashMap<EnumKey, String>);
 #[specta(collect = false)]
 struct StrictUnit;
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct StrictOptionalPrimitive {
+    value: Option<String>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenA {
@@ -225,6 +231,22 @@ fn openapi_preserves_shapes_metadata_and_generics() {
 
 #[test]
 fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
+    let optional = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictOptionalPrimitive>(),
+            specta_serde::Format,
+        )
+        .expect("strict mode should represent nullable primitive fields exactly");
+    let optional = serde_json::to_value(optional).unwrap();
+    assert_eq!(
+        optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["value"]["type"],
+        "string"
+    );
+    assert_eq!(
+        optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["value"]["nullable"],
+        true
+    );
+
     OpenApi::default()
         .export(
             &Types::default().register::<StringMap>(),

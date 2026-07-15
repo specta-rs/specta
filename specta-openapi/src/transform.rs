@@ -102,6 +102,11 @@ fn transform_object(
         schema.insert("x-specta-type".to_string(), Value::String("null".into()));
     }
 
+    // Collapse nullable unions before recursively transforming their branches.
+    // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
+    // it can be represented by OpenAPI 3.0's `nullable` keyword.
+    collapse_nullable_any_of(&mut schema);
+
     let prefix_items = schema.remove("prefixItems").or_else(|| {
         schema
             .get("items")
@@ -251,12 +256,16 @@ fn collapse_nullable_any_of(schema: &mut Map<String, Value>) {
 
 fn is_nullable_only(value: &Value) -> bool {
     value.as_object().is_some_and(|schema| {
-        schema.get("nullable") == Some(&Value::Bool(true))
-            && schema.keys().all(|key| {
-                matches!(
-                    key.as_str(),
-                    "nullable" | "title" | "description" | "x-specta-type"
-                )
-            })
+        (schema.get("type").and_then(Value::as_str) == Some("null")
+            && schema
+                .keys()
+                .all(|key| matches!(key.as_str(), "type" | "title" | "description")))
+            || (schema.get("nullable") == Some(&Value::Bool(true))
+                && schema.keys().all(|key| {
+                    matches!(
+                        key.as_str(),
+                        "nullable" | "title" | "description" | "x-specta-type"
+                    )
+                }))
     })
 }
