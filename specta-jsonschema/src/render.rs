@@ -684,7 +684,8 @@ impl<'a> Renderer<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let any_of = untagged
+        let any_of = self.allow_additional_properties
+            || untagged
             || enm.variants.iter().any(|(_, variant)| {
                 !variant.skip && variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
             });

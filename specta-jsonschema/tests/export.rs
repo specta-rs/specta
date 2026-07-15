@@ -212,6 +212,13 @@ struct Flattened {
     b: FlattenB,
 }
 
+#[derive(Serialize, Deserialize, Type)]
+struct OptionalFlattened {
+    base: String,
+    #[serde(flatten)]
+    extra: Option<FlattenA>,
+}
+
 #[derive(Type)]
 struct DocumentedFields {
     /// GitHub issue #491 regression: field docs should become JSON Schema descriptions.
@@ -514,6 +521,22 @@ fn can_allow_additional_struct_properties() {
     assert!(validator.is_valid(&serde_json::json!({
         "id": 1, "name": "name", "email": null, "extra": true
     })));
+}
+
+#[test]
+fn permissive_objects_allow_present_optional_flatten_fields() {
+    let schema = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(
+            &Types::default().register::<OptionalFlattened>(),
+            specta_serde::Format,
+            "OptionalFlattened",
+        )
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({ "base": "base" })));
+    assert!(validator.is_valid(&serde_json::json!({ "base": "base", "a": "extra" })));
 }
 
 #[test]
