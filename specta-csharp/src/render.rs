@@ -500,11 +500,6 @@ fn render_field_property(
     used: &mut HashSet<String>,
     reserved_type_names: &HashSet<String>,
 ) -> Result<(), Error> {
-    if contains_recursive_inline(ty) {
-        return Err(Error::RecursiveInline {
-            path: format!("{path}.{wire_name}"),
-        });
-    }
     let mut structural_types = Vec::new();
     for structural_ty in collect_inline_structural_types(types, ty) {
         if structural_types
@@ -746,7 +741,9 @@ fn render_datatype_with_inline_overrides(
                     )?;
                 }
                 NamedReferenceType::Recursive(_) => {
-                    return Err(Error::RecursiveInline { path: path.into() });
+                    let ndt = recursive_inline_fallback(types, reference)
+                        .ok_or_else(|| Error::RecursiveInline { path: path.into() })?;
+                    reference_name(out, exporter, ndt);
                 }
                 NamedReferenceType::Reference { generics, .. } => {
                     let ndt = types
@@ -1233,9 +1230,6 @@ fn datatype(
     ty: &DataType,
     path: &str,
 ) -> Result<(), Error> {
-    if contains_recursive_inline(ty) {
-        return Err(Error::RecursiveInline { path: path.into() });
-    }
     match ty {
         DataType::Primitive(Primitive::f128) => {
             return Err(Error::UnsupportedType {
@@ -1286,7 +1280,9 @@ fn datatype(
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => datatype(out, exporter, types, dt, path)?,
             NamedReferenceType::Recursive(_) => {
-                return Err(Error::RecursiveInline { path: path.into() });
+                let ndt = recursive_inline_fallback(types, reference)
+                    .ok_or_else(|| Error::RecursiveInline { path: path.into() })?;
+                reference_name(out, exporter, ndt);
             }
             NamedReferenceType::Reference { .. } => {
                 let ndt = types
@@ -1419,6 +1415,15 @@ fn is_emitted_named(ndt: &NamedDataType) -> bool {
     )
 }
 
+fn recursive_inline_fallback<'a>(
+    types: &'a Types,
+    reference: &NamedReference,
+) -> Option<&'a NamedDataType> {
+    types
+        .get(reference)
+        .filter(|ndt| ndt.generics.is_empty() && is_emitted_named(ndt))
+}
+
 fn validate_non_object_roots(types: &Types) -> Result<(), Error> {
     for root in types.roots() {
         if let DataType::Reference(Reference::Named(reference)) = root {
@@ -1482,9 +1487,9 @@ fn validate_non_object_recursion(
             NamedReferenceType::Inline { dt, .. } => {
                 validate_non_object_recursion(types, dt, generic_layers, visiting, path)?;
             }
-            NamedReferenceType::Recursive(_) => {
-                return Err(Error::RecursiveInline { path: path.into() });
-            }
+            NamedReferenceType::Recursive(_) => recursive_inline_fallback(types, reference)
+                .ok_or_else(|| Error::RecursiveInline { path: path.into() })
+                .map(|_| ())?,
             NamedReferenceType::Reference { generics, .. } => {
                 let ndt = types
                     .get(reference)
