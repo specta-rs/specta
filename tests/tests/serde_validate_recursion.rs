@@ -727,3 +727,124 @@ fn generic_cycle_with_uninspectable_opaque_payload_fails_honestly() {
         "error should explain the unrepresentable cycle: {message}"
     );
 }
+
+/// A pass-through [`specta::Format`] for the dynamically-built fixtures
+/// below: they model the post-serde untagged shape directly (bare newtype
+/// variants), so no serde rewriting must run over them.
+struct RawFormat;
+
+impl specta::Format for RawFormat {
+    fn map_types(&self, types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
+        Ok(std::borrow::Cow::Owned(types.clone()))
+    }
+
+    fn map_type(
+        &self,
+        _types: &Types,
+        dt: &specta::datatype::DataType,
+    ) -> Result<std::borrow::Cow<'_, specta::datatype::DataType>, specta::FormatError> {
+        Ok(std::borrow::Cow::Owned(dt.clone()))
+    }
+}
+
+/// Builds `enum <name><T> { V0(<name><arg(0)>), ..., Terminal(T) }` as a
+/// dynamically-constructed [`Types`] graph, with each self-edge's `T`
+/// instantiated at `arg(k)`. Static `#[derive]`d types can't express the
+/// shapes these tests need (huge or growing instantiation sets), so this
+/// models the untagged wire shape - bare newtype variants - directly.
+fn dynamic_self_cycle(
+    name: &'static str,
+    edges: usize,
+    arg: impl Fn(usize) -> specta::datatype::DataType,
+) -> Types {
+    use specta::datatype::{
+        DataType, Enum, Field, GenericDefinition, GenericReference, NamedDataType, Variant,
+    };
+
+    let mut types = Types::default();
+    NamedDataType::new(name, &mut types, |_, ndt| {
+        let t = GenericDefinition::new("T".into(), None);
+        ndt.generics = std::borrow::Cow::Owned(vec![t.clone()]);
+
+        let mut e = Enum::default();
+        for k in 0..edges {
+            let self_ref = ndt.reference(vec![(t.reference(), arg(k))]);
+            e.variants.push((
+                format!("V{k}").into(),
+                Variant::unnamed()
+                    .field(Field::new(DataType::Reference(self_ref)))
+                    .build(),
+            ));
+        }
+        e.variants.push((
+            "Terminal".into(),
+            Variant::unnamed()
+                .field(Field::new(DataType::Generic(GenericReference::new(
+                    "T".into(),
+                ))))
+                .build(),
+        ));
+        ndt.ty = Some(DataType::Enum(e));
+    });
+    types
+}
+
+/// A cycle whose instantiation set is large but *finite*
+/// (https://github.com/specta-rs/specta/pull/528#discussion_r3584652533):
+/// `Many<T>` has 70 self-edges, each at a distinct concrete argument. The
+/// substitution walk must run to its fixed point and collapse - a step
+/// budget sized at 64 used to give up first and fail the export even
+/// though the substitutions converge.
+#[test]
+fn large_finite_instantiation_set_reaches_its_fixed_point() {
+    use specta::datatype::{DataType, Primitive};
+
+    let types = dynamic_self_cycle("Many", 70, |k| {
+        // 70 structurally-distinct concrete arguments: k-times-nullable u8.
+        let mut dt = DataType::Primitive(Primitive::u8);
+        for _ in 0..k {
+            dt = DataType::Nullable(Box::new(dt));
+        }
+        dt
+    });
+
+    let ts = Typescript::default()
+        .export(&types, RawFormat)
+        .expect("a finite instantiation set must converge and collapse");
+    assert!(
+        ts.contains("export type Many<T> = T | number"),
+        "Many must collapse to its terminal branch under every instantiation: {ts}"
+    );
+    assert!(
+        !ts.contains("Many<") || !ts[ts.find('=').unwrap()..].contains("Many<"),
+        "no self-reference may survive the collapse: {ts}"
+    );
+}
+
+/// The genuinely divergent control: `Diverge<T>`'s self-edge instantiates
+/// `T` at `T | null`, so every trip around the cycle grows the argument
+/// and the instantiation set never converges. Only dynamically-built
+/// [`Types`] can express this (serde would need infinite monomorphization);
+/// the export must fail with an honest error rather than hang or emit the
+/// illegal TS2456 alias.
+#[test]
+fn divergent_instantiation_set_still_fails_honestly() {
+    use specta::datatype::{DataType, GenericReference};
+
+    let types = dynamic_self_cycle("Diverge", 1, |_| {
+        DataType::Nullable(Box::new(DataType::Generic(GenericReference::new(
+            "T".into(),
+        ))))
+    });
+
+    let err = with_timeout(Duration::from_secs(20), move || {
+        Typescript::default().export(&types, RawFormat)
+    })
+    .expect_err("a divergent instantiation set must fail the export");
+
+    let message = err.to_string();
+    assert!(
+        message.contains("recursive type-alias cycle") && message.contains("converge"),
+        "error should explain the divergence: {message}"
+    );
+}

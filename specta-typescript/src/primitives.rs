@@ -2369,6 +2369,58 @@ fn substitute_generics(dt: &mut DataType, subst: &GenericSubst) -> Result<(), Co
     }
 }
 
+/// Structural size of a datatype, used as a divergence guard for cycle
+/// instantiations (see [`collapse_untagged_alias_cycle`] phase 3): a type
+/// argument that grows on every trip around a cycle grows in weight, so
+/// capping the weight bounds the walk even for exponential growth.
+fn datatype_weight(dt: &DataType) -> usize {
+    fn fields_weight(fields: &Fields) -> usize {
+        match fields {
+            Fields::Unit => 1,
+            Fields::Unnamed(unnamed) => unnamed
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .map(datatype_weight)
+                .sum(),
+            Fields::Named(named) => named
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .map(datatype_weight)
+                .sum(),
+        }
+    }
+
+    1_usize.saturating_add(match dt {
+        DataType::Primitive(_) | DataType::Generic(_) => 0,
+        DataType::List(list) => datatype_weight(&list.ty),
+        DataType::Map(map) => {
+            datatype_weight(map.key_ty()).saturating_add(datatype_weight(map.value_ty()))
+        }
+        DataType::Struct(s) => fields_weight(&s.fields),
+        DataType::Enum(e) => e
+            .variants
+            .iter()
+            .map(|(_, variant)| fields_weight(&variant.fields))
+            .sum(),
+        DataType::Tuple(t) => t.elements.iter().map(datatype_weight).sum(),
+        DataType::Nullable(inner) => datatype_weight(inner),
+        DataType::Intersection(parts) => parts.iter().map(datatype_weight).sum(),
+        DataType::Reference(Reference::Named(r)) => match &r.inner {
+            NamedReferenceType::Reference { generics, .. } => {
+                generics.iter().map(|(_, dt)| datatype_weight(dt)).sum()
+            }
+            NamedReferenceType::Inline { dt, .. } => datatype_weight(dt),
+            NamedReferenceType::Recursive(_) => 0,
+        },
+        DataType::Reference(Reference::Opaque(opaque_ref)) => opaque_ref
+            .downcast_ref::<Branded>()
+            .map(|branded| datatype_weight(branded.ty()))
+            .unwrap_or(0),
+    })
+}
+
 fn substitute_fields_generics(
     fields: &mut Fields,
     subst: &GenericSubst,
@@ -2496,18 +2548,32 @@ fn collapse_untagged_alias_cycle(
     drop(frontier);
     drop(reverse);
 
-    // Phase 3: propagate generic instantiations around the cycle, starting
-    // from the root's identity. Every path from `root` to a cycle member
-    // stays inside the cycle (an intermediate node on such a path is
-    // mutually reachable with `root` by definition), so only cycle-internal
-    // edges need to carry substitutions. A member can be reached with
-    // several distinct instantiations (`Gen<T>` as the root *and* as
-    // `Gen<String>` through the cycle); each one contributes a copy of its
-    // variants during the merge. The instantiation set is finite unless the
-    // cycle grows its own type arguments (`Gen<T> -> Gen<Vec<T>>`) - a shape
-    // serde itself cannot serialize (it would need infinite
-    // monomorphization) but dynamically built [`Types`] can express, so a
-    // budget turns divergence into an error instead of a hang.
+    // Phase 3: propagate generic instantiations around the cycle to a fixed
+    // point, starting from the root's identity. Every path from `root` to a
+    // cycle member stays inside the cycle (an intermediate node on such a
+    // path is mutually reachable with `root` by definition), so only
+    // cycle-internal edges need to carry substitutions. A member can be
+    // reached with several distinct instantiations (`Gen<T>` as the root
+    // *and* as `Gen<String>` through the cycle); each one contributes a
+    // copy of its variants during the merge.
+    //
+    // Termination: only genuinely new (node, substitution) pairs enter the
+    // work list, so the walk stops exactly when the instantiation set stops
+    // growing - a finite set of any size converges. The set is infinite
+    // only when the cycle grows its own type arguments
+    // (`Gen<T> -> Gen<Vec<T>>`) - a shape serde itself cannot serialize (it
+    // would need infinite monomorphization) but dynamically built [`Types`]
+    // can express - so two generous divergence guards turn that into an
+    // error instead of a hang: a cap on *distinct* instantiations per node
+    // (breadth - many small instantiations), and a much smaller cap on the
+    // structural size of a single instantiation (growth - it stops both
+    // linearly-growing arguments like `Gen<T> -> Gen<Vec<T>>` after a few
+    // hundred trips and exponentially-growing ones like
+    // `Gen<T> -> Gen<(T, T)>` long before they exhaust memory; no
+    // realistic single type argument is 256 nodes deep/wide).
+    const MAX_SUBSTS_PER_NODE: usize = 1024;
+    const MAX_SUBST_WEIGHT: usize = 256;
+
     let identity: GenericSubst = root
         .generics
         .iter()
@@ -2519,15 +2585,10 @@ fn collapse_untagged_alias_cycle(
         .expect("root node always exists")
         .substs
         .push(identity);
-    let mut budget = in_cycle.len().saturating_mul(8).max(64);
     let mut cursor = 0;
     while cursor < work.len() {
         let (id, subst) = work[cursor].clone();
         cursor += 1;
-
-        budget = budget.checked_sub(1).ok_or(Cow::Borrowed(
-            "the cycle's generic instantiations never repeat",
-        ))?;
 
         let mut discovered = Vec::new();
         for edge in &nodes[&id].edges {
@@ -2545,7 +2606,20 @@ fn collapse_untagged_alias_cycle(
                 })
                 .collect::<Result<GenericSubst, Cow<'static, str>>>()?;
 
-            if !nodes[&edge.target].substs.contains(&target_subst) {
+            let target_substs = &nodes[&edge.target].substs;
+            if !target_substs.contains(&target_subst)
+                && !discovered.contains(&(edge.target.clone(), target_subst.clone()))
+            {
+                if target_substs.len() >= MAX_SUBSTS_PER_NODE {
+                    return Err(Cow::Borrowed(
+                        "the cycle's generic parameter instantiations do not converge (a single type is instantiated with an unbounded number of distinct arguments)",
+                    ));
+                }
+                if target_subst.values().map(datatype_weight).sum::<usize>() > MAX_SUBST_WEIGHT {
+                    return Err(Cow::Borrowed(
+                        "the cycle's generic parameter instantiations do not converge (a type argument keeps growing with every trip around the cycle)",
+                    ));
+                }
                 discovered.push((edge.target.clone(), target_subst));
             }
         }
