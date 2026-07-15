@@ -736,9 +736,18 @@ impl_ndt!(bytesize::ByteSize as String = inline);
 const _: () = {
     impl_ndt!(
         uhlc::NTP64 as u64 = inline;
-        uhlc::ID as [u8; 16] = inline;
+        uhlc::ID as UhlcId = inline;
         uhlc::Timestamp as UhlcTimestamp = inline;
     );
+
+    struct UhlcId;
+    impl Type for UhlcId {
+        fn definition(types: &mut Types) -> DataType {
+            let mut list = List::new(u8::definition(types));
+            list.length = Some(16);
+            DataType::List(list)
+        }
+    }
 
     struct UhlcTimestamp;
     impl Type for UhlcTimestamp {

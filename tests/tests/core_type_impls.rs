@@ -185,6 +185,36 @@ fn uhlc_id_uses_its_byte_array_shape() {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct ConstGenericUhlcWrapper<const N: usize> {
+    id: uhlc::ID,
+}
+
+#[test]
+fn uhlc_id_keeps_its_length_inside_const_generic_types() {
+    let DataType::Struct(wrapper) =
+        named_data_type::<ConstGenericUhlcWrapper<8>>("ConstGenericUhlcWrapper")
+    else {
+        panic!("wrapper should be modeled as a struct");
+    };
+    let Fields::Named(fields) = wrapper.fields else {
+        panic!("wrapper should have named fields");
+    };
+    let id = fields
+        .fields
+        .iter()
+        .find_map(|(name, field)| (name == "id").then_some(field.ty.as_ref()))
+        .flatten()
+        .expect("wrapper should contain an ID field");
+    let DataType::List(list) = inline_data_type(id) else {
+        panic!("uhlc::ID should be modeled as an array");
+    };
+
+    assert_eq!(list.length, Some(16));
+    assert_eq!(list.ty.as_ref(), &DataType::Primitive(Primitive::u8));
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct IterA;
 
 #[derive(Type)]
