@@ -154,8 +154,14 @@ struct FlattenMapValid {
 }
 
 // serde_json evidence (verified with a scratch crate against serde 1.0.228 /
-// serde_json 1.0.150): every one of these four representations flattens
-// fine, merging tag/content fields straight into the surrounding map.
+// serde_json 1.0.150): external, internal, and adjacent tagging always
+// flatten fine, merging tag/content fields straight into the surrounding map
+// (an externally tagged unit variant flattens as `"Variant": null`). An
+// untagged enum only flattens when the active variant's payload is
+// map-shaped - a variant wrapping e.g. a `u32` fails at runtime - but
+// rejecting untagged enums statically would break flattening
+// `serde_json::Value`, so they are deliberately accepted too (see
+// `flatten_of_json_value_and_json_map_is_accepted` below).
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
@@ -356,6 +362,276 @@ fn flatten_of_adjacently_tagged_enum_is_accepted() {
             specta_serde::Format,
         )
         .expect("flattening an adjacently tagged enum is valid serde usage");
+}
+
+// --- Gap 2 continued: adversarial edge cases ---
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenOptionVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: Option<Vec<u8>>,
+}
+
+#[test]
+fn flatten_of_option_vec_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenOptionVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "serde_json fails at runtime with \"can only flatten structs and maps (got a \
+             sequence)\" whenever the option is Some",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+// A tuple struct with exactly one field is a newtype: serde delegates
+// (de)serialization straight to the inner value with no `#[serde(transparent)]`
+// required, so flattening one is exactly as valid as flattening its inner type
+// (verified against serde_json 1.x: newtype-of-struct flattens fine,
+// newtype-of-integer fails with "can only flatten structs and maps").
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NewtypeOfStruct(Inner);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NewtypeOfNewtype(NewtypeOfStruct);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NewtypeOfPrimitive(u32);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenNewtypeStructValid {
+    a: i32,
+    #[serde(flatten)]
+    v: NewtypeOfStruct,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenNewtypeChainValid {
+    a: i32,
+    #[serde(flatten)]
+    v: NewtypeOfNewtype,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenNewtypePrimitiveInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: NewtypeOfPrimitive,
+}
+
+#[test]
+fn flatten_of_newtype_struct_wrapping_struct_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNewtypeStructValid>(),
+            specta_serde::Format,
+        )
+        .expect("serde delegates a newtype straight to its inner value, which is a struct here");
+}
+
+#[test]
+fn flatten_of_newtype_chain_wrapping_struct_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNewtypeChainValid>(),
+            specta_serde::Format,
+        )
+        .expect("newtype delegation applies at every level of the chain");
+}
+
+#[test]
+fn flatten_of_newtype_struct_wrapping_primitive_is_rejected() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNewtypePrimitiveInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "serde_json fails at runtime with \"can only flatten structs and maps (got an \
+             integer)\"",
+        );
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenBoxStructValid {
+    a: i32,
+    #[serde(flatten)]
+    v: Box<Inner>,
+}
+
+#[test]
+fn flatten_of_boxed_struct_is_accepted() {
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenBoxStructValid>(),
+            specta_serde::Format,
+        )
+        .expect("Box<T> is invisible to serde, so flattening Box<Struct> is valid");
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenGeneric<T> {
+    a: i32,
+    #[serde(flatten)]
+    t: T,
+}
+
+#[test]
+fn flatten_of_generic_parameter_is_accepted() {
+    // The generic definition's flatten field is `DataType::Generic`, whose
+    // shape is unknowable at validation time. serde allows this whenever the
+    // instantiation is struct/map-shaped, so rejecting it would be a false
+    // positive that breaks valid code.
+    Typescript::default()
+        .export(
+            &Types::default().register::<FlattenGeneric<Inner>>(),
+            specta_serde::Format,
+        )
+        .expect("flattening a generic parameter instantiated with a struct is valid serde usage");
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentOuter(TransparentInner);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentInner(Vec<u8>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenNestedTransparentVecInvalid {
+    a: i32,
+    #[serde(flatten)]
+    v: TransparentOuter,
+}
+
+#[test]
+fn flatten_of_nested_transparent_wrappers_around_vec_is_rejected() {
+    // Transparent resolution must recurse: two `#[serde(transparent)]`
+    // wrappers still delegate straight down to the `Vec<u8>`, which
+    // serde_json rejects at runtime with "can only flatten structs and maps
+    // (got a sequence)".
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FlattenNestedTransparentVecInvalid>(),
+            specta_serde::Format,
+        )
+        .expect_err("nested transparent wrappers still serialize as a sequence");
+
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenSelfRecursive {
+    a: i32,
+    #[serde(flatten)]
+    s: Box<FlattenSelfRecursive>,
+}
+
+#[test]
+fn flatten_of_self_referential_struct_terminates() {
+    // Serializing this at runtime would recurse forever, but that's not a
+    // flatten-shape problem - the target resolves to a named struct. What
+    // matters here is that the flatten target resolution's cycle guard
+    // terminates instead of hanging the export.
+    let result = with_timeout(std::time::Duration::from_secs(10), || {
+        Typescript::default().export(
+            &Types::default().register::<FlattenSelfRecursive>(),
+            specta_serde::Format,
+        )
+    });
+    result.expect("self-referential flatten target is struct-shaped, so validation accepts it");
+}
+
+/// Runs `f` on a background thread, panicking if it doesn't finish within
+/// `timeout`, so a recursion regression fails the test instead of hanging CI.
+fn with_timeout<T: Send + 'static>(
+    timeout: std::time::Duration,
+    f: impl FnOnce() -> T + Send + 'static,
+) -> T {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(timeout)
+        .expect("operation timed out - likely an infinite recursion regression")
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct FlattenJsonValue {
+    a: i32,
+    #[serde(flatten)]
+    v: serde_json::Value,
+    #[serde(flatten)]
+    extra: HashMap<String, serde_json::Value>,
+}
+
+#[test]
+fn flatten_of_json_value_and_json_map_is_accepted() {
+    // `serde_json::Value` is modelled as an untagged enum. Flattening it only
+    // works at runtime when the value is an object, but rejecting it would
+    // break the extremely common "extra fields" pattern, so enum targets are
+    // deliberately accepted (see `validate_flatten_target`).
+    //
+    // Validation is exercised via `Format::map_types` rather than a full
+    // TypeScript export because `Value` contains `i64`, which trips the
+    // exporter's unrelated BigInt policy after validation succeeds.
+    use specta::Format as _;
+
+    specta_serde::Format
+        .map_types(&Types::default().register::<FlattenJsonValue>())
+        .expect("flattening serde_json::Value / HashMap<String, Value> must stay accepted");
+}
+
+// --- Gap 1 continued: error paths use declaration indices ---
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct TupleCodecAfterSkipped(#[serde(skip)] u32, #[serde(with = "codec")] u32);
+
+#[test]
+fn tuple_struct_codec_error_uses_declaration_index() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<TupleCodecAfterSkipped>(),
+            specta_serde::Format,
+        )
+        .expect_err("codec without override must still be rejected after a skipped field");
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("[1]"),
+        "error should use the declaration index (1), not the post-filter index (0): {msg}"
+    );
 }
 
 // --- Gap 3: nested untagged enum inside an internally tagged enum reports

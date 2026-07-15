@@ -603,11 +603,21 @@ fn validate_flatten_target(
     seen: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match ty {
-        // Maps merge directly. Every serde enum representation (untagged,
-        // external, internal, adjacent) also flattens fine - verified against
-        // serde_json 1.x, which merges the tag/content fields straight into
-        // the surrounding map for all four representations.
+        // Maps merge directly. Enums are accepted for all four serde
+        // representations: external, internal, and adjacent tagging always
+        // produce map-shaped output when flattened (verified against
+        // serde_json 1.x - even an externally tagged unit variant flattens as
+        // `"Variant": null`). An untagged enum only flattens when the active
+        // variant's payload is map-shaped, but rejecting it statically would
+        // break the common pattern of flattening `serde_json::Value` (an
+        // untagged enum) for extra fields, so it is deliberately accepted.
         DataType::Map(_) | DataType::Enum(_) => Ok(()),
+        // An intersection is a structural merge of object-like types (see
+        // `DataType::Intersection`'s docs), so it is map-shaped by
+        // construction. It can't come out of a derive - specta-serde only
+        // produces it *after* validation, when lowering flatten itself - but
+        // a manually built one must not be false-positived on.
+        DataType::Intersection(_) => Ok(()),
         // A flattened `Option<T>` (including nested `Option<Option<T>>`)
         // contributes nothing when absent and validates as `T` when present.
         DataType::Nullable(inner) => validate_flatten_target(inner, types, path, seen),
@@ -645,10 +655,26 @@ fn validate_flatten_target(
 
             match &strct.fields {
                 Fields::Unit | Fields::Named(_) => Ok(()),
-                Fields::Unnamed(_) => Err(Error::invalid_flatten_target(
-                    path.to_string(),
-                    "tuple structs serialize as a sequence; serde can only flatten structs and maps",
-                )),
+                Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
+                    // A tuple struct with exactly one declared field is a
+                    // newtype: serde delegates (de)serialization straight to
+                    // the inner value (no `#[serde(transparent)]` needed), so
+                    // the flatten target is the inner value's shape.
+                    [single] => match &single.ty {
+                        Some(ty) => validate_flatten_target(ty, types, path, seen),
+                        // The field is skipped, so its type is unknowable
+                        // here (serde still delegates to it when
+                        // serializing); don't false-positive.
+                        None => Ok(()),
+                    },
+                    // Zero or multiple declared fields serialize as a
+                    // sequence (`[]` / `[a, b]`), even when skips leave one
+                    // live field - verified against serde_json 1.x.
+                    _ => Err(Error::invalid_flatten_target(
+                        path.to_string(),
+                        "tuple structs serialize as a sequence; serde can only flatten structs and maps",
+                    )),
+                },
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
@@ -666,13 +692,12 @@ fn validate_flatten_target(
         // Can't inspect the shape behind an opaque reference or a generic
         // parameter here; don't false-positive on it.
         DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => Ok(()),
-        DataType::List(_)
-        | DataType::Tuple(_)
-        | DataType::Primitive(_)
-        | DataType::Intersection(_) => Err(Error::invalid_flatten_target(
-            path.to_string(),
-            "serde can only flatten structs and maps, but this field's type serializes as a sequence, tuple, or scalar value",
-        )),
+        DataType::List(_) | DataType::Tuple(_) | DataType::Primitive(_) => {
+            Err(Error::invalid_flatten_target(
+                path.to_string(),
+                "serde can only flatten structs and maps, but this field's type serializes as a sequence, tuple, or scalar value",
+            ))
+        }
     }
 }
 
