@@ -332,6 +332,10 @@ struct WireNewtype(String);
 #[specta(collect = false)]
 struct WireTuple(String, u32);
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct WireSkippedTuple(#[serde(skip)] (), String);
+
 #[derive(Default, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct WireGeneric<T>(Option<T>);
@@ -343,6 +347,7 @@ struct NonObjectWireShapes {
     unit: WireUnit,
     id: WireNewtype,
     tuple: WireTuple,
+    skipped_tuple: WireSkippedTuple,
     generic: WireGeneric<u8>,
     nested_generic: WireGeneric<Option<u8>>,
     #[serde(default)]
@@ -830,6 +835,14 @@ fn anonymous_structural_types_are_supported() {
 
 #[test]
 fn serde_non_object_structs_render_as_their_wire_shapes() {
+    let mut definition_types = Types::default();
+    let skipped_tuple = WireSkippedTuple::definition(&mut definition_types);
+    assert_eq!(
+        specta_csharp::primitives::datatype(&CSharp::new(), &definition_types, &skipped_tuple,)
+            .unwrap(),
+        "global::System.ValueTuple<string>"
+    );
+
     let output = CSharp::new()
         .export(
             &Types::default().register::<NonObjectWireShapes>(),
@@ -841,6 +854,10 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
     assert!(output.contains("object? RawUnit"));
     assert!(output.contains("string Id"));
     assert!(output.contains("(string, uint) Tuple"));
+    assert!(
+        output.contains("global::System.ValueTuple<string> SkippedTuple"),
+        "{output}"
+    );
     assert!(output.contains("byte? Generic"));
     assert!(output.contains("byte? NestedGeneric"));
     assert!(output.contains("object? OptionalUnit"));

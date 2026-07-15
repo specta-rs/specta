@@ -317,7 +317,7 @@ fn render_named(
     let Some(ty) = ndt.ty.as_ref() else {
         return Ok(());
     };
-    if matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)) {
+    if is_non_object_datatype(ty) {
         return Ok(());
     }
     xml_docs(out, base, &ndt.docs);
@@ -622,19 +622,12 @@ fn collect_inline_structural_types<'a>(types: &'a Types, ty: &'a DataType) -> Ve
                         collect(types, generic, generic_layers, visiting, found);
                     }
                     if visiting.insert(reference.clone()) {
-                        if let Some(DataType::Struct(strct)) =
-                            types.get(reference).and_then(|ndt| ndt.ty.as_ref())
-                            && is_non_object_struct(&strct.fields)
+                        if let Some(ty) = types.get(reference).and_then(|ndt| ndt.ty.as_ref())
+                            && is_non_object_datatype(ty)
                         {
                             let mut layers = generic_layers.to_vec();
                             layers.push(generics);
-                            if let Fields::Unnamed(fields) = &strct.fields {
-                                for field in &fields.fields {
-                                    if let Some(ty) = &field.ty {
-                                        collect(types, ty, &layers, visiting, found);
-                                    }
-                                }
-                            }
+                            collect(types, ty, &layers, visiting, found);
                         }
                         visiting.remove(reference);
                     }
@@ -686,17 +679,33 @@ fn render_datatype_with_inline_overrides(
     ) -> Result<(), Error> {
         match ty {
             DataType::Struct(strct) if is_non_object_struct(&strct.fields) => {
-                let fields = match &strct.fields {
-                    Fields::Unit => Vec::new(),
-                    Fields::Unnamed(fields) => fields
-                        .fields
-                        .iter()
-                        .filter_map(|field| field.ty.as_ref())
-                        .collect(),
+                let (fields, preserve_tuple_shape) = match &strct.fields {
+                    Fields::Unit => (Vec::new(), false),
+                    Fields::Unnamed(fields) => (
+                        fields
+                            .fields
+                            .iter()
+                            .filter_map(|field| field.ty.as_ref())
+                            .collect(),
+                        fields.fields.len() != 1,
+                    ),
                     Fields::Named(_) => unreachable!(),
                 };
                 match fields.as_slice() {
                     [] => out.push_str("object?"),
+                    [field] if preserve_tuple_shape => {
+                        out.push_str("global::System.ValueTuple<");
+                        render(
+                            out,
+                            exporter,
+                            types,
+                            field,
+                            structural_types,
+                            path,
+                            generic_layers,
+                        )?;
+                        out.push('>');
+                    }
                     [field] => {
                         render(
                             out,
@@ -762,22 +771,43 @@ fn render_datatype_with_inline_overrides(
                             name: rust_path(ndt),
                         });
                     }
+                    let mut layers = generic_layers.to_vec();
+                    layers.push(generics);
+                    if let Some(ty) = ndt.ty.as_ref()
+                        && matches!(ty, DataType::Tuple(_))
+                    {
+                        return render(out, exporter, types, ty, structural_types, path, &layers);
+                    }
                     if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                         && is_non_object_struct(&strct.fields)
                     {
-                        let mut layers = generic_layers.to_vec();
-                        layers.push(generics);
-                        let fields = match &strct.fields {
-                            Fields::Unit => Vec::new(),
-                            Fields::Unnamed(fields) => fields
-                                .fields
-                                .iter()
-                                .filter_map(|field| field.ty.as_ref())
-                                .collect(),
+                        let (fields, preserve_tuple_shape) = match &strct.fields {
+                            Fields::Unit => (Vec::new(), false),
+                            Fields::Unnamed(fields) => (
+                                fields
+                                    .fields
+                                    .iter()
+                                    .filter_map(|field| field.ty.as_ref())
+                                    .collect(),
+                                fields.fields.len() != 1,
+                            ),
                             Fields::Named(_) => unreachable!(),
                         };
                         match fields.as_slice() {
                             [] => out.push_str("object?"),
+                            [field] if preserve_tuple_shape => {
+                                out.push_str("global::System.ValueTuple<");
+                                render(
+                                    out,
+                                    exporter,
+                                    types,
+                                    field,
+                                    structural_types,
+                                    path,
+                                    &layers,
+                                )?;
+                                out.push('>');
+                            }
                             [field] => render(
                                 out,
                                 exporter,
@@ -1301,6 +1331,22 @@ fn datatype(
                         name: rust_path(ndt),
                     });
                 }
+                if let Some(ty) = ndt.ty.as_ref()
+                    && matches!(ty, DataType::Tuple(_))
+                {
+                    let NamedReferenceType::Reference { generics, .. } = &reference.inner else {
+                        unreachable!()
+                    };
+                    return wire_datatype(
+                        out,
+                        exporter,
+                        types,
+                        ty,
+                        path,
+                        &[generics],
+                        &mut HashSet::new(),
+                    );
+                }
                 if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                     && is_non_object_struct(&strct.fields)
                 {
@@ -1373,6 +1419,11 @@ fn is_non_object_struct(fields: &Fields) -> bool {
     matches!(fields, Fields::Unit | Fields::Unnamed(_))
 }
 
+fn is_non_object_datatype(ty: &DataType) -> bool {
+    matches!(ty, DataType::Tuple(_))
+        || matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields))
+}
+
 fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
     let variants = enm
         .variants
@@ -1417,9 +1468,9 @@ fn is_rewritten_string_enum(enm: &specta::datatype::Enum) -> bool {
 }
 
 fn is_emitted_named(ndt: &NamedDataType) -> bool {
-    ndt.ty.as_ref().is_some_and(
-        |ty| !matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields)),
-    )
+    ndt.ty
+        .as_ref()
+        .is_some_and(|ty| !is_non_object_datatype(ty))
 }
 
 fn recursive_inline_fallback<'a>(
@@ -1501,8 +1552,8 @@ fn validate_non_object_recursion(
                 let ndt = types
                     .get(reference)
                     .ok_or_else(|| Error::DanglingReference { path: path.into() })?;
-                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
-                    && is_non_object_struct(&strct.fields)
+                if let Some(ty) = ndt.ty.as_ref()
+                    && is_non_object_datatype(ty)
                 {
                     let key = format!("{}::{generics:?}", rust_path(ndt));
                     if visiting.len() >= 128 || !visiting.insert(key.clone()) {
@@ -1510,11 +1561,7 @@ fn validate_non_object_recursion(
                     }
                     let mut layers = generic_layers.to_vec();
                     layers.push(generics);
-                    if let Fields::Unnamed(fields) = &strct.fields {
-                        for field in fields.fields.iter().filter_map(|field| field.ty.as_ref()) {
-                            validate_non_object_recursion(types, field, &layers, visiting, path)?;
-                        }
-                    }
+                    validate_non_object_recursion(types, ty, &layers, visiting, path)?;
                     visiting.remove(&key);
                 }
             }
@@ -1564,17 +1611,33 @@ fn render_non_object_struct_inner(
     generic_layers: &[GenericArguments<'_>],
     visited_non_objects: &mut HashSet<String>,
 ) -> Result<(), Error> {
-    let fields = match fields {
-        Fields::Unit => Vec::new(),
-        Fields::Unnamed(fields) => fields
-            .fields
-            .iter()
-            .filter_map(|field| field.ty.as_ref())
-            .collect(),
+    let (fields, preserve_tuple_shape) = match fields {
+        Fields::Unit => (Vec::new(), false),
+        Fields::Unnamed(fields) => (
+            fields
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .collect(),
+            fields.fields.len() != 1,
+        ),
         Fields::Named(_) => unreachable!("named fields have an object wire shape"),
     };
     match fields.as_slice() {
         [] => out.push_str("object?"),
+        [field] if preserve_tuple_shape => {
+            out.push_str("global::System.ValueTuple<");
+            wire_datatype(
+                out,
+                exporter,
+                types,
+                field,
+                path,
+                generic_layers,
+                visited_non_objects,
+            )?;
+            out.push('>');
+        }
         [field] => wire_datatype(
             out,
             exporter,
@@ -1745,6 +1808,19 @@ fn wire_datatype(
                         path: path.into(),
                         name: rust_path(ndt),
                     });
+                }
+                if let Some(ty) = ndt.ty.as_ref()
+                    && matches!(ty, DataType::Tuple(_))
+                {
+                    return wire_datatype(
+                        out,
+                        exporter,
+                        types,
+                        ty,
+                        path,
+                        generic_layers,
+                        visited_non_objects,
+                    );
                 }
                 if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
                     && is_non_object_struct(&strct.fields)

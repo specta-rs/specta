@@ -78,7 +78,7 @@ cargo add specta-python      # Python 3.13 type hints (partial)
 cargo add specta_kotlin       # Kotlin (partial)
 cargo add specta_jsonschema   # JSON Schema (partial)
 # cargo add specta_zod         # Zod schemas (planned)
-cargo add specta_csharp        # C# (partial)
+cargo add specta-csharp        # C# (partial)
 ```
 
 Then you can use Specta like following:
