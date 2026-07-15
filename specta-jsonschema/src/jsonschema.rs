@@ -1,7 +1,7 @@
 use std::{borrow::Cow, path::Path};
 
 use serde_json::{Map, Value};
-use specta::{Format, Types};
+use specta::{Format, Type, Types};
 
 use crate::{Error, SchemaVersion, render::Renderer};
 
@@ -88,7 +88,7 @@ impl JsonSchema {
         let types = types.as_ref();
 
         let renderer = Renderer::new(self.schema_version, types, self.allow_additional_properties);
-        let definitions = renderer.render_definitions(&roots)?;
+        let (definitions, _) = renderer.render_definitions(&roots)?;
 
         let mut root = Map::new();
         root.insert(
@@ -116,6 +116,81 @@ impl JsonSchema {
         );
 
         Ok(Value::Object(root))
+    }
+
+    /// Export `T` as the document's root schema.
+    ///
+    /// Unlike [`Self::export_value`], this preserves the concrete registered
+    /// root itself, including anonymous collection and tuple types, while
+    /// still placing named dependencies in the definitions object.
+    pub fn export_type_value<T: Type>(&self, format: impl Format) -> Result<Value, Error> {
+        let types = Types::default().register::<T>();
+        let roots = types
+            .roots()
+            .map(|root| {
+                format
+                    .map_type(&types, root)
+                    .map(Cow::into_owned)
+                    .map_err(|err| Error::format("root type formatter failed", err))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mapped = format
+            .map_types(&types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?;
+        let renderer = Renderer::new(
+            self.schema_version,
+            mapped.as_ref(),
+            self.allow_additional_properties,
+        );
+        let (definitions, mut roots) = renderer.render_definitions(&roots)?;
+        let root_schema = roots.pop().unwrap_or(Value::Bool(true));
+
+        let mut document = match root_schema {
+            Value::Object(schema) => schema,
+            schema => Map::from_iter([("allOf".to_string(), Value::Array(vec![schema]))]),
+        };
+        if matches!(self.schema_version, SchemaVersion::Draft7)
+            && let Some(reference) = document.remove("$ref")
+        {
+            document.insert(
+                "allOf".to_string(),
+                Value::Array(vec![Value::Object(Map::from_iter([(
+                    "$ref".to_string(),
+                    reference,
+                )]))]),
+            );
+        }
+        document.insert(
+            "$schema".to_string(),
+            Value::String(self.schema_version.uri().to_string()),
+        );
+        if let Some(id) = &self.id {
+            document.insert("$id".to_string(), Value::String(id.to_string()));
+        }
+        if let Some(title) = &self.title {
+            document.insert("title".to_string(), Value::String(title.to_string()));
+        }
+        if let Some(description) = &self.description {
+            document.insert(
+                "description".to_string(),
+                Value::String(description.to_string()),
+            );
+        }
+        if let Some(comment) = &self.comment {
+            document.insert("$comment".to_string(), Value::String(comment.to_string()));
+        }
+        document.insert(
+            self.schema_version.definitions_key().to_string(),
+            Value::Object(definitions),
+        );
+        Ok(Value::Object(document))
+    }
+
+    /// Export `T` as a pretty-printed root schema document.
+    pub fn export_type<T: Type>(&self, format: impl Format) -> Result<String, Error> {
+        Ok(serde_json::to_string_pretty(
+            &self.export_type_value::<T>(format)?,
+        )?)
     }
 
     /// Export the schema document as a [`serde_json::Value`] with a root `$ref` into the definitions.

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedDataType, Primitive},
+    datatype::{DataType, Field, NamedDataType, Primitive, Struct},
 };
 use specta_openapi::{OpenApi, OutputFormat, SchemaMode};
 
@@ -354,10 +354,8 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
         .expect("compatible mode should preserve enum-key constraints");
     let enum_map = serde_json::to_value(enum_map).unwrap();
     assert_eq!(
-        enum_map["components"]["schemas"]["EnumMap"]["x-specta-property-names"]["oneOf"]
-            .as_array()
-            .map(Vec::len),
-        Some(2)
+        enum_map["components"]["schemas"]["EnumMap"]["x-specta-property-names"]["$ref"],
+        "#/components/schemas/EnumKey"
     );
 
     let null_error = OpenApi::default()
@@ -410,6 +408,32 @@ fn openapi_rejects_component_name_collisions() {
         .export(&types, specta_serde::Format)
         .expect_err("sanitized component names must not overwrite each other");
     assert!(error.to_string().contains("definition name collision"));
+}
+
+#[test]
+fn openapi_sanitizes_escaped_definition_names_and_rewrites_refs() {
+    let mut types = Types::default();
+    let escaped = NamedDataType::new("A/B~%#é", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(Primitive::str));
+    });
+    NamedDataType::new("EscapedHolder", &mut types, |_, ndt| {
+        ndt.ty = Some(
+            Struct::named()
+                .field("value", Field::new(escaped.reference(vec![]).into()))
+                .build(),
+        );
+    });
+
+    let document = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .unwrap();
+    let document = serde_json::to_value(document).unwrap();
+    let schemas = &document["components"]["schemas"];
+    assert!(schemas.get("A_B").is_some());
+    assert_eq!(
+        schemas["EscapedHolder"]["properties"]["value"]["$ref"],
+        "#/components/schemas/A_B"
+    );
 }
 
 #[test]

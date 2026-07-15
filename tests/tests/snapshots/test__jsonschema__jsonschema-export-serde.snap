@@ -729,10 +729,30 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       ],
       "title": "Eight"
     },
-    "EmptyEnum": false,
-    "EmptyEnumTagged": false,
-    "EmptyEnumTaggedWContent": false,
-    "EmptyEnumUntagged": false,
+    "EmptyEnum": {
+      "allOf": [
+        false
+      ],
+      "title": "EmptyEnum"
+    },
+    "EmptyEnumTagged": {
+      "allOf": [
+        false
+      ],
+      "title": "EmptyEnumTagged"
+    },
+    "EmptyEnumTaggedWContent": {
+      "allOf": [
+        false
+      ],
+      "title": "EmptyEnumTaggedWContent"
+    },
+    "EmptyEnumUntagged": {
+      "allOf": [
+        false
+      ],
+      "title": "EmptyEnumUntagged"
+    },
     "EmptyStruct": {
       "additionalProperties": false,
       "properties": {},
@@ -925,14 +945,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             "type": "integer"
           },
           "propertyNames": {
-            "oneOf": [
-              {
-                "const": "A"
-              },
-              {
-                "const": "B"
-              }
-            ]
+            "$ref": "#/$defs/BasicEnum"
           },
           "type": "object"
         }
@@ -3866,14 +3879,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             "type": "null"
           },
           "propertyNames": {
-            "oneOf": [
-              {
-                "const": "A"
-              },
-              {
-                "const": "B"
-              }
-            ]
+            "$ref": "#/$defs/BasicEnum"
           },
           "type": "object"
         },
@@ -3884,14 +3890,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             "type": "integer"
           },
           "propertyNames": {
-            "oneOf": [
-              {
-                "const": "A"
-              },
-              {
-                "const": "B"
-              }
-            ]
+            "$ref": "#/$defs/BasicEnum"
           },
           "type": "object"
         },
@@ -3919,17 +3918,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
             "type": "null"
           },
           "propertyNames": {
-            "oneOf": [
-              {
-                "const": "A"
-              },
-              {
-                "const": "B"
-              },
-              {
-                "const": "C"
-              }
-            ]
+            "$ref": "#/$defs/UnitVariants"
           },
           "type": "object"
         },
@@ -5638,7 +5627,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       ],
       "title": "Tenth"
     },
-    "TestCollectionRegister": false,
+    "TestCollectionRegister": {
+      "allOf": [
+        false
+      ],
+      "title": "TestCollectionRegister"
+    },
     "TestEnum": {
       "oneOf": [
         {
@@ -5877,7 +5871,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "title": "TupleStructWithRep",
       "type": "string"
     },
-    "Type": false,
+    "Type": {
+      "allOf": [
+        false
+      ],
+      "title": "Type"
+    },
     "Unit1": {
       "title": "Unit1",
       "type": "null"

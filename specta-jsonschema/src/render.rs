@@ -18,6 +18,7 @@ const INLINE_RECURSION_LIMIT: usize = 128;
 const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
+const SERDE_ENUM_OTHER_VARIANT: &str = "specta_serde:variant_other";
 
 type Generics = BTreeMap<Cow<'static, str>, DataType>;
 
@@ -76,9 +77,15 @@ impl<'a> Renderer<'a> {
     pub(crate) fn render_definitions(
         mut self,
         roots: &[DataType],
-    ) -> Result<Map<String, Value>, Error> {
+    ) -> Result<(Map<String, Value>, Vec<Value>), Error> {
+        let mut rendered_roots = Vec::with_capacity(roots.len());
         for root in roots {
-            self.render_datatype(root, &Generics::new(), "registered root", 0)?;
+            rendered_roots.push(self.render_datatype(
+                root,
+                &Generics::new(),
+                "registered root",
+                0,
+            )?);
         }
 
         for ndt in self.types.into_sorted_iter() {
@@ -97,7 +104,7 @@ impl<'a> Renderer<'a> {
             self.ensure_definition(ndt, key, generics, &path)?;
         }
 
-        Ok(self.definitions)
+        Ok((self.definitions, rendered_roots))
     }
 
     fn ensure_definition(
@@ -775,7 +782,13 @@ impl<'a> Renderer<'a> {
             .collect::<Result<Vec<_>, _>>()?;
 
         if rewritten {
-            exclude_known_discriminants(&mut variants);
+            let other_variants = enm
+                .variants
+                .iter()
+                .filter(|(_, variant)| !variant.skip)
+                .map(|(_, variant)| variant.attributes.contains_key(SERDE_ENUM_OTHER_VARIANT))
+                .collect::<Vec<_>>();
+            exclude_known_discriminants(&mut variants, &other_variants);
         }
 
         let rewritten_may_overlap = rewritten
@@ -914,8 +927,15 @@ impl<'a> Renderer<'a> {
         docs: &str,
         deprecated: Option<&Deprecated>,
     ) {
+        if !schema.is_object() {
+            if title.is_none() && docs.is_empty() && deprecated.is_none() {
+                return;
+            }
+            let inner = std::mem::replace(schema, Value::Object(Map::new()));
+            *schema = object([("allOf", Value::Array(vec![inner]))]);
+        }
         let Value::Object(schema) = schema else {
-            return;
+            unreachable!("boolean schemas with metadata are wrapped above")
         };
 
         if matches!(self.schema_version, SchemaVersion::Draft7)
@@ -1295,9 +1315,27 @@ fn enum_is_string_unit_only(enm: &Enum) -> bool {
             .iter()
             .filter(|(_, variant)| !variant.skip)
             .all(|(_, variant)| {
-                matches!(variant.fields, Fields::Unit)
-                    && (rewritten || !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED))
+                if rewritten {
+                    let Fields::Unnamed(fields) = &variant.fields else {
+                        return false;
+                    };
+                    let [field] = fields.fields.as_slice() else {
+                        return false;
+                    };
+                    field.ty.as_ref().is_some_and(is_string_literal_datatype)
+                } else {
+                    matches!(variant.fields, Fields::Unit)
+                        && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                }
             })
+}
+
+fn is_string_literal_datatype(dt: &DataType) -> bool {
+    let DataType::Enum(enm) = dt else {
+        return false;
+    };
+    enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN)
+        && matches!(enm.variants.as_slice(), [(_, variant)] if matches!(variant.fields, Fields::Unit))
 }
 
 fn metadata_description(docs: &str, deprecated: Option<&Deprecated>) -> String {
@@ -1431,16 +1469,15 @@ fn schema_has_const(schema: &Value, value: &str) -> bool {
     }
 }
 
-fn exclude_known_discriminants(variants: &mut [Value]) {
+fn exclude_known_discriminants(variants: &mut [Value], other_variants: &[bool]) {
     let mut properties = BTreeMap::<Option<String>, BTreeSet<String>>::new();
     for variant in variants.iter() {
         collect_fixed_discriminants(variant, &mut properties);
     }
-    for variant in variants
-        .iter_mut()
-        .filter(|variant| !schema_contains_const(variant))
-    {
-        exclude_discriminants(variant, &properties);
+    for (variant, is_other) in variants.iter_mut().zip(other_variants) {
+        if *is_other {
+            exclude_discriminants(variant, &properties);
+        }
     }
 }
 
@@ -1471,16 +1508,6 @@ fn collect_fixed_discriminants(
         for schema in schemas {
             collect_fixed_discriminants(schema, discriminants);
         }
-    }
-}
-
-fn schema_contains_const(schema: &Value) -> bool {
-    match schema {
-        Value::Object(schema) => {
-            schema.contains_key("const") || schema.values().any(schema_contains_const)
-        }
-        Value::Array(values) => values.iter().any(schema_contains_const),
-        _ => false,
     }
 }
 

@@ -38,14 +38,7 @@ expression: schema
             "type": "integer"
           },
           "propertyNames": {
-            "oneOf": [
-              {
-                "const": "A"
-              },
-              {
-                "const": "B"
-              }
-            ]
+            "$ref": "#/$defs/Key"
           },
           "type": "object"
         }

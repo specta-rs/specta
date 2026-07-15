@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, dead_code, missing_docs)]
+#![allow(clippy::unwrap_used, dead_code, deprecated, missing_docs)]
 
 use std::{borrow::Cow, fs};
 
@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use specta::{
     Format, Type, Types,
     datatype::{
-        DataType, Field, Generic, GenericDefinition, List, Map as SpectaMap, NamedDataType,
-        Primitive, Struct,
+        Attributes, DataType, Deprecated, Enum, Field, Generic, GenericDefinition, List,
+        Map as SpectaMap, NamedDataType, Primitive, Struct, Variant,
     },
 };
 use specta_jsonschema::{JsonSchema, SchemaVersion};
@@ -173,6 +173,20 @@ enum InternalOther {
     Known { value: u32 },
     #[serde(other)]
     Other,
+}
+
+/// Named map-key documentation.
+#[deprecated(note = "Use another key")]
+#[derive(Type, Eq, PartialEq, std::hash::Hash)]
+enum DocumentedKey {
+    A,
+    B,
+}
+
+#[allow(deprecated)]
+#[derive(Type)]
+struct DocumentedKeyMap {
+    values: std::collections::HashMap<DocumentedKey, String>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -348,6 +362,36 @@ fn directly_registered_generic_root_is_materialized() {
         "string"
     );
     assert!(schema["$defs"].get("Wrapper").is_none());
+}
+
+#[test]
+fn exports_typed_anonymous_root_schema() {
+    let schema = JsonSchema::default()
+        .export_type_value::<Vec<User>>(IdentityFormat)
+        .unwrap();
+
+    assert_eq!(schema["type"], "array");
+    assert_eq!(schema["items"]["$ref"], "#/$defs/User");
+    assert!(schema["$defs"].get("User").is_some());
+}
+
+#[test]
+fn draft7_typed_named_root_wraps_ref_and_keeps_document_metadata() {
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .id("https://example.com/user.schema.json")
+        .title("Configured user")
+        .description("Configured root description")
+        .comment("Generated root")
+        .export_type_value::<User>(IdentityFormat)
+        .unwrap();
+
+    assert!(schema.get("$ref").is_none());
+    assert_eq!(schema["allOf"][0]["$ref"], "#/definitions/User");
+    assert_eq!(schema["$id"], "https://example.com/user.schema.json");
+    assert_eq!(schema["title"], "Configured user");
+    assert_eq!(schema["description"], "Configured root description");
+    assert_eq!(schema["$comment"], "Generated root");
 }
 
 #[test]
@@ -674,6 +718,122 @@ fn rewritten_other_variants_keep_their_wire_shape() {
     assert!(!validator.is_valid(&serde_json::json!({
         "Other": { "kind": "unknown" }
     })));
+}
+
+#[test]
+fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
+    fn string_literal(value: &'static str) -> DataType {
+        let mut enm = Enum::default();
+        enm.attributes
+            .insert("specta_serde:enum_repr_rewritten", true);
+        enm.variants.push((value.into(), Variant::unit()));
+        enm.into()
+    }
+
+    let mut types = Types::default();
+    NamedDataType::new("MixedUntaggedOther", &mut types, |_, ndt| {
+        let mut enm = Enum::default();
+        enm.attributes
+            .insert("specta_serde:enum_repr_rewritten", true);
+        enm.variants.push((
+            "Known".into(),
+            Variant::named()
+                .field("kind", Field::new(string_literal("Known")))
+                .field("value", Field::new(Primitive::u32.into()))
+                .build(),
+        ));
+        enm.variants.push((
+            "Raw".into(),
+            Variant::named()
+                .field("kind", Field::new(Primitive::str.into()))
+                .build(),
+        ));
+        let mut attributes = Attributes::default();
+        attributes.insert("specta_serde:variant_other", true);
+        enm.variants.push((
+            "Other".into(),
+            Variant::named()
+                .field("kind", Field::new(Primitive::str.into()))
+                .attributes(attributes)
+                .build(),
+        ));
+        ndt.ty = Some(enm.into());
+    });
+    let schema = JsonSchema::default()
+        .export_ref_value(&types, IdentityFormat, "MixedUntaggedOther")
+        .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    assert!(validator.is_valid(&serde_json::json!({ "kind": "Known", "value": 1 })));
+    assert!(validator.is_valid(&serde_json::json!({ "kind": "Known" })));
+}
+
+#[test]
+fn boolean_schemas_preserve_named_and_field_metadata() {
+    let mut types = Types::default();
+    NamedDataType::new("Impossible", &mut types, |_, ndt| {
+        ndt.docs = "No values exist.".into();
+        ndt.deprecated = Some(Deprecated::with_note("Use another type".into()));
+        ndt.ty = Some(Enum::default().into());
+    });
+    NamedDataType::new("ImpossibleField", &mut types, |_, ndt| {
+        let mut field = Field::new(Enum::default().into());
+        field.docs = "Impossible field.".into();
+        field.deprecated = Some(Deprecated::with_note("Remove this field".into()));
+        ndt.ty = Some(Struct::named().field("value", field).build());
+    });
+
+    let schema = JsonSchema::default()
+        .export_value(&types, IdentityFormat)
+        .unwrap();
+    let impossible = &schema["$defs"]["Impossible"];
+    assert_eq!(impossible["allOf"][0], false);
+    assert_eq!(impossible["title"], "Impossible");
+    assert_eq!(impossible["deprecated"], true);
+    assert!(
+        impossible["description"]
+            .as_str()
+            .unwrap()
+            .contains("No values")
+    );
+    let field = &schema["$defs"]["ImpossibleField"]["properties"]["value"];
+    assert_eq!(field["allOf"][0], false);
+    assert_eq!(field["deprecated"], true);
+    assert!(
+        field["description"]
+            .as_str()
+            .unwrap()
+            .contains("Impossible field")
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn serde_named_enum_map_keys_keep_definition_metadata() {
+    fn assert_schema(schema: serde_json::Value) {
+        let property_names =
+            &schema["$defs"]["DocumentedKeyMap"]["properties"]["values"]["propertyNames"];
+        assert_eq!(property_names["$ref"], "#/$defs/DocumentedKey");
+        assert_eq!(schema["$defs"]["DocumentedKey"]["deprecated"], true);
+        assert!(
+            schema["$defs"]["DocumentedKey"]["description"]
+                .as_str()
+                .unwrap()
+                .contains("Named map-key documentation")
+        );
+    }
+
+    let types = Types::default().register::<DocumentedKeyMap>();
+    assert_schema(
+        JsonSchema::default()
+            .export_value(&types, specta_serde::Format)
+            .unwrap(),
+    );
+    assert_schema(
+        JsonSchema::default()
+            .export_value(&types, specta_serde::PhasesFormat)
+            .unwrap(),
+    );
 }
 
 #[test]
