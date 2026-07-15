@@ -2174,6 +2174,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-python"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "unicode-ident",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "specta-serde"
 version = "0.0.13"
 dependencies = [
@@ -2224,6 +2235,7 @@ dependencies = [
  "specta-kotlin",
  "specta-openapi",
  "specta-rust",
+ "specta-python",
  "specta-serde",
  "specta-swift",
  "specta-typescript",
@@ -2540,6 +2552,15 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd4f6878c9cb28d874b009da9e8d183b5abc80117c40bbd187a1fde336be6e8"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-segmentation"

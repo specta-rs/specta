@@ -18,6 +18,7 @@ specta-java = { path = "../specta-java" }
 specta-kotlin = { path = "../specta-kotlin" }
 specta-openapi = { path = "../specta-openapi" }
 specta-rust = { path = "../specta-rust" }
+specta-python = { path = "../specta-python" }
 specta-serde = { path = "../specta-serde" }
 specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
