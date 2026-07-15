@@ -303,6 +303,46 @@ fn python_inline_and_opaque_types() {
 }
 
 #[test]
+fn python_flatten_uses_omitted_generic_defaults() {
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Inner<T = String> {
+        value: T,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct Outer {
+        outer: bool,
+        #[serde(flatten)]
+        inner: Inner,
+    }
+
+    let output = Python::default()
+        .export(&Types::default().register::<Outer>(), specta_serde::Format)
+        .unwrap();
+    assert!(
+        output.contains("\"value\": _specta_builtins.str"),
+        "{output}"
+    );
+}
+
+#[test]
+fn python_rejects_debug_constant_name() {
+    #[allow(non_camel_case_types)]
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct __debug__ {
+        value: String,
+    }
+
+    let error = Python::default()
+        .export(&Types::default().register::<__debug__>(), IdentityFormat)
+        .unwrap_err();
+    assert!(error.to_string().contains("__debug__"));
+}
+
+#[test]
 fn python_preserves_dunder_wire_keys() {
     #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]

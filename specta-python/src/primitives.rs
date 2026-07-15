@@ -728,7 +728,20 @@ fn object_variants(
                             format!("{reference:?}"),
                         )
                     })?;
-                    substitute_generics(&mut ty, generics);
+                    let mut resolved = Vec::with_capacity(ndt.generics.len());
+                    for definition in ndt.generics.iter() {
+                        let mut argument = generics
+                            .iter()
+                            .find(|(generic, _)| generic == &definition.reference())
+                            .map(|(_, datatype)| datatype.clone())
+                            .or_else(|| definition.default.clone())
+                            .unwrap_or_else(|| {
+                                DataType::Reference(Reference::opaque(opaque::Unknown))
+                            });
+                        substitute_generics(&mut argument, &resolved);
+                        resolved.push((definition.reference(), argument));
+                    }
+                    substitute_generics(&mut ty, &resolved);
                     object_variants(ctx, &ty, location, visiting)
                 }
                 NamedReferenceType::Recursive(_) => Err(Error::unrepresentable_intersection(
