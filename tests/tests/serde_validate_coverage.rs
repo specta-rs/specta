@@ -2171,3 +2171,152 @@ fn phases_map_type_into_wire_deserialize_only_flatten_is_accepted() {
         "an into-wire is only ever serialized; its deserialize-only shapes are unreachable",
     );
 }
+
+// An `#[specta(inline)]` generic reference stores the concrete argument
+// *inside* `NamedReferenceType::Inline { dt }` (as an unresolved
+// `Generic(T)` when the inline sits inside another generic definition), not
+// in a `generics` vector - so the memo key must resolve the inline datatype
+// too, or two instantiations of the same inline reference collide.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct InlineOuter<T> {
+    #[specta(inline)]
+    inner: FlattenGeneric<T>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct InlineBothGoodFirst {
+    good: InlineOuter<Inner>,
+    bad: InlineOuter<Vec<u8>>,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct InlineBothBadFirst {
+    bad: InlineOuter<Vec<u8>>,
+    good: InlineOuter<Inner>,
+}
+
+#[test]
+fn flatten_of_inline_generic_reached_under_two_substitutions_rejects_the_bad_one() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<InlineBothGoodFirst>(),
+            specta_serde::Format,
+        )
+        .expect_err(
+            "the struct-shaped inline instantiation being walked first must not mask the Vec one",
+        );
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<InlineBothBadFirst>(),
+            specta_serde::Format,
+        )
+        .expect_err("the Vec instantiation must be rejected regardless of walk order");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_inline_generic_with_good_substitution_is_accepted() {
+    #[derive(Type, Serialize)]
+    #[specta(collect = false)]
+    struct InlineOnlyGood {
+        good: InlineOuter<Inner>,
+    }
+
+    Typescript::default()
+        .export(
+            &Types::default().register::<InlineOnlyGood>(),
+            specta_serde::Format,
+        )
+        .expect("the struct-shaped inline instantiation alone is valid");
+}
+
+// A `Phased` override inside a generic *argument* wraps datatypes (possibly
+// containing `Generic(T)`) in an opaque reference; the memo key must resolve
+// those contents too, or two instantiations collide the same way.
+#[derive(Type)]
+#[specta(collect = false)]
+struct PhasedArgOuter<T> {
+    inner: FlattenGeneric<specta_serde::Phased<T, Inner>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct PhasedArgBothGoodFirst {
+    good: PhasedArgOuter<HashMap<String, String>>,
+    bad: PhasedArgOuter<Vec<u8>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct PhasedArgBothBadFirst {
+    bad: PhasedArgOuter<Vec<u8>>,
+    good: PhasedArgOuter<HashMap<String, String>>,
+}
+
+#[test]
+fn flatten_of_phased_generic_arg_reached_under_two_substitutions_rejects_the_bad_one() {
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<PhasedArgBothGoodFirst>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err(
+            "the map-shaped Phased instantiation being walked first must not mask the Vec one",
+        );
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<PhasedArgBothBadFirst>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("the Vec instantiation must be rejected regardless of walk order");
+    assert!(
+        err.to_string().contains("flatten"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn flatten_of_phased_generic_arg_with_good_substitution_passes_validation() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct PhasedArgOnlyGood {
+        good: PhasedArgOuter<HashMap<String, String>>,
+    }
+
+    // A `Phased` override buried inside a generic *argument* is not detected
+    // by the phase-splitting rewrite yet (pre-existing limitation), so even
+    // this valid usage fails at the rewrite - but it must get *past
+    // validation*: the error must be the rewrite's phased-usage complaint,
+    // not a flatten rejection of the map-shaped instantiation.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<PhasedArgOnlyGood>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect_err("pre-existing rewrite limitation for Phased inside generic arguments");
+    let msg = err.to_string();
+    assert!(
+        !msg.contains("flatten"),
+        "the map-shaped instantiation must pass flatten validation: {msg}"
+    );
+    assert!(
+        msg.contains("requires `PhasesFormat`"),
+        "expected the pre-existing rewrite limitation error: {msg}"
+    );
+}

@@ -1082,15 +1082,22 @@ const RESOLVED_KEY_NODE_BUDGET: usize = 256;
 fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_>>) -> Reference {
     let mut resolved = reference.clone();
 
-    if env.is_some()
-        && let NamedReferenceType::Reference { generics, .. } = &mut resolved.inner
-        && !generics.is_empty()
-    {
+    if env.is_some() {
         let mut budget = RESOLVED_KEY_NODE_BUDGET;
-        if !generics
-            .iter_mut()
-            .all(|(_, dt)| resolve_generics_for_key(dt, env, &mut budget))
-        {
+        let ok = match &mut resolved.inner {
+            NamedReferenceType::Reference { generics, .. } => generics
+                .iter_mut()
+                .all(|(_, dt)| resolve_generics_for_key(dt, env, &mut budget)),
+            // An `#[specta(inline)]` reference carries its instantiation
+            // inside the inline datatype itself (as unresolved `Generic`
+            // placeholders when it sits in another generic definition), so
+            // the key must resolve that content too or two instantiations of
+            // the same inline reference would collide.
+            NamedReferenceType::Inline { dt, .. } => resolve_generics_for_key(dt, env, &mut budget),
+            NamedReferenceType::Recursive(_) => true,
+        };
+
+        if !ok {
             return Reference::Named(reference.clone());
         }
     }
@@ -1159,7 +1166,31 @@ fn resolve_generics_for_key(
             NamedReferenceType::Inline { dt, .. } => resolve_generics_for_key(dt, env, budget),
             NamedReferenceType::Recursive(_) => true,
         },
-        DataType::Reference(Reference::Opaque(_)) | DataType::Primitive(_) => true,
+        // A `Phased` override wraps datatypes that may themselves contain
+        // `Generic` placeholders (e.g. `Phased<T, Inner>` used as a generic
+        // argument), so its contents must be resolved for the key too; a
+        // rebuilt opaque with equal contents still compares/hashes equal.
+        DataType::Reference(Reference::Opaque(reference)) => {
+            match reference.downcast_ref::<PhasedTy>() {
+                Some(phased) => {
+                    let mut serialize = phased.serialize.clone();
+                    let mut deserialize = phased.deserialize.clone();
+                    if !resolve_generics_for_key(&mut serialize, env, budget)
+                        || !resolve_generics_for_key(&mut deserialize, env, budget)
+                    {
+                        return false;
+                    }
+                    *dt = DataType::Reference(Reference::opaque(PhasedTy {
+                        serialize,
+                        deserialize,
+                    }));
+                    true
+                }
+                // Other opaque references are exporter-specific leaves.
+                None => true,
+            }
+        }
+        DataType::Primitive(_) => true,
     }
 }
 
