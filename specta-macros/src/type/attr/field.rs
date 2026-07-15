@@ -40,6 +40,12 @@ impl FieldAttr {
             result.serde_skip = result.skip;
         }
 
+        for attr in ["skip_serializing", "skip_deserializing"] {
+            if let Some(value) = attrs.extract("serde", attr) {
+                result.serde_skip |= value.parse_bool_or_true()?;
+            }
+        }
+
         if let Some(attr) = attrs.extract("specta", "optional") {
             result.optional = attr.parse_bool_or_true()?;
         }

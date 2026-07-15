@@ -357,6 +357,21 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
         .expect_err("OpenAPI 3.0 cannot represent a null-only type");
     assert!(null_error.to_string().contains("null-only types"));
 
+    let compatible_unit = OpenApi::default()
+        .schema_mode(SchemaMode::Compatible)
+        .export_document(
+            &Types::default().register::<StrictUnit>(),
+            specta_serde::Format,
+        )
+        .expect("compatible mode should emit a legal nullable approximation");
+    let compatible_unit = serde_json::to_value(compatible_unit).unwrap();
+    let compatible_unit = &compatible_unit["components"]["schemas"]["StrictUnit"];
+    assert_eq!(compatible_unit["type"], "object");
+    assert_eq!(compatible_unit["nullable"], true);
+    assert_eq!(compatible_unit["maxProperties"], 0);
+    assert_eq!(compatible_unit["additionalProperties"], false);
+    assert_eq!(compatible_unit["x-specta-type"], "null");
+
     let flattened_error = OpenApi::default()
         .export(
             &Types::default().register::<StrictFlattened>(),

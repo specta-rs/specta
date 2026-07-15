@@ -97,8 +97,10 @@ fn transform_object(
         if mode == SchemaMode::Strict {
             return Err(unsupported(component, "null-only types"));
         }
-        schema.remove("type");
+        schema.insert("type".to_string(), Value::String("object".into()));
         schema.insert("nullable".to_string(), Value::Bool(true));
+        schema.insert("maxProperties".to_string(), Value::Number(0.into()));
+        schema.insert("additionalProperties".to_string(), Value::Bool(false));
         schema.insert("x-specta-type".to_string(), Value::String("null".into()));
     }
 

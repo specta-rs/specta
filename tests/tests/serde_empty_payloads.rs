@@ -927,6 +927,18 @@ fn tuple_struct_skipped_field_container_rename() {
 #[specta(collect = false)]
 struct NewtypeStructSkip(#[serde(skip)] u8);
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NewtypeStructSkipSerializing(#[serde(skip_serializing)] u8);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NewtypeStructSkipDeserializing(#[serde(skip_deserializing)] u8);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NewtypeStructSkipBoth(#[serde(skip_serializing, skip_deserializing)] u8);
+
 // Control: a declared-multi-field tuple struct with all fields serde-skipped
 // really is `[]` on the wire and stays exportable.
 #[derive(Type, Serialize, Deserialize)]
@@ -964,6 +976,41 @@ fn newtype_struct_skip_exports_bare_inner_type() {
         )
         .expect("both phases should retain the bare inner type");
     assert!(phases.contains("type NewtypeStructSkip = number"));
+}
+
+#[test]
+fn directional_newtype_skip_spellings_are_ignored() {
+    assert_eq!(
+        serde_json::to_string(&NewtypeStructSkipSerializing(7)).unwrap(),
+        "7"
+    );
+    assert!(serde_json::from_str::<NewtypeStructSkipDeserializing>("7").is_ok());
+    assert_eq!(
+        serde_json::to_string(&NewtypeStructSkipBoth(7)).unwrap(),
+        "7"
+    );
+    assert!(serde_json::from_str::<NewtypeStructSkipBoth>("7").is_ok());
+
+    let types = Types::default()
+        .register::<NewtypeStructSkipSerializing>()
+        .register::<NewtypeStructSkipDeserializing>()
+        .register::<NewtypeStructSkipBoth>();
+    let unified = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect("serde ignores directional skips on newtype fields");
+    for name in [
+        "NewtypeStructSkipSerializing",
+        "NewtypeStructSkipDeserializing",
+        "NewtypeStructSkipBoth",
+    ] {
+        assert!(unified.contains(&format!("type {name} = number")));
+    }
+
+    let phased = Typescript::default()
+        .export(&types, specta_serde::PhasesFormat)
+        .expect("ignored skips should not split newtypes into phases");
+    assert!(!phased.contains("_Serialize"));
+    assert!(!phased.contains("_Deserialize"));
 }
 
 #[test]

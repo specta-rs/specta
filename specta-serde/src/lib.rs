@@ -124,6 +124,8 @@ use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
 use phased::PhasedTy;
 use repr::EnumRepr;
 
+const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
+
 pub use error::Error;
 pub use phased::{Phased, phased};
 
@@ -1583,10 +1585,7 @@ fn rewrite_struct_repr_for_phase(
 }
 
 fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool, Error> {
-    if field
-        .attributes
-        .contains_key("specta:serde_newtype_skip_ignored")
-    {
+    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
         return Ok(false);
     }
     let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
@@ -3061,6 +3060,9 @@ fn unnamed_trailing_default_run(unnamed: &UnnamedFields) -> Result<usize, Error>
 }
 
 fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
+    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
+        return Ok(false);
+    }
     if field.ty.is_none() {
         return Ok(true);
     }
@@ -3080,6 +3082,7 @@ fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
 }
 
 fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
+    let ignored_skip = field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED);
     Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
@@ -3104,7 +3107,7 @@ fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<b
                     && !attrs.skip_deserializing
                     && !attrs.flatten
                     && field.ty.is_some())
-                || attrs.skip_serializing != attrs.skip_deserializing
+                || (!ignored_skip && attrs.skip_serializing != attrs.skip_deserializing)
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with
                 || attrs.has_deserialize_with
@@ -3403,6 +3406,9 @@ fn apply_field_attrs(
     mode: PhaseRewrite,
     container_default: bool,
 ) -> Result<(), Error> {
+    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
+        return Ok(());
+    }
     let mut optional = field.optional;
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
         if field_is_optional_for_mode(Some(&attrs), container_default, mode) {

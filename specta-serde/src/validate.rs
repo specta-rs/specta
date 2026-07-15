@@ -182,7 +182,7 @@ fn inner(
                 && let [field] = unnamed.fields.as_slice()
                 && !field
                     .attributes
-                    .contains_key("specta:serde_newtype_skip_ignored")
+                    .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
                 && SerdeFieldAttrs::from_attributes(&field.attributes)?
                     .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
             {
@@ -885,7 +885,11 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     // keys in `validate_named_field_keys` (unnamed fields have no wire key,
     // so renames are meaningless for them).
 
-    if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+    if mode == ApplyMode::Unified
+        && !field
+            .attributes
+            .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
+        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
     {
         // Plain `#[serde(skip)]` sets both flags and never reaches here.
         // A one-sided skip means serde requires/emits the field on one side
@@ -1034,6 +1038,12 @@ impl FlattenDirections {
     /// *through* the field can flatten there. (Fully skipped fields carry no
     /// type and are never walked at all.)
     fn for_field(field: &Field) -> Result<Self, Error> {
+        if field
+            .attributes
+            .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
+        {
+            return Ok(Self::LIVE);
+        }
         let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
         Ok(Self {
             serialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_serializing),

@@ -441,20 +441,12 @@ impl<'a> Renderer<'a> {
         match fields {
             Fields::Unit => Ok(object([("type", string("null"))])),
             Fields::Unnamed(fields) => {
-                if let [field] = fields.fields.as_slice() {
-                    return field.ty.as_ref().map_or_else(
-                        || Ok(Value::Object(Map::new())),
-                        |ty| {
-                            let mut schema = self.render_datatype(ty, generics, path, depth + 1)?;
-                            self.apply_metadata(
-                                &mut schema,
-                                None,
-                                &field.docs,
-                                field.deprecated.as_ref(),
-                            );
-                            Ok(schema)
-                        },
-                    );
+                if let [field] = fields.fields.as_slice()
+                    && let Some(ty) = &field.ty
+                {
+                    let mut schema = self.render_datatype(ty, generics, path, depth + 1)?;
+                    self.apply_metadata(&mut schema, None, &field.docs, field.deprecated.as_ref());
+                    return Ok(schema);
                 }
                 self.render_unnamed_fields(&fields.fields, generics, path, depth)
             }

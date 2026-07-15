@@ -136,6 +136,9 @@ struct DocumentedFields {
 #[derive(Serialize, Deserialize, Type)]
 struct SkippedNewtype(#[serde(skip)] u8);
 
+#[derive(Type)]
+struct SpectaSkippedNewtype(#[specta(skip)] u8);
+
 #[test]
 fn exports_metadata_and_primitives() {
     let types = Types::default().register::<Primitives>();
@@ -176,6 +179,23 @@ fn serde_skip_on_newtype_preserves_bare_wire_shape() {
     assert_eq!(skipped["type"], "integer");
     assert_eq!(skipped["minimum"], 0);
     assert_eq!(skipped["maximum"], 255);
+}
+
+#[test]
+fn specta_skipped_newtype_preserves_empty_tuple_shape() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<SpectaSkippedNewtype>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let skipped = &schema["$defs"]["SpectaSkippedNewtype"];
+
+    assert_eq!(skipped["type"], "array");
+    assert_eq!(skipped["prefixItems"], serde_json::json!([]));
+    assert_eq!(skipped["items"], false);
+    assert_eq!(skipped["minItems"], 0);
+    assert_eq!(skipped["maxItems"], 0);
 }
 
 #[test]
