@@ -261,7 +261,7 @@ fn generated_single_file_layouts_compile_when_included() {
 fn recursive_nullable_fields_keep_option_outside_box() {
     let output = Rust::default().export(&types(), Identity).unwrap();
     assert!(
-        output.contains("pub direct: Option<Box<Recursive>>,"),
+        output.contains("pub direct: ::std::option::Option<::std::boxed::Box<Recursive>>,"),
         "unexpected recursive nullable field:\n{output}"
     );
 }
@@ -598,7 +598,7 @@ fn opaque_renderer_and_inline_helpers() {
                 Identity,
             )
             .unwrap(),
-        "Option<u8>"
+        "::std::option::Option<u8>"
     );
     assert_eq!(
         exporter.reference(&types, &opaque, Identity).unwrap(),
@@ -632,7 +632,7 @@ fn exports_named_alias_with_generic_default() {
     });
     let output = Rust::default().export(&types, Identity).unwrap();
     assert!(
-        output.contains("pub type Items<T = u8> = Vec<T>;"),
+        output.contains("pub type Items<T = u8> = ::std::vec::Vec<T>;"),
         "{output}"
     );
     compile_source("generic-alias", &output);
@@ -657,6 +657,51 @@ fn generated_nonstandard_names_compile_with_denied_warnings() {
         .export(&types, Identity)
         .unwrap();
     compile_source("nonstandard-names", &output);
+}
+
+#[test]
+fn generated_standard_library_wrappers_cannot_be_shadowed() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Option;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Vec;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Box;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct String;
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UsesStd {
+        nullable: std::option::Option<bool>,
+        sequence: std::vec::Vec<u8>,
+        text: std::string::String,
+    }
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveUsesStd {
+        next: std::option::Option<std::boxed::Box<RecursiveUsesStd>>,
+    }
+
+    let types = Types::default()
+        .register::<Option>()
+        .register::<Vec>()
+        .register::<Box>()
+        .register::<String>()
+        .register::<UsesStd>()
+        .register::<RecursiveUsesStd>();
+    let output = Rust::default().export(&types, Identity).unwrap();
+    assert!(output.contains("::std::option::Option<bool>"), "{output}");
+    assert!(output.contains("::std::vec::Vec<u8>"), "{output}");
+    assert!(output.contains("::std::string::String"), "{output}");
+    assert!(
+        output.contains("::std::boxed::Box<RecursiveUsesStd>"),
+        "{output}"
+    );
+    compile_source("standard-library-shadowing", &output);
 }
 
 #[test]

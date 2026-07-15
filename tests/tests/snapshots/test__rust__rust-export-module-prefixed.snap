@@ -9,16 +9,16 @@ expression: prefixed
 pub struct test_rust_Account {
     /// Stable database identifier.
     pub id: u64,
-    pub display_name: String,
-    pub aliases: Vec<String>,
-    pub flags: std::collections::HashSet<String>,
-    pub metadata: std::collections::HashMap<String, bool>,
+    pub display_name: ::std::string::String,
+    pub aliases: ::std::vec::Vec<::std::string::String>,
+    pub flags: ::std::collections::HashSet<::std::string::String>,
+    pub metadata: ::std::collections::HashMap<::std::string::String, bool>,
     pub coordinates: (f64, f64),
     pub singleton: (u8,),
     pub bytes: [u8; 4],
-    pub optional: Option<String>,
-    pub maybe_count: Option<i32>,
-    pub kind: String,
+    pub optional: ::std::option::Option<::std::string::String>,
+    pub maybe_count: ::std::option::Option<i32>,
+    pub kind: ::std::string::String,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
@@ -28,17 +28,17 @@ pub enum test_rust_Event {
         /// Completion percentage.
         u8,
         #[deprecated = "use structured progress"]
-        String,
+        ::std::string::String,
     ),
     Finished {
         success: bool,
-        message: Option<String>,
+        message: ::std::option::Option<::std::string::String>,
     },
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_Keywords {
-    pub r#type: String,
+    pub r#type: ::std::string::String,
     pub r#abstract: bool,
 }
 
@@ -47,25 +47,25 @@ pub struct test_rust_Marker;
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_MutualA {
-    pub b: Box<test_rust_MutualB>,
+    pub b: ::std::boxed::Box<test_rust_MutualB>,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_MutualB {
-    pub a: Box<test_rust_MutualA>,
+    pub a: ::std::boxed::Box<test_rust_MutualA>,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_Page<T> {
-    pub items: Vec<T>,
-    pub next: Option<String>,
+    pub items: ::std::vec::Vec<T>,
+    pub next: ::std::option::Option<::std::string::String>,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]
 pub struct test_rust_Recursive {
-    pub direct: Option<Box<test_rust_Recursive>>,
-    pub indirect: Vec<test_rust_Recursive>,
-    pub fixed: Box<[test_rust_Recursive; 1]>,
+    pub direct: ::std::option::Option<::std::boxed::Box<test_rust_Recursive>>,
+    pub indirect: ::std::vec::Vec<test_rust_Recursive>,
+    pub fixed: ::std::boxed::Box<[test_rust_Recursive; 1]>,
 }
 
 #[allow(deprecated, non_camel_case_types, non_snake_case)]

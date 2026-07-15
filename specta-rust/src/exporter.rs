@@ -439,18 +439,18 @@ fn render_field_type(
 ) -> Result<String, Error> {
     let recursive = is_direct_recursive_field(types, ty, path);
     let mut ty = render_datatype(exporter, format, types, ty, path)?;
-    if field.optional && !matches!(ty.as_str(), s if s.starts_with("Option<")) {
-        ty = format!("Option<{ty}>");
+    if field.optional && !matches!(ty.as_str(), s if s.starts_with("::std::option::Option<")) {
+        ty = format!("::std::option::Option<{ty}>");
     }
     Ok(if !recursive {
         ty
     } else if let Some(inner) = ty
-        .strip_prefix("Option<")
+        .strip_prefix("::std::option::Option<")
         .and_then(|ty| ty.strip_suffix('>'))
     {
-        format!("Option<Box<{inner}>>")
+        format!("::std::option::Option<::std::boxed::Box<{inner}>>")
     } else {
-        format!("Box<{ty}>")
+        format!("::std::boxed::Box<{ty}>")
     })
 }
 
@@ -592,12 +592,12 @@ fn render_datatype(
             )?;
             match list.length {
                 Some(length) => format!("[{inner}; {length}]"),
-                None if list.unique => format!("std::collections::HashSet<{inner}>"),
-                None => format!("Vec<{inner}>"),
+                None if list.unique => format!("::std::collections::HashSet<{inner}>"),
+                None => format!("::std::vec::Vec<{inner}>"),
             }
         }
         DataType::Map(map) => format!(
-            "std::collections::HashMap<{}, {}>",
+            "::std::collections::HashMap<{}, {}>",
             render_datatype(
                 exporter,
                 format,
@@ -633,7 +633,7 @@ fn render_datatype(
         },
         DataType::Nullable(inner) => {
             format!(
-                "Option<{}>",
+                "::std::option::Option<{}>",
                 render_datatype(exporter, format, types, inner, path)?
             )
         }
@@ -832,7 +832,7 @@ fn primitive_name(primitive: &Primitive) -> &'static str {
         Primitive::f128 => unreachable!("unstable primitive rejected before rendering"),
         Primitive::bool => "bool",
         Primitive::char => "char",
-        Primitive::str => "String",
+        Primitive::str => "::std::string::String",
     }
 }
 
