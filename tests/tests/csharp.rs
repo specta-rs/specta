@@ -242,6 +242,12 @@ struct GenericObjectNewtype<T>(T);
 
 #[derive(Type)]
 #[specta(collect = false)]
+enum TupleGenericHelperCollision<Item1Value> {
+    Value(#[specta(inline)] InlineInner, Item1Value),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct MultiInlineFields {
     tuple: (AlwaysInlineA, AlwaysInlineB),
     map: std::collections::HashMap<AlwaysInlineA, AlwaysInlineB>,
@@ -578,6 +584,19 @@ fn generic_parameters_do_not_collide_with_record_members() {
 
     assert!(output.contains("record GenericMemberCollision<T>"));
     assert!(output.contains("T T2 { get; init; }"));
+}
+
+#[test]
+fn generic_parameters_do_not_collide_with_tuple_helpers() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<TupleGenericHelperCollision<String>>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("record TupleGenericHelperCollision<Item1Value>"));
+    assert!(output.contains("record Item1Value2"));
 }
 
 #[test]
@@ -1199,6 +1218,7 @@ fn generated_csharp_compiles_when_dotnet_sdk_is_available() {
         .register::<RecordVariantCollisions>()
         .register::<GenericMemberCollision<String>>()
         .register::<GenericVariantCollision<String>>()
+        .register::<TupleGenericHelperCollision<String>>()
         .register::<DefaultedNonNullableFields>();
     let types = types.register::<NonObjectWireShapes>();
     let bindings = CSharp::new().export(&types, IdentityFormat).unwrap();

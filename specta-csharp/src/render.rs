@@ -412,15 +412,7 @@ fn render_fields(
         Fields::Unit => {}
         Fields::Named(fields) => {
             let mut used = record_reserved_names(containing_name);
-            used.extend(
-                generics
-                    .trim_start_matches('<')
-                    .trim_end_matches('>')
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|name| !name.is_empty())
-                    .map(str::to_string),
-            );
+            reserve_generic_names(&mut used, generics);
             for (wire_name, field) in &fields.fields {
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
@@ -460,6 +452,7 @@ fn render_fields(
         }
         Fields::Unnamed(fields) => {
             let mut used = record_reserved_names(containing_name);
+            reserve_generic_names(&mut used, generics);
             for (index, field) in fields.fields.iter().enumerate() {
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
@@ -485,6 +478,18 @@ fn render_fields(
         }
     }
     Ok(())
+}
+
+fn reserve_generic_names(used: &mut HashSet<String>, generics: &str) {
+    used.extend(
+        generics
+            .trim_start_matches('<')
+            .trim_end_matches('>')
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string),
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
