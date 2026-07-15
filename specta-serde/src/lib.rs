@@ -2406,17 +2406,19 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     }
 }
 
-/// Whether at least one named field survives the deserialize phase — the only
-/// fields a container `#[serde(default)]` can widen (a `skip_deserializing`
-/// field's default is applied invisibly, off the wire).
+/// Whether at least one named field survives into the exported deserialize
+/// shape — the only fields a container `#[serde(default)]` can widen (a
+/// `skip_deserializing` field's default is applied invisibly, off the wire,
+/// and a `#[specta(skip)]` field (`ty: None`) is hidden from the export).
 fn struct_has_deserialize_wire_field(fields: &Fields) -> Result<bool, Error> {
     let Fields::Named(named) = fields else {
         return Ok(false);
     };
 
     for (_, field) in &named.fields {
-        if !SerdeFieldAttrs::from_attributes(&field.attributes)?
-            .is_some_and(|attrs| attrs.skip_deserializing)
+        if field.ty.is_some()
+            && !SerdeFieldAttrs::from_attributes(&field.attributes)?
+                .is_some_and(|attrs| attrs.skip_deserializing)
         {
             return Ok(true);
         }
@@ -2488,13 +2490,14 @@ fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
                 // `#[serde(default)]` only widens the deserialize shape
                 // (absent fields fall back to `Default::default()`); serde
                 // always emits the field on serialize. It is therefore only
-                // a phase difference when the field actually appears on the
-                // deserialize wire: with `skip_deserializing` (including via
-                // full `skip`, e.g. `#[serde(skip, default = "...")]` cache
-                // fields) the default is applied invisibly and neither
-                // exported shape is affected. An asymmetric skip still
-                // splits via the skip check below.
-                || (attrs.default && !attrs.skip_deserializing)
+                // a phase difference when the field actually appears in the
+                // exported deserialize shape: with `skip_deserializing`
+                // (including via full `skip`, e.g. `#[serde(skip, default =
+                // "...")]` cache fields) the default is applied invisibly,
+                // and a `#[specta(skip)]` field (`ty: None`) is hidden from
+                // both exported phases entirely. An asymmetric serde skip
+                // still splits via the skip check below.
+                || (attrs.default && !attrs.skip_deserializing && field.ty.is_some())
                 || attrs.skip_serializing != attrs.skip_deserializing
                 || attrs.skip_serializing_if.is_some()
                 || attrs.has_serialize_with

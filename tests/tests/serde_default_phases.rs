@@ -185,6 +185,35 @@ struct MixedSkipped {
     live: i32,
 }
 
+/// `#[specta(skip)]` hides a field from the exported shape entirely
+/// (`field.ty` is `None`) while serde still handles it on the wire, so a
+/// `#[serde(default)]` on it can't show up in either exported phase.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct HiddenDefault {
+    #[specta(skip)]
+    #[serde(default)]
+    cache: i32,
+    a: i32,
+}
+
+/// A dependent of [`HiddenDefault`] must not be dragged into a split either.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct HiddenDefaultParent {
+    inner: HiddenDefault,
+}
+
+/// Container-default counterpart of [`HiddenDefault`]: every field hidden by
+/// specta leaves nothing in the exported shape for the default to widen.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct AllHidden {
+    #[specta(skip)]
+    cache: i32,
+}
+
 fn named_field_optional(dt: &DataType, types: &Types, field_name: &str) -> bool {
     let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
         panic!("expected named reference, got {dt:?}");
@@ -533,4 +562,37 @@ fn container_default_with_all_fields_skipped_does_not_split() {
     assert_eq!(serde_json::to_string(&value).unwrap(), "{}");
     let parsed: AllSkipped = serde_json::from_str("{}").unwrap();
     assert_eq!((parsed.a, parsed.b.as_str()), (0, ""));
+}
+
+/// A `#[specta(skip)]` field is absent from both exported phases, so its
+/// `#[serde(default)]` (field-level or via container default) must not split
+/// the type or cascade splits into dependents. Visible `default` fields still
+/// splitting is pinned by the tests above as the control.
+#[test]
+fn default_on_specta_hidden_field_does_not_split() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<HiddenDefaultParent>()
+                .register::<AllHidden>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should accept `#[specta(skip)] #[serde(default)]` fields");
+
+    for split_name in [
+        "HiddenDefault_Serialize",
+        "HiddenDefaultParent_Serialize",
+        "AllHidden_Serialize",
+    ] {
+        assert!(
+            !rendered.contains(split_name),
+            "a `#[specta(skip)]` field is absent from both exported phases \
+             and its `default` must not cause a phase split (found \
+             `{split_name}`): {rendered}"
+        );
+    }
+    assert!(
+        !rendered.contains("cache"),
+        "`#[specta(skip)]` fields must stay out of the exported shape: {rendered}"
+    );
 }
