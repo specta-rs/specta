@@ -216,7 +216,9 @@ impl<'a> Renderer<'a> {
 
         let mut schema = Map::new();
         schema.insert("allOf".to_string(), Value::Array(parts));
-        if self.schema_version.supports_unevaluated_properties() {
+        if !self.allow_additional_properties
+            && self.schema_version.supports_unevaluated_properties()
+        {
             schema.insert("unevaluatedProperties".to_string(), Value::Bool(false));
         }
 

@@ -631,6 +631,33 @@ fn permissive_objects_allow_present_optional_flatten_fields() {
 }
 
 #[test]
+fn permissive_objects_allow_unknown_fields_in_intersection_fallbacks() {
+    let mut types = Types::default();
+    NamedDataType::new("FallbackIntersection", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Intersection(vec![
+            Struct::named()
+                .field("known", Field::new(Primitive::str.into()))
+                .build(),
+            DataType::Nullable(Box::new(Struct::named().build())),
+        ]));
+    });
+
+    let schema = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_value(&types, IdentityFormat)
+        .unwrap();
+    let fallback = &schema["$defs"]["FallbackIntersection"];
+    assert!(fallback["allOf"].is_array());
+    assert!(fallback.get("unevaluatedProperties").is_none());
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "known": "value",
+        "extra": true
+    })));
+}
+
+#[test]
 fn fixed_width_integer_bounds_are_exported() {
     let schema = JsonSchema::default()
         .export_value(
