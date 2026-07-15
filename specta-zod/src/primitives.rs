@@ -494,6 +494,16 @@ fn struct_dt(
                     )?;
                 }
                 fields => {
+                    // serde accepts sequences truncated anywhere inside the
+                    // trailing run of defaulted (`optional`) elements; zod
+                    // expresses that with trailing `.optional()` elements.
+                    let mut optional_from = 0;
+                    for (i, (field, _)) in fields.iter().enumerate() {
+                        if !field.optional {
+                            optional_from = i + 1;
+                        }
+                    }
+
                     s.push_str("z.tuple([");
                     for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
@@ -509,6 +519,9 @@ fn struct_dt(
                             false,
                             type_render_stack,
                         )?;
+                        if i >= optional_from {
+                            s.push_str(".optional()");
+                        }
                     }
                     s.push_str("])");
                 }

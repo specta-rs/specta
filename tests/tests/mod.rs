@@ -24,6 +24,7 @@ mod references;
 mod semantic;
 mod serde_container_rename;
 mod serde_conversions;
+mod serde_default_phases;
 mod serde_empty_payloads;
 mod serde_enum_rewrite;
 mod serde_flatten_option;

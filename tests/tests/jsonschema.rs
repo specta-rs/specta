@@ -59,3 +59,47 @@ fn jsonschema_keeps_type_info_typescript_preserves() {
         .expect("field doc comment should become a description");
     assert_eq!(description.trim(), "Display name for the user.");
 }
+
+/// A trailing `#[serde(default)]` tuple element is optional on deserialize
+/// (serde accepts `[1]`): the deserialize half's array schema must lower
+/// `minItems` below the full arity while serialize keeps it exact.
+#[derive(Type, Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct JsonTupleDefault(u8, #[serde(default)] u8);
+
+#[test]
+fn jsonschema_tuple_default_phases() {
+    let rendered = JsonSchema::default()
+        .export(
+            &Types::default().register::<JsonTupleDefault>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("JsonSchema should support defaulted tuple elements under PhasesFormat");
+
+    insta::assert_snapshot!("jsonschema-tuple-default-phases", rendered);
+}
+
+/// A skip-reduced tuple struct's `ty: None` marker slots (kept so the
+/// declared arity survives for other exporters) are OFF-wire: serde emits
+/// `[2]` and accepts `[]`/`[2]`. The array schema must be sized over live
+/// elements only — one prefix item, `minItems: 0` / `maxItems: 1` on
+/// deserialize and `minItems: 1` on serialize — not two.
+#[derive(Type, Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct JsonSkipSlotTuple(#[serde(skip)] u8, #[serde(default)] u8);
+
+#[test]
+fn jsonschema_skip_slot_tuple_phases() {
+    let rendered = JsonSchema::default()
+        .export(
+            &Types::default().register::<JsonSkipSlotTuple>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("JsonSchema should support skip-reduced defaulted tuple structs");
+
+    assert!(
+        !rendered.contains("\"maxItems\": 2"),
+        "the off-wire skipped slot must not count toward the schema size: {rendered}"
+    );
+    insta::assert_snapshot!("jsonschema-skip-slot-tuple-phases", rendered);
+}
