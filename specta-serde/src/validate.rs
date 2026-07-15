@@ -2,14 +2,19 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, NamedReferenceType, Reference, Variant},
+    datatype::{
+        DataType, Enum, Field, Fields, NamedFields, NamedReferenceType, Reference, Variant,
+    },
 };
 
 use crate::{
-    Error,
+    Error, PhaseRewrite, container_rename_all_rule, enum_variant_field_rename_rule,
+    inflection::RenameRule,
     parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
+    phase_field_key,
     phased::PhasedTy,
     repr::EnumRepr,
+    serialized_variant_name,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -119,13 +124,6 @@ fn inner(
                 checked_references,
                 &path,
                 mode,
-                // Struct `rename_all` only affects the wire when the struct
-                // has a live named field key to rename; unit/newtype/tuple
-                // structs and all-flattened/all-skipped named structs have
-                // none. `rename_all_fields` is enum-only in serde, so stay
-                // conservative for structs.
-                has_live_named_field_keys(&strct.fields)?,
-                true,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
                 if attrs.variant_identifier || attrs.field_identifier {
@@ -177,6 +175,12 @@ fn inner(
                     }
                 }
                 Fields::Named(named) => {
+                    validate_named_field_keys(
+                        named,
+                        struct_field_key_rules(&strct.attributes, &path)?,
+                        &path,
+                        mode,
+                    )?;
                     for (name, (field, _)) in named
                         .fields
                         .iter()
@@ -206,29 +210,9 @@ fn inner(
             // rename variant labels are not part of the wire shape for them.
             let variant_names_emitted =
                 !matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged);
-            // `rename_all_fields` only renames named-field variants
-            // (`rewrite_fields_for_phase` ignores the rule for unit/tuple
-            // variants), so it only affects the wire when such a variant
-            // exists.
-            let mut has_named_field_variants = false;
-            for (_, variant) in &enm.variants {
-                if !variant.skip && has_live_named_field_keys(&variant.fields)? {
-                    has_named_field_variants = true;
-                    break;
-                }
-            }
-            validate_container_attributes(
-                &enm.attributes,
-                types,
-                checked_references,
-                &path,
-                mode,
-                variant_names_emitted,
-                has_named_field_variants,
-            )?;
-            if SerdeContainerAttrs::from_attributes(&enm.attributes)?
-                .is_some_and(|attrs| attrs.default)
-            {
+            validate_container_attributes(&enm.attributes, types, checked_references, &path, mode)?;
+            let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
+            if container_attrs.as_ref().is_some_and(|attrs| attrs.default) {
                 return Err(Error::invalid_phased_type_usage(
                     path,
                     "`#[serde(default)]` is only valid on structs",
@@ -238,15 +222,19 @@ fn inner(
             validate_enum(enm, types, path.clone(), mode)?;
 
             for (variant_name, variant) in &enm.variants {
-                validate_variant_attributes(
-                    variant,
-                    format!("{path}::{variant_name}"),
-                    mode,
-                    variant_names_emitted,
-                )?;
+                validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
+                if variant_names_emitted {
+                    validate_variant_key(variant_name, variant, &container_attrs, &path, mode)?;
+                }
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
+                        validate_named_field_keys(
+                            named,
+                            variant_field_key_rules(&container_attrs, variant, variant_name)?,
+                            &format!("{path}::{variant_name}"),
+                            mode,
+                        )?;
                         for (name, (field, _)) in named.fields.iter().filter_map(|(name, field)| {
                             field.ty.as_ref().map(|ty| (name, (field, ty)))
                         }) {
@@ -458,22 +446,12 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
     Ok(())
 }
 
-/// `rename_all_affects_wire` is false only for untagged enums, where container
-/// `rename_all` renames variant labels that serde never emits; everywhere else
-/// (struct field names, tagged enum variant names) `rename_all` changes the
-/// wire shape and a directional mismatch must be rejected in unified mode.
-///
-/// `rename_all_fields_affects_wire` is false for enums without any named-field
-/// variant, where `rename_all_fields` has nothing to rename in either
-/// direction.
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
-    rename_all_affects_wire: bool,
-    rename_all_fields_affects_wire: bool,
 ) -> Result<(), Error> {
     let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(());
@@ -507,43 +485,23 @@ fn validate_container_attributes(
     }
 
     if mode == ApplyMode::Unified {
-        if container_attrs.rename_serialize != container_attrs.rename_deserialize {
+        // The effective container name per direction defaults to the type's
+        // own name (`path` is the type name here: the traversal resets it at
+        // every named reference), so a one-sided rename equal to that name is
+        // a no-op. `rename_all` / `rename_all_fields` are validated per field
+        // and variant key via `validate_named_field_keys` /
+        // `validate_variant_key` instead of comparing the raw rules.
+        let rename_serialize = container_attrs.rename_serialize.as_deref().unwrap_or(path);
+        let rename_deserialize = container_attrs
+            .rename_deserialize
+            .as_deref()
+            .unwrap_or(path);
+        if rename_serialize != rename_deserialize {
             return Err(Error::incompatible_rename(
                 "container rename",
                 path.to_string(),
-                container_attrs.rename_serialize,
-                container_attrs.rename_deserialize,
-            ));
-        }
-
-        if rename_all_affects_wire
-            && container_attrs.rename_all_serialize != container_attrs.rename_all_deserialize
-        {
-            return Err(Error::incompatible_rename(
-                "container rename_all",
-                path.to_string(),
-                container_attrs
-                    .rename_all_serialize
-                    .map(|rule| format!("{rule:?}")),
-                container_attrs
-                    .rename_all_deserialize
-                    .map(|rule| format!("{rule:?}")),
-            ));
-        }
-
-        if rename_all_fields_affects_wire
-            && container_attrs.rename_all_fields_serialize
-                != container_attrs.rename_all_fields_deserialize
-        {
-            return Err(Error::incompatible_rename(
-                "container rename_all_fields",
-                path.to_string(),
-                container_attrs
-                    .rename_all_fields_serialize
-                    .map(|rule| format!("{rule:?}")),
-                container_attrs
-                    .rename_all_fields_deserialize
-                    .map(|rule| format!("{rule:?}")),
+                Some(rename_serialize.to_string()),
+                Some(rename_deserialize.to_string()),
             ));
         }
     }
@@ -551,14 +509,10 @@ fn validate_container_attributes(
     Ok(())
 }
 
-/// `variant_names_emitted` is false for untagged enums; combined with the
-/// variant's own `#[serde(untagged)]` flag it gates the variant `rename` check
-/// to representations where the variant label actually reaches the wire.
 fn validate_variant_attributes(
     variant: &Variant,
     path: String,
     mode: ApplyMode,
-    variant_names_emitted: bool,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
         return Ok(());
@@ -582,43 +536,9 @@ fn validate_variant_attributes(
         ensure_codec_override(has_type_override, &path, "with")?;
     }
 
-    if mode == ApplyMode::Unified
-        && variant_names_emitted
-        && !serde_attrs.untagged
-        && serde_attrs.rename_serialize.as_deref() != serde_attrs.rename_deserialize.as_deref()
-    {
-        // A variant `rename` only matters when the variant label reaches the
-        // wire; untagged enums and variant-level `#[serde(untagged)]` variants
-        // serialize just the payload, so a directional rename is harmless
-        // there.
-        return Err(Error::incompatible_rename(
-            "variant rename",
-            path,
-            serde_attrs.rename_serialize.clone(),
-            serde_attrs.rename_deserialize.clone(),
-        ));
-    }
-
-    if mode == ApplyMode::Unified
-        && has_live_named_field_keys(&variant.fields)?
-        && serde_attrs.rename_all_serialize != serde_attrs.rename_all_deserialize
-    {
-        // Not gated on `variant_names_emitted`: variant-level `rename_all`
-        // renames the variant's *field* names, which appear in the payload
-        // for every representation, untagged included. It is gated on the
-        // variant actually having named fields, since unit/tuple variants
-        // give the rule nothing to rename in either direction.
-        return Err(Error::incompatible_rename(
-            "variant rename_all",
-            path,
-            serde_attrs
-                .rename_all_serialize
-                .map(|rule| format!("{rule:?}")),
-            serde_attrs
-                .rename_all_deserialize
-                .map(|rule| format!("{rule:?}")),
-        ));
-    }
+    // Variant renames and rename_all rules are validated by comparing the
+    // *effective* per-direction names/keys in `validate_variant_key` and
+    // `validate_named_field_keys` (see `inner`'s enum arm), not the raw attrs.
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
     {
@@ -637,33 +557,152 @@ fn validate_variant_attributes(
     Ok(())
 }
 
-/// Whether these fields contain at least one named field whose *key* is part
-/// of the local wire shape — the keys a `rename_all` / `rename_all_fields`
-/// rule can actually change. Excludes fields with an erased type (never
-/// rendered), flattened fields (their keys come from the flattened type), and
-/// fields skipped in both directions.
-fn has_live_named_field_keys(fields: &Fields) -> Result<bool, Error> {
-    let Fields::Named(named) = fields else {
-        return Ok(false);
-    };
+/// The rename rules a struct's named field keys are subject to, per phase
+/// (`Serialize`, then `Deserialize`), computed by the same helper the rewrite
+/// path uses.
+fn struct_field_key_rules(
+    attrs: &specta::datatype::Attributes,
+    path: &str,
+) -> Result<(Option<RenameRule>, Option<RenameRule>), Error> {
+    Ok((
+        container_rename_all_rule(attrs, PhaseRewrite::Serialize, "struct rename_all", path)?,
+        container_rename_all_rule(attrs, PhaseRewrite::Deserialize, "struct rename_all", path)?,
+    ))
+}
 
-    for (_, field) in &named.fields {
-        if field.ty.is_none() {
-            continue;
-        }
+/// The rename rules an enum variant's named field keys are subject to
+/// (variant `rename_all`, falling back to the container's
+/// `rename_all_fields`), per phase, computed by the same helper the rewrite
+/// path uses.
+fn variant_field_key_rules(
+    container_attrs: &Option<SerdeContainerAttrs>,
+    variant: &Variant,
+    variant_name: &str,
+) -> Result<(Option<RenameRule>, Option<RenameRule>), Error> {
+    Ok((
+        enum_variant_field_rename_rule(
+            container_attrs,
+            variant,
+            PhaseRewrite::Serialize,
+            variant_name,
+        )?,
+        enum_variant_field_rename_rule(
+            container_attrs,
+            variant,
+            PhaseRewrite::Deserialize,
+            variant_name,
+        )?,
+    ))
+}
 
-        let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
-            return Ok(true);
-        };
-
-        if attrs.flatten || (attrs.skip_serializing && attrs.skip_deserializing) {
-            continue;
-        }
-
-        return Ok(true);
+/// Unified mode requires every live named field key to resolve to the same
+/// effective wire key in both directions. Effective keys are computed with
+/// [`phase_field_key`] — the exact function the rewrite path uses — so
+/// explicit renames, rename rules applied to default names, and their no-op
+/// coincidences are all judged by what actually reaches the wire, never by
+/// comparing raw attribute options.
+fn validate_named_field_keys(
+    named: &NamedFields,
+    (rule_serialize, rule_deserialize): (Option<RenameRule>, Option<RenameRule>),
+    path: &str,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    if mode != ApplyMode::Unified {
+        return Ok(());
     }
 
-    Ok(false)
+    for (name, field) in &named.fields {
+        if !field_has_live_key(field)? {
+            continue;
+        }
+
+        let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+        let serialize_key = phase_field_key(
+            name.as_ref(),
+            serde_attrs.as_ref(),
+            rule_serialize,
+            PhaseRewrite::Serialize,
+        )?;
+        let deserialize_key = phase_field_key(
+            name.as_ref(),
+            serde_attrs.as_ref(),
+            rule_deserialize,
+            PhaseRewrite::Deserialize,
+        )?;
+
+        if serialize_key != deserialize_key {
+            return Err(Error::incompatible_rename(
+                "field key",
+                format!("{path}.{name}"),
+                Some(serialize_key),
+                Some(deserialize_key),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Unified mode requires an emitted variant label to resolve to the same
+/// effective name in both directions, computed with
+/// [`serialized_variant_name`] — the exact function the rewrite path uses.
+/// Variant-level `#[serde(untagged)]` variants and variants that are never
+/// rendered have no emitted label to compare.
+fn validate_variant_key(
+    variant_name: &str,
+    variant: &Variant,
+    container_attrs: &Option<SerdeContainerAttrs>,
+    path: &str,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    if mode != ApplyMode::Unified || variant.skip {
+        return Ok(());
+    }
+
+    if let Some(attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)?
+        && (attrs.untagged || (attrs.skip_serializing && attrs.skip_deserializing))
+    {
+        return Ok(());
+    }
+
+    let serialize_name = serialized_variant_name(
+        variant_name,
+        variant,
+        container_attrs,
+        PhaseRewrite::Serialize,
+    )?;
+    let deserialize_name = serialized_variant_name(
+        variant_name,
+        variant,
+        container_attrs,
+        PhaseRewrite::Deserialize,
+    )?;
+
+    if serialize_name != deserialize_name {
+        return Err(Error::incompatible_rename(
+            "variant name",
+            format!("{path}::{variant_name}"),
+            Some(serialize_name),
+            Some(deserialize_name),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Whether a named field's *key* is part of the local wire shape: excludes
+/// fields with an erased type (never rendered), flattened fields (their keys
+/// come from the flattened type), and fields skipped in both directions.
+fn field_has_live_key(field: &Field) -> Result<bool, Error> {
+    if field.ty.is_none() {
+        return Ok(false);
+    }
+
+    let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+        return Ok(true);
+    };
+
+    Ok(!attrs.flatten && !(attrs.skip_serializing && attrs.skip_deserializing))
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
@@ -671,20 +710,9 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         return Ok(());
     };
 
-    if mode == ApplyMode::Unified
-        && serde_attrs.rename_serialize.as_deref() != serde_attrs.rename_deserialize.as_deref()
-    {
-        // A one-sided `rename(serialize = ...)` / `rename(deserialize = ...)`
-        // is just as incompatible as two differing renames: the missing side
-        // means "no rename", which differs from the side that is set, so a
-        // single unified name can't represent both directions correctly.
-        return Err(Error::incompatible_rename(
-            "field rename",
-            path,
-            serde_attrs.rename_serialize.clone(),
-            serde_attrs.rename_deserialize.clone(),
-        ));
-    }
+    // Field renames are validated by comparing the *effective* per-direction
+    // keys in `validate_named_field_keys` (unnamed fields have no wire key,
+    // so renames are meaningless for them).
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
     {

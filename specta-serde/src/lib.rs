@@ -597,7 +597,7 @@ pub fn select_phase_datatype(dt: &DataType, types: &Types, phase: Phase) -> Data
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PhaseRewrite {
+pub(crate) enum PhaseRewrite {
     Unified,
     Serialize,
     Deserialize,
@@ -1251,22 +1251,11 @@ fn rewrite_fields_for_phase(
             for (name, field) in &mut named.fields {
                 apply_field_attrs(field, mode, container_default)?;
 
-                if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
-                    let rename = select_phase_string(
-                        mode,
-                        serde_attrs.rename_serialize.as_deref(),
-                        serde_attrs.rename_deserialize.as_deref(),
-                        "field rename",
-                        name.as_ref(),
-                    )?;
-
-                    if let Some(rename) = rename {
-                        *name = Cow::Owned(rename.to_string());
-                    } else if let Some(rule) = rename_all_rule {
-                        *name = Cow::Owned(rule.apply_to_field(name.as_ref()));
-                    }
-                } else if let Some(rule) = rename_all_rule {
-                    *name = Cow::Owned(rule.apply_to_field(name.as_ref()));
+                let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+                let key =
+                    phase_field_key(name.as_ref(), serde_attrs.as_ref(), rename_all_rule, mode)?;
+                if key != name.as_ref() {
+                    *name = Cow::Owned(key);
                 }
 
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
@@ -1275,6 +1264,36 @@ fn rewrite_fields_for_phase(
     }
 
     Ok(())
+}
+
+/// The effective wire key of a named field for `mode`: the explicit
+/// directional `rename` if set, else the phase's `rename_all` /
+/// `rename_all_fields` rule applied to the default name, else the default
+/// name. This is the single source of truth for field keys — unified-mode
+/// validation compares the `Serialize` and `Deserialize` results of this
+/// same function, so validation and rewriting cannot drift.
+pub(crate) fn phase_field_key(
+    field_name: &str,
+    serde_attrs: Option<&SerdeFieldAttrs>,
+    rename_all_rule: Option<RenameRule>,
+    mode: PhaseRewrite,
+) -> Result<String, Error> {
+    if let Some(attrs) = serde_attrs
+        && let Some(rename) = select_phase_string(
+            mode,
+            attrs.rename_serialize.as_deref(),
+            attrs.rename_deserialize.as_deref(),
+            "field rename",
+            field_name,
+        )?
+    {
+        return Ok(rename.to_string());
+    }
+
+    Ok(match rename_all_rule {
+        Some(rule) => rule.apply_to_field(field_name),
+        None => field_name.to_string(),
+    })
 }
 
 fn rewrite_field_for_phase(
@@ -1743,7 +1762,7 @@ fn rewrite_identifier_enum_for_phase(
     Ok(true)
 }
 
-fn container_rename_all_rule(
+pub(crate) fn container_rename_all_rule(
     attrs: &specta::datatype::Attributes,
     mode: PhaseRewrite,
     context: &str,
@@ -1762,7 +1781,7 @@ fn container_rename_all_rule(
     )
 }
 
-fn enum_variant_field_rename_rule(
+pub(crate) fn enum_variant_field_rename_rule(
     container_attrs: &Option<SerdeContainerAttrs>,
     variant: &Variant,
     mode: PhaseRewrite,
@@ -1845,7 +1864,7 @@ fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) ->
     }
 }
 
-fn serialized_variant_name(
+pub(crate) fn serialized_variant_name(
     variant_name: &str,
     variant: &Variant,
     container_attrs: &Option<SerdeContainerAttrs>,

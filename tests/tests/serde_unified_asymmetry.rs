@@ -231,6 +231,72 @@ struct FlattenedPlusLiveOneSidedRenameAll {
     field_one: String,
 }
 
+// --- No-op directional renames: effective keys are equal ---
+//
+// What matters for the unified contract is the *effective* wire key per
+// direction (explicit directional rename, else the direction's rename_all
+// rule applied to the default name, else the default name). When both
+// directions resolve to the same key, a one-sided attribute is a no-op and
+// must keep working under `Format`.
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldNoopOneSidedRename {
+    // Explicit serialize name equals the default field key.
+    #[serde(rename(serialize = "field_a"))]
+    field_a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct RenameAllNoop {
+    // camelCase("foo") == "foo": the rule changes nothing.
+    foo: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct RenameAllCoincidence {
+    // Multiple fields, all of which happen to be fixed points of the rule.
+    value: String,
+    other: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantNoopOneSidedRename {
+    // Explicit serialize name equals the default variant label.
+    #[serde(rename(serialize = "A"))]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "PascalCase"))]
+enum EnumRenameAllNoop {
+    // Variant names are already PascalCase: the rule changes nothing.
+    Foo(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename(serialize = "ContainerRenameNoop"))]
+struct ContainerRenameNoop {
+    // Explicit serialize name equals the type's own name.
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all(serialize = "camelCase"))]
+struct RenameAllPartialNoop {
+    // Control: one fixed point plus one genuinely changed key still errors.
+    foo: String,
+    field_one: String,
+}
+
 // --- Controls: these must keep working unchanged under `Format` ---
 
 #[derive(Type, Serialize, Deserialize)]
@@ -279,7 +345,7 @@ fn one_sided_field_rename_requires_phases_format() {
     ] {
         let msg = err.to_string();
         assert!(
-            msg.contains("field rename") && msg.contains("PhasesFormat"),
+            msg.contains("field key") && msg.contains("PhasesFormat"),
             "{name}: unexpected error: {msg}"
         );
     }
@@ -350,7 +416,7 @@ fn one_sided_rename_all_requires_phases_format() {
         .expect_err("one-sided rename_all should require PhasesFormat");
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
@@ -384,7 +450,7 @@ fn one_sided_variant_rename_requires_phases_format() {
         .expect_err("one-sided variant rename should require PhasesFormat");
     let msg = err.to_string();
     assert!(
-        msg.contains("variant rename") && msg.contains("PhasesFormat"),
+        msg.contains("variant name") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
@@ -418,7 +484,7 @@ fn one_sided_rename_all_fields_requires_phases_format() {
         .expect_err("one-sided rename_all_fields should require PhasesFormat");
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all_fields") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
@@ -608,7 +674,7 @@ fn untagged_field_name_renames_still_require_phases_format() {
         .expect_err("one-sided rename_all_fields on an untagged enum should still error");
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all_fields") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 
@@ -621,7 +687,7 @@ fn untagged_field_name_renames_still_require_phases_format() {
         .expect_err("one-sided variant rename_all on an untagged enum should still error");
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
@@ -672,7 +738,7 @@ fn rename_all_fields_without_named_field_variants_is_not_direction_dependent() {
         );
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all_fields") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
@@ -739,7 +805,42 @@ fn struct_rename_all_with_a_live_named_field_still_requires_phases_format() {
         .expect_err("one-sided rename_all should still error when a live named field exists");
     let msg = err.to_string();
     assert!(
-        msg.contains("rename_all") && msg.contains("PhasesFormat"),
+        msg.contains("field key") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn noop_directional_renames_export_fine_under_format() {
+    fn assert_exports<T: Type>(name: &str) {
+        Typescript::default()
+            .export(&Types::default().register::<T>(), specta_serde::Format)
+            .unwrap_or_else(|err| {
+                panic!("{name}: no-op directional rename should export under Format: {err}")
+            });
+    }
+
+    assert_exports::<FieldNoopOneSidedRename>("FieldNoopOneSidedRename");
+    assert_exports::<RenameAllNoop>("RenameAllNoop");
+    assert_exports::<RenameAllCoincidence>("RenameAllCoincidence");
+    assert_exports::<VariantNoopOneSidedRename>("VariantNoopOneSidedRename");
+    assert_exports::<EnumRenameAllNoop>("EnumRenameAllNoop");
+    assert_exports::<ContainerRenameNoop>("ContainerRenameNoop");
+}
+
+#[test]
+fn genuinely_differing_effective_keys_still_require_phases_format() {
+    // Control alongside the pure no-op cases: as soon as one live key's
+    // effective serialize and deserialize names differ, unified mode errors.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<RenameAllPartialNoop>(),
+            specta_serde::Format,
+        )
+        .expect_err("a genuinely renamed key should still require PhasesFormat");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("field_one") && msg.contains("PhasesFormat"),
         "unexpected error: {msg}"
     );
 }
