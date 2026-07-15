@@ -144,6 +144,12 @@ struct LexicalMapKeys {
     boolean: std::collections::HashMap<bool, String>,
 }
 
+#[derive(Type, Serialize)]
+struct FixedWidthIntegerMapKeys {
+    signed: std::collections::HashMap<i8, String>,
+    unsigned: std::collections::HashMap<u8, String>,
+}
+
 #[derive(Type)]
 enum RawNewtypeEnum {
     Value(String),
@@ -352,6 +358,31 @@ fn rejects_object_map_keys() {
         error,
         specta_jsonschema::Error::InvalidMapKey { .. }
     ));
+}
+
+#[test]
+fn constrains_fixed_width_integer_map_key_ranges() {
+    let schema = JsonSchema::default()
+        .export_ref_value(
+            &Types::default().register::<FixedWidthIntegerMapKeys>(),
+            specta_serde::Format,
+            "FixedWidthIntegerMapKeys",
+        )
+        .unwrap();
+
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    assert!(validator.is_valid(&serde_json::json!({
+        "signed": { "-128": "minimum", "127": "maximum" },
+        "unsigned": { "0": "minimum", "255": "maximum" }
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "signed": { "128": "out of range" },
+        "unsigned": {}
+    })));
+    assert!(!validator.is_valid(&serde_json::json!({
+        "signed": {},
+        "unsigned": { "256": "out of range" }
+    })));
 }
 
 #[test]

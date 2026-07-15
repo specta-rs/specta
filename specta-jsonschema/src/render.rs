@@ -439,22 +439,38 @@ impl<'a> Renderer<'a> {
                 "enum",
                 Value::Array(vec![string("false"), string("true")]),
             )])),
-            DataType::Primitive(
-                Primitive::i8
-                | Primitive::i16
-                | Primitive::i32
-                | Primitive::i64
-                | Primitive::i128
-                | Primitive::isize,
-            ) => Some(pattern_schema("^-?(0|[1-9][0-9]*)$")),
-            DataType::Primitive(
-                Primitive::u8
-                | Primitive::u16
-                | Primitive::u32
-                | Primitive::u64
-                | Primitive::u128
-                | Primitive::usize,
-            ) => Some(pattern_schema("^(0|[1-9][0-9]*)$")),
+            DataType::Primitive(Primitive::i8) => Some(pattern_schema(
+                &signed_integer_key_pattern(i8::MIN.unsigned_abs().into(), i8::MAX as u128),
+            )),
+            DataType::Primitive(Primitive::i16) => Some(pattern_schema(
+                &signed_integer_key_pattern(i16::MIN.unsigned_abs().into(), i16::MAX as u128),
+            )),
+            DataType::Primitive(Primitive::i32) => Some(pattern_schema(
+                &signed_integer_key_pattern(i32::MIN.unsigned_abs().into(), i32::MAX as u128),
+            )),
+            DataType::Primitive(Primitive::i64) => Some(pattern_schema(
+                &signed_integer_key_pattern(i64::MIN.unsigned_abs().into(), i64::MAX as u128),
+            )),
+            DataType::Primitive(Primitive::i128) => Some(pattern_schema(
+                &signed_integer_key_pattern(i128::MIN.unsigned_abs(), i128::MAX as u128),
+            )),
+            DataType::Primitive(Primitive::isize) => Some(pattern_schema("^-?(0|[1-9][0-9]*)$")),
+            DataType::Primitive(Primitive::u8) => Some(pattern_schema(
+                &unsigned_integer_key_pattern(u8::MAX.into()),
+            )),
+            DataType::Primitive(Primitive::u16) => Some(pattern_schema(
+                &unsigned_integer_key_pattern(u16::MAX.into()),
+            )),
+            DataType::Primitive(Primitive::u32) => Some(pattern_schema(
+                &unsigned_integer_key_pattern(u32::MAX.into()),
+            )),
+            DataType::Primitive(Primitive::u64) => Some(pattern_schema(
+                &unsigned_integer_key_pattern(u64::MAX.into()),
+            )),
+            DataType::Primitive(Primitive::u128) => {
+                Some(pattern_schema(&unsigned_integer_key_pattern(u128::MAX)))
+            }
+            DataType::Primitive(Primitive::usize) => Some(pattern_schema("^(0|[1-9][0-9]*)$")),
             DataType::Primitive(Primitive::f32 | Primitive::f64) => Some(pattern_schema(
                 "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$",
             )),
@@ -1056,6 +1072,56 @@ fn number_schema(format: Option<&str>) -> Value {
 
 fn pattern_schema(pattern: &str) -> Value {
     object([("type", string("string")), ("pattern", string(pattern))])
+}
+
+fn unsigned_integer_key_pattern(maximum: u128) -> String {
+    format!("^({})$", bounded_decimal_pattern(maximum))
+}
+
+fn signed_integer_key_pattern(negative_maximum: u128, positive_maximum: u128) -> String {
+    format!(
+        "^({}|-({}))$",
+        bounded_decimal_pattern(positive_maximum),
+        bounded_decimal_pattern(negative_maximum)
+    )
+}
+
+fn bounded_decimal_pattern(maximum: u128) -> String {
+    let maximum = maximum.to_string();
+    let digits = maximum.as_bytes();
+    let mut alternatives = vec!["0".to_string()];
+
+    if digits.len() == 2 {
+        alternatives.push("[1-9]".to_string());
+    } else if digits.len() > 2 {
+        alternatives.push(format!("[1-9][0-9]{{0,{}}}", digits.len() - 2));
+    }
+
+    for (index, digit) in digits.iter().enumerate() {
+        let lower = if index == 0 { b'1' } else { b'0' };
+        if *digit <= lower {
+            continue;
+        }
+
+        let mut alternative = maximum[..index].to_string();
+        let upper = digit - 1;
+        if lower == upper {
+            alternative.push(char::from(lower));
+        } else {
+            alternative.push_str(&format!("[{}-{}]", char::from(lower), char::from(upper)));
+        }
+
+        let remaining = digits.len() - index - 1;
+        match remaining {
+            0 => {}
+            1 => alternative.push_str("[0-9]"),
+            _ => alternative.push_str(&format!("[0-9]{{{remaining}}}")),
+        }
+        alternatives.push(alternative);
+    }
+
+    alternatives.push(maximum);
+    alternatives.join("|")
 }
 
 fn object<const N: usize>(entries: [(&str, Value); N]) -> Value {
