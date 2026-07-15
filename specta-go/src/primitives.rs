@@ -880,14 +880,17 @@ fn datatype_reaches(
                 if path == target {
                     return true;
                 }
-                if !visited.insert(path) {
+                if !visited.insert(path.clone()) {
                     return false;
                 }
                 let Some(mut ty) = ndt.ty.clone() else {
+                    visited.remove(&path);
                     return false;
                 };
                 substitute_generics(&mut ty, &resolve_reference_arguments(ndt, generics));
-                datatype_reaches(types, &ty, target, visited)
+                let reaches = datatype_reaches(types, &ty, target, visited);
+                visited.remove(&path);
+                reaches
             }
             NamedReferenceType::Recursive(_) => true,
         },

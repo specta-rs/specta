@@ -801,6 +801,7 @@ fn go_only_pointers_recursive_required_references() {
     #[derive(Type)]
     #[specta(collect = false)]
     struct DefaultCycleD {
+        c_string: DefaultCycleC<String>,
         c: DefaultCycleC,
     }
 
