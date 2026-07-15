@@ -889,7 +889,10 @@ fn datatype_nullability_mapped(
         return Ok(Nullability::NonNullable);
     };
     let mut aliased = map_datatype(format, types, original)?;
-    if matches!(aliased, DataType::Struct(_) | DataType::Enum(_)) {
+    if matches!(
+        aliased,
+        DataType::Struct(_) | DataType::Enum(_) | DataType::Generic(_)
+    ) {
         return Ok(Nullability::NonNullable);
     }
 

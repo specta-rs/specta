@@ -448,13 +448,13 @@ fn kotlin_rejects_declarations_that_shadow_generic_modifiers() {
 
 #[test]
 fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
-    use specta::datatype::{Generic, GenericDefinition, NamedDataType};
+    use specta::datatype::{Field, Generic, GenericDefinition, NamedDataType, Primitive, Struct};
 
     let mut types = Types::default();
-    NamedDataType::new("Identity", &mut types, |_, datatype| {
-        let generic = Generic::new(Cow::Borrowed("T"));
+    let generic = Generic::new(Cow::Borrowed("T"));
+    let identity = NamedDataType::new("Identity", &mut types, |_, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
-        datatype.ty = Some(DataType::Generic(generic));
+        datatype.ty = Some(DataType::Generic(generic.clone()));
     });
 
     let output = Kotlin::default()
@@ -474,6 +474,26 @@ fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
         .export(&types, IdentityFormat)
         .expect_err("mutable generic wrappers cannot preserve scalar Kotlinx encoding");
     assert!(error.to_string().contains("generic wrappers"));
+
+    NamedDataType::new("UsesIdentity", &mut types, |_, datatype| {
+        datatype.ty = Some(
+            Struct::named()
+                .field(
+                    "value",
+                    Field::new(DataType::Reference(identity.reference(vec![(
+                        generic.clone(),
+                        DataType::Nullable(Box::new(DataType::Primitive(Primitive::str))),
+                    )]))),
+                )
+                .build(),
+        );
+    });
+    let output = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(&types, IdentityFormat)
+        .expect("generic value wrappers are nominal even with nullable type arguments");
+    assert!(output.contains("val value: Identity<kotlin.String?>"));
+    assert!(!output.contains("val value: Identity<kotlin.String?> = null"));
 }
 
 #[test]
