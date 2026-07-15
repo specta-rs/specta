@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
-use specta::{Type, Types, datatype::Primitive};
-use specta_typescript::Typescript;
+use specta::{Type, Types};
+use specta_typescript::{Typescript, semantic::Configuration};
 use specta_util::Remapper;
 
 #[derive(Debug)]
@@ -134,8 +134,7 @@ fn serde_json_value_does_not_recurse_when_exported() {
     }
 
     let types = Remapper::new()
-        .rule(Primitive::i64.into(), Primitive::f64.into())
-        .rule(Primitive::u64.into(), Primitive::f64.into())
+        .dangerous_bigints_as_number()
         .remap_types(Types::default().register::<CoapBody>());
 
     insta::assert_snapshot!(
@@ -143,6 +142,46 @@ fn serde_json_value_does_not_recurse_when_exported() {
         Typescript::default()
             .export(&types, specta_serde::Format)
             .expect("serde_json::Value should export without inline recursion")
+    );
+}
+
+// https://github.com/specta-rs/specta/issues/500
+#[test]
+fn serde_json_number_uses_untagged_wire_shape() {
+    #[derive(Type)]
+    struct HasJsonNumber {
+        value: serde_json::Number,
+    }
+
+    let types = Types::default().register::<HasJsonNumber>();
+    let err = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect_err("JSON numbers containing wide integers must require an explicit remap");
+    assert!(
+        err.to_string()
+            .contains("forbids exporting BigInt-style types"),
+        "unexpected error: {err}"
+    );
+
+    let lossless_types = Configuration::empty()
+        .enable_lossless_bigints()
+        .apply_types(&types)
+        .into_owned();
+    let lossless_output = Typescript::default()
+        .export(&lossless_types, specta_serde::Format)
+        .unwrap();
+    assert!(lossless_output.contains("value: number"));
+    assert!(!lossless_output.contains("bigint"));
+
+    let types = Remapper::new()
+        .dangerous_bigints_as_number()
+        .remap_types(types);
+
+    insta::assert_snapshot!(
+        "serde_json_number_uses_untagged_wire_shape",
+        Typescript::default()
+            .export(&types, specta_serde::Format)
+            .unwrap()
     );
 }
 

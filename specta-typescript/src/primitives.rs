@@ -732,15 +732,17 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
     }
 }
 
-/// Generate an Typescript string to refer to a specific [`DataType`].
+/// Generate a Typescript string for a specific [`DataType`] while preserving ordinary named
+/// references recursively.
 ///
-/// For primitives this will include the literal type but for named type it will contain a reference.
+/// Unlike [`inline`], named types are rendered as references even when nested within an anonymous
+/// composite type. References explicitly marked as inline are still expanded.
 ///
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &Types,
-    r: &Reference,
+    dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
     datatype(
@@ -748,7 +750,7 @@ pub fn reference(
         exporter.as_ref(),
         None,
         types,
-        &DataType::Reference(r.clone()),
+        dt,
         vec![],
         None,
         "",
@@ -3030,6 +3032,8 @@ fn enum_dt(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
+
     if e.variants.is_empty() {
         s.push_str(NEVER);
         return Ok(());
@@ -3069,6 +3073,12 @@ fn enum_dt(
             value: ts_values.unwrap_or_else(|| NEVER.to_string()),
             strict_keys: untagged_strict_keys(variant),
         });
+    }
+
+    // Rendering first preserves errors for unremapped BigInt-style variants.
+    if is_finite_number {
+        s.push_str("number");
+        return Ok(());
     }
 
     if discriminator.is_none() && !has_anonymous_variant(&filtered_variants) {
