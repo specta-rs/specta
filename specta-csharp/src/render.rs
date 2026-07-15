@@ -981,6 +981,14 @@ fn render_simple_enum(
             path,
         );
     }
+    let wire_string = is_rewritten_string_enum(enm);
+    let converter = format!("__Specta{name}JsonConverter");
+    if wire_string {
+        out.push_str(base);
+        out.push_str("[global::System.Text.Json.Serialization.JsonConverter(typeof(");
+        out.push_str(&converter);
+        out.push_str("))]\n");
+    }
     out.push_str(base);
     out.push_str(exporter.visibility.keyword());
     out.push_str(" enum ");
@@ -990,22 +998,97 @@ fn render_simple_enum(
     out.push_str("{\n");
     let indent = format!("{base}{}", exporter.indent);
     let mut used = HashSet::from([name.to_string()]);
+    let mut mappings = Vec::new();
     for (wire_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
         xml_docs(out, &indent, &variant.docs);
         obsolete(out, &indent, variant.deprecated.as_ref());
         let member = unique_identifier(property_name(wire_name), &mut used);
-        if member.trim_start_matches('@') != wire_name {
-            out.push_str(&indent);
-            out.push_str("[global::System.Runtime.Serialization.EnumMember(Value = \"");
-            out.push_str(&escape_csharp_string(wire_name));
-            out.push_str("\")]\n");
-        }
         out.push_str(&indent);
         out.push_str(&member);
         out.push_str(",\n");
+        mappings.push((wire_name, member));
     }
     out.push_str(base);
     out.push_str("}\n");
+    if wire_string {
+        out.push('\n');
+        out.push_str(base);
+        out.push_str(exporter.visibility.keyword());
+        out.push_str(" sealed class ");
+        out.push_str(&converter);
+        out.push_str(" : global::System.Text.Json.Serialization.JsonConverter<");
+        out.push_str(name);
+        out.push_str(">\n");
+        out.push_str(base);
+        out.push_str("{\n");
+        out.push_str(&indent);
+        out.push_str("public override ");
+        out.push_str(name);
+        out.push_str(" Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)\n");
+        out.push_str(&indent);
+        out.push_str("{\n");
+        let body = format!("{indent}{}", exporter.indent);
+        out.push_str(&body);
+        out.push_str("if (reader.TokenType != global::System.Text.Json.JsonTokenType.String)\n");
+        out.push_str(&body);
+        out.push_str("{\n");
+        out.push_str(&body);
+        out.push_str(exporter.indent.as_ref());
+        out.push_str("throw new global::System.Text.Json.JsonException();\n");
+        out.push_str(&body);
+        out.push_str("}\n");
+        out.push_str(&body);
+        out.push_str("return reader.GetString() switch\n");
+        out.push_str(&body);
+        out.push_str("{\n");
+        for (wire_name, member) in &mappings {
+            out.push_str(&body);
+            out.push_str(exporter.indent.as_ref());
+            out.push('"');
+            out.push_str(&escape_csharp_string(wire_name));
+            out.push_str("\" => ");
+            out.push_str(name);
+            out.push('.');
+            out.push_str(member);
+            out.push_str(",\n");
+        }
+        out.push_str(&body);
+        out.push_str(exporter.indent.as_ref());
+        out.push_str("_ => throw new global::System.Text.Json.JsonException(),\n");
+        out.push_str(&body);
+        out.push_str("};\n");
+        out.push_str(&indent);
+        out.push_str("}\n");
+        out.push_str(&indent);
+        out.push_str("public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ");
+        out.push_str(name);
+        out.push_str(" value, global::System.Text.Json.JsonSerializerOptions options)\n");
+        out.push_str(&indent);
+        out.push_str("{\n");
+        out.push_str(&body);
+        out.push_str("writer.WriteStringValue(value switch\n");
+        out.push_str(&body);
+        out.push_str("{\n");
+        for (wire_name, member) in &mappings {
+            out.push_str(&body);
+            out.push_str(exporter.indent.as_ref());
+            out.push_str(name);
+            out.push('.');
+            out.push_str(member);
+            out.push_str(" => \"");
+            out.push_str(&escape_csharp_string(wire_name));
+            out.push_str("\",\n");
+        }
+        out.push_str(&body);
+        out.push_str(exporter.indent.as_ref());
+        out.push_str("_ => throw new global::System.Text.Json.JsonException(),\n");
+        out.push_str(&body);
+        out.push_str("});\n");
+        out.push_str(&indent);
+        out.push_str("}\n");
+        out.push_str(base);
+        out.push_str("}\n");
+    }
     Ok(())
 }
 
@@ -1248,10 +1331,17 @@ fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
     variants
         .iter()
         .all(|(_, variant)| matches!(variant.fields, Fields::Unit))
-        || (enm
-            .attributes
-            .contains_key("specta_serde:enum_repr_rewritten")
-            && variants.iter().all(|(wire_name, variant)| {
+        || is_rewritten_string_enum(enm)
+}
+
+fn is_rewritten_string_enum(enm: &specta::datatype::Enum) -> bool {
+    enm.attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
+        && enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .all(|(wire_name, variant)| {
                 let Fields::Unnamed(fields) = &variant.fields else {
                     return false;
                 };
@@ -1272,7 +1362,7 @@ fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
                             if literal_name == wire_name
                                 && matches!(variant.fields, Fields::Unit)
                     )
-            }))
+            })
 }
 
 fn is_emitted_named(ndt: &NamedDataType) -> bool {
@@ -2060,6 +2150,24 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
                 first,
                 second: path,
             });
+        }
+        if matches!(ndt.ty.as_ref(), Some(DataType::Enum(enm)) if is_rewritten_string_enum(enm)) {
+            let converter = format!("__Specta{name}JsonConverter");
+            let converter_path = format!("generated JSON converter for {path}");
+            if let Some(first) = scopes
+                .entry(match exporter.layout {
+                    Layout::Namespaces | Layout::Files => module_segments(&ndt.module_path),
+                    Layout::FlatFile | Layout::ModulePrefixedName => Vec::new(),
+                })
+                .or_default()
+                .insert(converter.clone(), converter_path.clone())
+            {
+                return Err(Error::DuplicateTypeName {
+                    name: converter,
+                    first,
+                    second: converter_path,
+                });
+            }
         }
     }
     Ok(())

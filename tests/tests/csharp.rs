@@ -606,8 +606,9 @@ fn serde_unit_enums_keep_their_string_wire_shape() {
     assert!(output.contains("enum Status"));
     assert!(output.contains("InProgress,"));
     assert!(output.contains("Complete,"));
-    assert!(output.contains("EnumMember(Value = \"in_progress\")"));
-    assert!(output.contains("EnumMember(Value = \"complete\")"));
+    assert!(output.contains("JsonConverter(typeof(__SpectaStatusJsonConverter))"));
+    assert!(output.contains("\"in_progress\" => Status.InProgress"));
+    assert!(output.contains("Status.Complete => \"complete\""));
     assert!(!output.contains("abstract record Status"));
     assert!(!output.contains("Item1"));
 }

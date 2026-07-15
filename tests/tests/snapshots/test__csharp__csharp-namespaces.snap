@@ -59,12 +59,37 @@ namespace Company.Api.Test.Csharp
     public required global::System.Collections.Generic.IReadOnlyDictionary<string, ulong> Counts { get; init; }
   }
 
+  [global::System.Text.Json.Serialization.JsonConverter(typeof(__SpectaStatusJsonConverter))]
   internal enum Status
   {
-    [global::System.Runtime.Serialization.EnumMember(Value = "in_progress")]
     InProgress,
-    [global::System.Runtime.Serialization.EnumMember(Value = "complete")]
     Complete,
+  }
+
+  internal sealed class __SpectaStatusJsonConverter : global::System.Text.Json.Serialization.JsonConverter<Status>
+  {
+    public override Status Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)
+    {
+      if (reader.TokenType != global::System.Text.Json.JsonTokenType.String)
+      {
+        throw new global::System.Text.Json.JsonException();
+      }
+      return reader.GetString() switch
+      {
+        "in_progress" => Status.InProgress,
+        "complete" => Status.Complete,
+        _ => throw new global::System.Text.Json.JsonException(),
+      };
+    }
+    public override void Write(global::System.Text.Json.Utf8JsonWriter writer, Status value, global::System.Text.Json.JsonSerializerOptions options)
+    {
+      writer.WriteStringValue(value switch
+      {
+        Status.InProgress => "in_progress",
+        Status.Complete => "complete",
+        _ => throw new global::System.Text.Json.JsonException(),
+      });
+    }
   }
 }
 
