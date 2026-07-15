@@ -775,89 +775,28 @@ fn render_datatype_with_inline_overrides(
                     let mut layers = generic_layers.to_vec();
                     layers.push(generics);
                     if let Some(ty) = ndt.ty.as_ref()
-                        && matches!(ty, DataType::Tuple(_))
+                        && is_non_object_datatype(ty)
                     {
                         return render(out, exporter, types, ty, structural_types, path, &layers);
                     }
-                    if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
-                        && is_non_object_struct(&strct.fields)
-                    {
-                        let (fields, preserve_tuple_shape) = match &strct.fields {
-                            Fields::Unit => (Vec::new(), false),
-                            Fields::Unnamed(fields) => (
-                                fields
-                                    .fields
-                                    .iter()
-                                    .filter_map(|field| field.ty.as_ref())
-                                    .collect(),
-                                fields.fields.len() != 1,
-                            ),
-                            Fields::Named(_) => unreachable!(),
-                        };
-                        match fields.as_slice() {
-                            [] if preserve_tuple_shape => out.push_str("global::System.ValueTuple"),
-                            [] => out.push_str("object?"),
-                            [field] if preserve_tuple_shape => {
-                                out.push_str("global::System.ValueTuple<");
-                                render(
-                                    out,
-                                    exporter,
-                                    types,
-                                    field,
-                                    structural_types,
-                                    path,
-                                    &layers,
-                                )?;
-                                out.push('>');
+                    reference_name(out, exporter, ndt);
+                    if !generics.is_empty() {
+                        out.push('<');
+                        for (index, (_, generic)) in generics.iter().enumerate() {
+                            if index != 0 {
+                                out.push_str(", ");
                             }
-                            [field] => render(
+                            render(
                                 out,
                                 exporter,
                                 types,
-                                field,
+                                generic,
                                 structural_types,
                                 path,
-                                &layers,
-                            )?,
-                            fields => {
-                                out.push('(');
-                                for (index, field) in fields.iter().enumerate() {
-                                    if index != 0 {
-                                        out.push_str(", ");
-                                    }
-                                    render(
-                                        out,
-                                        exporter,
-                                        types,
-                                        field,
-                                        structural_types,
-                                        path,
-                                        &layers,
-                                    )?;
-                                }
-                                out.push(')');
-                            }
+                                generic_layers,
+                            )?;
                         }
-                    } else {
-                        reference_name(out, exporter, ndt);
-                        if !generics.is_empty() {
-                            out.push('<');
-                            for (index, (_, generic)) in generics.iter().enumerate() {
-                                if index != 0 {
-                                    out.push_str(", ");
-                                }
-                                render(
-                                    out,
-                                    exporter,
-                                    types,
-                                    generic,
-                                    structural_types,
-                                    path,
-                                    generic_layers,
-                                )?;
-                            }
-                            out.push('>');
-                        }
+                        out.push('>');
                     }
                 }
             },
@@ -1328,7 +1267,7 @@ fn datatype(
                     });
                 }
                 if let Some(ty) = ndt.ty.as_ref()
-                    && matches!(ty, DataType::Tuple(_))
+                    && is_non_object_datatype(ty)
                 {
                     let NamedReferenceType::Reference { generics, .. } = &reference.inner else {
                         unreachable!()
@@ -1341,21 +1280,6 @@ fn datatype(
                         path,
                         &[generics],
                         &mut HashSet::new(),
-                    );
-                }
-                if let Some(DataType::Struct(strct)) = ndt.ty.as_ref()
-                    && is_non_object_struct(&strct.fields)
-                {
-                    let NamedReferenceType::Reference { generics, .. } = &reference.inner else {
-                        unreachable!()
-                    };
-                    return render_non_object_struct(
-                        out,
-                        exporter,
-                        types,
-                        &strct.fields,
-                        path,
-                        &[generics],
                     );
                 }
                 reference_name(out, exporter, ndt);
@@ -1416,8 +1340,8 @@ fn is_non_object_struct(fields: &Fields) -> bool {
 }
 
 fn is_non_object_datatype(ty: &DataType) -> bool {
-    matches!(ty, DataType::Tuple(_))
-        || matches!(ty, DataType::Struct(strct) if is_non_object_struct(&strct.fields))
+    !matches!(ty, DataType::Struct(strct) if matches!(strct.fields, Fields::Named(_)))
+        && !matches!(ty, DataType::Enum(_))
 }
 
 fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
@@ -1826,7 +1750,7 @@ fn wire_datatype(
                             &layers,
                             visited_non_objects,
                         ),
-                        DataType::Tuple(_) => wire_datatype(
+                        _ => wire_datatype(
                             out,
                             exporter,
                             types,
@@ -1835,7 +1759,6 @@ fn wire_datatype(
                             &layers,
                             visited_non_objects,
                         ),
-                        _ => unreachable!(),
                     };
                     visited_non_objects.remove(&key);
                     result?;

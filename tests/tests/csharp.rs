@@ -170,6 +170,16 @@ struct FooValue {
 }
 
 #[derive(Type)]
+#[specta(type = String, collect = false)]
+struct StringAlias;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UsesStringAlias {
+    id: StringAlias,
+}
+
+#[derive(Type)]
 #[specta(collect = false)]
 struct InlineFoo {
     value: bool,
@@ -976,6 +986,23 @@ fn directly_registered_non_object_roots_are_rejected() {
         Err(Error::UnsupportedRoot { .. })
     ));
     assert!(!root.exists());
+}
+
+#[test]
+fn primitive_overrides_are_inlined_at_use_sites() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<UsesStringAlias>(),
+            IdentityFormat,
+        )
+        .unwrap();
+
+    assert!(output.contains("string Id"));
+    assert!(!output.contains("record StringAlias"));
+    assert!(matches!(
+        CSharp::new().export(&Types::default().register::<StringAlias>(), IdentityFormat,),
+        Err(Error::UnsupportedRoot { .. })
+    ));
 }
 
 #[test]
