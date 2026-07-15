@@ -3744,6 +3744,9 @@ fn external_enum_tagged_payload_datatype(
                 vec![(Cow::Owned(name.clone()), payload)],
             );
             transformed_variant.attributes = Default::default();
+            transformed_variant
+                .attributes
+                .insert(STRICT_OBJECT_MARKER, true);
             transformed
                 .variants
                 .push((Cow::Owned(name), transformed_variant));

@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
 import {
+  ContextualExternalWrapperSchema,
   ExternalEnumSchema,
   GenericSchema,
   GenericMapHolderSchema,
+  MapOnlyExternalWrapperSchema,
   OptionalFlattenSchema,
   ProtoFieldSchema,
   RecursiveSchema,
@@ -29,6 +31,12 @@ test("generated schemas validate representative wire values", () => {
     remote_keys: { "42": "value" },
   }).success).toBe(true);
   expect(ExternalEnumSchema.safeParse({ Newtype: "value", Tuple: [1, true] }).success).toBe(false);
+  expect(ContextualExternalWrapperSchema.safeParse({ kind: "Value", Unit: null }).success).toBe(true);
+  expect(ContextualExternalWrapperSchema.safeParse({ kind: "Value", Newtype: 1 }).success).toBe(true);
+  expect(ContextualExternalWrapperSchema.safeParse({ kind: "Value", Unit: null, Newtype: 1 }).success).toBe(false);
+  expect(MapOnlyExternalWrapperSchema.safeParse({ kind: "Value", First: { value: 1 } }).success).toBe(true);
+  expect(MapOnlyExternalWrapperSchema.safeParse({ kind: "Value", Second: { label: "ok" } }).success).toBe(true);
+  expect(MapOnlyExternalWrapperSchema.safeParse({ kind: "Value", First: { value: 1 }, Second: { label: "no" } }).success).toBe(false);
   expect(UntaggedMatchingFieldSchema.safeParse({ Variant: "value", extra: true }).success).toBe(true);
   expect(UntaggedMatchingFieldSchema.safeParse({ extra: true }).success).toBe(true);
   expect(OptionalFlattenSchema.parse({ id: "id", inner: "kept" })).toEqual({ id: "id", inner: "kept" });

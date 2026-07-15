@@ -947,6 +947,61 @@ fn zod_recursive_types_use_lazy() {
 }
 
 #[test]
+fn zod_recursive_named_references_in_intersections_remain_lazy() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct InlineRecursive {
+        #[specta(inline)]
+        child: Option<Box<InlineRecursive>>,
+    }
+
+    fn find_recursive_reference(ty: &DataType) -> Option<DataType> {
+        match ty {
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                specta::datatype::NamedReferenceType::Recursive(_) => Some(ty.clone()),
+                specta::datatype::NamedReferenceType::Inline { dt, .. } => {
+                    find_recursive_reference(dt)
+                }
+                specta::datatype::NamedReferenceType::Reference { .. } => None,
+            },
+            DataType::Struct(strct) => match &strct.fields {
+                specta::datatype::Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .find_map(|(_, field)| field.ty.as_ref().and_then(find_recursive_reference)),
+                specta::datatype::Fields::Unnamed(fields) => fields
+                    .fields
+                    .iter()
+                    .find_map(|field| field.ty.as_ref().and_then(find_recursive_reference)),
+                specta::datatype::Fields::Unit => None,
+            },
+            DataType::List(list) => find_recursive_reference(&list.ty),
+            DataType::Nullable(inner) => find_recursive_reference(inner),
+            _ => None,
+        }
+    }
+
+    let mut types = Types::default();
+    let root = InlineRecursive::definition(&mut types);
+    let DataType::Reference(Reference::Named(root_reference)) = root else {
+        panic!("recursive type definition should be a named reference");
+    };
+    let root_ty = types
+        .get(&root_reference)
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("recursive type should have a registered definition");
+    let recursive = find_recursive_reference(root_ty)
+        .expect("inline recursive type should contain a recursive named reference");
+
+    let tag = specta::datatype::Struct::named()
+        .field("kind", specta::datatype::Field::new(Primitive::str.into()))
+        .build();
+    let intersection = DataType::Intersection(vec![tag, recursive]);
+    let rendered = primitives::inline(&Zod::default(), &types, &intersection).unwrap();
+    assert!(rendered.contains("z.lazy"), "{rendered}");
+}
+
+#[test]
 fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", &mut types, |_, ndt| {

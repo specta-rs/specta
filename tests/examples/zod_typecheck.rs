@@ -111,6 +111,30 @@ enum ExternalEnum {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+enum ContextualExternalPayload {
+    Unit,
+    Newtype(i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+enum ContextualExternalWrapper {
+    Value(ContextualExternalPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum MapOnlyExternalPayload<T> {
+    First { value: T },
+    Second { label: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+enum MapOnlyExternalWrapper {
+    Value(MapOnlyExternalPayload<i32>),
+}
+
+#[derive(Type, Serialize, Deserialize)]
 #[serde(untagged)]
 enum UntaggedMatchingField {
     Variant {
@@ -175,6 +199,8 @@ fn main() {
                 .register::<GenericMapHolder>()
                 .register::<OpaqueTypes>()
                 .register::<ExternalEnum>()
+                .register::<ContextualExternalWrapper>()
+                .register::<MapOnlyExternalWrapper>()
                 .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),
         );

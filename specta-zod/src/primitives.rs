@@ -889,6 +889,7 @@ fn datatype(
             location,
             generics,
             type_render_stack,
+            &[],
         )?,
         DataType::Tuple(tuple) => tuple_dt(
             s,
@@ -930,19 +931,69 @@ fn datatype(
                 s.push_str("z.unknown()");
                 return Ok(());
             }
+            let allowed_object_keys = intersection
+                .iter()
+                .filter_map(|ty| match ty {
+                    DataType::Struct(strct) => match &strct.fields {
+                        Fields::Named(named) => Some(named),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .flat_map(|named| {
+                    named
+                        .fields
+                        .iter()
+                        .filter(|(_, field)| field.ty.is_some())
+                        .map(|(name, _)| name.as_ref())
+                })
+                .collect::<Vec<_>>();
             let mut parts = Vec::with_capacity(intersection.len());
             for ty in intersection {
                 let mut part = String::new();
-                datatype(
-                    &mut part,
-                    exporter,
-                    types,
-                    ty,
-                    location.clone(),
-                    generics,
-                    false,
-                    type_render_stack,
-                )?;
+                if let DataType::Enum(enm) = ty {
+                    enum_dt(
+                        &mut part,
+                        exporter,
+                        types,
+                        enm,
+                        location.clone(),
+                        generics,
+                        type_render_stack,
+                        &allowed_object_keys,
+                    )?;
+                } else if let DataType::Reference(Reference::Named(named)) = ty
+                    && !matches!(&named.inner, NamedReferenceType::Recursive(_))
+                    && let DataType::Enum(enm) = named_reference_ty(types, named)?
+                {
+                    let reference_generics = named_reference_generics(named)?;
+                    let mut resolved = DataType::Enum(enm.clone());
+                    substitute_generics(&mut resolved, reference_generics);
+                    let DataType::Enum(resolved) = resolved else {
+                        unreachable!("enum generic substitution preserves the datatype kind")
+                    };
+                    enum_dt(
+                        &mut part,
+                        exporter,
+                        types,
+                        &resolved,
+                        location.clone(),
+                        generics,
+                        type_render_stack,
+                        &allowed_object_keys,
+                    )?;
+                } else {
+                    datatype(
+                        &mut part,
+                        exporter,
+                        types,
+                        ty,
+                        location.clone(),
+                        generics,
+                        false,
+                        type_render_stack,
+                    )?;
+                }
                 parts.push(part);
             }
             s.push_str(&parts.join(".and("));
@@ -1530,6 +1581,7 @@ fn enum_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
+    allowed_object_keys: &[&str],
 ) -> Result<(), Error> {
     let variants = e
         .variants
@@ -1546,6 +1598,7 @@ fn enum_dt(
                 child_location(&location, name.to_string()),
                 generics,
                 type_render_stack,
+                allowed_object_keys,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -1583,21 +1636,11 @@ fn enum_variant_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
+    allowed_object_keys: &[&str],
 ) -> Result<Option<String>, Error> {
     match &variant.fields {
         Fields::Unit => Ok(Some(format!("z.literal(\"{}\")", escape_string(name)))),
         Fields::Named(named) => {
-            if named.fields.iter().all(|(_, field)| field.ty.is_none()) {
-                return Ok(Some(
-                    if strict_object {
-                        "z.strictObject({})"
-                    } else {
-                        "z.object({})"
-                    }
-                    .to_string(),
-                ));
-            }
-
             let mut schema = if strict_object {
                 String::from("z.strictObject({")
             } else {
@@ -1628,6 +1671,21 @@ fn enum_variant_dt(
                     write!(schema, "\n\t{key}: {value}.optional(),")?;
                 } else {
                     write!(schema, "\n\t{key}: {value},")?;
+                }
+            }
+
+            if strict_object {
+                for field_name in allowed_object_keys {
+                    if named
+                        .fields
+                        .iter()
+                        .any(|(name, field)| field.ty.is_some() && name.as_ref() == *field_name)
+                    {
+                        continue;
+                    }
+                    has_field = true;
+                    let key = sanitise_key(field_name);
+                    write!(schema, "\n\t{key}: z.unknown().optional(),")?;
                 }
             }
 
