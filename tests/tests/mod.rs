@@ -23,6 +23,7 @@ mod maybe_undefined;
 mod references;
 mod semantic;
 mod serde_conversions;
+mod serde_enum_rewrite;
 mod serde_identifiers;
 mod serde_other;
 mod swift;
