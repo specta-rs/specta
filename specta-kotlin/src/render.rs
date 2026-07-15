@@ -451,8 +451,13 @@ fn render_variant(
                 .filter(|(_, field)| field.ty.is_some())
                 .collect::<Vec<_>>();
             if fields.is_empty() {
-                out.push_str("public data object ");
+                if generics.is_empty() {
+                    out.push_str("public data object ");
+                } else {
+                    out.push_str("public class ");
+                }
                 out.push_str(&variant_name);
+                out.push_str(&generic_declaration(generics));
                 out.push_str(" : ");
                 out.push_str(&parent_type);
             } else {
@@ -507,8 +512,13 @@ fn render_variant(
                 .filter(|(_, field)| field.ty.is_some())
                 .collect::<Vec<_>>();
             if fields.is_empty() {
-                out.push_str("public data object ");
+                if generics.is_empty() {
+                    out.push_str("public data object ");
+                } else {
+                    out.push_str("public class ");
+                }
                 out.push_str(&variant_name);
+                out.push_str(&generic_declaration(generics));
                 out.push_str(" : ");
                 out.push_str(&parent_type);
             } else {
@@ -679,11 +689,9 @@ fn datatype(
                     });
                 }
                 let name = named_type_identifier(kotlin, ndt, path)?;
-                let generics = generics
+                let generics = resolved_reference_generics(ndt, generics, path)?
                     .iter()
-                    .map(|(_, generic)| {
-                        datatype(kotlin, format, types, generic, generic_scope, path)
-                    })
+                    .map(|generic| datatype(kotlin, format, types, generic, generic_scope, path))
                     .collect::<Result<Vec<_>, _>>()?;
                 format!("{name}{}", generic_usage(&generics))
             }
@@ -782,6 +790,105 @@ fn datatype(
         }
         DataType::Enum(_) | DataType::Intersection(_) => "Any?".to_owned(),
     })
+}
+
+fn resolved_reference_generics(
+    ndt: &NamedDataType,
+    explicit: &[(Generic, DataType)],
+    path: &str,
+) -> Result<Vec<DataType>, Error> {
+    let mut scoped = Vec::with_capacity(ndt.generics.len());
+    let mut resolved = Vec::with_capacity(ndt.generics.len());
+
+    for definition in ndt.generics.iter() {
+        let ty = if let Some((_, ty)) = explicit
+            .iter()
+            .find(|(generic, _)| generic == &definition.reference())
+        {
+            ty.clone()
+        } else if let Some(default) = &definition.default {
+            let mut default = default.clone();
+            substitute_generics(&mut default, &scoped);
+            default
+        } else {
+            return Err(Error::UnsupportedType {
+                path: path.into(),
+                reason: "named reference is missing a required generic argument",
+            });
+        };
+
+        scoped.push((definition.reference(), ty.clone()));
+        resolved.push(ty);
+    }
+
+    Ok(resolved)
+}
+
+fn substitute_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
+    match dt {
+        DataType::Generic(generic) => {
+            if let Some((_, replacement)) =
+                generics.iter().find(|(candidate, _)| candidate == generic)
+            {
+                *dt = replacement.clone();
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                substitute_field_generics(&mut variant.fields, generics);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                substitute_generics(element, generics);
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Reference {
+                generics: reference_generics,
+                ..
+            } => {
+                for (_, generic) in reference_generics {
+                    substitute_generics(generic, generics);
+                }
+            }
+            NamedReferenceType::Inline { dt, .. } => substitute_generics(dt, generics),
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Intersection(types) => {
+            for ty in types {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType)]) {
+    match fields {
+        Fields::Named(fields) => {
+            for (_, field) in &mut fields.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        Fields::Unnamed(fields) => {
+            for field in &mut fields.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        Fields::Unit => {}
+    }
 }
 
 fn primitive_name(primitive: &Primitive) -> &'static str {

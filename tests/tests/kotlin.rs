@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
 use specta::{Format, Type, Types, datatype::DataType};
@@ -83,6 +83,37 @@ struct UsesInlineUnitEnum {
 
 #[derive(Type)]
 #[specta(collect = false)]
+struct KotlinGenericDefault<T = String> {
+    value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct KotlinChainedGenericDefault<T = String, U = T> {
+    first: T,
+    second: U,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct UsesKotlinGenericDefaults {
+    default: KotlinGenericDefault,
+    chained: KotlinChainedGenericDefault<i32>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum GenericSkippedVariant<T> {
+    Tuple(#[specta(skip)] PhantomData<T>),
+    Named {
+        #[specta(skip)]
+        marker: PhantomData<T>,
+    },
+    Value(T),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
 struct InnerPayload {
     value: String,
 }
@@ -163,6 +194,29 @@ fn kotlin_rejects_non_exportable_named_references() {
         error
             .to_string()
             .contains("does not have an exportable definition")
+    );
+}
+
+#[test]
+fn kotlin_materializes_generic_defaults_and_keeps_empty_variants_generic() {
+    let output = Kotlin::default()
+        .export(
+            &Types::default()
+                .register::<UsesKotlinGenericDefaults>()
+                .register::<GenericSkippedVariant<String>>(),
+            IdentityFormat,
+        )
+        .expect("defaulted references and skipped generic variants should export");
+
+    assert!(output.contains("val default: KotlinGenericDefault<String>"));
+    assert!(output.contains("val chained: KotlinChainedGenericDefault<Int, Int>"));
+    assert!(
+        output.contains("public class Tuple<T> : GenericSkippedVariant<T>"),
+        "{output}"
+    );
+    assert!(
+        output.contains("public class Named<T> : GenericSkippedVariant<T>"),
+        "{output}"
     );
 }
 
