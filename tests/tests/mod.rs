@@ -26,6 +26,7 @@ mod serde_conversions;
 mod serde_flatten_option;
 mod serde_identifiers;
 mod serde_other;
+mod serde_unknown_attrs;
 mod serde_validate_recursion;
 mod swift;
 mod types;
