@@ -210,7 +210,19 @@ fn go_output_is_accepted_by_go_toolchain() {
 
     #[derive(Type)]
     #[specta(collect = false)]
+    struct WrappedStamp(Stamp);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct WrappedNullableStamp(NullableStamp);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
     struct BigNumber(i128);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct WrappedBigNumber(BigNumber);
 
     #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
@@ -238,7 +250,10 @@ fn go_output_is_accepted_by_go_toolchain() {
             &Types::default()
                 .register::<Stamp>()
                 .register::<NullableStamp>()
-                .register::<BigNumber>(),
+                .register::<WrappedStamp>()
+                .register::<WrappedNullableStamp>()
+                .register::<BigNumber>()
+                .register::<WrappedBigNumber>(),
             IdentityFormat,
         )
         .unwrap();
@@ -283,6 +298,18 @@ fn go_output_is_accepted_by_go_toolchain() {
     );
     assert!(
         newtypes_before.contains("type NullableStamp = *time.Time"),
+        "{newtypes_before}"
+    );
+    assert!(
+        newtypes_before.contains("type WrappedStamp = Stamp"),
+        "{newtypes_before}"
+    );
+    assert!(
+        newtypes_before.contains("type WrappedNullableStamp = NullableStamp"),
+        "{newtypes_before}"
+    );
+    assert!(
+        newtypes_before.contains("type WrappedBigNumber = BigNumber"),
         "{newtypes_before}"
     );
 
@@ -345,12 +372,28 @@ func TestMethodBackedNewtypes(t *testing.T) {
 		t.Fatalf("nullable stamp: %s, %v", got, err)
 	}
 
+	var wrapped WrappedStamp
+	if err := json.Unmarshal([]byte(`"2024-01-02T03:04:05Z"`), &wrapped); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := json.Marshal(wrapped); err != nil || string(got) != `"2024-01-02T03:04:05Z"` {
+		t.Fatalf("wrapped stamp: %s, %v", got, err)
+	}
+
 	var number BigNumber
 	if err := json.Unmarshal([]byte(`12345678901234567890`), &number); err != nil {
 		t.Fatal(err)
 	}
 	if got := number.String(); got != "12345678901234567890" {
 		t.Fatalf("big number: %s", got)
+	}
+
+	var wrappedNumber WrappedBigNumber
+	if err := json.Unmarshal([]byte(`12345678901234567890`), &wrappedNumber); err != nil {
+		t.Fatal(err)
+	}
+	if got := wrappedNumber.String(); got != "12345678901234567890" {
+		t.Fatalf("wrapped big number: %s", got)
 	}
 }
 

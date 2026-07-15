@@ -153,7 +153,7 @@ fn named_datatype(
     )?;
     out.push_str("type ");
     out.push_str(&name);
-    if is_method_backed_newtype(ty, &rendered) {
+    if is_method_backed_newtype(types, ty) {
         if !generics.is_empty() {
             return Err(Error::UnsupportedType {
                 path: rust_type_path(ndt),
@@ -170,15 +170,76 @@ fn named_datatype(
     Ok(out)
 }
 
-fn is_method_backed_newtype(dt: &DataType, rendered: &str) -> bool {
+fn is_method_backed_newtype(types: &Types, dt: &DataType) -> bool {
     let DataType::Struct(strct) = dt else {
         return false;
     };
     let Fields::Unnamed(fields) = &strct.fields else {
         return false;
     };
-    matches!(fields.fields.as_slice(), [field] if field.ty.is_some())
-        && matches!(rendered, "time.Time" | "*time.Time" | "*big.Int")
+    let [field] = fields.fields.as_slice() else {
+        return false;
+    };
+    field
+        .ty
+        .as_ref()
+        .is_some_and(|dt| datatype_relies_on_json_methods(types, dt, &mut BTreeSet::new()))
+}
+
+fn datatype_relies_on_json_methods(
+    types: &Types,
+    dt: &DataType,
+    visited: &mut BTreeSet<String>,
+) -> bool {
+    match dt {
+        DataType::Primitive(Primitive::i128 | Primitive::u128) => true,
+        DataType::Nullable(inner) => datatype_relies_on_json_methods(types, inner, visited),
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(fields) => matches!(
+                fields.fields.as_slice(),
+                [field] if field.ty.as_ref().is_some_and(|dt| {
+                    datatype_relies_on_json_methods(types, dt, visited)
+                })
+            ),
+            Fields::Unit | Fields::Named(_) => false,
+        },
+        DataType::Reference(Reference::Opaque(opaque)) => {
+            let name = opaque.type_name();
+            name.ends_with("SystemTime") || name.contains("DateTime")
+        }
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => {
+                datatype_relies_on_json_methods(types, dt, visited)
+            }
+            NamedReferenceType::Reference {
+                generics: arguments,
+                ..
+            } => {
+                let Some(ndt) = types.get(reference) else {
+                    return false;
+                };
+                let type_path = rust_type_path(ndt);
+                if !visited.insert(type_path.clone()) {
+                    return false;
+                }
+                let result = ndt.ty.as_ref().is_some_and(|ty| {
+                    let mut ty = ty.clone();
+                    substitute_generics(&mut ty, &resolve_reference_arguments(ndt, arguments));
+                    datatype_relies_on_json_methods(types, &ty, visited)
+                });
+                visited.remove(&type_path);
+                result
+            }
+            NamedReferenceType::Recursive(_) => false,
+        },
+        DataType::List(_)
+        | DataType::Map(_)
+        | DataType::Tuple(_)
+        | DataType::Enum(_)
+        | DataType::Intersection(_)
+        | DataType::Generic(_)
+        | DataType::Primitive(_) => false,
+    }
 }
 
 fn render_string_enum(
