@@ -375,6 +375,25 @@ fn tuple_struct_skipped_field_typescript() {
     );
 }
 
+// The arity fix must not change the datatype's top-level kind: exporters like
+// specta-swift only emit named definitions for `Struct`/`Enum` datatypes, so
+// rewriting the definition to a bare `DataType::Tuple` would make the type
+// silently disappear from their output.
+#[test]
+fn tuple_struct_skipped_field_swift() {
+    let swift = specta_swift::Swift::default()
+        .export(
+            &Types::default().register::<TupleSkip>(),
+            specta_serde::Format,
+        )
+        .expect("swift export should succeed");
+
+    assert!(
+        swift.contains("TupleSkip"),
+        "the tuple struct must not disappear from Swift output:\n{swift}"
+    );
+}
+
 // A serde-transparent tuple struct is the exception to the arity rule above:
 // serde serializes it as the bare inner value, so it must NOT be rewritten to
 // an array even though its declared arity is > 1. `#[specta(transparent =

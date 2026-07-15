@@ -883,6 +883,9 @@ fn rewrite_datatype_for_phase(
             // struct, which `Fields::Unnamed` already renders bare by
             // design. Rewriting the live field(s) into a `DataType::Tuple`
             // forces array rendering regardless of the live count.
+            // (Exporters must render named `Tuple` definitions -- see
+            // specta-swift's `export_type`, which treats them as tuple
+            // structs.)
             let live_unnamed_types = match (original_unnamed_arity, &s.fields) {
                 (Some(arity), Fields::Unnamed(unnamed))
                     if arity > 1 && unnamed.fields.len() == 1 =>
