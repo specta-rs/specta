@@ -371,6 +371,70 @@ fn adjacent_tagged_untagged_skip_phases_no_split() {
     );
 }
 
+// `#[specta(skip)]` is invisible to serde: the wire still carries the full
+// payload symmetrically (`{"t":"V","c":7}` round-trips; a missing `c` and
+// `c: null` are both rejected). The skip only *hides* the field from the
+// export, so the variant renders as `{ t: "V" }` (no fabricated `c`), with
+// no serde asymmetry: no unified-mode error and no `PhasesFormat` split.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjSpectaSkip {
+    V(#[specta(skip)] u8),
+    Live(String),
+}
+
+#[test]
+fn adjacent_tagged_specta_skip_serde_ground_truth() {
+    assert_eq!(
+        serde_json::to_string(&AdjSpectaSkip::V(7)).unwrap(),
+        r#"{"t":"V","c":7}"#
+    );
+
+    assert!(serde_json::from_str::<AdjSpectaSkip>(r#"{"t":"V","c":7}"#).is_ok());
+    // serde never collapses this variant: `c` is required with a real value.
+    assert!(serde_json::from_str::<AdjSpectaSkip>(r#"{"t":"V"}"#).is_err());
+    assert!(serde_json::from_str::<AdjSpectaSkip>(r#"{"t":"V","c":null}"#).is_err());
+}
+
+#[test]
+fn adjacent_tagged_specta_skip_unified() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjSpectaSkip>(),
+            specta_serde::Format,
+        )
+        .expect("specta-only skips are not serde-asymmetric; unified export must succeed");
+
+    assert!(
+        ts.contains(r#"{ t: "V" }"#),
+        "the hidden payload must omit `c` entirely (specta-skip hides the field):\n{ts}"
+    );
+    assert!(
+        !ts.contains("c?: null") && !ts.contains(r#"{ t: "V"; c: null }"#),
+        "must not fabricate a `null` content for a field serde still transports:\n{ts}"
+    );
+}
+
+#[test]
+fn adjacent_tagged_specta_skip_phases_no_split() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<AdjSpectaSkip>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("typescript export should succeed");
+
+    assert!(
+        !ts.contains("AdjSpectaSkip_Serialize"),
+        "specta-only skips are symmetric on the wire; no phase split:\n{ts}"
+    );
+    assert!(
+        ts.contains(r#"{ t: "V" }"#),
+        "the hidden payload must omit `c` entirely:\n{ts}"
+    );
+}
+
 // A user-defined type whose path merely ENDS in `Option` must not be
 // mistaken for the std `Option`: serde's `missing_field` special case only
 // applies to the real `std`/`core` `Option`, so a skipped `wire::Option<u8>`

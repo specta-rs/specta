@@ -2193,15 +2193,22 @@ fn transform_adjacent_variant(
         let payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         fields.push((Cow::Owned(content.to_string()), payload));
-    } else if !matches!(variant.fields, Fields::Unit) {
-        // A newtype variant collapsed to unit by a skipped sole field is
-        // asymmetric under adjacent tagging: serde's serializer omits
+    } else if !matches!(variant.fields, Fields::Unit) && sole_field_is_serde_skipped(variant, mode)?
+    {
+        // A newtype variant collapsed to unit by a serde-skipped sole field
+        // is asymmetric under adjacent tagging: serde's serializer omits
         // `content` entirely (like a unit variant), but its deserializer
         // still requires `content` to be present and exactly `null` --
         // UNLESS the skipped field is an `Option`, which serde's
         // `missing_field` helper deserializes as `None` when the key is
         // absent, making `content` genuinely optional on deserialize too.
         // `DataType::Tuple(vec![])` renders as `null`.
+        //
+        // A sole field hidden WITHOUT a serde skip (`#[specta(skip)]` or a
+        // hand-built `Field { ty: None, .. }`) does not take this branch:
+        // serde still transports the payload symmetrically, the skip merely
+        // hides it from the export, so `content` is omitted in every mode
+        // (the `else` fall-through), matching the hidden-field convention.
         let skipped_nullable = skipped_sole_field_is_nullable(variant);
         match mode {
             PhaseRewrite::Serialize => {}
@@ -2405,6 +2412,19 @@ fn variant_collapses_to_unit(variant: &Variant) -> bool {
             unnamed.fields.len() == 1 && unnamed_live_field_count(unnamed) == 0
         }
         Fields::Named(_) => false,
+    }
+}
+
+/// Whether a collapsed newtype variant's sole field carries a *serde* skip
+/// for the given phase, as opposed to being hidden by `#[specta(skip)]` (or a
+/// hand-built `Field { ty: None, .. }`), which serde knows nothing about.
+fn sole_field_is_serde_skipped(variant: &Variant, mode: PhaseRewrite) -> Result<bool, Error> {
+    match &variant.fields {
+        Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
+            [field] => should_skip_field_for_mode(field, mode),
+            _ => Ok(false),
+        },
+        Fields::Unit | Fields::Named(_) => Ok(false),
     }
 }
 
@@ -2775,9 +2795,12 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
         return Ok(false);
     }
 
-    Ok(field.ty.is_none()
-        || (should_skip_field_for_mode(field, PhaseRewrite::Serialize)?
-            && should_skip_field_for_mode(field, PhaseRewrite::Deserialize)?))
+    // Only symmetric *serde* skips exhibit the ser/de content asymmetry. A
+    // field hidden by `#[specta(skip)]` alone (or a hand-built
+    // `Field { ty: None, .. }`) is invisible to serde -- the wire carries the
+    // payload symmetrically -- so `ty` absence is deliberately not evidence.
+    Ok(should_skip_field_for_mode(field, PhaseRewrite::Serialize)?
+        && should_skip_field_for_mode(field, PhaseRewrite::Deserialize)?)
 }
 
 fn field_has_local_difference(field: &Field) -> Result<bool, Error> {
