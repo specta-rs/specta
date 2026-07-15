@@ -73,13 +73,22 @@ impl JsonSchema {
 
     /// Export the schema document as a [`serde_json::Value`].
     pub fn export_value(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
+        let roots = types
+            .roots()
+            .map(|root| {
+                format
+                    .map_type(types, root)
+                    .map(Cow::into_owned)
+                    .map_err(|err| Error::format("root type formatter failed", err))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let types = format
             .map_types(types)
             .map_err(|err| Error::format("type graph formatter failed", err))?;
         let types = types.as_ref();
 
         let renderer = Renderer::new(self.schema_version, types, self.allow_additional_properties);
-        let definitions = renderer.render_definitions()?;
+        let definitions = renderer.render_definitions(&roots)?;
 
         let mut root = Map::new();
         root.insert(

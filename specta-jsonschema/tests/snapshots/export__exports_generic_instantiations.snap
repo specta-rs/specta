@@ -4,17 +4,6 @@ expression: schema
 ---
 {
   "$defs": {
-    "Nested": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {}
-      },
-      "required": [
-        "value"
-      ],
-      "title": "Nested",
-      "type": "object"
-    },
     "Nested<String>": {
       "additionalProperties": false,
       "properties": {
@@ -105,17 +94,6 @@ expression: schema
         "number"
       ],
       "title": "UsesNestedGenerics",
-      "type": "object"
-    },
-    "Wrapper": {
-      "additionalProperties": false,
-      "properties": {
-        "value": {}
-      },
-      "required": [
-        "value"
-      ],
-      "title": "Wrapper",
       "type": "object"
     },
     "Wrapper<Nested<String>>": {

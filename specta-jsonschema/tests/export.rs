@@ -335,6 +335,22 @@ fn exports_generic_instantiations() {
 }
 
 #[test]
+fn directly_registered_generic_root_is_materialized() {
+    let schema = JsonSchema::default()
+        .export_value(
+            &Types::default().register::<Wrapper<String>>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert_eq!(
+        schema["$defs"]["Wrapper<String>"]["properties"]["value"]["type"],
+        "string"
+    );
+    assert!(schema["$defs"].get("Wrapper").is_none());
+}
+
+#[test]
 fn substitutes_generics_inside_nested_references() {
     let schema = JsonSchema::default()
         .export_value(
@@ -505,7 +521,11 @@ fn rejects_expanding_recursive_generics() {
     let mut types = Types::default();
     NamedDataType::new("Grow", &mut types, |_, ndt| {
         let generic = Generic::new("T".into());
-        ndt.generics = vec![GenericDefinition::new("T".into(), None)].into();
+        ndt.generics = vec![GenericDefinition::new(
+            "T".into(),
+            Some(Primitive::str.into()),
+        )]
+        .into();
         let nested = List::new(generic.clone().into()).into();
         ndt.ty = Some(
             Struct::named()

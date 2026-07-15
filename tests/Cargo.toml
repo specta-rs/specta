@@ -13,6 +13,8 @@ harness = true
 [dependencies]
 specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson"] }
 specta-jsonschema = { path = "../specta-jsonschema" }
+specta-rust = { path = "../specta-rust" }
+specta-openapi = { path = "../specta-openapi" }
 specta-serde = { path = "../specta-serde" }
 specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
@@ -26,6 +28,7 @@ serde_json = "1.0.150"
 serde_yaml = "0.9.34"
 toml = "1.1.2"
 insta = "1.48.0"
+openapiv3 = { version = "2", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 either = { version = "1.16", default-features = false }
 ulid = { version = "2.0", default-features = false, features = [] }

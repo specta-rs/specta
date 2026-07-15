@@ -73,13 +73,25 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    pub(crate) fn render_definitions(mut self) -> Result<Map<String, Value>, Error> {
+    pub(crate) fn render_definitions(
+        mut self,
+        roots: &[DataType],
+    ) -> Result<Map<String, Value>, Error> {
+        for root in roots {
+            self.render_datatype(root, &Generics::new(), "registered root", 0)?;
+        }
+
         for ndt in self.types.into_sorted_iter() {
             if ndt.ty.is_none() {
                 continue;
             }
 
             let generics = default_generics(ndt);
+            // JSON Schema has no generic declarations. Concrete instantiations
+            // are materialized while rendering references and registered roots.
+            if generics.len() != ndt.generics.len() {
+                continue;
+            }
             let key = self.definition_key(ndt, &generics);
             let path = format!("{}.{}", self.schema_version.definitions_key(), key);
             self.ensure_definition(ndt, key, generics, &path)?;
@@ -577,11 +589,18 @@ impl<'a> Renderer<'a> {
                         .get(reference)
                         .ok_or_else(|| Error::dangling(path, format!("{reference:?}")))?;
                     let resolved = self.resolve_generics(ndt, reference_generics, generics);
-                    ndt.ty
-                        .as_ref()
-                        .map(|ty| self.map_key_schema(ty, &resolved, path, depth + 1))
-                        .transpose()?
-                        .flatten()
+                    if matches!(
+                        &ndt.ty,
+                        Some(DataType::Enum(enm)) if enum_is_string_unit_only(enm)
+                    ) {
+                        Some(self.render_named_reference(reference, generics, path, depth + 1)?)
+                    } else {
+                        ndt.ty
+                            .as_ref()
+                            .map(|ty| self.map_key_schema(ty, &resolved, path, depth + 1))
+                            .transpose()?
+                            .flatten()
+                    }
                 }
                 NamedReferenceType::Recursive(_) => None,
             },
@@ -1268,12 +1287,25 @@ fn rust_type_path(ndt: &NamedDataType) -> String {
     }
 }
 
+fn enum_is_string_unit_only(enm: &Enum) -> bool {
+    let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+    (rewritten || !enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED))
+        && enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .all(|(_, variant)| {
+                matches!(variant.fields, Fields::Unit)
+                    && (rewritten || !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED))
+            })
+}
+
 fn metadata_description(docs: &str, deprecated: Option<&Deprecated>) -> String {
     let mut description = docs.to_string();
     let Some(deprecated) = deprecated else {
         return description;
     };
-    let Some(note) = &deprecated.note else {
+    let Some(note) = deprecated.note.as_deref().filter(|note| !note.is_empty()) else {
         return description;
     };
 
