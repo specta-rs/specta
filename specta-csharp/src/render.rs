@@ -55,12 +55,24 @@ pub(crate) fn export_to(
     validate_non_object_roots(&types)?;
 
     let mut files = Vec::new();
+    let mut case_folded_paths = HashMap::new();
     for ndt in types.into_sorted_iter().filter(|ndt| is_emitted_named(ndt)) {
         let module = module_segments(&ndt.module_path);
         let mut file_path = module
             .iter()
             .fold(path.to_path_buf(), |path, segment| path.join(segment));
         file_path.push(format!("{}.cs", exported_name(exporter, ndt)));
+        let relative_path = file_path
+            .strip_prefix(path)
+            .expect("generated file paths are rooted in the output directory");
+        let path_key = relative_path.to_string_lossy().to_lowercase();
+        if let Some(first) = case_folded_paths.insert(path_key, rust_path(ndt)) {
+            return Err(Error::DuplicateTypeName {
+                name: relative_path.display().to_string(),
+                first,
+                second: rust_path(ndt),
+            });
+        }
         let namespace = joined_namespace(exporter.namespace.as_ref(), &module);
         let output = render_file(exporter, &types, &[ndt], &namespace, false)?;
         files.push((file_path, output));

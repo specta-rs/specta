@@ -325,6 +325,18 @@ struct Foo {
     value: bool,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct FileCaseA {
+    value: bool,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct FileCaseB {
+    value: bool,
+}
+
 mod foo {
     #[derive(specta::Type)]
     #[specta(collect = false)]
@@ -510,6 +522,30 @@ fn invalid_namespace_and_module_paths_are_rejected_before_writes() {
             .layout(Layout::Files)
             .export_to(&root, &types, IdentityFormat),
         Err(Error::InvalidName { .. })
+    ));
+    assert!(!root.exists());
+}
+
+#[test]
+fn files_layout_rejects_case_insensitive_path_collisions() {
+    let mut types = Types::default()
+        .register::<FileCaseA>()
+        .register::<FileCaseB>();
+    types.iter_mut(|ndt| {
+        ndt.name = if ndt.name == "FileCaseA" {
+            "Url".into()
+        } else {
+            "URL".into()
+        };
+    });
+
+    let root = workspace_scratch("case-colliding-files");
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(matches!(
+        CSharp::new()
+            .layout(Layout::Files)
+            .export_to(&root, &types, IdentityFormat),
+        Err(Error::DuplicateTypeName { .. })
     ));
     assert!(!root.exists());
 }
