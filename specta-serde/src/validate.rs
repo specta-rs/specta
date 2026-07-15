@@ -592,7 +592,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
     validate_other_variant(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
-        validate_internally_tag_enum(enm, types, path)?;
+        validate_internally_tag_enum(enm, types, path, &mut HashSet::new())?;
     }
 
     Ok(())
@@ -676,9 +676,14 @@ fn validate_other_variant(
     Ok(())
 }
 
-fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<(), Error> {
+fn validate_internally_tag_enum(
+    enm: &Enum,
+    types: &Types,
+    path: String,
+    seen: &mut HashSet<Reference>,
+) -> Result<(), Error> {
     for (variant_name, variant) in &enm.variants {
-        validate_internally_tag_variant(enm, variant_name, variant, types, &path)?;
+        validate_internally_tag_variant(enm, variant_name, variant, types, &path, seen)?;
     }
 
     Ok(())
@@ -690,6 +695,7 @@ fn validate_internally_tag_variant(
     variant: &Variant,
     types: &Types,
     path: &str,
+    seen: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     let _ = enm;
     if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
@@ -716,16 +722,24 @@ fn validate_internally_tag_variant(
                 ));
             }
 
-            validate_internally_tag_enum_datatype(first_field, types, path, variant_name)
+            validate_internally_tag_enum_datatype(first_field, types, path, variant_name, seen)
         }
     }
 }
 
+// `seen` tracks named references already on the current recursion path so that
+// cyclic (self- or mutually-recursive) untagged enums terminate instead of
+// looping forever. A reference already on the path is assumed valid (its
+// validation is already in progress further up the stack); it is removed
+// again once the recursion through it completes so the same type reached via
+// two different, non-cyclic paths is still fully validated. This mirrors the
+// `seen` discipline in `internal_tag_payload_compatibility` (lib.rs).
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
     types: &Types,
     path: &str,
     variant_name: &str,
+    seen: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match ty {
         DataType::Map(_) => Ok(()),
@@ -733,21 +747,33 @@ fn validate_internally_tag_enum_datatype(
         DataType::Reference(Reference::Named(reference))
             if matches!(reference.inner, NamedReferenceType::Inline { .. }) =>
         {
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+            let key = Reference::Named(reference.clone());
+            if !seen.insert(key.clone()) {
+                return Ok(());
             }
+
+            if let Some(ty) = named_reference_ty(reference, types) {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)?;
+            }
+            seen.remove(&key);
 
             Ok(())
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
-            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
+            EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string(), seen),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ty) = named_reference_ty(reference, types) {
-                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+            let key = Reference::Named(reference.clone());
+            if !seen.insert(key.clone()) {
+                return Ok(());
             }
+
+            if let Some(ty) = named_reference_ty(reference, types) {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name, seen)?;
+            }
+            seen.remove(&key);
 
             Ok(())
         }
