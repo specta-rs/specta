@@ -87,6 +87,13 @@ enum Status {
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
+#[serde(rename = "@VerbatimStatus")]
+enum VerbatimStatus {
+    Ready,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
 enum DuplicateEnumWireNames {
     #[serde(rename = "same")]
     First,
@@ -1032,6 +1039,20 @@ fn serde_unit_enums_keep_their_string_wire_shape() {
     assert!(output.contains("Status.Complete => \"complete\""));
     assert!(!output.contains("abstract record Status"));
     assert!(!output.contains("Item1"));
+}
+
+#[test]
+fn verbatim_string_enum_names_generate_valid_converter_names() {
+    let output = CSharp::new()
+        .export(
+            &Types::default().register::<VerbatimStatus>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(output.contains("enum @VerbatimStatus"));
+    assert!(output.contains("__SpectaVerbatimStatusJsonConverter"));
+    assert!(!output.contains("__Specta@VerbatimStatusJsonConverter"));
 }
 
 #[test]

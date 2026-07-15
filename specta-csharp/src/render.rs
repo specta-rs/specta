@@ -995,7 +995,7 @@ fn render_simple_enum(
             }
         }
     }
-    let converter = format!("__Specta{name}JsonConverter");
+    let converter = enum_converter_name(name);
     if wire_string {
         out.push_str(base);
         out.push_str("[global::System.Text.Json.Serialization.JsonConverter(typeof(");
@@ -1385,6 +1385,13 @@ fn is_rewritten_string_enum(enm: &specta::datatype::Enum) -> bool {
                                 && matches!(variant.fields, Fields::Unit)
                     )
             })
+}
+
+fn enum_converter_name(name: &str) -> String {
+    format!(
+        "__Specta{}JsonConverter",
+        name.strip_prefix('@').unwrap_or(name)
+    )
 }
 
 fn is_emitted_named(ndt: &NamedDataType) -> bool {
@@ -2111,7 +2118,7 @@ fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
             });
         }
         if matches!(ndt.ty.as_ref(), Some(DataType::Enum(enm)) if is_rewritten_string_enum(enm)) {
-            let converter = format!("__Specta{name}JsonConverter");
+            let converter = enum_converter_name(&name);
             let converter_path = format!("generated JSON converter for {path}");
             if let Some(first) = scopes
                 .entry(match exporter.layout {
