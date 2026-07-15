@@ -130,7 +130,7 @@ fn render_named(
             &ndt.name,
         ),
         _ => {
-            if contains_named_reference(types, &ty, ndt) {
+            if contains_named_reference(format, types, &ty, ndt)? {
                 return Err(Error::UnsupportedType {
                     path: ndt.name.to_string(),
                     reason: "recursive Kotlin typealiases are not supported",
@@ -153,60 +153,144 @@ fn render_named(
     }
 }
 
-fn contains_named_reference(types: &Types, dt: &DataType, target: &NamedDataType) -> bool {
+fn contains_named_reference(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    target: &NamedDataType,
+) -> Result<bool, Error> {
+    contains_named_reference_inner(
+        format,
+        types,
+        dt,
+        target,
+        &mut vec![target as *const NamedDataType],
+    )
+}
+
+fn contains_named_reference_inner(
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    target: &NamedDataType,
+    visited: &mut Vec<*const NamedDataType>,
+) -> Result<bool, Error> {
     match dt {
         DataType::Primitive(_)
         | DataType::Generic(_)
-        | DataType::Reference(Reference::Opaque(_)) => false,
-        DataType::List(list) => contains_named_reference(types, &list.ty, target),
+        | DataType::Reference(Reference::Opaque(_)) => Ok(false),
+        DataType::List(list) => {
+            contains_named_reference_inner(format, types, &list.ty, target, visited)
+        }
         DataType::Map(map) => {
-            contains_named_reference(types, map.key_ty(), target)
-                || contains_named_reference(types, map.value_ty(), target)
+            Ok(
+                contains_named_reference_inner(format, types, map.key_ty(), target, visited)?
+                    || contains_named_reference_inner(
+                        format,
+                        types,
+                        map.value_ty(),
+                        target,
+                        visited,
+                    )?,
+            )
         }
-        DataType::Nullable(inner) => contains_named_reference(types, inner, target),
-        DataType::Tuple(tuple) => tuple
-            .elements
-            .iter()
-            .any(|ty| contains_named_reference(types, ty, target)),
-        DataType::Struct(strct) => fields_contain_named_reference(types, &strct.fields, target),
-        DataType::Enum(enm) => enm
-            .variants
-            .iter()
-            .any(|(_, variant)| fields_contain_named_reference(types, &variant.fields, target)),
-        DataType::Reference(Reference::Named(reference)) => {
-            types.get(reference).is_some_and(|ndt| ndt == target)
-                || match &reference.inner {
-                    NamedReferenceType::Reference { generics, .. } => generics
-                        .iter()
-                        .any(|(_, ty)| contains_named_reference(types, ty, target)),
-                    NamedReferenceType::Inline { dt, .. } => {
-                        contains_named_reference(types, dt, target)
-                    }
-                    NamedReferenceType::Recursive(_) => false,
+        DataType::Nullable(inner) => {
+            contains_named_reference_inner(format, types, inner, target, visited)
+        }
+        DataType::Tuple(tuple) => {
+            for ty in &tuple.elements {
+                if contains_named_reference_inner(format, types, ty, target, visited)? {
+                    return Ok(true);
                 }
+            }
+            Ok(false)
         }
-        DataType::Intersection(types_) => types_
-            .iter()
-            .any(|ty| contains_named_reference(types, ty, target)),
+        DataType::Struct(strct) => {
+            fields_contain_named_reference(format, types, &strct.fields, target, visited)
+        }
+        DataType::Enum(enm) => {
+            for (_, variant) in &enm.variants {
+                if fields_contain_named_reference(format, types, &variant.fields, target, visited)?
+                {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => {
+                    for (_, ty) in generics {
+                        if contains_named_reference_inner(format, types, ty, target, visited)? {
+                            return Ok(true);
+                        }
+                    }
+                }
+                NamedReferenceType::Inline { dt, .. } => {
+                    if contains_named_reference_inner(format, types, dt, target, visited)? {
+                        return Ok(true);
+                    }
+                }
+                NamedReferenceType::Recursive(_) => {}
+            }
+
+            let Some(ndt) = types.get(reference) else {
+                return Ok(false);
+            };
+            if ndt == target {
+                return Ok(true);
+            }
+            let pointer = ndt as *const NamedDataType;
+            if visited.contains(&pointer) {
+                return Ok(false);
+            }
+            let Some(original) = &ndt.ty else {
+                return Ok(false);
+            };
+            let mapped = map_datatype(format, types, original)?;
+            if matches!(mapped, DataType::Struct(_) | DataType::Enum(_)) {
+                return Ok(false);
+            }
+            visited.push(pointer);
+            let result = contains_named_reference_inner(format, types, &mapped, target, visited);
+            visited.pop();
+            result
+        }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                if contains_named_reference_inner(format, types, ty, target, visited)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
     }
 }
 
-fn fields_contain_named_reference(types: &Types, fields: &Fields, target: &NamedDataType) -> bool {
-    match fields {
-        Fields::Named(fields) => fields.fields.iter().any(|(_, field)| {
-            field
-                .ty
-                .as_ref()
-                .is_some_and(|ty| contains_named_reference(types, ty, target))
-        }),
-        Fields::Unnamed(fields) => fields.fields.iter().any(|field| {
-            field
-                .ty
-                .as_ref()
-                .is_some_and(|ty| contains_named_reference(types, ty, target))
-        }),
-        Fields::Unit => false,
+fn fields_contain_named_reference(
+    format: Option<&dyn Format>,
+    types: &Types,
+    fields: &Fields,
+    target: &NamedDataType,
+    visited: &mut Vec<*const NamedDataType>,
+) -> Result<bool, Error> {
+    let fields = match fields {
+        Fields::Named(fields) => fields
+            .fields
+            .iter()
+            .map(|(_, field)| field)
+            .collect::<Vec<_>>(),
+        Fields::Unnamed(fields) => fields.fields.iter().collect::<Vec<_>>(),
+        Fields::Unit => return Ok(false),
+    };
+    for field in fields {
+        if let Some(ty) = &field.ty
+            && contains_named_reference_inner(format, types, ty, target, visited)?
+        {
+            return Ok(true);
+        }
     }
+    Ok(false)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -386,6 +470,7 @@ fn render_enum(
     let serde_rewritten = enm
         .attributes
         .contains_key("specta_serde:enum_repr_rewritten");
+    let serde_untagged = enm.attributes.contains_key("serde:container:untagged");
     ensure_unique(
         path,
         variants.iter().map(|(name, _)| {
@@ -398,6 +483,7 @@ fn render_enum(
                 name,
                 &variant.fields,
                 serde_rewritten,
+                serde_untagged,
             ))
         });
 
@@ -452,6 +538,7 @@ fn render_enum(
             variant,
             path,
             serde_rewritten,
+            serde_untagged,
         )?;
         out.push('\n');
     }
@@ -472,8 +559,14 @@ fn render_variant(
     variant: &Variant,
     path: &str,
     serde_rewritten: bool,
+    serde_untagged: bool,
 ) -> Result<(), Error> {
-    let fields = normalized_variant_fields(original_name, &variant.fields, serde_rewritten);
+    let fields = normalized_variant_fields(
+        original_name,
+        &variant.fields,
+        serde_rewritten,
+        serde_untagged,
+    );
     let indent = kotlin.indentation(1);
     render_kdoc(out, &indent, &variant.docs);
     render_deprecated(out, &indent, variant.deprecated.as_ref());
@@ -1018,7 +1111,12 @@ fn is_unit_fields(fields: &Fields) -> bool {
     }
 }
 
-fn normalized_variant_fields(variant_name: &str, fields: &Fields, serde_rewritten: bool) -> Fields {
+fn normalized_variant_fields(
+    variant_name: &str,
+    fields: &Fields,
+    serde_rewritten: bool,
+    serde_untagged: bool,
+) -> Fields {
     if !serde_rewritten {
         return fields.clone();
     }
@@ -1037,7 +1135,7 @@ fn normalized_variant_fields(variant_name: &str, fields: &Fields, serde_rewritte
     let Some((field_name, field, payload)) = payload else {
         return fields.clone();
     };
-    if field_name.is_none() && literal_enum_value(payload).is_some() {
+    if !serde_untagged && literal_enum_value(payload) == Some(variant_name) {
         return Fields::Unit;
     }
     if field_name.is_some_and(|name| name.eq_ignore_ascii_case(variant_name)) {

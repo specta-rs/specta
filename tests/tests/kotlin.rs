@@ -124,6 +124,13 @@ enum CarriesInlineLiteral {
     Value(InlineLiteralPayload),
 }
 
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum CarriesUntaggedInlineLiteral {
+    Value(InlineLiteralPayload),
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct InnerPayload {
@@ -221,12 +228,36 @@ fn kotlin_rejects_recursive_aliases_and_preserves_literal_payloads() {
         .expect_err("recursive Kotlin aliases must be rejected");
     assert!(error.to_string().contains("recursive Kotlin typealiases"));
 
+    let mut indirect = Types::default();
+    let alias_a = specta::datatype::NamedDataType::new("AliasA", &mut indirect, |_, _| {});
+    let alias_b = specta::datatype::NamedDataType::new("AliasB", &mut indirect, |_, datatype| {
+        datatype.ty = Some(DataType::Reference(alias_a.reference(vec![])));
+    });
+    indirect.iter_mut(|datatype| {
+        if datatype.name == "AliasA" {
+            datatype.ty = Some(DataType::Reference(alias_b.reference(vec![])));
+        }
+    });
+    let error = Kotlin::default()
+        .export(&indirect, IdentityFormat)
+        .expect_err("indirect recursive Kotlin aliases must be rejected");
+    assert!(error.to_string().contains("recursive Kotlin typealiases"));
+
     let output = Kotlin::default()
         .export(
             &Types::default().register::<CarriesInlineLiteral>(),
             specta_serde::Format,
         )
         .expect("a real inline literal payload must survive Serde normalization");
+    assert!(output.contains("public data class Value("), "{output}");
+    assert!(output.contains("public val value:"), "{output}");
+
+    let output = Kotlin::default()
+        .export(
+            &Types::default().register::<CarriesUntaggedInlineLiteral>(),
+            specta_serde::Format,
+        )
+        .expect("an untagged inline literal payload must survive Serde normalization");
     assert!(output.contains("public data class Value("), "{output}");
     assert!(output.contains("public val value:"), "{output}");
 }
