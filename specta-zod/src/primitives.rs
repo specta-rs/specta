@@ -109,11 +109,11 @@ fn export_single_internal(
         let mut alias_ndt = ndt.clone();
         alias_ndt.generics.to_mut().iter_mut().for_each(|generic| {
             if let Some(default) = &mut generic.default {
-                typescript_alias_datatype(default);
+                typescript_alias_datatype(default, false);
             }
         });
         if let Some(ty) = &mut alias_ndt.ty {
-            typescript_alias_datatype(ty);
+            typescript_alias_datatype(ty, false);
         }
         let mut type_alias = specta_typescript::primitives::export(
             &typescript,
@@ -305,15 +305,15 @@ fn indent_continuations<'a>(value: &'a str, indent: &str) -> Cow<'a, str> {
     }
 }
 
-fn typescript_alias_datatype(dt: &mut DataType) {
+fn typescript_alias_datatype(dt: &mut DataType, map_key: bool) {
     match dt {
         DataType::Primitive(_) | DataType::Generic(_) => {}
-        DataType::List(list) => typescript_alias_datatype(&mut list.ty),
+        DataType::List(list) => typescript_alias_datatype(&mut list.ty, map_key),
         DataType::Map(map) => {
-            typescript_alias_datatype(map.key_ty_mut());
-            typescript_alias_datatype(map.value_ty_mut());
+            typescript_alias_datatype(map.key_ty_mut(), true);
+            typescript_alias_datatype(map.value_ty_mut(), false);
         }
-        DataType::Nullable(inner) => typescript_alias_datatype(inner),
+        DataType::Nullable(inner) => typescript_alias_datatype(inner, map_key),
         DataType::Struct(strct) => typescript_alias_fields(&mut strct.fields),
         DataType::Enum(enm) => enm
             .variants
@@ -322,13 +322,15 @@ fn typescript_alias_datatype(dt: &mut DataType) {
         DataType::Tuple(tuple) => tuple
             .elements
             .iter_mut()
-            .for_each(typescript_alias_datatype),
-        DataType::Intersection(types) => types.iter_mut().for_each(typescript_alias_datatype),
+            .for_each(|dt| typescript_alias_datatype(dt, map_key)),
+        DataType::Intersection(types) => types
+            .iter_mut()
+            .for_each(|dt| typescript_alias_datatype(dt, map_key)),
         DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt),
+            NamedReferenceType::Inline { dt, .. } => typescript_alias_datatype(dt, map_key),
             NamedReferenceType::Reference { generics, .. } => generics
                 .iter_mut()
-                .for_each(|(_, dt)| typescript_alias_datatype(dt)),
+                .for_each(|(_, dt)| typescript_alias_datatype(dt, map_key)),
             NamedReferenceType::Recursive(_) => {}
         },
         DataType::Reference(Reference::Opaque(reference)) => {
@@ -336,11 +338,13 @@ fn typescript_alias_datatype(dt: &mut DataType) {
                 Some("any")
             } else if reference.downcast_ref::<opaque::Never>().is_some() {
                 Some("never")
-            } else if reference.downcast_ref::<opaque::Unknown>().is_some()
-                || reference.downcast_ref::<opaque::Define>().is_some()
-            {
-                // A raw Zod expression carries no corresponding TypeScript type metadata.
+            } else if reference.downcast_ref::<opaque::Unknown>().is_some() {
                 Some("unknown")
+            } else if reference.downcast_ref::<opaque::Define>().is_some() {
+                // A raw Zod expression carries no corresponding TypeScript type metadata.
+                // Map keys must still be valid TypeScript property keys, and JSON object
+                // keys are strings regardless of the schema used to validate them.
+                Some(if map_key { "string" } else { "unknown" })
             } else {
                 None
             };
@@ -358,12 +362,12 @@ fn typescript_alias_fields(fields: &mut Fields) {
             .fields
             .iter_mut()
             .filter_map(|field| field.ty.as_mut())
-            .for_each(typescript_alias_datatype),
+            .for_each(|dt| typescript_alias_datatype(dt, false)),
         Fields::Named(fields) => fields
             .fields
             .iter_mut()
             .filter_map(|(_, field)| field.ty.as_mut())
-            .for_each(typescript_alias_datatype),
+            .for_each(|dt| typescript_alias_datatype(dt, false)),
     }
 }
 

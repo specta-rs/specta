@@ -242,6 +242,27 @@ fn zod_high_level_export_supports_zod_opaque_types() {
 }
 
 #[test]
+fn zod_define_map_key_uses_a_valid_typescript_property_key() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct DefinedMapKey {
+        values: HashMap<i64, String>,
+    }
+
+    let types = Remapper::new()
+        .rule(Primitive::i64.into(), define("z.string()").into())
+        .remap_types(Types::default().register::<DefinedMapKey>());
+    let out = Zod::default().export(&types, specta_serde::Format).unwrap();
+
+    assert!(
+        out.contains("values: Partial<{ [key in string]: string }>"),
+        "unexpected export: {out}"
+    );
+    assert!(out.contains("values: z.record(z.string(), z.string())"));
+    assert!(!out.contains("[key in unknown]"));
+}
+
+#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     #[derive(Type)]
     #[specta(collect = false)]

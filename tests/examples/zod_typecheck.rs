@@ -5,6 +5,7 @@ use specta::{
     Type, Types,
     datatype::{NamedDataType, Primitive},
 };
+use specta_util::Remapper;
 use specta_zod::{Layout, Zod};
 
 #[derive(Type, Serialize, Deserialize)]
@@ -43,6 +44,11 @@ struct WireTypes {
     generic_finite_keys: HashMap<GenericKey<FiniteKey>, String>,
     nested_generic_finite_keys: HashMap<OuterKey<FiniteKey>, String>,
     remote_keys: HashMap<keys::RemoteKey, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct DefinedMapKey {
+    value: HashMap<i64, String>,
 }
 
 #[derive(Type)]
@@ -88,13 +94,21 @@ struct UsesKeywordModule {
 }
 
 fn main() {
-    let types = Types::default()
-        .register::<Recursive>()
-        .register::<Generic>()
-        .register::<WireTypes>()
-        .register::<OpaqueTypes>()
-        .register::<ExternalEnum>()
-        .register::<UsesKeywordModule>();
+    let types = Remapper::new()
+        .rule(
+            Primitive::i64.into(),
+            specta_zod::define("z.string()").into(),
+        )
+        .remap_types(
+            Types::default()
+                .register::<Recursive>()
+                .register::<Generic>()
+                .register::<WireTypes>()
+                .register::<DefinedMapKey>()
+                .register::<OpaqueTypes>()
+                .register::<ExternalEnum>()
+                .register::<UsesKeywordModule>(),
+        );
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("zod-typecheck/generated");
     std::fs::create_dir_all(&out).unwrap();
 
