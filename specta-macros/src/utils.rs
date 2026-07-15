@@ -218,11 +218,13 @@ impl AttrExtract for Vec<Attribute> {
 
 struct NestedAttributeList {
     attrs: Vec<Attribute>,
+    unstructured_argument: Option<Span>,
 }
 
 impl Parse for NestedAttributeList {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut attrs = Vec::new();
+        let mut unstructured_argument = None;
         while !input.is_empty() {
             if input.peek(Ident::peek_any) {
                 let fork = input.fork();
@@ -234,6 +236,7 @@ impl Parse for NestedAttributeList {
                         || fork.peek(Token![=])
                         || fork.peek(Token![,]))
                 {
+                    unstructured_argument.get_or_insert(input.span());
                     skip_unstructured_argument(input)?;
                 } else {
                     let key = input.call(Ident::parse_any)?;
@@ -246,9 +249,13 @@ impl Parse for NestedAttributeList {
                             _ if input.peek(Paren) => {
                                 let content;
                                 syn::parenthesized!(content in input);
+                                let nested = content.parse::<NestedAttributeList>()?;
+                                if unstructured_argument.is_none() {
+                                    unstructured_argument = nested.unstructured_argument;
+                                }
                                 Some(AttributeValue::Attribute {
                                     span: key_span,
-                                    attr: content.parse::<NestedAttributeList>()?.attrs,
+                                    attr: nested.attrs,
                                 })
                             }
                             _ if input.peek(Token![=]) => {
@@ -260,6 +267,7 @@ impl Parse for NestedAttributeList {
                     });
                 }
             } else {
+                unstructured_argument.get_or_insert(input.span());
                 skip_unstructured_argument(input)?;
             }
 
@@ -267,7 +275,10 @@ impl Parse for NestedAttributeList {
                 input.parse::<Token![,]>()?;
             }
         }
-        Ok(NestedAttributeList { attrs })
+        Ok(NestedAttributeList {
+            attrs,
+            unstructured_argument,
+        })
     }
 }
 
@@ -318,9 +329,16 @@ pub fn parse_attrs_with_filter(
             }],
             Meta::List(meta) => {
                 let source = attr_name.clone();
-                let mut parsed: Vec<Attribute> =
-                    syn::parse2::<NestedAttributeList>(meta.tokens.clone())?.attrs;
-                for a in &mut parsed {
+                let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
+                if source == "specta"
+                    && let Some(span) = parsed.unstructured_argument
+                {
+                    return Err(syn::Error::new(
+                        span,
+                        "specta: unsupported attribute syntax",
+                    ));
+                }
+                for a in &mut parsed.attrs {
                     a.source = source.clone();
                 }
                 vec![Attribute {
@@ -328,7 +346,7 @@ pub fn parse_attrs_with_filter(
                     key: ident.clone(),
                     value: Some(AttributeValue::Attribute {
                         span: ident.span(),
-                        attr: parsed,
+                        attr: parsed.attrs,
                     }),
                 }]
             }
@@ -402,5 +420,18 @@ mod tests {
                 .expect("rename_all should be a string"),
             "camelCase"
         );
+    }
+
+    #[test]
+    fn rejects_unstructured_specta_arguments() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[specta(collect = false, typo.missing)]
+                struct Invalid;
+            "#,
+        )
+        .expect("test input should parse");
+
+        assert!(parse_attrs(&input.attrs).is_err());
     }
 }
