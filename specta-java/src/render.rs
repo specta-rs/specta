@@ -299,15 +299,6 @@ fn render_unit_enum(
             .map(|(variant, _)| value_identifier(variant, path)),
         path,
     )?;
-    if variants
-        .iter()
-        .map(|(variant, _)| type_identifier(variant, path))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .any(|variant| variant == name)
-    {
-        return Err(Error::duplicate_type(name, path, path));
-    }
     for (index, (variant_name, variant)) in variants.iter().enumerate() {
         javadoc(out, &variant.docs, variant.deprecated.as_ref(), 1);
         if variant.deprecated.is_some() {
@@ -328,10 +319,11 @@ fn render_unit_enum(
         out.push('\n');
     }
     if raw_values.is_some() {
-        out.push_str("\n    private final String value;\n\n");
-        writeln!(out, "    {name}(String value) {{").expect("writing to String cannot fail");
+        out.push_str("\n    private final java.lang.String value;\n\n");
+        writeln!(out, "    {name}(java.lang.String value) {{")
+            .expect("writing to String cannot fail");
         out.push_str("        this.value = value;\n    }\n\n");
-        out.push_str("    public String value() {\n        return value;\n    }\n");
+        out.push_str("    public java.lang.String value() {\n        return value;\n    }\n");
     }
     out.push('}');
     Ok(())
@@ -357,6 +349,15 @@ fn render_tagged_enum(
             .map(|(variant, _)| type_identifier(variant, path)),
         path,
     )?;
+    if variants
+        .iter()
+        .map(|(variant, _)| type_identifier(variant, path))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .any(|variant| variant == name)
+    {
+        return Err(Error::duplicate_type(name, path, path));
+    }
     let permits = variants
         .iter()
         .map(|(variant, _)| type_identifier(variant, &format!("{path}.{variant}")))
@@ -623,7 +624,7 @@ struct Context<'a> {
 
 fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Error> {
     if string_literal_raw_value(ty).is_some() {
-        return Ok("String".to_string());
+        return Ok("java.lang.String".to_string());
     }
     Ok(match ty {
         DataType::Primitive(primitive) => primitive_type(primitive).to_string(),
@@ -639,7 +640,7 @@ fn datatype(ctx: &Context<'_>, ty: &DataType, path: &str) -> Result<String, Erro
             datatype(ctx, &tuple.elements[0], path)?
         }
         DataType::Tuple(_) => "java.util.List<java.lang.Object>".to_string(),
-        DataType::Struct(_) => "java.util.Map<String, java.lang.Object>".to_string(),
+        DataType::Struct(_) => "java.util.Map<java.lang.String, java.lang.Object>".to_string(),
         DataType::Enum(_) => "java.lang.Object".to_string(),
         DataType::Intersection(_) => {
             return Err(Error::unsupported(
@@ -705,21 +706,21 @@ fn optional_type(java: &Java, inner: String) -> String {
 
 fn primitive_type(primitive: &Primitive) -> &'static str {
     match primitive {
-        Primitive::i8 => "Byte",
-        Primitive::u8 | Primitive::i16 => "Short",
-        Primitive::u16 | Primitive::i32 => "Integer",
-        Primitive::u32 | Primitive::i64 => "Long",
+        Primitive::i8 => "java.lang.Byte",
+        Primitive::u8 | Primitive::i16 => "java.lang.Short",
+        Primitive::u16 | Primitive::i32 => "java.lang.Integer",
+        Primitive::u32 | Primitive::i64 => "java.lang.Long",
         Primitive::i128
         | Primitive::u64
         | Primitive::u128
         | Primitive::isize
         | Primitive::usize => "java.math.BigInteger",
-        Primitive::f16 | Primitive::f32 => "Float",
-        Primitive::f64 => "Double",
+        Primitive::f16 | Primitive::f32 => "java.lang.Float",
+        Primitive::f64 => "java.lang.Double",
         Primitive::f128 => "java.math.BigDecimal",
-        Primitive::bool => "Boolean",
-        Primitive::char => "String",
-        Primitive::str => "String",
+        Primitive::bool => "java.lang.Boolean",
+        Primitive::char => "java.lang.String",
+        Primitive::str => "java.lang.String",
     }
 }
 

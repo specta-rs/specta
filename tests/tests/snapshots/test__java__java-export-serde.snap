@@ -15,7 +15,7 @@ public final class Bindings {
 
         record Progress<T>(
             String kind,
-            Short payload
+            java.lang.Short payload
         ) implements Event<T> {}
 
         record Finished<T>(
@@ -29,15 +29,15 @@ public final class Bindings {
     }
 
     public record Model(
-        Response<String> response,
+        Response<java.lang.String> response,
         Status status,
-        Event<String> event,
-        java.util.Map<String, Long> lookup,
+        Event<java.lang.String> event,
+        java.util.Map<java.lang.String, java.lang.Long> lookup,
         Tuple tuple
     ) {
         public record Tuple(
-            String field0,
-            Boolean field1
+            java.lang.String field0,
+            java.lang.Boolean field1
         ) {}
     }
 
@@ -49,21 +49,21 @@ public final class Bindings {
          * Returned payload.
          */
         T value,
-        Long optional_count,
-        java.util.List<String> labels
+        java.lang.Long optional_count,
+        java.util.List<java.lang.String> labels
     ) {}
 
     public enum Status {
         ready("ready"),
         pending_review("pending_review");
 
-        private final String value;
+        private final java.lang.String value;
 
-        Status(String value) {
+        Status(java.lang.String value) {
             this.value = value;
         }
 
-        public String value() {
+        public java.lang.String value() {
             return value;
         }
     }

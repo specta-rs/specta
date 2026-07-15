@@ -263,7 +263,7 @@ fn module_prefixed_optional_and_inline_apis_are_valid_java() {
         .export_to(&path, &types(), IdentityFormat)
         .unwrap();
     let source = std::fs::read_to_string(&path).unwrap();
-    assert!(source.contains("java.util.Optional<Long> optional_count"));
+    assert!(source.contains("java.util.Optional<java.lang.Long> optional_count"));
     assert!(!source.contains("public record Model("));
     compile_java(temp.path(), &[&path]);
 
@@ -274,7 +274,69 @@ fn module_prefixed_optional_and_inline_apis_are_valid_java() {
             IdentityFormat,
         )
         .unwrap();
-    assert_eq!(inline, "Integer");
+    assert_eq!(inline, "java.lang.Integer");
+}
+
+#[test]
+fn java_lang_types_cannot_be_shadowed() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct String;
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Shadowed {
+        value: std::string::String,
+        generated: String,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<String>().register::<Shadowed>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("java.lang.String value"));
+    assert!(source.contains("String generated"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn enum_type_name_collisions_match_java_rules() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum UnitFoo {
+        UnitFoo,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum DataFoo {
+        DataFoo(u8),
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<UnitFoo>(),
+            IdentityFormat,
+        )
+        .unwrap();
+    compile_java(temp.path(), &[&path]);
+
+    assert!(
+        Java::default()
+            .export(&Types::default().register::<DataFoo>(), IdentityFormat)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate Java type name")
+    );
 }
 
 #[test]
