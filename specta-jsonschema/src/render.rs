@@ -24,6 +24,7 @@ type Generics = BTreeMap<Cow<'static, str>, DataType>;
 
 #[derive(Clone, PartialEq)]
 struct DefinitionSource {
+    identity: *const NamedDataType,
     type_path: String,
     file: &'static str,
     line: u32,
@@ -33,10 +34,7 @@ struct DefinitionSource {
 
 impl DefinitionSource {
     fn is_same_type_as(&self, other: &Self) -> bool {
-        self.type_path == other.type_path
-            && self.file == other.file
-            && self.line == other.line
-            && self.column == other.column
+        self.identity == other.identity
     }
 }
 
@@ -115,6 +113,7 @@ impl<'a> Renderer<'a> {
         path: &str,
     ) -> Result<(), Error> {
         let source = DefinitionSource {
+            identity: std::ptr::from_ref(ndt),
             type_path: rust_type_path(ndt),
             file: ndt.location.file(),
             line: ndt.location.line(),

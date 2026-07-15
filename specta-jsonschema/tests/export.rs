@@ -1275,6 +1275,24 @@ fn rejects_duplicate_definition_names() {
 }
 
 #[test]
+fn rejects_duplicate_definition_names_from_same_callsite() {
+    let mut types = Types::default();
+    for ty in [DataType::Primitive(Primitive::str), Primitive::i32.into()] {
+        NamedDataType::new("SameCallsite", &mut types, |_, ndt| {
+            ndt.ty = Some(ty);
+        });
+    }
+
+    let error = JsonSchema::default()
+        .export_value(&types, IdentityFormat)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        specta_jsonschema::Error::DuplicateDefinitionName { .. }
+    ));
+}
+
+#[test]
 fn applies_serde_format() {
     let types = Types::default()
         .register::<SerdeUser>()
