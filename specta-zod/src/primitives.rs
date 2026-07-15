@@ -627,7 +627,7 @@ fn map_dt(
         type_render_stack,
     )?;
 
-    let constructor = if map_key_is_finite(m.key_ty(), types) {
+    let constructor = if map_key_is_finite(m.key_ty(), types, generics) {
         "z.partialRecord"
     } else {
         "z.record"
@@ -636,7 +636,11 @@ fn map_dt(
     Ok(())
 }
 
-fn map_key_is_finite(dt: &DataType, types: &Types) -> bool {
+fn map_key_is_finite(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+) -> bool {
     match dt {
         DataType::Primitive(Primitive::bool) => true,
         DataType::Enum(enm) => enm
@@ -647,7 +651,9 @@ fn map_key_is_finite(dt: &DataType, types: &Types) -> bool {
                 Fields::Unit => true,
                 Fields::Unnamed(fields) => {
                     let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
-                    fields.next().is_some_and(|dt| map_key_is_finite(dt, types))
+                    fields
+                        .next()
+                        .is_some_and(|dt| map_key_is_finite(dt, types, generics))
                         && fields.next().is_none()
                 }
                 Fields::Named(_) => false,
@@ -655,7 +661,9 @@ fn map_key_is_finite(dt: &DataType, types: &Types) -> bool {
         DataType::Struct(strct) => match &strct.fields {
             Fields::Unnamed(fields) => {
                 let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
-                fields.next().is_some_and(|dt| map_key_is_finite(dt, types))
+                fields
+                    .next()
+                    .is_some_and(|dt| map_key_is_finite(dt, types, generics))
                     && fields.next().is_none()
             }
             _ => false,
@@ -663,7 +671,17 @@ fn map_key_is_finite(dt: &DataType, types: &Types) -> bool {
         DataType::Reference(Reference::Named(reference)) => types
             .get(reference)
             .and_then(|ndt| ndt.ty.as_ref())
-            .is_some_and(|dt| map_key_is_finite(dt, types)),
+            .is_some_and(|dt| {
+                named_reference_generics(reference)
+                    .is_ok_and(|generics| map_key_is_finite(dt, types, generics))
+            }),
+        DataType::Generic(generic) => generics
+            .iter()
+            .find(|(candidate, _)| candidate == generic)
+            .is_some_and(|(_, dt)| {
+                !matches!(dt, DataType::Generic(candidate) if candidate == generic)
+                    && map_key_is_finite(dt, types, generics)
+            }),
         _ => false,
     }
 }

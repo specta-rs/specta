@@ -1169,13 +1169,37 @@ fn push_nullable(s: &mut String, inner: &str) {
     }
 }
 
-fn is_exhaustive_map_key(dt: &DataType, types: &Types) -> bool {
+fn is_exhaustive_map_key(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+) -> bool {
     match dt {
         DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
         DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r, &[])
-            .map(|ty| is_exhaustive_map_key(ty, types))
+            .and_then(|ty| {
+                named_reference_generics(r)
+                    .map(|generics| is_exhaustive_map_key(ty, types, generics))
+            })
             .unwrap_or(false),
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(fields) => {
+                let mut fields = fields.fields.iter().filter_map(|field| field.ty.as_ref());
+                fields
+                    .next()
+                    .is_none_or(|dt| is_exhaustive_map_key(dt, types, generics))
+                    && fields.next().is_none()
+            }
+            _ => true,
+        },
         DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::Generic(generic) => generics
+            .iter()
+            .find(|(candidate, _)| candidate == generic)
+            .is_none_or(|(_, dt)| {
+                matches!(dt, DataType::Generic(candidate) if candidate == generic)
+                    || is_exhaustive_map_key(dt, types, generics)
+            }),
         _ => true,
     }
 }
@@ -1196,7 +1220,7 @@ fn render_map(
     map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
 
     let rendered_key = map_key_render_type(map.key_ty().clone());
-    let exhaustive = is_exhaustive_map_key(&rendered_key, types);
+    let exhaustive = is_exhaustive_map_key(&rendered_key, types, generics);
 
     // Use `{ [key in K]: V }` instead of `Record<K, V>` to avoid circular reference issues.
     if !exhaustive {
