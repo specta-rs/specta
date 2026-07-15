@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, fmt::Write, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write,
+    path::Path,
+};
 
 use specta::{
     Types,
@@ -349,6 +353,12 @@ fn render_tagged_enum(
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .collect::<Vec<_>>();
+    if variants.is_empty() {
+        return Err(Error::unsupported(
+            path,
+            "Java sealed interfaces require at least one non-skipped enum variant",
+        ));
+    }
     validate_names(
         variants
             .iter()
@@ -478,15 +488,25 @@ fn fields<'a>(
             .map(|(name, field, ty)| rendered_field(ctx, path, name, field, ty))
             .collect(),
     }?;
-    let mut names = BTreeMap::<String, usize>::new();
+    let mut counts = BTreeMap::<String, usize>::new();
+    let mut names = BTreeSet::new();
     for field in &mut rendered {
-        let count = names.entry(field.name.clone()).or_default();
-        *count += 1;
-        if *count > 1 {
-            if field.nested.is_some() {
-                return Err(Error::duplicate_type(field.name.clone(), path, path));
+        if names.insert(field.name.clone()) {
+            counts.insert(field.name.clone(), 1);
+            continue;
+        }
+        if field.nested.is_some() {
+            return Err(Error::duplicate_type(field.name.clone(), path, path));
+        }
+        let base = field.name.clone();
+        let count = counts.entry(base.clone()).or_insert(1);
+        loop {
+            *count += 1;
+            let candidate = format!("{base}_{count}");
+            if names.insert(candidate.clone()) {
+                field.name = candidate;
+                break;
             }
-            field.name = format!("{}_{}", field.name, count);
         }
     }
     Ok(rendered)

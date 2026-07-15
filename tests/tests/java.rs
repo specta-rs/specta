@@ -374,6 +374,43 @@ fn enum_type_name_collisions_match_java_rules() {
 }
 
 #[test]
+fn field_suffixes_skip_existing_normalized_names() {
+    #[derive(Type, Serialize)]
+    #[specta(collect = false)]
+    struct SuffixedFields {
+        foo: u8,
+        foo_2: u8,
+        #[serde(rename = "foo-")]
+        foo_dash: u8,
+    }
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    Java::default()
+        .export_to(
+            &path,
+            &Types::default().register::<SuffixedFields>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("java.lang.Short foo_3"));
+    compile_java(temp.path(), &[&path]);
+}
+
+#[test]
+fn empty_generic_enums_return_an_export_error() {
+    let mut types = Types::default();
+    specta::datatype::NamedDataType::new("EmptyGeneric", &mut types, |_, datatype| {
+        datatype.generics = vec![specta::datatype::GenericDefinition::new("T".into(), None)].into();
+        datatype.ty = Some(specta::datatype::Enum::default().into());
+    });
+
+    let error = Java::default().export(&types, IdentityFormat).unwrap_err();
+    assert!(error.to_string().contains("at least one non-skipped"));
+}
+
+#[test]
 fn rejects_wrapper_and_nested_declaration_collisions() {
     #[derive(Type)]
     #[specta(collect = false)]
