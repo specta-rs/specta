@@ -65,6 +65,24 @@ struct KotlinxChar {
 }
 
 #[derive(Type)]
+#[specta(collect = false)]
+struct Serializable {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct SerialName {
+    value: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct EncodeDefault {
+    value: Option<String>,
+}
+
+#[derive(Type)]
 #[specta(inline, collect = false)]
 struct InlineUnit;
 
@@ -415,8 +433,8 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
             specta_serde::Format,
         )
         .expect("plain records have compatible Kotlinx declarations");
-    assert!(supported.contains("@Serializable"));
-    assert!(supported.contains("@EncodeDefault"));
+    assert!(supported.contains("@kotlinx.serialization.Serializable"));
+    assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
     assert!(supported.contains("val maybe: String? = null"));
 
     let supported = Kotlin::default()
@@ -424,6 +442,20 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .export(&Types::default().register::<KotlinxChar>(), IdentityFormat)
         .expect("Rust char should use the wire-compatible Kotlinx string representation");
     assert!(supported.contains("val value: String"));
+
+    let supported = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default()
+                .register::<Serializable>()
+                .register::<SerialName>()
+                .register::<EncodeDefault>(),
+            IdentityFormat,
+        )
+        .expect("generated names must not shadow fully qualified Kotlinx annotations");
+    assert!(!supported.contains("import kotlinx.serialization"));
+    assert!(supported.contains("@kotlinx.serialization.Serializable"));
+    assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
 
     let error = Kotlin::default()
         .serialization(Serialization::Kotlinx)

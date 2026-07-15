@@ -38,12 +38,6 @@ pub(crate) fn render_file(
         out.push_str(&package_name(package)?);
         out.push_str("\n\n");
     }
-    if kotlin.serialization == Serialization::Kotlinx {
-        out.push_str("import kotlinx.serialization.EncodeDefault\n");
-        out.push_str("import kotlinx.serialization.SerialName\n");
-        out.push_str("import kotlinx.serialization.Serializable\n\n");
-    }
-
     match selection {
         Selection::All => {
             let mut names = BTreeMap::new();
@@ -1197,6 +1191,7 @@ fn annotation(
     }
     out.push_str(indent);
     out.push('@');
+    out.push_str("kotlinx.serialization.");
     out.push_str(annotation);
     if let Some(argument) = argument {
         out.push_str("(\"");
