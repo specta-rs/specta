@@ -119,6 +119,9 @@ fn inner(
                 checked_references,
                 &path,
                 mode,
+                // Struct `rename_all` renames field names, which are always
+                // part of the wire shape.
+                true,
             )?;
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
                 if attrs.variant_identifier || attrs.field_identifier {
@@ -195,7 +198,18 @@ fn inner(
             }
         }
         DataType::Enum(enm) => {
-            validate_container_attributes(&enm.attributes, types, checked_references, &path, mode)?;
+            // Untagged enums never emit variant names, so attrs that only
+            // rename variant labels are not part of the wire shape for them.
+            let variant_names_emitted =
+                !matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged);
+            validate_container_attributes(
+                &enm.attributes,
+                types,
+                checked_references,
+                &path,
+                mode,
+                variant_names_emitted,
+            )?;
             if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
             {
@@ -208,7 +222,12 @@ fn inner(
             validate_enum(enm, types, path.clone(), mode)?;
 
             for (variant_name, variant) in &enm.variants {
-                validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
+                validate_variant_attributes(
+                    variant,
+                    format!("{path}::{variant_name}"),
+                    mode,
+                    variant_names_emitted,
+                )?;
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
@@ -423,12 +442,17 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
     Ok(())
 }
 
+/// `rename_all_affects_wire` is false only for untagged enums, where container
+/// `rename_all` renames variant labels that serde never emits; everywhere else
+/// (struct field names, tagged enum variant names) `rename_all` changes the
+/// wire shape and a directional mismatch must be rejected in unified mode.
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
+    rename_all_affects_wire: bool,
 ) -> Result<(), Error> {
     let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(());
@@ -471,7 +495,9 @@ fn validate_container_attributes(
             ));
         }
 
-        if container_attrs.rename_all_serialize != container_attrs.rename_all_deserialize {
+        if rename_all_affects_wire
+            && container_attrs.rename_all_serialize != container_attrs.rename_all_deserialize
+        {
             return Err(Error::incompatible_rename(
                 "container rename_all",
                 path.to_string(),
@@ -503,10 +529,14 @@ fn validate_container_attributes(
     Ok(())
 }
 
+/// `variant_names_emitted` is false for untagged enums; combined with the
+/// variant's own `#[serde(untagged)]` flag it gates the variant `rename` check
+/// to representations where the variant label actually reaches the wire.
 fn validate_variant_attributes(
     variant: &Variant,
     path: String,
     mode: ApplyMode,
+    variant_names_emitted: bool,
 ) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
         return Ok(());
@@ -531,8 +561,14 @@ fn validate_variant_attributes(
     }
 
     if mode == ApplyMode::Unified
+        && variant_names_emitted
+        && !serde_attrs.untagged
         && serde_attrs.rename_serialize.as_deref() != serde_attrs.rename_deserialize.as_deref()
     {
+        // A variant `rename` only matters when the variant label reaches the
+        // wire; untagged enums and variant-level `#[serde(untagged)]` variants
+        // serialize just the payload, so a directional rename is harmless
+        // there.
         return Err(Error::incompatible_rename(
             "variant rename",
             path,
@@ -544,6 +580,9 @@ fn validate_variant_attributes(
     if mode == ApplyMode::Unified
         && serde_attrs.rename_all_serialize != serde_attrs.rename_all_deserialize
     {
+        // Not gated on `variant_names_emitted`: variant-level `rename_all`
+        // renames the variant's *field* names, which appear in the payload
+        // for every representation, untagged included.
         return Err(Error::incompatible_rename(
             "variant rename_all",
             path,

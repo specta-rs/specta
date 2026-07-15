@@ -96,6 +96,62 @@ enum VarSkip {
     B(String),
 }
 
+// --- Untagged enums: variant names never hit the wire ---
+//
+// serde's untagged representation serializes only the variant payload, so
+// attributes that rename variant *labels* (container `rename_all`, variant
+// `rename`) are not direction-dependent there and must keep working under
+// `Format`. Attributes that rename variant *field* names (`rename_all_fields`,
+// variant-level `rename_all`) still affect the payload shape and must error,
+// as must directional variant skips (union membership differs per direction).
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged, rename_all(serialize = "camelCase"))]
+enum UntaggedOneSidedRenameAll {
+    Foo(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedOneSidedVariantRename {
+    #[serde(rename(serialize = "Foo"))]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum TaggedWithUntaggedVariantOneSidedRename {
+    A(String),
+    #[serde(untagged, rename(serialize = "Renamed"))]
+    B(u32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged, rename_all_fields(serialize = "camelCase"))]
+enum UntaggedOneSidedRenameAllFields {
+    A { field_one: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedVariantOneSidedRenameAll {
+    #[serde(rename_all(serialize = "camelCase"))]
+    A { field_one: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedOneSidedVariantSkip {
+    A(String),
+    #[serde(skip_serializing)]
+    B(u32),
+}
+
 // --- Controls: these must keep working unchanged under `Format` ---
 
 #[derive(Type, Serialize, Deserialize)]
@@ -415,6 +471,97 @@ fn skip_deserializing_only_variant_is_present_in_serialize_and_dropped_from_dese
     // serde will never construct the `B` variant from wire input, so
     // deserialize must not accept it.
     assert!(!deserialize_ty.contains('B'), "got: {deserialize_ty}");
+}
+
+#[test]
+fn untagged_variant_label_renames_are_not_direction_dependent_under_format() {
+    // Container `rename_all` on an untagged enum only renames variant labels,
+    // which serde never emits for untagged enums; both directions are just
+    // the payload shape.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedOneSidedRenameAll>(),
+            specta_serde::Format,
+        )
+        .expect("one-sided rename_all on an untagged enum should export under Format");
+    assert!(
+        rendered.contains("UntaggedOneSidedRenameAll = string"),
+        "got: {rendered}"
+    );
+
+    // Same for a variant `rename` on an untagged enum.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedOneSidedVariantRename>(),
+            specta_serde::Format,
+        )
+        .expect("one-sided variant rename on an untagged enum should export under Format");
+    assert!(
+        rendered.contains("UntaggedOneSidedVariantRename = string"),
+        "got: {rendered}"
+    );
+
+    // And for a variant-level `#[serde(untagged)]` variant inside a tagged
+    // enum: its tag is never emitted either.
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TaggedWithUntaggedVariantOneSidedRename>(),
+            specta_serde::Format,
+        )
+        .expect(
+            "one-sided rename on a variant-level untagged variant should export under Format",
+        );
+    assert!(
+        rendered.contains("{ A: string } | number"),
+        "got: {rendered}"
+    );
+}
+
+#[test]
+fn untagged_field_name_renames_still_require_phases_format() {
+    // `rename_all_fields` renames struct-variant *field* names, which do
+    // appear in the untagged payload.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedOneSidedRenameAllFields>(),
+            specta_serde::Format,
+        )
+        .expect_err("one-sided rename_all_fields on an untagged enum should still error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("rename_all_fields") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
+    );
+
+    // Variant-level `rename_all` renames the variant's field names too.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedVariantOneSidedRenameAll>(),
+            specta_serde::Format,
+        )
+        .expect_err("one-sided variant rename_all on an untagged enum should still error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("rename_all") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
+    );
+}
+
+#[test]
+fn untagged_variant_skip_asymmetry_still_requires_phases_format() {
+    // Even without variant labels, a directional variant skip changes which
+    // payload shapes are members of the untagged union per direction.
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<UntaggedOneSidedVariantSkip>(),
+            specta_serde::Format,
+        )
+        .expect_err("one-sided variant skip on an untagged enum should still error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("skip") && msg.contains("PhasesFormat"),
+        "unexpected error: {msg}"
+    );
 }
 
 #[test]
