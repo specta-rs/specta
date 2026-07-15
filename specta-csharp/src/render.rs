@@ -856,7 +856,7 @@ fn render_datatype_with_inline_overrides(
                 out.push('>');
             }
             DataType::Tuple(tuple) => match tuple.elements.as_slice() {
-                [] => out.push_str("global::System.ValueTuple"),
+                [] => out.push_str("object?"),
                 [element] => {
                     out.push_str("global::System.ValueTuple<");
                     render(
@@ -1222,7 +1222,7 @@ fn datatype(
             }
         }
         DataType::Tuple(tuple) => match tuple.elements.as_slice() {
-            [] => out.push_str("global::System.ValueTuple"),
+            [] => out.push_str("object?"),
             [element] => {
                 out.push_str("global::System.ValueTuple<");
                 datatype(out, exporter, types, element, path)?;
@@ -1653,7 +1653,7 @@ fn wire_datatype(
             }
         }
         DataType::Tuple(tuple) => match tuple.elements.as_slice() {
-            [] => out.push_str("global::System.ValueTuple"),
+            [] => out.push_str("object?"),
             [element] => {
                 out.push_str("global::System.ValueTuple<");
                 wire_datatype(

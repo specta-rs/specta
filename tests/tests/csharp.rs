@@ -283,6 +283,7 @@ struct WireGeneric<T>(Option<T>);
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct NonObjectWireShapes {
+    raw_unit: (),
     unit: WireUnit,
     id: WireNewtype,
     tuple: WireTuple,
@@ -608,6 +609,7 @@ fn serde_non_object_structs_render_as_their_wire_shapes() {
         .unwrap();
 
     assert!(output.contains("object? Unit"));
+    assert!(output.contains("object? RawUnit"));
     assert!(output.contains("string Id"));
     assert!(output.contains("(string, uint) Tuple"));
     assert!(output.contains("byte? Generic"));
