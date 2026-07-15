@@ -1434,9 +1434,7 @@ fn reference_named_dt(
         Layout::FlatFile => format!("{}Schema", ndt.name),
         Layout::ModulePrefixedName => {
             let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            if !name.is_empty() {
-                name.push('_');
-            }
+            name.push('_');
             name.push_str(&ndt.name);
             name.push_str("Schema");
             name
@@ -1501,9 +1499,7 @@ fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> 
         Layout::Namespaces | Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            if !s.is_empty() {
-                s.push('_');
-            }
+            s.push('_');
             s.push_str(&ndt.name);
             Cow::Owned(s)
         }

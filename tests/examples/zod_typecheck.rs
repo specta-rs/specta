@@ -1,7 +1,10 @@
 use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
+use specta::{
+    Type, Types,
+    datatype::{NamedDataType, Primitive},
+};
 use specta_zod::{Layout, Zod};
 
 #[derive(Type, Serialize, Deserialize)]
@@ -101,6 +104,19 @@ fn main() {
     Zod::default()
         .layout(Layout::Namespaces)
         .export_to(out.join("namespaces.ts"), &types, specta_serde::Format)
+        .unwrap();
+    let mut module_prefixed_types = Types::default();
+    NamedDataType::new("RootType", &mut module_prefixed_types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    Zod::default()
+        .layout(Layout::ModulePrefixedName)
+        .export_to(
+            out.join("module-prefixed.ts"),
+            &module_prefixed_types,
+            specta_serde::Format,
+        )
         .unwrap();
     Zod::default()
         .layout(Layout::Files)
