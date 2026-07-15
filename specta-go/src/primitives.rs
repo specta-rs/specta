@@ -1057,7 +1057,10 @@ fn exported_name(name: &str, path: &str) -> Result<String, Error> {
     flush(&mut out, &mut segment);
 
     if out.is_empty()
-        || out.chars().next().is_some_and(|ch| ch.is_numeric())
+        || out
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_numeric() || !ch.is_uppercase())
         || crate::reserved_names::RESERVED_GO_NAMES.contains(&out.as_str())
     {
         return Err(Error::InvalidName {

@@ -217,6 +217,13 @@ fn go_output_is_accepted_by_go_toolchain() {
         lookup: Option<HashMap<String, i32>>,
     }
 
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct LocalizedWireName {
+        #[serde(rename = "名字")]
+        value: String,
+    }
+
     let newtypes = temp.path().join("newtypes.go");
     Go::default()
         .package_name("bindings")
@@ -235,10 +242,24 @@ fn go_output_is_accepted_by_go_toolchain() {
             specta_serde::PhasesFormat,
         )
         .unwrap();
+    let localized = temp.path().join("localized.go");
+    Go::default()
+        .package_name("bindings")
+        .export_to(
+            &localized,
+            &Types::default().register::<LocalizedWireName>(),
+            specta_serde::Format,
+        )
+        .unwrap();
 
     let before = std::fs::read_to_string(&output).unwrap();
     let newtypes_before = std::fs::read_to_string(&newtypes).unwrap();
     let optional_collections_before = std::fs::read_to_string(&optional_collections).unwrap();
+    let localized_before = std::fs::read_to_string(&localized).unwrap();
+    assert!(
+        localized_before.contains("Field1 string `json:\"名字\"`"),
+        "{localized_before}"
+    );
     assert!(
         newtypes_before.contains("type Stamp = time.Time"),
         "{newtypes_before}"
@@ -263,6 +284,10 @@ fn go_output_is_accepted_by_go_toolchain() {
     assert_eq!(
         optional_collections_before,
         std::fs::read_to_string(&optional_collections).unwrap()
+    );
+    assert_eq!(
+        localized_before,
+        std::fs::read_to_string(&localized).unwrap()
     );
     std::fs::write(
         temp.path().join("bindings_test.go"),
@@ -318,6 +343,24 @@ func TestOptionalCollectionsPreserveEmptyValues(t *testing.T) {
 	}
 	if got, want := string(absent), `{}`; got != want {
 		t.Fatalf("absent: got %s, want %s", got, want)
+	}
+}
+
+func TestLocalizedWireName(t *testing.T) {
+	encoded, err := json.Marshal(LocalizedWireName{Field1: "value"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(encoded), `{"名字":"value"}`; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+
+	var decoded LocalizedWireName
+	if err := json.Unmarshal([]byte(`{"名字":"decoded"}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Field1 != "decoded" {
+		t.Fatalf("decoded: %s", decoded.Field1)
 	}
 }
 "#,
