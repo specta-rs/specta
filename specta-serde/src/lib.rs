@@ -2389,7 +2389,7 @@ fn internal_tag_variant_payload_compatibility(
 
 fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     match dt {
-        // `#[serde(default)]` on a struct container widens every named field
+        // `#[serde(default)]` on a struct container widens every field
         // to optional on deserialize while serialize still always emits
         // them, so it forces a phase split just like a field-level default.
         // serde only supports this attribute on structs (not enums), so it
@@ -2450,27 +2450,49 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
     }
 }
 
-/// Whether at least one named field survives into the exported deserialize
-/// shape — the only fields a container `#[serde(default)]` can widen (a
+/// Whether at least one field survives into the exported deserialize shape —
+/// the only fields a container `#[serde(default)]` can widen (a
 /// `skip_deserializing` field's default is applied invisibly, off the wire,
 /// a `#[specta(skip)]` field (`ty: None`) is hidden from the export, and
 /// serde never applies defaults to `flatten` fields: their keys stay
 /// required on deserialize).
+///
+/// For tuple structs, serde fills every missing trailing element from the
+/// container's `Default` instance (a shorter array — even `[]` — is
+/// accepted), so any live element counts. A newtype keeps its bare-value
+/// representation, which has nothing to omit.
 fn struct_has_deserialize_wire_field(fields: &Fields) -> Result<bool, Error> {
-    let Fields::Named(named) = fields else {
-        return Ok(false);
-    };
+    match fields {
+        Fields::Unit => Ok(false),
+        Fields::Named(named) => {
+            for (_, field) in &named.fields {
+                if field.ty.is_some()
+                    && !SerdeFieldAttrs::from_attributes(&field.attributes)?
+                        .is_some_and(|attrs| attrs.skip_deserializing || attrs.flatten)
+                {
+                    return Ok(true);
+                }
+            }
 
-    for (_, field) in &named.fields {
-        if field.ty.is_some()
-            && !SerdeFieldAttrs::from_attributes(&field.attributes)?
-                .is_some_and(|attrs| attrs.skip_deserializing || attrs.flatten)
-        {
-            return Ok(true);
+            Ok(false)
+        }
+        Fields::Unnamed(unnamed) => {
+            if unnamed.fields.len() == 1 {
+                return Ok(false);
+            }
+
+            for field in &unnamed.fields {
+                if field.ty.is_some()
+                    && !SerdeFieldAttrs::from_attributes(&field.attributes)?
+                        .is_some_and(|attrs| attrs.skip_deserializing)
+                {
+                    return Ok(true);
+                }
+            }
+
+            Ok(false)
         }
     }
-
-    Ok(false)
 }
 
 fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> Result<bool, Error> {

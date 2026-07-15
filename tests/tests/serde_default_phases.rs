@@ -1067,3 +1067,60 @@ fn hand_built_skip_variant_with_default_payload_does_not_split() {
          payload must not split the enum: {rendered}"
     );
 }
+
+/// Container `#[serde(default)]` on a tuple struct fills every missing
+/// trailing element from the container's `Default` instance, so a shorter
+/// array (even `[]`) deserializes while serialize still emits all elements.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct TupleContainerDefault(u8, u8);
+
+/// A newtype keeps its bare-value representation even with a container
+/// default — there is no sequence to shorten, so the default is inert.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct NewtypeContainerDefault(u8);
+
+#[test]
+fn container_default_on_tuple_struct_splits_with_all_optional_elements() {
+    // serde_json ground truth.
+    let v: TupleContainerDefault = serde_json::from_str("[]").unwrap();
+    assert!(v.0 == 0 && v.1 == 0);
+    let v: TupleContainerDefault = serde_json::from_str("[1]").unwrap();
+    assert!(v.0 == 1 && v.1 == 0);
+    assert_eq!(
+        serde_json::to_string(&TupleContainerDefault(1, 2)).unwrap(),
+        "[1,2]"
+    );
+    // Newtype: bare value, nothing to omit.
+    assert_eq!(
+        serde_json::to_string(&NewtypeContainerDefault(5)).unwrap(),
+        "5"
+    );
+    assert!(serde_json::from_str::<NewtypeContainerDefault>("[]").is_err());
+    assert!(serde_json::from_str::<NewtypeContainerDefault>("null").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<TupleContainerDefault>()
+                .register::<NewtypeContainerDefault>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support container defaults on tuple structs");
+
+    assert!(
+        rendered.contains("TupleContainerDefault_Serialize = [number, number]"),
+        "serialize always emits every element: {rendered}"
+    );
+    assert!(
+        rendered.contains("TupleContainerDefault_Deserialize = [number?, number?]"),
+        "every element may be omitted on deserialize: {rendered}"
+    );
+    assert!(
+        !rendered.contains("NewtypeContainerDefault_Serialize"),
+        "a newtype container default is inert and must not split: {rendered}"
+    );
+}
