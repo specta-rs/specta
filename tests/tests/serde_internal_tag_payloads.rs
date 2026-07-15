@@ -202,6 +202,40 @@ enum ExternalFlattenOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+enum ExternalWithContextualFlatten {
+    Unit,
+    Struct {
+        #[serde(flatten)]
+        inner: Inner,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum ExternalWithContextualFlattenWrapper {
+    Value(ExternalWithContextualFlatten),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum ExternalWithContextualAlias {
+    Unit,
+    Struct {
+        #[serde(alias = "old_value")]
+        value: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum ExternalWithContextualAliasWrapper {
+    Value(ExternalWithContextualAlias),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "kind")]
 enum ExternalFlattenOnlyWrapper {
     Value(ExternalFlattenOnly),
@@ -667,6 +701,62 @@ fn exact_external_map_payload_bypasses_contextual_rebuilding() {
     specta_serde::Format
         .map_types(&Types::default().register::<ExternalFlattenOnlyWrapper>())
         .expect("an external enum with only map variants already has the contextual wire shape");
+}
+
+#[test]
+fn contextual_external_enum_lowers_flattened_and_aliased_fields() {
+    assert_eq!(
+        serde_json::to_value(ExternalWithContextualFlattenWrapper::Value(
+            ExternalWithContextualFlatten::Struct {
+                inner: Inner { value: 1 },
+            },
+        ))
+        .unwrap(),
+        serde_json::json!({ "kind": "Value", "Struct": { "value": 1 } })
+    );
+    assert!(matches!(
+        serde_json::from_value::<ExternalWithContextualAliasWrapper>(serde_json::json!({
+            "kind": "Value",
+            "Struct": { "old_value": 1 },
+        }))
+        .unwrap(),
+        ExternalWithContextualAliasWrapper::Value(ExternalWithContextualAlias::Struct { value: 1 })
+    ));
+
+    let flattened = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<ExternalWithContextualFlattenWrapper>())
+        .expect("a flattened map variant remains valid beside a contextual unit variant")
+        .into_owned();
+    let flattened = flattened
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "ExternalWithContextualFlattenWrapper")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped flattened wrapper definition should exist");
+    assert!(!contains_named_field(flattened, "inner", |_| true));
+
+    let aliased = specta_serde::PhasesFormat
+        .map_types(&Types::default().register::<ExternalWithContextualAliasWrapper>())
+        .expect("an aliased map variant remains valid beside a contextual unit variant")
+        .into_owned();
+    let aliased = aliased
+        .into_unsorted_iter()
+        .find(|ndt| ndt.name == "ExternalWithContextualAliasWrapper_Deserialize")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("mapped aliased deserialize wrapper definition should exist");
+    assert!(
+        contains_named_field(aliased, "value", |ty| matches!(
+            ty,
+            DataType::Primitive(specta::datatype::Primitive::i32)
+        )),
+        "aliased payload should accept `value`: {aliased:#?}"
+    );
+    assert!(
+        contains_named_field(aliased, "old_value", |ty| matches!(
+            ty,
+            DataType::Primitive(specta::datatype::Primitive::i32)
+        )),
+        "aliased payload should accept `old_value`: {aliased:#?}"
+    );
 }
 
 #[test]

@@ -3511,28 +3511,19 @@ fn external_enum_tagged_payload_datatype(
             true,
         )?;
 
-        if let Fields::Named(fields) = &variant.fields {
-            if fields
-                .fields
-                .iter()
-                .any(|(_, field)| field_is_flattened(field))
-            {
-                return Err(Error::invalid_internally_tagged_variant(
-                    variant_name.clone(),
-                    "flattened fields in a contextual external enum payload are not supported",
-                ));
-            }
-            if mode == PhaseRewrite::Deserialize
-                && fields
-                    .fields
-                    .iter()
-                    .any(|(_, field)| field_has_aliases(field))
-            {
-                return Err(Error::invalid_internally_tagged_variant(
-                    variant_name.clone(),
-                    "field aliases in a contextual external enum payload are not supported",
-                ));
-            }
+        if let Some(aliases) = lower_field_aliases_for_phase(&mut variant.fields, mode)? {
+            variant.fields =
+                clone_variant_with_unnamed_fields(&variant, vec![Field::new(aliases)]).fields;
+        } else if matches!(
+            &variant.fields,
+            Fields::Named(fields) if fields.fields.iter().any(|(_, field)| field_is_flattened(field))
+        ) {
+            let mut payload = Struct::unit();
+            payload.fields = variant.fields.clone();
+            let payload = lower_flattened_struct(&mut payload)?
+                .expect("a named payload containing flatten must be lowered");
+            variant.fields =
+                clone_variant_with_unnamed_fields(&variant, vec![Field::new(payload)]).fields;
         }
 
         if variant_payload_is_hidden(&variant, mode)? {
