@@ -889,6 +889,8 @@ fn rewrite_datatype_for_phase(
                 Fields::Unnamed(unnamed) if !container_transparent => Some(unnamed.fields.len()),
                 Fields::Unit | Fields::Named(_) | Fields::Unnamed(_) => None,
             };
+            let conditional_omission_applies = !container_transparent
+                && !matches!(&s.fields, Fields::Unnamed(unnamed) if unnamed.fields.len() == 1);
 
             rewrite_fields_for_phase(
                 &mut s.fields,
@@ -902,7 +904,7 @@ fn rewrite_datatype_for_phase(
                 // `ty: None` slots across later passes; see
                 // `PRESERVED_ARITY_PAYLOAD_MARKER`.
                 s.attributes.contains_key(PRESERVED_ARITY_PAYLOAD_MARKER),
-                true,
+                conditional_omission_applies,
             )?;
 
             // A declared-multi-field tuple struct stays an array even when

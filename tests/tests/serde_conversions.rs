@@ -93,6 +93,12 @@ struct DefaultedSkipSerializingIfOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct NewtypeSkipSerializingIfOnly(
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum TupleVariantSkipSerializingIfOnly {
     Value(#[serde(skip_serializing_if = "Option::is_none")] Option<String>),
 }
@@ -655,6 +661,28 @@ fn tuple_variant_skip_serializing_if_unifies_and_splits_owner() {
     assert!(
         rendered.contains("TupleVariantSkipSerializingIfOnly_Serialize = { Value: string | null }"),
         "unexpected phased output: {rendered}"
+    );
+}
+
+#[test]
+fn newtype_struct_skip_serializing_if_keeps_nullable_payload() {
+    assert_eq!(
+        serde_json::to_string(&NewtypeSkipSerializingIfOnly(None)).unwrap(),
+        "null"
+    );
+
+    let types = Types::default().register::<NewtypeSkipSerializingIfOnly>();
+    let unified = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .expect("unified export should keep the bare newtype payload");
+    assert!(unified.contains("NewtypeSkipSerializingIfOnly = string | null"));
+
+    let phased = Typescript::default()
+        .export(&types, specta_serde::PhasesFormat)
+        .expect("phased export should keep the bare newtype payload");
+    assert!(
+        phased.contains("NewtypeSkipSerializingIfOnly_Serialize = string | null"),
+        "unexpected phased output: {phased}"
     );
 }
 
