@@ -997,6 +997,25 @@ fn zod_framework_export_formats_generic_named_datatypes() {
 }
 
 #[test]
+fn zod_type_alias_cleanup_preserves_jsdoc_markdown_breaks() {
+    #[doc = "First line  \nSecond line"]
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Documented {
+        value: String,
+    }
+
+    let rendered = Zod::default()
+        .export(
+            &Types::default().register::<Documented>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(rendered.contains("First line  \n"), "{rendered}");
+}
+
+#[test]
 fn zod_framework_inline_formats_inline_named_reference_children() {
     #[derive(Type)]
     #[specta(collect = false)]

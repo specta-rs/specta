@@ -185,14 +185,21 @@ fn export_single_internal(
                 }
             }
         }
+        let alias_prefix = format!("{indent}export type ");
         if type_alias
             .lines()
-            .any(|line| line.len() != line.trim_end().len())
+            .any(|line| line.starts_with(&alias_prefix) && line.ends_with(" = "))
         {
             let had_trailing_newline = type_alias.ends_with('\n');
             type_alias = type_alias
                 .lines()
-                .map(str::trim_end)
+                .map(|line| {
+                    if line.starts_with(&alias_prefix) && line.ends_with(" = ") {
+                        &line[..line.len() - 1]
+                    } else {
+                        line
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
             if had_trailing_newline {
