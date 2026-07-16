@@ -15,6 +15,10 @@ pub enum Error {
     #[error("Invalid ReScript record label: {0}")]
     InvalidRecordLabel(String),
 
+    /// Multiple fields map to the same ReScript record label.
+    #[error("Duplicate ReScript record label: {0}")]
+    DuplicateRecordLabel(String),
+
     /// A type name cannot be represented in ReScript source.
     #[error("Invalid ReScript type name: {0}")]
     InvalidTypeName(String),

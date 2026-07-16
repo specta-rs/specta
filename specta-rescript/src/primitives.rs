@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashSet};
 
 use specta::{
     Types,
@@ -446,12 +446,16 @@ fn render_named_fields(
     scope: Scope<'_>,
     nf: &specta::datatype::NamedFields,
 ) -> Result<Vec<String>> {
+    let mut labels = HashSet::new();
     nf.fields
         .iter()
         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, field, ty)))
         .map(|(name, field, ty)| {
             if !is_valid_record_label(name) {
                 return Err(Error::InvalidRecordLabel(name.to_string()));
+            }
+            if !labels.insert(name) {
+                return Err(Error::DuplicateRecordLabel(name.to_string()));
             }
             let ty_str = datatype_to_rescript(types, scope, ty)?;
             let mut out = render_docs(&field.docs, "  ");

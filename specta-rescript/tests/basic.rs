@@ -297,6 +297,23 @@ fn test_serde_record_label_is_validated() {
 }
 
 #[test]
+fn test_duplicate_serde_record_labels_are_rejected() {
+    #[derive(Type, serde::Serialize)]
+    struct DuplicateField {
+        x: String,
+        #[serde(rename = "x")]
+        other: String,
+    }
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<DuplicateField>()),
+        Err(specta_rescript::Error::DuplicateRecordLabel(label)) if label == "x"
+    ));
+}
+
+#[test]
 fn test_serde_type_name_is_validated() {
     #[derive(Type, serde::Serialize)]
     #[serde(rename = "api-response")]
