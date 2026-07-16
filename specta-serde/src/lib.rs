@@ -1389,6 +1389,14 @@ fn rewrite_fields_for_phase(
                 apply_field_attrs(field, mode, container_default)?;
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+                if mode == PhaseRewrite::Deserialize
+                    && field.attributes.contains_key(NULLABLE_FIELD)
+                    && !serde_attrs
+                        .as_ref()
+                        .is_some_and(|attrs| attrs.has_deserialize_with || attrs.has_with)
+                {
+                    field.optional = true;
+                }
                 let key =
                     phase_field_key(name.as_ref(), serde_attrs.as_ref(), rename_all_rule, mode)?;
                 if key != name.as_ref() {
@@ -4166,9 +4174,17 @@ fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
 
 fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
     let ignored_skip = field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED);
-    Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
-        .map(|attrs| {
-            attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
+    let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
+    let declared_option_is_deserialize_optional = field.ty.is_some()
+        && field.attributes.contains_key(NULLABLE_FIELD)
+        && !attrs
+            .as_ref()
+            .is_some_and(|attrs| attrs.flatten || attrs.has_deserialize_with || attrs.has_with);
+
+    Ok(declared_option_is_deserialize_optional
+        || attrs
+            .map(|attrs| {
+                attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || !attrs.aliases.is_empty()
                 // `#[serde(default)]` only widens the deserialize shape
                 // (absent fields fall back to `Default::default()`); serde
@@ -4195,8 +4211,8 @@ fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<b
                 || attrs.has_serialize_with
                 || attrs.has_deserialize_with
                 || attrs.has_with
-        })
-        .unwrap_or_default())
+            })
+            .unwrap_or_default())
 }
 
 fn variant_has_local_difference(variant: &Variant) -> Result<bool, Error> {

@@ -149,18 +149,9 @@ Unit7: /**
 	*/
 
 SimpleStruct: /**
-	* @typedef {{
-	*		a: number,
-	*		b: string,
-	*		c: [number, string, number],
-	*		d: string[],
-	*		e: string | null,
-	*	}} SimpleStruct
-	* @property {number} a
-	* @property {string} b
-	* @property {[number, string, number]} c
-	* @property {string[]} d
-	* @property {string | null} e
+	* @typedef {SimpleStruct_Serialize | SimpleStruct_Deserialize} SimpleStruct
+	* @property {SimpleStruct_Serialize} Serialize
+	* @property {SimpleStruct_Deserialize} Deserialize
 	*/
 
 TupleStruct1: /**
@@ -193,18 +184,9 @@ RefStruct: /**
 	*/
 
 InlinerStruct: /**
-	* @typedef {{
-	*		inline_this: {
-	*			ref_struct: SimpleStruct,
-	*			val: number,
-	*		},
-	*		dont_inline_this: RefStruct,
-	*	}} InlinerStruct
-	* @property {{
-	*		ref_struct: SimpleStruct,
-	*		val: number,
-	*	}} inline_this
-	* @property {RefStruct} dont_inline_this
+	* @typedef {InlinerStruct_Serialize | InlinerStruct_Deserialize} InlinerStruct
+	* @property {InlinerStruct_Serialize} Serialize
+	* @property {InlinerStruct_Deserialize} Deserialize
 	*/
 
 GenericStruct<i32>: /**
@@ -264,14 +246,9 @@ InlineEnumField: /**
 	*/
 
 InlineOptionalType: /**
-	* @typedef {{
-	*		optional_field: {
-	* 	a: string,
-	* } | null,
-	*	}} InlineOptionalType
-	* @property {{
-	* 	a: string,
-	* } | null} optional_field
+	* @typedef {InlineOptionalType_Serialize | InlineOptionalType_Deserialize} InlineOptionalType
+	* @property {InlineOptionalType_Serialize} Serialize
+	* @property {InlineOptionalType_Deserialize} Deserialize
 	*/
 
 Rename: /**
@@ -466,10 +443,9 @@ ContainerTypeOverrideTupleGeneric<i32>: /**
 	*/
 
 InvalidToValidType: /**
-	* @typedef {{
-	*		cause: null,
-	*	}} InvalidToValidType
-	* @property {null} cause
+	* @typedef {InvalidToValidType_Serialize | InvalidToValidType_Deserialize} InvalidToValidType
+	* @property {InvalidToValidType_Serialize} Serialize
+	* @property {InvalidToValidType_Deserialize} Deserialize
 	*/
 
 TupleStruct: /**
@@ -578,13 +554,15 @@ RecursiveInEnum: /**
 	*/
 
 NonOptional: /**
-	* @typedef {string | null} NonOptional
-	* @property {string | null} "0"
+	* @typedef {NonOptional_Serialize | NonOptional_Deserialize} NonOptional
+	* @property {NonOptional_Serialize} Serialize
+	* @property {NonOptional_Deserialize} Deserialize
 	*/
 
 OptionalOnNamedField: /**
-	* @typedef {string | null} OptionalOnNamedField
-	* @property {string | null} ["0"]
+	* @typedef {OptionalOnNamedField_Serialize | OptionalOnNamedField_Deserialize} OptionalOnNamedField
+	* @property {OptionalOnNamedField_Serialize} Serialize
+	* @property {OptionalOnNamedField_Deserialize} Deserialize
 	*/
 
 OptionalOnTransparentNamedField: /**
@@ -595,18 +573,9 @@ OptionalOnTransparentNamedField: /**
 	*/
 
 OptionalInEnum: /**
-	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	* 	a: string | null,
-	* } }) & { A?: never; C?: never } | ({ C: {
-	* 	a?: string | null,
-	* } }) & { A?: never; B?: never }} OptionalInEnum
-	* @property {{ A?: string | null }} A
-	* @property {{ B: {
-	* 	a: string | null,
-	* } }} B
-	* @property {{ C: {
-	* 	a?: string | null,
-	* } }} C
+	* @typedef {OptionalInEnum_Serialize | OptionalInEnum_Deserialize} OptionalInEnum
+	* @property {OptionalInEnum_Serialize} Serialize
+	* @property {OptionalInEnum_Deserialize} Deserialize
 	*/
 
 UntaggedVariants: /**

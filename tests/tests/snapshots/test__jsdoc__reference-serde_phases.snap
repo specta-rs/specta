@@ -1,6 +1,5 @@
 ---
 source: tests/tests/jsdoc.rs
-assertion_line: 171
 expression: output
 ---
 Issue374: Issue374_Serialize
@@ -41,12 +40,12 @@ Unit4: Unit4
 Unit5: Unit5
 Unit6: Unit6
 Unit7: Unit7
-SimpleStruct: SimpleStruct
+SimpleStruct: SimpleStruct_Serialize
 TupleStruct1: TupleStruct1
 TupleStruct3: TupleStruct3
 TestEnum: TestEnum
 RefStruct: RefStruct
-InlinerStruct: InlinerStruct
+InlinerStruct: InlinerStruct_Serialize
 GenericStruct<i32>: GenericStruct<number>
 GenericStruct<String>: GenericStruct<string>
 FlattenEnumStruct: FlattenEnumStruct
@@ -54,7 +53,7 @@ OverridenStruct: OverridenStruct
 HasGenericAlias: HasGenericAlias
 EnumMacroAttributes: EnumMacroAttributes
 InlineEnumField: InlineEnumField
-InlineOptionalType: InlineOptionalType
+InlineOptionalType: InlineOptionalType_Serialize
 Rename: Rename
 TransparentType: TransparentType
 TransparentType2: TransparentType2
@@ -91,7 +90,7 @@ ContainerTypeOverrideGeneric<Box<dyn Any>>: ContainerTypeOverrideGeneric
 ContainerTypeOverrideToGeneric<i32>: ContainerTypeOverrideToGeneric<number>
 ContainerTypeOverrideTuple: ContainerTypeOverrideTuple
 ContainerTypeOverrideTupleGeneric<i32>: ContainerTypeOverrideTupleGeneric<number>
-InvalidToValidType: InvalidToValidType
+InvalidToValidType: InvalidToValidType_Serialize
 TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
@@ -108,10 +107,10 @@ Recursive: Recursive
 RecursiveMapValue: RecursiveMapValue
 RecursiveTransparent: RecursiveTransparent
 RecursiveInEnum: RecursiveInEnum
-NonOptional: NonOptional
-OptionalOnNamedField: OptionalOnNamedField
+NonOptional: NonOptional_Serialize
+OptionalOnNamedField: OptionalOnNamedField_Serialize
 OptionalOnTransparentNamedField: OptionalOnTransparentNamedField
-OptionalInEnum: OptionalInEnum
+OptionalInEnum: OptionalInEnum_Serialize
 UntaggedVariants: UntaggedVariants
 UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
 UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches

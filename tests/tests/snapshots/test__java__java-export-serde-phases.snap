@@ -28,8 +28,31 @@ public final class Bindings {
         }
     }
 
-    public record Model(
-        Response<java.lang.String> response,
+    public sealed interface Model permits Model.Serialize, Model.Deserialize {
+        record Serialize(
+            ModelSerialize field0
+        ) implements Model {}
+
+        record Deserialize(
+            ModelDeserialize field0
+        ) implements Model {}
+    }
+
+    public record ModelDeserialize(
+        ResponseDeserialize<java.lang.String> response,
+        Status status,
+        Event<java.lang.String> event,
+        java.util.Map<java.lang.String, java.lang.Long> lookup,
+        Tuple tuple
+    ) {
+        public record Tuple(
+            java.lang.String field0,
+            java.lang.Boolean field1
+        ) {}
+    }
+
+    public record ModelSerialize(
+        ResponseSerialize<java.lang.String> response,
         Status status,
         Event<java.lang.String> event,
         java.util.Map<java.lang.String, java.lang.Long> lookup,
@@ -44,7 +67,32 @@ public final class Bindings {
     /**
      * A documented generic response.
      */
-    public record Response<T>(
+    public sealed interface Response<T> permits Response.Serialize, Response.Deserialize {
+        record Serialize<T>(
+            ResponseSerialize<T> field0
+        ) implements Response<T> {}
+
+        record Deserialize<T>(
+            ResponseDeserialize<T> field0
+        ) implements Response<T> {}
+    }
+
+    /**
+     * A documented generic response.
+     */
+    public record ResponseDeserialize<T>(
+        /**
+         * Returned payload.
+         */
+        T value,
+        java.lang.Long optional_count,
+        java.util.List<java.lang.String> labels
+    ) {}
+
+    /**
+     * A documented generic response.
+     */
+    public record ResponseSerialize<T>(
         /**
          * Returned payload.
          */

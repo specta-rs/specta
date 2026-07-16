@@ -429,7 +429,15 @@ export type InlineFlattenGenericsG<T> = {
 	t: T,
 };
 
-export type InlineOptionalType = {
+export type InlineOptionalType = InlineOptionalType_Serialize | InlineOptionalType_Deserialize;
+
+export type InlineOptionalType_Deserialize = {
+	optional_field?: {
+	a: string,
+} | null,
+};
+
+export type InlineOptionalType_Serialize = {
 	optional_field: {
 	a: string,
 } | null,
@@ -458,8 +466,15 @@ export type InlineRecursiveConstGenericContainer = {
 	d: [number, number],
 };
 
-export type InlineStruct = {
-	ref_struct: SimpleStruct,
+export type InlineStruct = InlineStruct_Serialize | InlineStruct_Deserialize;
+
+export type InlineStruct_Deserialize = {
+	ref_struct: SimpleStruct_Deserialize,
+	val: number,
+};
+
+export type InlineStruct_Serialize = {
+	ref_struct: SimpleStruct_Serialize,
 	val: number,
 };
 
@@ -473,11 +488,15 @@ export type InlineTuple2 = {
 }, boolean],
 };
 
-export type InlinerStruct = {
-	inline_this: {
-		ref_struct: SimpleStruct,
-		val: number,
-	},
+export type InlinerStruct = InlinerStruct_Serialize | InlinerStruct_Deserialize;
+
+export type InlinerStruct_Deserialize = {
+	inline_this: InlineStruct_Deserialize,
+	dont_inline_this: RefStruct,
+};
+
+export type InlinerStruct_Serialize = {
+	inline_this: InlineStruct_Serialize,
 	dont_inline_this: RefStruct,
 };
 
@@ -521,7 +540,13 @@ export type InternallyTaggedWithAlias_Deserialize = {
 
 export type InternallyTaggedWithAlias_Serialize = { type: "A"; field: string } | { type: "B"; other: number };
 
-export type InvalidToValidType = {
+export type InvalidToValidType = InvalidToValidType_Serialize | InvalidToValidType_Deserialize;
+
+export type InvalidToValidType_Deserialize = {
+	cause?: null,
+};
+
+export type InvalidToValidType_Serialize = {
 	cause: null,
 };
 
@@ -623,26 +648,42 @@ export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 	a: string,
 } } | { t: "D"; c: First };
 
-export type NonOptional = string | null;
+export type NonOptional = NonOptional_Serialize | NonOptional_Deserialize;
+
+export type NonOptional_Deserialize = string | null;
+
+export type NonOptional_Serialize = string | null;
 
 export type Optional = Optional_Serialize | Optional_Deserialize;
 
-export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
+export type OptionalInEnum = OptionalInEnum_Serialize | OptionalInEnum_Deserialize;
+
+export type OptionalInEnum_Deserialize = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
+	a?: string | null,
+} }) & { A?: never; C?: never } | ({ C: {
+	a?: string | null,
+} }) & { A?: never; B?: never };
+
+export type OptionalInEnum_Serialize = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
 	a: string | null,
 } }) & { A?: never; C?: never } | ({ C: {
 	a?: string | null,
 } }) & { A?: never; B?: never };
 
-export type OptionalOnNamedField = string | null;
+export type OptionalOnNamedField = OptionalOnNamedField_Serialize | OptionalOnNamedField_Deserialize;
+
+export type OptionalOnNamedField_Deserialize = string | null;
+
+export type OptionalOnNamedField_Serialize = string | null;
 
 export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
 export type Optional_Deserialize = {
-	a: number | null,
+	a?: number | null,
 	b?: number | null,
-	c: string | null,
+	c?: string | null,
 	d?: boolean,
 };
 
@@ -666,7 +707,9 @@ export type PlaceholderInnerField = {
 	a: string,
 };
 
-export type Primitives = {
+export type Primitives = Primitives_Serialize | Primitives_Deserialize;
+
+export type Primitives_Deserialize = {
 	i8: number,
 	i16: number,
 	i32: number,
@@ -727,12 +770,12 @@ export type Primitives = {
 	Unit5: Unit5,
 	Unit6: Unit6,
 	Unit7: Unit7,
-	SimpleStruct: SimpleStruct,
+	SimpleStruct: SimpleStruct_Deserialize,
 	TupleStruct1: TupleStruct1,
 	TupleStruct3: TupleStruct3,
 	TestEnum: TestEnum,
 	RefStruct: RefStruct,
-	InlinerStruct: InlinerStruct,
+	InlinerStruct: InlinerStruct_Deserialize,
 	"GenericStruct<i32>": GenericStruct<number>,
 	"GenericStruct<String>": GenericStruct<string>,
 	FlattenEnumStruct: FlattenEnumStruct,
@@ -740,7 +783,7 @@ export type Primitives = {
 	HasGenericAlias: HasGenericAlias,
 	EnumMacroAttributes: EnumMacroAttributes,
 	InlineEnumField: InlineEnumField,
-	InlineOptionalType: InlineOptionalType,
+	InlineOptionalType: InlineOptionalType_Deserialize,
 	Rename: Rename,
 	TransparentType: TransparentType,
 	TransparentType2: TransparentType2,
@@ -781,7 +824,7 @@ export type Primitives = {
 	"ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric<number>,
 	ContainerTypeOverrideTuple: ContainerTypeOverrideTuple,
 	"ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric<number>,
-	InvalidToValidType: InvalidToValidType,
+	InvalidToValidType: InvalidToValidType_Deserialize,
 	TupleStruct: TupleStruct,
 	TupleStructWithRep: TupleStructWithRep,
 	"GenericTupleStruct<String>": GenericTupleStruct<string>,
@@ -798,10 +841,266 @@ export type Primitives = {
 	RecursiveMapValue: RecursiveMapValue,
 	RecursiveTransparent: RecursiveTransparent,
 	RecursiveInEnum: RecursiveInEnum,
-	NonOptional: NonOptional,
-	OptionalOnNamedField: OptionalOnNamedField,
+	NonOptional: NonOptional_Deserialize,
+	OptionalOnNamedField: OptionalOnNamedField_Deserialize,
 	OptionalOnTransparentNamedField: OptionalOnTransparentNamedField,
-	OptionalInEnum: OptionalInEnum,
+	OptionalInEnum: OptionalInEnum_Deserialize,
+	UntaggedVariants: UntaggedVariants,
+	UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
+	UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
+	"HashMap<String, ()>": { [key in string]: null },
+	Regular: Regular,
+	"HashMap<Infallible, ()>": { [key in never]: null },
+	"HashMap<TransparentStruct, ()>": { [key in TransparentStruct]: null },
+	"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
+	"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
+	ValidMaybeValidKey: ValidMaybeValidKey,
+	ValidMaybeValidKeyNested: ValidMaybeValidKeyNested,
+	MacroStruct: MacroStruct,
+	MacroStruct2: MacroStruct2,
+	MacroEnum: MacroEnum,
+	DeprecatedType: DeprecatedType,
+	DeprecatedTypeWithMsg: DeprecatedTypeWithMsg,
+	DeprecatedTypeWithMsg2: DeprecatedTypeWithMsg2,
+	DeprecatedFields: DeprecatedFields,
+	DeprecatedTupleVariant: DeprecatedTupleVariant,
+	DeprecatedEnumVariants: DeprecatedEnumVariants,
+	CommentedStruct: CommentedStruct,
+	CommentedEnum: CommentedEnum,
+	SingleLineComment: SingleLineComment,
+	NonGeneric: Demo<number, boolean>,
+	"HalfGenericA<u8>": Demo<number, boolean>,
+	"HalfGenericB<bool>": Demo<number, boolean>,
+	"FullGeneric<u8, bool>": Demo<number, boolean>,
+	"Another<bool>": Demo<number, boolean>,
+	"MapA<u32>": { [key in string]: number },
+	"MapB<u32>": { [key in number]: string },
+	"MapC<u32>": { [key in string]: AGenericStruct<number> },
+	"AGenericStruct<u32>": AGenericStruct<number>,
+	A: A,
+	DoubleFlattened: DoubleFlattened,
+	FlattenedInner: FlattenedInner,
+	BoxFlattened: BoxFlattened,
+	BoxInline: BoxInline,
+	First: First,
+	Second: Second,
+	Third: Third,
+	Fourth: Fourth,
+	TagOnStructWithInline: TagOnStructWithInline,
+	Sixth: Sixth,
+	Seventh: Seventh,
+	Eight: Eight,
+	Ninth: Ninth,
+	Tenth: Tenth,
+	MyEnumTagged: MyEnumTagged,
+	MyEnumExternal: MyEnumExternal,
+	MyEnumAdjacent: MyEnumAdjacent,
+	MyEnumUntagged: MyEnumUntagged,
+	EmptyStruct: EmptyStruct,
+	EmptyStructWithTag: EmptyStructWithTag,
+	AdjacentlyTagged: AdjacentlyTagged,
+	LoadProjectEvent: LoadProjectEvent,
+	ExternallyTagged: ExternallyTagged,
+	Issue221External: Issue221External,
+	InternallyTaggedD: InternallyTaggedD,
+	InternallyTaggedE: InternallyTaggedE,
+	InternallyTaggedF: InternallyTaggedF,
+	InternallyTaggedH: InternallyTaggedH,
+	InternallyTaggedL: InternallyTaggedL,
+	InternallyTaggedM: InternallyTaggedM,
+	Issue221UntaggedSafe: Issue221UntaggedSafe,
+	Issue221UntaggedMixed: Issue221UntaggedMixed,
+	EmptyEnum: EmptyEnum,
+	EmptyEnumTagged: EmptyEnumTagged,
+	EmptyEnumTaggedWContent: EmptyEnumTaggedWContent,
+	EmptyEnumUntagged: EmptyEnumUntagged,
+	SkipOnlyField: SkipOnlyField,
+	SkipField: SkipField,
+	SkipVariant: SkipVariant,
+	SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
+	SkipNamedFieldInVariant: SkipNamedFieldInVariant,
+	TransparentWithSkip: TransparentWithSkip,
+	TransparentWithSkip2: TransparentWithSkip2,
+	TransparentWithSkip3: TransparentWithSkip3,
+	SkipVariant2: SkipVariant2,
+	SkipVariant3: SkipVariant3,
+	SkipStructFields: SkipStructFields,
+	SpectaSkipNonTypeField: SpectaSkipNonTypeField,
+	FlattenA: FlattenA,
+	FlattenB: FlattenB,
+	FlattenC: FlattenC,
+	FlattenD: FlattenD,
+	FlattenE: FlattenE,
+	FlattenF: FlattenF,
+	FlattenG: FlattenG,
+	TupleNested: TupleNested,
+	"Generic1<()>": Generic1<null>,
+	"GenericAutoBound<()>": GenericAutoBound<null>,
+	"GenericAutoBound2<()>": GenericAutoBound2<null>,
+	Container1: Container1,
+	"Generic2<(), String, i32>": Generic2<null, string, number>,
+	"GenericNewType1<()>": GenericNewType1<null>,
+	"GenericTuple<()>": GenericTuple<null>,
+	"GenericStruct2<()>": GenericStruct2<null>,
+	"InlineGenericNewtype<String>": string,
+	"InlineGenericNested<String>": [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: {
+	value: string,
+} }) & { Unnamed?: never }],
+	"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
+	InlineFlattenGenerics: InlineFlattenGenerics,
+	GenericDefault: GenericDefault,
+	ChainedGenericDefault: ChainedGenericDefault,
+	"ChainedGenericDefault<String, String>": ChainedGenericDefault,
+	"ChainedGenericDefault<i32>": ChainedGenericDefault<number, number>,
+	"ChainedGenericDefault<String, i32>": ChainedGenericDefault<string, number>,
+	GenericDefaultSkipped: GenericDefaultSkipped<string>,
+	GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>,
+	GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
+	ConstGenericInConstContainer: ConstGenericInConstContainer,
+	NamedConstGenericContainer: NamedConstGenericContainer,
+	InlineConstGenericContainer: InlineConstGenericContainer,
+	InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer,
+	TestCollectionRegister: TestCollectionRegister,
+	TestCollectionRegister: TestCollectionRegister,
+};
+
+export type Primitives_Serialize = {
+	i8: number,
+	i16: number,
+	i32: number,
+	u8: number,
+	u16: number,
+	u32: number,
+	f32: number | null,
+	f64: number | null,
+	bool: boolean,
+	char: string,
+	"Range<i32>": Range<number>,
+	"RangeInclusive<i32>": RangeInclusive<number>,
+	"()": null,
+	"(String, i32)": [string, number],
+	"(String, i32, bool)": [string, number, boolean],
+	"((String, i32), (bool, char, bool), ())": [[string, number], [boolean, string, boolean], null],
+	"(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean],
+	"(Vec<i32>, Vec<bool>)": [number[], boolean[]],
+	String: string,
+	PathBuf: string,
+	IpAddr: string,
+	Ipv4Addr: string,
+	Ipv6Addr: string,
+	SocketAddr: string,
+	SocketAddrV4: string,
+	SocketAddrV6: string,
+	"Cow<'static, str>": string,
+	"Cow<'static, i32>": number,
+	"&'static str": string,
+	"&'static bool": boolean,
+	"&'static i32": number,
+	"Vec<i32>": number[],
+	"&'static [i32]": number[],
+	"&'static [i32; 3]": [number, number, number],
+	"[i32; 3]": [number, number, number],
+	"Vec<MyEnum>": MyEnum[],
+	"&'static [MyEnum]": MyEnum[],
+	"&'static [MyEnum; 6]": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
+	"[MyEnum; 2]": [MyEnum, MyEnum],
+	"&'static [i32; 1]": [number],
+	"&'static [i32; 0]": [],
+	"Option<i32>": number | null,
+	"Option<()>": null,
+	"Option<Vec<i32>>": number[] | null,
+	"Result<String, i32>": Result<string, number>,
+	"Vec<Option<Cow<'static, i32>>>": (number | null)[],
+	"Option<Vec<Cow<'static, i32>>>": number[] | null,
+	"[Vec<String>; 3]": [string[], string[], string[]],
+	"Option<Option<String>>": string | null,
+	"Option<Option<Option<String>>>": string | null,
+	"PhantomData<()>": null,
+	"PhantomData<String>": null,
+	Infallible: never,
+	Unit1: Unit1,
+	Unit2: Unit2,
+	Unit3: Unit3,
+	Unit4: Unit4,
+	Unit5: Unit5,
+	Unit6: Unit6,
+	Unit7: Unit7,
+	SimpleStruct: SimpleStruct_Serialize,
+	TupleStruct1: TupleStruct1,
+	TupleStruct3: TupleStruct3,
+	TestEnum: TestEnum,
+	RefStruct: RefStruct,
+	InlinerStruct: InlinerStruct_Serialize,
+	"GenericStruct<i32>": GenericStruct<number>,
+	"GenericStruct<String>": GenericStruct<string>,
+	FlattenEnumStruct: FlattenEnumStruct,
+	OverridenStruct: OverridenStruct,
+	HasGenericAlias: HasGenericAlias,
+	EnumMacroAttributes: EnumMacroAttributes,
+	InlineEnumField: InlineEnumField,
+	InlineOptionalType: InlineOptionalType_Serialize,
+	Rename: Rename,
+	TransparentType: TransparentType,
+	TransparentType2: TransparentType2,
+	TransparentTypeWithOverride: TransparentTypeWithOverride,
+	"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
+	"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
+	"HashMap<BasicEnum, i32>": Partial<{ [key in BasicEnum]: number }>,
+	"Option<Option<Option<Option<i32>>>>": number | null,
+	"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
+	EnumReferenceRecordKey: EnumReferenceRecordKey,
+	FlattenOnNestedEnum: FlattenOnNestedEnum,
+	MyEmptyInput: MyEmptyInput,
+	"(String)": string,
+	"(String,)": [string],
+	ExtraBracketsInTupleVariant: ExtraBracketsInTupleVariant,
+	ExtraBracketsInUnnamedStruct: ExtraBracketsInUnnamedStruct,
+	"Vec<MyEnum>": MyEnum[],
+	InlineTuple: InlineTuple,
+	InlineTuple2: InlineTuple2,
+	"Box<str>": string,
+	"Box<String>": string,
+	SkippedFieldWithinVariant: SkippedFieldWithinVariant,
+	KebabCase: KebabCase,
+	"&[&str]": string[],
+	"Issue281<'_>": Issue281,
+	"LifetimeGenericStruct<'_, i32>": LifetimeGenericStruct<number>,
+	"LifetimeGenericEnum<'_, i32>": LifetimeGenericEnum<number>,
+	RenameWithWeirdCharsField: RenameWithWeirdCharsField,
+	RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
+	RenamedFieldKeys: RenamedFieldKeys,
+	RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
+	"type_type::Type": Type,
+	ActualType: ActualType,
+	SpectaTypeOverride: SpectaTypeOverride,
+	ContainerTypeOverrideStruct: ContainerTypeOverrideStruct,
+	ContainerTypeOverrideEnum: ContainerTypeOverrideEnum,
+	"ContainerTypeOverrideGeneric<Box<dyn Any>>": ContainerTypeOverrideGeneric,
+	"ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric<number>,
+	ContainerTypeOverrideTuple: ContainerTypeOverrideTuple,
+	"ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric<number>,
+	InvalidToValidType: InvalidToValidType_Serialize,
+	TupleStruct: TupleStruct,
+	TupleStructWithRep: TupleStructWithRep,
+	"GenericTupleStruct<String>": GenericTupleStruct<string>,
+	BracedStruct: BracedStruct,
+	Struct: StructNew,
+	Struct2: Struct2,
+	Enum: EnumNew,
+	Enum2: Enum2New,
+	Enum3: Enum3New,
+	StructRenameAllUppercase: StructRenameAllUppercase,
+	RenameSerdeSpecialChar: RenameSerdeSpecialChar,
+	EnumRenameAllUppercase: EnumRenameAllUppercase,
+	Recursive: Recursive,
+	RecursiveMapValue: RecursiveMapValue,
+	RecursiveTransparent: RecursiveTransparent,
+	RecursiveInEnum: RecursiveInEnum,
+	NonOptional: NonOptional_Serialize,
+	OptionalOnNamedField: OptionalOnNamedField_Serialize,
+	OptionalOnTransparentNamedField: OptionalOnTransparentNamedField,
+	OptionalInEnum: OptionalInEnum_Serialize,
 	UntaggedVariants: UntaggedVariants,
 	UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
 	UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
@@ -986,7 +1285,17 @@ export type Seventh = {
 	b: Second,
 };
 
-export type SimpleStruct = {
+export type SimpleStruct = SimpleStruct_Serialize | SimpleStruct_Deserialize;
+
+export type SimpleStruct_Deserialize = {
+	a: number,
+	b: string,
+	c: [number, string, number],
+	d: string[],
+	e?: string | null,
+};
+
+export type SimpleStruct_Serialize = {
 	a: number,
 	b: string,
 	c: [number, string, number],
