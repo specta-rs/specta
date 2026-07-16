@@ -246,6 +246,7 @@ impl NamedDataType {
                             .map(|frame| frame.ty.clone())
                             .chain(std::iter::once(current_ty))
                             .collect(),
+                        instantiation_generics.to_vec(),
                     )),
                 });
             }

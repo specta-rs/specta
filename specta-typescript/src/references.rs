@@ -7,7 +7,12 @@ thread_local! {
     static MODULE_PATH_CONTEXT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
-pub(crate) fn with_module_path<R>(module_path: &str, func: impl FnOnce() -> R) -> R {
+/// Run a renderer with the current Files-layout module path set.
+///
+/// This is exposed for exporters which delegate TypeScript fragments to
+/// [`crate::primitives`] while managing the surrounding files themselves.
+#[doc(hidden)]
+pub fn with_module_path<R>(module_path: &str, func: impl FnOnce() -> R) -> R {
     struct Guard;
     impl Drop for Guard {
         fn drop(&mut self) {

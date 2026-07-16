@@ -220,9 +220,9 @@ fn inner(
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
                     if root_directions.serialize
-                        && !container_attrs
+                        && container_attrs
                             .as_ref()
-                            .is_some_and(|attrs| attrs.resolved_into.is_some())
+                            .is_none_or(|attrs| attrs.resolved_into.is_none())
                     {
                         validate_unnamed_conditional_omission(unnamed, &path)?;
                     }
@@ -299,9 +299,9 @@ fn inner(
             let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)?;
             let declared_directions = FlattenDirections {
                 serialize: root_directions.serialize
-                    && !container_attrs
+                    && container_attrs
                         .as_ref()
-                        .is_some_and(|attrs| attrs.resolved_into.is_some()),
+                        .is_none_or(|attrs| attrs.resolved_into.is_none()),
                 deserialize: root_directions.deserialize
                     && !container_attrs.as_ref().is_some_and(|attrs| {
                         attrs.resolved_from.is_some() || attrs.resolved_try_from.is_some()

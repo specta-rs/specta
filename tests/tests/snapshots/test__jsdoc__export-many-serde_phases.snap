@@ -89,18 +89,9 @@ expression: output
 	* @typedef {{ A: Record<string, never> }} Unit7
 	* @property {{ A: Record<string, never> }} A
 	*
-	* @typedef {{
-	*		a: number,
-	*		b: string,
-	*		c: [number, string, number],
-	*		d: string[],
-	*		e: string | null,
-	*	}} SimpleStruct
-	* @property {number} a
-	* @property {string} b
-	* @property {[number, string, number]} c
-	* @property {string[]} d
-	* @property {string | null} e
+	* @typedef {SimpleStruct_Serialize | SimpleStruct_Deserialize} SimpleStruct
+	* @property {SimpleStruct_Serialize} Serialize
+	* @property {SimpleStruct_Deserialize} Deserialize
 	*
 	* @typedef {number} TupleStruct1
 	* @property {number} "0"
@@ -123,18 +114,9 @@ expression: output
 	* @typedef {TestEnum} RefStruct
 	* @property {TestEnum} "0"
 	*
-	* @typedef {{
-	*		inline_this: {
-	*			ref_struct: SimpleStruct,
-	*			val: number,
-	*		},
-	*		dont_inline_this: RefStruct,
-	*	}} InlinerStruct
-	* @property {{
-	*		ref_struct: SimpleStruct,
-	*		val: number,
-	*	}} inline_this
-	* @property {RefStruct} dont_inline_this
+	* @typedef {InlinerStruct_Serialize | InlinerStruct_Deserialize} InlinerStruct
+	* @property {InlinerStruct_Serialize} Serialize
+	* @property {InlinerStruct_Deserialize} Deserialize
 	*
 	* @typedef {{
 	*		arg: T,
@@ -178,14 +160,9 @@ expression: output
 	* 	a: string,
 	* } }} A
 	*
-	* @typedef {{
-	*		optional_field: {
-	* 	a: string,
-	* } | null,
-	*	}} InlineOptionalType
-	* @property {{
-	* 	a: string,
-	* } | null} optional_field
+	* @typedef {InlineOptionalType_Serialize | InlineOptionalType_Deserialize} InlineOptionalType
+	* @property {InlineOptionalType_Serialize} Serialize
+	* @property {InlineOptionalType_Deserialize} Deserialize
 	*
 	* @typedef {"OneWord" | "Two words"} Rename
 	* @property {"OneWord"} OneWord
@@ -313,10 +290,9 @@ expression: output
 	*
 	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
 	*
-	* @typedef {{
-	*		cause: null,
-	*	}} InvalidToValidType
-	* @property {null} cause
+	* @typedef {InvalidToValidType_Serialize | InvalidToValidType_Deserialize} InvalidToValidType
+	* @property {InvalidToValidType_Serialize} Serialize
+	* @property {InvalidToValidType_Deserialize} Deserialize
 	*
 	* @typedef {string} TupleStruct
 	* @property {string} "0"
@@ -391,29 +367,22 @@ expression: output
 	* 	demo: RecursiveInEnum,
 	* } }} A
 	*
-	* @typedef {string | null} NonOptional
-	* @property {string | null} "0"
+	* @typedef {NonOptional_Serialize | NonOptional_Deserialize} NonOptional
+	* @property {NonOptional_Serialize} Serialize
+	* @property {NonOptional_Deserialize} Deserialize
 	*
-	* @typedef {string | null} OptionalOnNamedField
-	* @property {string | null} ["0"]
+	* @typedef {OptionalOnNamedField_Serialize | OptionalOnNamedField_Deserialize} OptionalOnNamedField
+	* @property {OptionalOnNamedField_Serialize} Serialize
+	* @property {OptionalOnNamedField_Deserialize} Deserialize
 	*
 	* @typedef {{
 	*		b: string | null,
 	*	}} OptionalOnTransparentNamedField
 	* @property {string | null} b
 	*
-	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	* 	a: string | null,
-	* } }) & { A?: never; C?: never } | ({ C: {
-	* 	a?: string | null,
-	* } }) & { A?: never; B?: never }} OptionalInEnum
-	* @property {{ A?: string | null }} A
-	* @property {{ B: {
-	* 	a: string | null,
-	* } }} B
-	* @property {{ C: {
-	* 	a?: string | null,
-	* } }} C
+	* @typedef {OptionalInEnum_Serialize | OptionalInEnum_Deserialize} OptionalInEnum
+	* @property {OptionalInEnum_Serialize} Serialize
+	* @property {OptionalInEnum_Deserialize} Deserialize
 	*
 	* @typedef {string | number | { id: string } | [string, boolean]} UntaggedVariants
 	* @property {string} A

@@ -2410,6 +2410,61 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InlineOptionalType": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/InlineOptionalType_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/InlineOptionalType_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InlineOptionalType"
+    },
+    "InlineOptionalType_Deserialize": {
+      "additionalProperties": false,
+      "properties": {
+        "optional_field": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "a"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "InlineOptionalType_Deserialize",
+      "type": "object"
+    },
+    "InlineOptionalType_Serialize": {
       "additionalProperties": false,
       "properties": {
         "optional_field": {
@@ -2435,7 +2490,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "required": [
         "optional_field"
       ],
-      "title": "InlineOptionalType",
+      "title": "InlineOptionalType_Serialize",
       "type": "object"
     },
     "InlineRecursiveConstGeneric": {
@@ -2593,10 +2648,39 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InlineStruct": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/InlineStruct_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/InlineStruct_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InlineStruct"
+    },
+    "InlineStruct_Deserialize": {
       "additionalProperties": false,
       "properties": {
         "ref_struct": {
-          "$ref": "#/$defs/SimpleStruct"
+          "$ref": "#/$defs/SimpleStruct_Deserialize"
         },
         "val": {
           "maximum": 2147483647,
@@ -2608,7 +2692,26 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "ref_struct",
         "val"
       ],
-      "title": "InlineStruct",
+      "title": "InlineStruct_Deserialize",
+      "type": "object"
+    },
+    "InlineStruct_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "ref_struct": {
+          "$ref": "#/$defs/SimpleStruct_Serialize"
+        },
+        "val": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ref_struct",
+        "val"
+      ],
+      "title": "InlineStruct_Serialize",
       "type": "object"
     },
     "InlineTuple": {
@@ -2680,35 +2783,66 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "InlinerStruct": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/InlinerStruct_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/InlinerStruct_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InlinerStruct"
+    },
+    "InlinerStruct_Deserialize": {
       "additionalProperties": false,
       "properties": {
         "dont_inline_this": {
           "$ref": "#/$defs/RefStruct"
         },
         "inline_this": {
-          "additionalProperties": false,
-          "properties": {
-            "ref_struct": {
-              "$ref": "#/$defs/SimpleStruct"
-            },
-            "val": {
-              "maximum": 2147483647,
-              "minimum": -2147483648,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "ref_struct",
-            "val"
-          ],
-          "type": "object"
+          "$ref": "#/$defs/InlineStruct_Deserialize"
         }
       },
       "required": [
         "inline_this",
         "dont_inline_this"
       ],
-      "title": "InlinerStruct",
+      "title": "InlinerStruct_Deserialize",
+      "type": "object"
+    },
+    "InlinerStruct_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "dont_inline_this": {
+          "$ref": "#/$defs/RefStruct"
+        },
+        "inline_this": {
+          "$ref": "#/$defs/InlineStruct_Serialize"
+        }
+      },
+      "required": [
+        "inline_this",
+        "dont_inline_this"
+      ],
+      "title": "InlinerStruct_Serialize",
       "type": "object"
     },
     "Inner": {
@@ -3042,6 +3176,52 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "InternallyTaggedWithAlias_Serialize"
     },
     "InvalidToValidType": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/InvalidToValidType_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/InvalidToValidType_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "InvalidToValidType"
+    },
+    "InvalidToValidType_Deserialize": {
+      "additionalProperties": false,
+      "properties": {
+        "cause": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "InvalidToValidType_Deserialize",
+      "type": "object"
+    },
+    "InvalidToValidType_Serialize": {
       "additionalProperties": false,
       "properties": {
         "cause": {
@@ -3058,7 +3238,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "required": [
         "cause"
       ],
-      "title": "InvalidToValidType",
+      "title": "InvalidToValidType_Serialize",
       "type": "object"
     },
     "Issue221External": {
@@ -3768,6 +3948,35 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Ninth"
     },
     "NonOptional": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/NonOptional_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/NonOptional_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "NonOptional"
+    },
+    "NonOptional_Deserialize": {
       "anyOf": [
         {
           "type": "string"
@@ -3776,7 +3985,18 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "null"
         }
       ],
-      "title": "NonOptional"
+      "title": "NonOptional_Deserialize"
+    },
+    "NonOptional_Serialize": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "NonOptional_Serialize"
     },
     "Optional": {
       "oneOf": [
@@ -3808,6 +4028,106 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "title": "Optional"
     },
     "OptionalInEnum": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/OptionalInEnum_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/OptionalInEnum_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "OptionalInEnum"
+    },
+    "OptionalInEnum_Deserialize": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "B": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "B"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "C": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "C"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "OptionalInEnum_Deserialize"
+    },
+    "OptionalInEnum_Serialize": {
       "oneOf": [
         {
           "additionalProperties": false,
@@ -3879,9 +4199,38 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "object"
         }
       ],
-      "title": "OptionalInEnum"
+      "title": "OptionalInEnum_Serialize"
     },
     "OptionalOnNamedField": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/OptionalOnNamedField_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/OptionalOnNamedField_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "OptionalOnNamedField"
+    },
+    "OptionalOnNamedField_Deserialize": {
       "anyOf": [
         {
           "type": "string"
@@ -3890,7 +4239,18 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "null"
         }
       ],
-      "title": "OptionalOnNamedField"
+      "title": "OptionalOnNamedField_Deserialize"
+    },
+    "OptionalOnNamedField_Serialize": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "OptionalOnNamedField_Serialize"
     },
     "OptionalOnTransparentNamedField": {
       "additionalProperties": false,
@@ -3953,10 +4313,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "boolean"
         }
       },
-      "required": [
-        "a",
-        "c"
-      ],
       "title": "Optional_Deserialize",
       "type": "object"
     },
@@ -4047,6 +4403,35 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "Primitives": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/Primitives_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/Primitives_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Primitives"
+    },
+    "Primitives_Deserialize": {
       "additionalProperties": false,
       "properties": {
         "&'static [MyEnum; 6]": {
@@ -4682,7 +5067,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "string"
         },
         "InlineOptionalType": {
-          "$ref": "#/$defs/InlineOptionalType"
+          "$ref": "#/$defs/InlineOptionalType_Deserialize"
         },
         "InlineRecursiveConstGenericContainer": {
           "$ref": "#/$defs/InlineRecursiveConstGenericContainer"
@@ -4694,7 +5079,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/InlineTuple2"
         },
         "InlinerStruct": {
-          "$ref": "#/$defs/InlinerStruct"
+          "$ref": "#/$defs/InlinerStruct_Deserialize"
         },
         "InternallyTaggedD": {
           "$ref": "#/$defs/InternallyTaggedD"
@@ -4715,7 +5100,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/InternallyTaggedM"
         },
         "InvalidToValidType": {
-          "$ref": "#/$defs/InvalidToValidType"
+          "$ref": "#/$defs/InvalidToValidType_Deserialize"
         },
         "IpAddr": {
           "type": "string"
@@ -4808,7 +5193,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
         },
         "NonOptional": {
-          "$ref": "#/$defs/NonOptional"
+          "$ref": "#/$defs/NonOptional_Deserialize"
         },
         "Option<()>": {
           "anyOf": [
@@ -4937,10 +5322,10 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           ]
         },
         "OptionalInEnum": {
-          "$ref": "#/$defs/OptionalInEnum"
+          "$ref": "#/$defs/OptionalInEnum_Deserialize"
         },
         "OptionalOnNamedField": {
-          "$ref": "#/$defs/OptionalOnNamedField"
+          "$ref": "#/$defs/OptionalOnNamedField_Deserialize"
         },
         "OptionalOnTransparentNamedField": {
           "$ref": "#/$defs/OptionalOnTransparentNamedField"
@@ -5009,7 +5394,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "$ref": "#/$defs/Seventh"
         },
         "SimpleStruct": {
-          "$ref": "#/$defs/SimpleStruct"
+          "$ref": "#/$defs/SimpleStruct_Deserialize"
         },
         "SingleLineComment": {
           "$ref": "#/$defs/SingleLineComment"
@@ -5537,7 +5922,1501 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "TestCollectionRegister",
         "TestCollectionRegister"
       ],
-      "title": "Primitives",
+      "title": "Primitives_Deserialize",
+      "type": "object"
+    },
+    "Primitives_Serialize": {
+      "additionalProperties": false,
+      "properties": {
+        "&'static [MyEnum; 6]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "maxItems": 6,
+          "minItems": 6,
+          "type": "array"
+        },
+        "&'static [MyEnum]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "type": "array"
+        },
+        "&'static [i32; 0]": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "maxItems": 0,
+          "minItems": 0,
+          "type": "array"
+        },
+        "&'static [i32; 1]": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "type": "array"
+        },
+        "&'static [i32; 3]": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "&'static [i32]": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "&'static bool": {
+          "type": "boolean"
+        },
+        "&'static i32": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "&'static str": {
+          "type": "string"
+        },
+        "&[&str]": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "((String, i32), (bool, char, bool), ())": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "maximum": 2147483647,
+                  "minimum": -2147483648,
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "items": false,
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "maxLength": 1,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "type": "array"
+        },
+        "()": {
+          "type": "null"
+        },
+        "(String)": {
+          "type": "string"
+        },
+        "(String, i32)": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "(String, i32, bool)": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        },
+        "(String,)": {
+          "items": false,
+          "maxItems": 1,
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "(Vec<i32>, Vec<bool>)": {
+          "items": false,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "boolean"
+              },
+              "type": "array"
+            }
+          ],
+          "type": "array"
+        },
+        "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": {
+          "items": false,
+          "maxItems": 12,
+          "minItems": 12,
+          "prefixItems": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "type": "array"
+        },
+        "A": {
+          "$ref": "#/$defs/A"
+        },
+        "AGenericStruct<u32>": {
+          "$ref": "#/$defs/AGenericStruct%3Cu32%3E"
+        },
+        "ActualType": {
+          "$ref": "#/$defs/ActualType"
+        },
+        "AdjacentlyTagged": {
+          "$ref": "#/$defs/AdjacentlyTagged"
+        },
+        "Another<bool>": {
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
+        },
+        "Box<String>": {
+          "type": "string"
+        },
+        "Box<str>": {
+          "type": "string"
+        },
+        "BoxFlattened": {
+          "$ref": "#/$defs/BoxFlattened"
+        },
+        "BoxInline": {
+          "$ref": "#/$defs/BoxInline"
+        },
+        "BracedStruct": {
+          "$ref": "#/$defs/BracedStruct"
+        },
+        "ChainedGenericDefault": {
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20String%3E"
+        },
+        "ChainedGenericDefault<String, String>": {
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20String%3E"
+        },
+        "ChainedGenericDefault<String, i32>": {
+          "$ref": "#/$defs/ChainedGenericDefault%3CString%2C%20i32%3E"
+        },
+        "ChainedGenericDefault<i32>": {
+          "$ref": "#/$defs/ChainedGenericDefault%3Ci32%2C%20i32%3E"
+        },
+        "CommentedEnum": {
+          "$ref": "#/$defs/CommentedEnum"
+        },
+        "CommentedStruct": {
+          "$ref": "#/$defs/CommentedStruct"
+        },
+        "ConstGenericInConstContainer": {
+          "$ref": "#/$defs/ConstGenericInConstContainer"
+        },
+        "ConstGenericInNonConstContainer": {
+          "$ref": "#/$defs/ConstGenericInNonConstContainer"
+        },
+        "Container1": {
+          "$ref": "#/$defs/Container1"
+        },
+        "ContainerTypeOverrideEnum": {
+          "$ref": "#/$defs/ContainerTypeOverrideEnum"
+        },
+        "ContainerTypeOverrideGeneric<Box<dyn Any>>": {
+          "$ref": "#/$defs/ContainerTypeOverrideGeneric"
+        },
+        "ContainerTypeOverrideStruct": {
+          "$ref": "#/$defs/ContainerTypeOverrideStruct"
+        },
+        "ContainerTypeOverrideToGeneric<i32>": {
+          "$ref": "#/$defs/ContainerTypeOverrideToGeneric%3Ci32%3E"
+        },
+        "ContainerTypeOverrideTuple": {
+          "$ref": "#/$defs/ContainerTypeOverrideTuple"
+        },
+        "ContainerTypeOverrideTupleGeneric<i32>": {
+          "$ref": "#/$defs/ContainerTypeOverrideTupleGeneric%3Ci32%3E"
+        },
+        "Cow<'static, i32>": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "Cow<'static, str>": {
+          "type": "string"
+        },
+        "DeprecatedEnumVariants": {
+          "$ref": "#/$defs/DeprecatedEnumVariants"
+        },
+        "DeprecatedFields": {
+          "$ref": "#/$defs/DeprecatedFields"
+        },
+        "DeprecatedTupleVariant": {
+          "$ref": "#/$defs/DeprecatedTupleVariant"
+        },
+        "DeprecatedType": {
+          "$ref": "#/$defs/DeprecatedType"
+        },
+        "DeprecatedTypeWithMsg": {
+          "$ref": "#/$defs/DeprecatedTypeWithMsg"
+        },
+        "DeprecatedTypeWithMsg2": {
+          "$ref": "#/$defs/DeprecatedTypeWithMsg2"
+        },
+        "DoubleFlattened": {
+          "$ref": "#/$defs/DoubleFlattened"
+        },
+        "Eight": {
+          "$ref": "#/$defs/Eight"
+        },
+        "EmptyEnum": {
+          "$ref": "#/$defs/EmptyEnum"
+        },
+        "EmptyEnumTagged": {
+          "$ref": "#/$defs/EmptyEnumTagged"
+        },
+        "EmptyEnumTaggedWContent": {
+          "$ref": "#/$defs/EmptyEnumTaggedWContent"
+        },
+        "EmptyEnumUntagged": {
+          "$ref": "#/$defs/EmptyEnumUntagged"
+        },
+        "EmptyStruct": {
+          "$ref": "#/$defs/EmptyStruct"
+        },
+        "EmptyStructWithTag": {
+          "$ref": "#/$defs/EmptyStructWithTag"
+        },
+        "Enum": {
+          "$ref": "#/$defs/EnumNew"
+        },
+        "Enum2": {
+          "$ref": "#/$defs/Enum2New"
+        },
+        "Enum3": {
+          "$ref": "#/$defs/Enum3New"
+        },
+        "EnumMacroAttributes": {
+          "$ref": "#/$defs/EnumMacroAttributes"
+        },
+        "EnumReferenceRecordKey": {
+          "$ref": "#/$defs/EnumReferenceRecordKey"
+        },
+        "EnumRenameAllUppercase": {
+          "$ref": "#/$defs/EnumRenameAllUppercase"
+        },
+        "ExternallyTagged": {
+          "$ref": "#/$defs/ExternallyTagged"
+        },
+        "ExtraBracketsInTupleVariant": {
+          "$ref": "#/$defs/ExtraBracketsInTupleVariant"
+        },
+        "ExtraBracketsInUnnamedStruct": {
+          "$ref": "#/$defs/ExtraBracketsInUnnamedStruct"
+        },
+        "First": {
+          "$ref": "#/$defs/First"
+        },
+        "FlattenA": {
+          "$ref": "#/$defs/FlattenA"
+        },
+        "FlattenB": {
+          "$ref": "#/$defs/FlattenB"
+        },
+        "FlattenC": {
+          "$ref": "#/$defs/FlattenC"
+        },
+        "FlattenD": {
+          "$ref": "#/$defs/FlattenD"
+        },
+        "FlattenE": {
+          "$ref": "#/$defs/FlattenE"
+        },
+        "FlattenEnumStruct": {
+          "$ref": "#/$defs/FlattenEnumStruct"
+        },
+        "FlattenF": {
+          "$ref": "#/$defs/FlattenF"
+        },
+        "FlattenG": {
+          "$ref": "#/$defs/FlattenG"
+        },
+        "FlattenOnNestedEnum": {
+          "$ref": "#/$defs/FlattenOnNestedEnum"
+        },
+        "FlattenedInner": {
+          "$ref": "#/$defs/FlattenedInner"
+        },
+        "Fourth": {
+          "$ref": "#/$defs/Fourth"
+        },
+        "FullGeneric<u8, bool>": {
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
+        },
+        "Generic1<()>": {
+          "$ref": "#/$defs/Generic1%3CTuple_%3E"
+        },
+        "Generic2<(), String, i32>": {
+          "$ref": "#/$defs/Generic2%3CTuple_%2C%20String%2C%20i32%3E"
+        },
+        "GenericAutoBound2<()>": {
+          "$ref": "#/$defs/GenericAutoBound2%3CTuple_%3E"
+        },
+        "GenericAutoBound<()>": {
+          "$ref": "#/$defs/GenericAutoBound%3CTuple_%3E"
+        },
+        "GenericDefault": {
+          "$ref": "#/$defs/GenericDefault%3CString%3E"
+        },
+        "GenericDefaultSkipped": {
+          "$ref": "#/$defs/GenericDefaultSkipped%3CString%3E"
+        },
+        "GenericDefaultSkippedNonType": {
+          "$ref": "#/$defs/GenericDefaultSkippedNonType"
+        },
+        "GenericNewType1<()>": {
+          "$ref": "#/$defs/GenericNewType1%3CTuple_%3E"
+        },
+        "GenericParameterOrderPreserved": {
+          "$ref": "#/$defs/GenericParameterOrderPreserved"
+        },
+        "GenericStruct2<()>": {
+          "$ref": "#/$defs/GenericStruct2%3CTuple_%3E"
+        },
+        "GenericStruct<String>": {
+          "$ref": "#/$defs/GenericStruct%3CString%3E"
+        },
+        "GenericStruct<i32>": {
+          "$ref": "#/$defs/GenericStruct%3Ci32%3E"
+        },
+        "GenericTuple<()>": {
+          "$ref": "#/$defs/GenericTuple%3CTuple_%3E"
+        },
+        "GenericTupleStruct<String>": {
+          "$ref": "#/$defs/GenericTupleStruct%3CString%3E"
+        },
+        "HalfGenericA<u8>": {
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
+        },
+        "HalfGenericB<bool>": {
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
+        },
+        "HasGenericAlias": {
+          "$ref": "#/$defs/HasGenericAlias"
+        },
+        "HashMap<BasicEnum, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/BasicEnum"
+          },
+          "type": "object"
+        },
+        "HashMap<BasicEnum, i32>": {
+          "additionalProperties": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/BasicEnum"
+          },
+          "type": "object"
+        },
+        "HashMap<Infallible, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": false,
+          "type": "object"
+        },
+        "HashMap<String, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "type": "object"
+        },
+        "HashMap<TransparentStruct, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "type": "object"
+        },
+        "HashMap<UnitVariants, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/UnitVariants"
+          },
+          "type": "object"
+        },
+        "HashMap<UntaggedVariantsKey, ()>": {
+          "additionalProperties": {
+            "type": "null"
+          },
+          "type": "object"
+        },
+        "Infallible": false,
+        "InlineConstGenericContainer": {
+          "$ref": "#/$defs/InlineConstGenericContainer"
+        },
+        "InlineEnumField": {
+          "$ref": "#/$defs/InlineEnumField"
+        },
+        "InlineFlattenGenerics": {
+          "$ref": "#/$defs/InlineFlattenGenerics"
+        },
+        "InlineFlattenGenericsG<()>": {
+          "$ref": "#/$defs/InlineFlattenGenericsG%3CTuple_%3E"
+        },
+        "InlineGenericNested<String>": {
+          "items": false,
+          "maxItems": 6,
+          "minItems": 6,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "items": false,
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "oneOf": [
+                {
+                  "const": "Unit"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "Unnamed": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "Unnamed"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "Named": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "Named"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          ],
+          "type": "array"
+        },
+        "InlineGenericNewtype<String>": {
+          "type": "string"
+        },
+        "InlineOptionalType": {
+          "$ref": "#/$defs/InlineOptionalType_Serialize"
+        },
+        "InlineRecursiveConstGenericContainer": {
+          "$ref": "#/$defs/InlineRecursiveConstGenericContainer"
+        },
+        "InlineTuple": {
+          "$ref": "#/$defs/InlineTuple"
+        },
+        "InlineTuple2": {
+          "$ref": "#/$defs/InlineTuple2"
+        },
+        "InlinerStruct": {
+          "$ref": "#/$defs/InlinerStruct_Serialize"
+        },
+        "InternallyTaggedD": {
+          "$ref": "#/$defs/InternallyTaggedD"
+        },
+        "InternallyTaggedE": {
+          "$ref": "#/$defs/InternallyTaggedE"
+        },
+        "InternallyTaggedF": {
+          "$ref": "#/$defs/InternallyTaggedF"
+        },
+        "InternallyTaggedH": {
+          "$ref": "#/$defs/InternallyTaggedH"
+        },
+        "InternallyTaggedL": {
+          "$ref": "#/$defs/InternallyTaggedL"
+        },
+        "InternallyTaggedM": {
+          "$ref": "#/$defs/InternallyTaggedM"
+        },
+        "InvalidToValidType": {
+          "$ref": "#/$defs/InvalidToValidType_Serialize"
+        },
+        "IpAddr": {
+          "type": "string"
+        },
+        "Ipv4Addr": {
+          "type": "string"
+        },
+        "Ipv6Addr": {
+          "type": "string"
+        },
+        "Issue221External": {
+          "$ref": "#/$defs/Issue221External"
+        },
+        "Issue221UntaggedMixed": {
+          "$ref": "#/$defs/Issue221UntaggedMixed"
+        },
+        "Issue221UntaggedSafe": {
+          "$ref": "#/$defs/Issue221UntaggedSafe"
+        },
+        "Issue281<'_>": {
+          "$ref": "#/$defs/Issue281"
+        },
+        "KebabCase": {
+          "$ref": "#/$defs/KebabCase"
+        },
+        "LifetimeGenericEnum<'_, i32>": {
+          "$ref": "#/$defs/LifetimeGenericEnum%3Ci32%3E"
+        },
+        "LifetimeGenericStruct<'_, i32>": {
+          "$ref": "#/$defs/LifetimeGenericStruct%3Ci32%3E"
+        },
+        "LoadProjectEvent": {
+          "$ref": "#/$defs/LoadProjectEvent"
+        },
+        "MacroEnum": {
+          "$ref": "#/$defs/MacroEnum"
+        },
+        "MacroStruct": {
+          "$ref": "#/$defs/MacroStruct"
+        },
+        "MacroStruct2": {
+          "$ref": "#/$defs/MacroStruct2"
+        },
+        "MapA<u32>": {
+          "additionalProperties": {
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "MapB<u32>": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "pattern": "^(0|[1-9][0-9]{0,8}|[1-3][0-9]{9}|4[0-1][0-9]{8}|42[0-8][0-9]{7}|429[0-3][0-9]{6}|4294[0-8][0-9]{5}|42949[0-5][0-9]{4}|429496[0-6][0-9]{3}|4294967[0-1][0-9]{2}|42949672[0-8][0-9]|429496729[0-4]|4294967295)$",
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "MapC<u32>": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AGenericStruct%3Cu32%3E"
+          },
+          "type": "object"
+        },
+        "MyEmptyInput": {
+          "$ref": "#/$defs/MyEmptyInput"
+        },
+        "MyEnumAdjacent": {
+          "$ref": "#/$defs/MyEnumAdjacent"
+        },
+        "MyEnumExternal": {
+          "$ref": "#/$defs/MyEnumExternal"
+        },
+        "MyEnumTagged": {
+          "$ref": "#/$defs/MyEnumTagged"
+        },
+        "MyEnumUntagged": {
+          "$ref": "#/$defs/MyEnumUntagged"
+        },
+        "NamedConstGenericContainer": {
+          "$ref": "#/$defs/NamedConstGenericContainer"
+        },
+        "Ninth": {
+          "$ref": "#/$defs/Ninth"
+        },
+        "NonGeneric": {
+          "$ref": "#/$defs/Demo%3Cu8%2C%20bool%3E"
+        },
+        "NonOptional": {
+          "$ref": "#/$defs/NonOptional_Serialize"
+        },
+        "Option<()>": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<Option<Option<i32>>>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "maximum": 2147483647,
+                          "minimum": -2147483648,
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<Option<String>>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Option<String>>": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Vec<Cow<'static, i32>>>": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<Vec<i32>>": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "Option<i32>": {
+          "anyOf": [
+            {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "OptionalInEnum": {
+          "$ref": "#/$defs/OptionalInEnum_Serialize"
+        },
+        "OptionalOnNamedField": {
+          "$ref": "#/$defs/OptionalOnNamedField_Serialize"
+        },
+        "OptionalOnTransparentNamedField": {
+          "$ref": "#/$defs/OptionalOnTransparentNamedField"
+        },
+        "OverridenStruct": {
+          "$ref": "#/$defs/OverridenStruct"
+        },
+        "PathBuf": {
+          "type": "string"
+        },
+        "PhantomData<()>": {
+          "type": "null"
+        },
+        "PhantomData<String>": {
+          "type": "null"
+        },
+        "Range<i32>": {
+          "$ref": "#/$defs/Range%3Ci32%3E"
+        },
+        "RangeInclusive<i32>": {
+          "$ref": "#/$defs/RangeInclusive%3Ci32%3E"
+        },
+        "Recursive": {
+          "$ref": "#/$defs/Recursive"
+        },
+        "RecursiveInEnum": {
+          "$ref": "#/$defs/RecursiveInEnum"
+        },
+        "RecursiveMapValue": {
+          "$ref": "#/$defs/RecursiveMapValue"
+        },
+        "RecursiveTransparent": {
+          "$ref": "#/$defs/RecursiveTransparent"
+        },
+        "RefStruct": {
+          "$ref": "#/$defs/RefStruct"
+        },
+        "Regular": {
+          "$ref": "#/$defs/Regular"
+        },
+        "Rename": {
+          "$ref": "#/$defs/Rename"
+        },
+        "RenameSerdeSpecialChar": {
+          "$ref": "#/$defs/RenameSerdeSpecialChar"
+        },
+        "RenameWithWeirdCharsField": {
+          "$ref": "#/$defs/RenameWithWeirdCharsField"
+        },
+        "RenameWithWeirdCharsVariant": {
+          "$ref": "#/$defs/RenameWithWeirdCharsVariant"
+        },
+        "RenamedFieldKeys": {
+          "$ref": "#/$defs/RenamedFieldKeys"
+        },
+        "RenamedVariantWithSkippedPayload": {
+          "$ref": "#/$defs/RenamedVariantWithSkippedPayload"
+        },
+        "Result<String, i32>": {
+          "$ref": "#/$defs/Result%3CString%2C%20i32%3E"
+        },
+        "Second": {
+          "$ref": "#/$defs/Second"
+        },
+        "Seventh": {
+          "$ref": "#/$defs/Seventh"
+        },
+        "SimpleStruct": {
+          "$ref": "#/$defs/SimpleStruct_Serialize"
+        },
+        "SingleLineComment": {
+          "$ref": "#/$defs/SingleLineComment"
+        },
+        "Sixth": {
+          "$ref": "#/$defs/Sixth"
+        },
+        "SkipField": {
+          "$ref": "#/$defs/SkipField"
+        },
+        "SkipNamedFieldInVariant": {
+          "$ref": "#/$defs/SkipNamedFieldInVariant"
+        },
+        "SkipOnlyField": {
+          "$ref": "#/$defs/SkipOnlyField"
+        },
+        "SkipStructFields": {
+          "$ref": "#/$defs/SkipStructFields"
+        },
+        "SkipUnnamedFieldInVariant": {
+          "$ref": "#/$defs/SkipUnnamedFieldInVariant"
+        },
+        "SkipVariant": {
+          "$ref": "#/$defs/SkipVariant"
+        },
+        "SkipVariant2": {
+          "$ref": "#/$defs/SkipVariant2"
+        },
+        "SkipVariant3": {
+          "$ref": "#/$defs/SkipVariant3"
+        },
+        "SkippedFieldWithinVariant": {
+          "$ref": "#/$defs/SkippedFieldWithinVariant"
+        },
+        "SocketAddr": {
+          "type": "string"
+        },
+        "SocketAddrV4": {
+          "type": "string"
+        },
+        "SocketAddrV6": {
+          "type": "string"
+        },
+        "SpectaSkipNonTypeField": {
+          "$ref": "#/$defs/SpectaSkipNonTypeField"
+        },
+        "SpectaTypeOverride": {
+          "$ref": "#/$defs/SpectaTypeOverride"
+        },
+        "String": {
+          "type": "string"
+        },
+        "Struct": {
+          "$ref": "#/$defs/StructNew"
+        },
+        "Struct2": {
+          "$ref": "#/$defs/Struct2"
+        },
+        "StructRenameAllUppercase": {
+          "$ref": "#/$defs/StructRenameAllUppercase"
+        },
+        "TagOnStructWithInline": {
+          "$ref": "#/$defs/TagOnStructWithInline"
+        },
+        "Tenth": {
+          "$ref": "#/$defs/Tenth"
+        },
+        "TestCollectionRegister": {
+          "$ref": "#/$defs/TestCollectionRegister"
+        },
+        "TestEnum": {
+          "$ref": "#/$defs/TestEnum"
+        },
+        "Third": {
+          "$ref": "#/$defs/Third"
+        },
+        "TransparentType": {
+          "$ref": "#/$defs/TransparentType"
+        },
+        "TransparentType2": {
+          "$ref": "#/$defs/TransparentType2"
+        },
+        "TransparentTypeWithOverride": {
+          "$ref": "#/$defs/TransparentTypeWithOverride"
+        },
+        "TransparentWithSkip": {
+          "$ref": "#/$defs/TransparentWithSkip"
+        },
+        "TransparentWithSkip2": {
+          "$ref": "#/$defs/TransparentWithSkip2"
+        },
+        "TransparentWithSkip3": {
+          "$ref": "#/$defs/TransparentWithSkip3"
+        },
+        "TupleNested": {
+          "$ref": "#/$defs/TupleNested"
+        },
+        "TupleStruct": {
+          "$ref": "#/$defs/TupleStruct"
+        },
+        "TupleStruct1": {
+          "$ref": "#/$defs/TupleStruct1"
+        },
+        "TupleStruct3": {
+          "$ref": "#/$defs/TupleStruct3"
+        },
+        "TupleStructWithRep": {
+          "$ref": "#/$defs/TupleStructWithRep"
+        },
+        "Unit1": {
+          "$ref": "#/$defs/Unit1"
+        },
+        "Unit2": {
+          "$ref": "#/$defs/Unit2"
+        },
+        "Unit3": {
+          "$ref": "#/$defs/Unit3"
+        },
+        "Unit4": {
+          "$ref": "#/$defs/Unit4"
+        },
+        "Unit5": {
+          "$ref": "#/$defs/Unit5"
+        },
+        "Unit6": {
+          "$ref": "#/$defs/Unit6"
+        },
+        "Unit7": {
+          "$ref": "#/$defs/Unit7"
+        },
+        "UntaggedVariants": {
+          "$ref": "#/$defs/UntaggedVariants"
+        },
+        "UntaggedVariantsWithDuplicateBranches": {
+          "$ref": "#/$defs/UntaggedVariantsWithDuplicateBranches"
+        },
+        "UntaggedVariantsWithoutValue": {
+          "$ref": "#/$defs/UntaggedVariantsWithoutValue"
+        },
+        "ValidMaybeValidKey": {
+          "$ref": "#/$defs/ValidMaybeValidKey"
+        },
+        "ValidMaybeValidKeyNested": {
+          "$ref": "#/$defs/ValidMaybeValidKeyNested"
+        },
+        "Vec<MyEnum>": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "type": "array"
+        },
+        "Vec<Option<Cow<'static, i32>>>": {
+          "items": {
+            "anyOf": [
+              {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "Vec<PlaceholderInnerField>": {
+          "items": {
+            "$ref": "#/$defs/PlaceholderInnerField"
+          },
+          "type": "array"
+        },
+        "Vec<i32>": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "[MyEnum; 2]": {
+          "items": {
+            "$ref": "#/$defs/MyEnum"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "[Option<u8>; 3]": {
+          "items": {
+            "anyOf": [
+              {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "[Vec<String>; 3]": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "[i32; 3]": {
+          "items": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "bool": {
+          "type": "boolean"
+        },
+        "char": {
+          "maxLength": 1,
+          "minLength": 1,
+          "type": "string"
+        },
+        "f32": {
+          "type": "number"
+        },
+        "f64": {
+          "type": "number"
+        },
+        "i16": {
+          "maximum": 32767,
+          "minimum": -32768,
+          "type": "integer"
+        },
+        "i32": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "i8": {
+          "maximum": 127,
+          "minimum": -128,
+          "type": "integer"
+        },
+        "type_type::Type": {
+          "$ref": "#/$defs/Type"
+        },
+        "u16": {
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "u32": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "u8": {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "i8",
+        "i16",
+        "i32",
+        "u8",
+        "u16",
+        "u32",
+        "f32",
+        "f64",
+        "bool",
+        "char",
+        "Range<i32>",
+        "RangeInclusive<i32>",
+        "()",
+        "(String, i32)",
+        "(String, i32, bool)",
+        "((String, i32), (bool, char, bool), ())",
+        "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)",
+        "(Vec<i32>, Vec<bool>)",
+        "String",
+        "PathBuf",
+        "IpAddr",
+        "Ipv4Addr",
+        "Ipv6Addr",
+        "SocketAddr",
+        "SocketAddrV4",
+        "SocketAddrV6",
+        "Cow<'static, str>",
+        "Cow<'static, i32>",
+        "&'static str",
+        "&'static bool",
+        "&'static i32",
+        "Vec<i32>",
+        "&'static [i32]",
+        "&'static [i32; 3]",
+        "[i32; 3]",
+        "Vec<MyEnum>",
+        "&'static [MyEnum]",
+        "&'static [MyEnum; 6]",
+        "[MyEnum; 2]",
+        "&'static [i32; 1]",
+        "&'static [i32; 0]",
+        "Option<i32>",
+        "Option<()>",
+        "Option<Vec<i32>>",
+        "Result<String, i32>",
+        "Vec<Option<Cow<'static, i32>>>",
+        "Option<Vec<Cow<'static, i32>>>",
+        "[Vec<String>; 3]",
+        "Option<Option<String>>",
+        "Option<Option<Option<String>>>",
+        "PhantomData<()>",
+        "PhantomData<String>",
+        "Infallible",
+        "Unit1",
+        "Unit2",
+        "Unit3",
+        "Unit4",
+        "Unit5",
+        "Unit6",
+        "Unit7",
+        "SimpleStruct",
+        "TupleStruct1",
+        "TupleStruct3",
+        "TestEnum",
+        "RefStruct",
+        "InlinerStruct",
+        "GenericStruct<i32>",
+        "GenericStruct<String>",
+        "FlattenEnumStruct",
+        "OverridenStruct",
+        "HasGenericAlias",
+        "EnumMacroAttributes",
+        "InlineEnumField",
+        "InlineOptionalType",
+        "Rename",
+        "TransparentType",
+        "TransparentType2",
+        "TransparentTypeWithOverride",
+        "[Option<u8>; 3]",
+        "HashMap<BasicEnum, ()>",
+        "HashMap<BasicEnum, i32>",
+        "Option<Option<Option<Option<i32>>>>",
+        "Vec<PlaceholderInnerField>",
+        "EnumReferenceRecordKey",
+        "FlattenOnNestedEnum",
+        "MyEmptyInput",
+        "(String)",
+        "(String,)",
+        "ExtraBracketsInTupleVariant",
+        "ExtraBracketsInUnnamedStruct",
+        "Vec<MyEnum>",
+        "InlineTuple",
+        "InlineTuple2",
+        "Box<str>",
+        "Box<String>",
+        "SkippedFieldWithinVariant",
+        "KebabCase",
+        "&[&str]",
+        "Issue281<'_>",
+        "LifetimeGenericStruct<'_, i32>",
+        "LifetimeGenericEnum<'_, i32>",
+        "RenameWithWeirdCharsField",
+        "RenameWithWeirdCharsVariant",
+        "RenamedFieldKeys",
+        "RenamedVariantWithSkippedPayload",
+        "type_type::Type",
+        "ActualType",
+        "SpectaTypeOverride",
+        "ContainerTypeOverrideStruct",
+        "ContainerTypeOverrideEnum",
+        "ContainerTypeOverrideGeneric<Box<dyn Any>>",
+        "ContainerTypeOverrideToGeneric<i32>",
+        "ContainerTypeOverrideTuple",
+        "ContainerTypeOverrideTupleGeneric<i32>",
+        "InvalidToValidType",
+        "TupleStruct",
+        "TupleStructWithRep",
+        "GenericTupleStruct<String>",
+        "BracedStruct",
+        "Struct",
+        "Struct2",
+        "Enum",
+        "Enum2",
+        "Enum3",
+        "StructRenameAllUppercase",
+        "RenameSerdeSpecialChar",
+        "EnumRenameAllUppercase",
+        "Recursive",
+        "RecursiveMapValue",
+        "RecursiveTransparent",
+        "RecursiveInEnum",
+        "NonOptional",
+        "OptionalOnNamedField",
+        "OptionalOnTransparentNamedField",
+        "OptionalInEnum",
+        "UntaggedVariants",
+        "UntaggedVariantsWithoutValue",
+        "UntaggedVariantsWithDuplicateBranches",
+        "HashMap<String, ()>",
+        "Regular",
+        "HashMap<Infallible, ()>",
+        "HashMap<TransparentStruct, ()>",
+        "HashMap<UnitVariants, ()>",
+        "HashMap<UntaggedVariantsKey, ()>",
+        "ValidMaybeValidKey",
+        "ValidMaybeValidKeyNested",
+        "MacroStruct",
+        "MacroStruct2",
+        "MacroEnum",
+        "DeprecatedType",
+        "DeprecatedTypeWithMsg",
+        "DeprecatedTypeWithMsg2",
+        "DeprecatedFields",
+        "DeprecatedTupleVariant",
+        "DeprecatedEnumVariants",
+        "CommentedStruct",
+        "CommentedEnum",
+        "SingleLineComment",
+        "NonGeneric",
+        "HalfGenericA<u8>",
+        "HalfGenericB<bool>",
+        "FullGeneric<u8, bool>",
+        "Another<bool>",
+        "MapA<u32>",
+        "MapB<u32>",
+        "MapC<u32>",
+        "AGenericStruct<u32>",
+        "A",
+        "DoubleFlattened",
+        "FlattenedInner",
+        "BoxFlattened",
+        "BoxInline",
+        "First",
+        "Second",
+        "Third",
+        "Fourth",
+        "TagOnStructWithInline",
+        "Sixth",
+        "Seventh",
+        "Eight",
+        "Ninth",
+        "Tenth",
+        "MyEnumTagged",
+        "MyEnumExternal",
+        "MyEnumAdjacent",
+        "MyEnumUntagged",
+        "EmptyStruct",
+        "EmptyStructWithTag",
+        "AdjacentlyTagged",
+        "LoadProjectEvent",
+        "ExternallyTagged",
+        "Issue221External",
+        "InternallyTaggedD",
+        "InternallyTaggedE",
+        "InternallyTaggedF",
+        "InternallyTaggedH",
+        "InternallyTaggedL",
+        "InternallyTaggedM",
+        "Issue221UntaggedSafe",
+        "Issue221UntaggedMixed",
+        "EmptyEnum",
+        "EmptyEnumTagged",
+        "EmptyEnumTaggedWContent",
+        "EmptyEnumUntagged",
+        "SkipOnlyField",
+        "SkipField",
+        "SkipVariant",
+        "SkipUnnamedFieldInVariant",
+        "SkipNamedFieldInVariant",
+        "TransparentWithSkip",
+        "TransparentWithSkip2",
+        "TransparentWithSkip3",
+        "SkipVariant2",
+        "SkipVariant3",
+        "SkipStructFields",
+        "SpectaSkipNonTypeField",
+        "FlattenA",
+        "FlattenB",
+        "FlattenC",
+        "FlattenD",
+        "FlattenE",
+        "FlattenF",
+        "FlattenG",
+        "TupleNested",
+        "Generic1<()>",
+        "GenericAutoBound<()>",
+        "GenericAutoBound2<()>",
+        "Container1",
+        "Generic2<(), String, i32>",
+        "GenericNewType1<()>",
+        "GenericTuple<()>",
+        "GenericStruct2<()>",
+        "InlineGenericNewtype<String>",
+        "InlineGenericNested<String>",
+        "InlineFlattenGenericsG<()>",
+        "InlineFlattenGenerics",
+        "GenericDefault",
+        "ChainedGenericDefault",
+        "ChainedGenericDefault<String, String>",
+        "ChainedGenericDefault<i32>",
+        "ChainedGenericDefault<String, i32>",
+        "GenericDefaultSkipped",
+        "GenericDefaultSkippedNonType",
+        "GenericParameterOrderPreserved",
+        "ConstGenericInNonConstContainer",
+        "ConstGenericInConstContainer",
+        "NamedConstGenericContainer",
+        "InlineConstGenericContainer",
+        "InlineRecursiveConstGenericContainer",
+        "TestCollectionRegister",
+        "TestCollectionRegister"
+      ],
+      "title": "Primitives_Serialize",
       "type": "object"
     },
     "Range<i32>": {
@@ -5810,6 +7689,93 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "type": "object"
     },
     "SimpleStruct": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Serialize": {
+              "$ref": "#/$defs/SimpleStruct_Serialize"
+            }
+          },
+          "required": [
+            "Serialize"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "Deserialize": {
+              "$ref": "#/$defs/SimpleStruct_Deserialize"
+            }
+          },
+          "required": [
+            "Deserialize"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SimpleStruct"
+    },
+    "SimpleStruct_Deserialize": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "maximum": 2147483647,
+          "minimum": -2147483648,
+          "type": "integer"
+        },
+        "b": {
+          "type": "string"
+        },
+        "c": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "d": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "e": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "title": "SimpleStruct_Deserialize",
+      "type": "object"
+    },
+    "SimpleStruct_Serialize": {
       "additionalProperties": false,
       "properties": {
         "a": {
@@ -5865,7 +7831,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "d",
         "e"
       ],
-      "title": "SimpleStruct",
+      "title": "SimpleStruct_Serialize",
       "type": "object"
     },
     "SingleLineComment": {

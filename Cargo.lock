@@ -2103,6 +2103,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-csharp"
+version = "0.0.4"
+dependencies = [
+ "rustix",
+ "serde",
+ "specta",
+ "specta-serde",
+]
+
+[[package]]
 name = "specta-go"
 version = "0.0.4"
 dependencies = [
@@ -2177,6 +2187,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-rescript"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "thiserror",
+]
+
+[[package]]
 name = "specta-rust"
 version = "0.0.1"
 dependencies = [
@@ -2230,6 +2250,7 @@ dependencies = [
  "smallvec",
  "smol_str 0.3.6",
  "specta",
+ "specta-csharp",
  "specta-go",
  "specta-java",
  "specta-jsonschema",
@@ -2278,7 +2299,6 @@ dependencies = [
  "specta-serde",
  "specta-typescript",
  "specta-util",
- "thiserror",
 ]
 
 [[package]]

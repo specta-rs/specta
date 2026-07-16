@@ -69,13 +69,7 @@ Unit6: export type Unit6 = { A: [] };
 
 Unit7: export type Unit7 = { A: Record<string, never> };
 
-SimpleStruct: export type SimpleStruct = {
-	a: number,
-	b: string,
-	c: [number, string, number],
-	d: string[],
-	e: string | null,
-};
+SimpleStruct: export type SimpleStruct = SimpleStruct_Serialize | SimpleStruct_Deserialize;
 
 TupleStruct1: export type TupleStruct1 = number;
 
@@ -87,13 +81,7 @@ TestEnum: export type TestEnum = "Unit" | ({ Single: number }) & { Multiple?: ne
 
 RefStruct: export type RefStruct = TestEnum;
 
-InlinerStruct: export type InlinerStruct = {
-	inline_this: {
-		ref_struct: SimpleStruct,
-		val: number,
-	},
-	dont_inline_this: RefStruct,
-};
+InlinerStruct: export type InlinerStruct = InlinerStruct_Serialize | InlinerStruct_Deserialize;
 
 GenericStruct<i32>: export type GenericStruct<T> = {
 	arg: T,
@@ -122,11 +110,7 @@ InlineEnumField: export type InlineEnumField = { A: {
 	a: string,
 } };
 
-InlineOptionalType: export type InlineOptionalType = {
-	optional_field: {
-	a: string,
-} | null,
-};
+InlineOptionalType: export type InlineOptionalType = InlineOptionalType_Serialize | InlineOptionalType_Deserialize;
 
 Rename: export type Rename = "OneWord" | "Two words";
 
@@ -226,9 +210,7 @@ ContainerTypeOverrideTuple: export type ContainerTypeOverrideTuple = [string, nu
 
 ContainerTypeOverrideTupleGeneric<i32>: export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
-InvalidToValidType: export type InvalidToValidType = {
-	cause: null,
-};
+InvalidToValidType: export type InvalidToValidType = InvalidToValidType_Serialize | InvalidToValidType_Deserialize;
 
 TupleStruct: export type TupleStruct = string;
 
@@ -278,19 +260,15 @@ RecursiveInEnum: export type RecursiveInEnum = { A: {
 	demo: RecursiveInEnum,
 } };
 
-NonOptional: export type NonOptional = string | null;
+NonOptional: export type NonOptional = NonOptional_Serialize | NonOptional_Deserialize;
 
-OptionalOnNamedField: export type OptionalOnNamedField = string | null;
+OptionalOnNamedField: export type OptionalOnNamedField = OptionalOnNamedField_Serialize | OptionalOnNamedField_Deserialize;
 
 OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
-OptionalInEnum: export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	a: string | null,
-} }) & { A?: never; C?: never } | ({ C: {
-	a?: string | null,
-} }) & { A?: never; B?: never };
+OptionalInEnum: export type OptionalInEnum = OptionalInEnum_Serialize | OptionalInEnum_Deserialize;
 
 UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 

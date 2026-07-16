@@ -1,0 +1,27 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "specta-rescript-generated",
+      "devDependencies": {
+        "rescript": "^12.3.0",
+      },
+    },
+  },
+  "packages": {
+    "@rescript/darwin-arm64": ["@rescript/darwin-arm64@12.3.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-tw0E+XcpPoFj3KizsT5qS/5O/dILi0NBZAz5I8ONK+F43qcqDJDDO+Ise45rGoNWhjwt9WOerYnOd0eUe3U9GA=="],
+
+    "@rescript/darwin-x64": ["@rescript/darwin-x64@12.3.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-dW2R31PpBvPjSy50mSd9zKOT3dFw/gKtsUZoML81fPuXPJh0h5rwu9z3S40UUUzOa68uKNxXcVLrG1RAgs20Bw=="],
+
+    "@rescript/linux-arm64": ["@rescript/linux-arm64@12.3.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-4GImq346kefHtaMhruFxVwWmr2shWEGQzAGdgZzn5zNWFN32hOXnztHjSFUmj5gmK9fFbidx/oB3BwdbRp5QFQ=="],
+
+    "@rescript/linux-x64": ["@rescript/linux-x64@12.3.0", "", { "os": "linux", "cpu": "x64" }, "sha512-0bPcKI0M38EpoFbhLz2w8ZAY3oZ0GWChwcDn43AN2EAWGLiCORhLP6biqRDg37jK/Bh8Y0MhYzjNWIeHoEDINQ=="],
+
+    "@rescript/runtime": ["@rescript/runtime@12.3.0", "", {}, "sha512-8SRM2f6+LaWach8NJjYQVCCmu6KYmJCb+437L7YpaUpJBDyUOC1x0FF75shZ/Gid9guKPF3zMHrTNHLuyQkkiQ=="],
+
+    "@rescript/win32-x64": ["@rescript/win32-x64@12.3.0", "", { "os": "win32", "cpu": "x64" }, "sha512-TM1aLfn8IJFi0/ztVwHqQOcmJg4jWFCmXjrIS9Tif+6Gx8NdX8ttommUscUghe+Dn2pI382FvqPPNWRUR3AI8g=="],
+
+    "rescript": ["rescript@12.3.0", "", { "dependencies": { "@rescript/runtime": "12.3.0" }, "optionalDependencies": { "@rescript/darwin-arm64": "12.3.0", "@rescript/darwin-x64": "12.3.0", "@rescript/linux-arm64": "12.3.0", "@rescript/linux-x64": "12.3.0", "@rescript/win32-x64": "12.3.0" }, "bin": { "bsc": "cli/bsc.js", "rescript": "cli/rescript.js", "bstracing": "cli/bstracing.js", "rescript-tools": "cli/rescript-tools.js", "rescript-legacy": "cli/rescript-legacy.js" } }, "sha512-xdnpEoDNoeYjZ8HHATwKJEfWti1Nqwx266edfUC8378a5AO1VvZElj2ZZ/SIJNFgUnohH9yDThB+CHEQfijxKw=="],
+  }
+}

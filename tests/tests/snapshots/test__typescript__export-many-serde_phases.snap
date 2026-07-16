@@ -53,13 +53,7 @@ export type Unit6 = { A: [] };
 
 export type Unit7 = { A: Record<string, never> };
 
-export type SimpleStruct = {
-	a: number,
-	b: string,
-	c: [number, string, number],
-	d: string[],
-	e: string | null,
-};
+export type SimpleStruct = SimpleStruct_Serialize | SimpleStruct_Deserialize;
 
 export type TupleStruct1 = number;
 
@@ -71,13 +65,7 @@ export type TestEnum = "Unit" | ({ Single: number }) & { Multiple?: never; Struc
 
 export type RefStruct = TestEnum;
 
-export type InlinerStruct = {
-	inline_this: {
-		ref_struct: SimpleStruct,
-		val: number,
-	},
-	dont_inline_this: RefStruct,
-};
+export type InlinerStruct = InlinerStruct_Serialize | InlinerStruct_Deserialize;
 
 export type GenericStruct<T> = {
 	arg: T,
@@ -106,11 +94,7 @@ export type InlineEnumField = { A: {
 	a: string,
 } };
 
-export type InlineOptionalType = {
-	optional_field: {
-	a: string,
-} | null,
-};
+export type InlineOptionalType = InlineOptionalType_Serialize | InlineOptionalType_Deserialize;
 
 export type Rename = "OneWord" | "Two words";
 
@@ -203,9 +187,7 @@ export type ContainerTypeOverrideTuple = [string, number];
 
 export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
-export type InvalidToValidType = {
-	cause: null,
-};
+export type InvalidToValidType = InvalidToValidType_Serialize | InvalidToValidType_Deserialize;
 
 export type TupleStruct = string;
 
@@ -255,19 +237,15 @@ export type RecursiveInEnum = { A: {
 	demo: RecursiveInEnum,
 } };
 
-export type NonOptional = string | null;
+export type NonOptional = NonOptional_Serialize | NonOptional_Deserialize;
 
-export type OptionalOnNamedField = string | null;
+export type OptionalOnNamedField = OptionalOnNamedField_Serialize | OptionalOnNamedField_Deserialize;
 
 export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
-export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	a: string | null,
-} }) & { A?: never; C?: never } | ({ C: {
-	a?: string | null,
-} }) & { A?: never; B?: never };
+export type OptionalInEnum = OptionalInEnum_Serialize | OptionalInEnum_Deserialize;
 
 export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 

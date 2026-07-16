@@ -595,7 +595,7 @@ fn openapi_exports_operations_into_paths() {
                 .summary("Fetch one recipe")
                 .operation_id("getRecipe")
                 .tag("recipes")
-                .path_param("slug")
+                .path_param::<String>("slug")
                 .response::<Recipe>(200, "The recipe")
                 .response::<ApiError>(404, "No such recipe"),
         )
@@ -792,4 +792,60 @@ fn openapi_resolution_probe_does_not_leak_into_the_document() {
         serde_json::to_value(without_operations.components.as_ref().unwrap()).unwrap(),
         "describing operations changed the exported components"
     );
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlinedBody {
+    value: String,
+}
+
+/// A type is a component only when the exporter gives it one. An `#[specta(inline)]` type is
+/// written out at its use site instead, so an operation carries its schema rather than a `$ref` to
+/// a component that was never exported.
+#[test]
+fn openapi_inlines_operation_types_that_have_no_component() {
+    let document = OpenApi::default()
+        .operation(Operation::get("/inlined").response::<InlinedBody>(200, "inlined"))
+        .export_document(
+            &Types::default().register::<InlinedBody>(),
+            specta_serde::Format,
+        )
+        .expect("an inlined type should be written in place");
+    let value = serde_json::to_value(&document).unwrap();
+
+    let schema = &value["paths"]["/inlined"]["get"]["responses"]["200"]["content"]["application/json"]
+        ["schema"];
+    assert!(
+        schema.get("$ref").is_none(),
+        "inlined types have no component to reference"
+    );
+    assert_eq!(schema["properties"]["value"]["type"], "string");
+}
+
+/// Parameters carry the schema of whatever the extractor parses the segment into, so `/users/{id}`
+/// served by a `Path<u32>` exports as an integer rather than as text.
+#[test]
+fn openapi_types_parameters_from_their_extracted_type() {
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/users/{id}")
+                .path_param::<u32>("id")
+                .query_param::<String>("q")
+                .response::<Recipe>(200, "ok"),
+        )
+        .export_document(&recipe_types(), specta_serde::Format)
+        .expect("typed parameters should export");
+    let value = serde_json::to_value(&document).unwrap();
+    let parameters = &value["paths"]["/users/{id}"]["get"]["parameters"];
+
+    assert_eq!(parameters[0]["name"], "id");
+    assert_eq!(parameters[0]["in"], "path");
+    assert_eq!(parameters[0]["required"], true);
+    assert_eq!(parameters[0]["schema"]["type"], "integer");
+    assert_eq!(parameters[0]["schema"]["maximum"], u32::MAX);
+
+    assert_eq!(parameters[1]["name"], "q");
+    assert_eq!(parameters[1]["in"], "query");
+    assert_eq!(parameters[1]["schema"]["type"], "string");
 }

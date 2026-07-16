@@ -19,10 +19,11 @@ specta-kotlin = { path = "../specta-kotlin" }
 specta-openapi = { path = "../specta-openapi" }
 specta-rust = { path = "../specta-rust" }
 specta-python = { path = "../specta-python" }
+specta-csharp = { path = "../specta-csharp" }
 specta-serde = { path = "../specta-serde" }
 specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
-specta-zod = { path = "../specta-zod" }
+specta-zod = { path = "../specta-zod", features = ["serde"] }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 
 serde = { version = "1.0.228", features = ["std", "derive"] }

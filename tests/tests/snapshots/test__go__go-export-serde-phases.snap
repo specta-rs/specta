@@ -9,7 +9,20 @@ package bindings
 import "math/big"
 
 // ApiResponse — A generic API response.
-type ApiResponse[T any] struct {
+type ApiResponse[T any] any
+
+// ApiResponseDeserialize — A generic API response.
+type ApiResponseDeserialize[T any] struct {
+	// UserID — Stable resource identifier.
+	UserID  uint64           `json:"user_id"`
+	Payload T                `json:"payload"`
+	NextURL *string          `json:"next_url,omitempty"`
+	Values  map[string]int32 `json:"values"`
+	Huge    *big.Int         `json:"huge"`
+}
+
+// ApiResponseSerialize — A generic API response.
+type ApiResponseSerialize[T any] struct {
 	// UserID — Stable resource identifier.
 	UserID  uint64           `json:"user_id"`
 	Payload T                `json:"payload"`
@@ -49,11 +62,20 @@ type Metadata struct {
 	RequestID string `json:"request_id"`
 }
 
-type Node struct {
-	Value  string    `json:"value"`
-	Child  *Node     `json:"child"`
-	Status JobStatus `json:"status"`
-	Event  Event     `json:"event"`
+type Node any
+
+type NodeDeserialize struct {
+	Value  string           `json:"value"`
+	Child  *NodeDeserialize `json:"child,omitempty"`
+	Status JobStatus        `json:"status"`
+	Event  Event            `json:"event"`
+}
+
+type NodeSerialize struct {
+	Value  string         `json:"value"`
+	Child  *NodeSerialize `json:"child"`
+	Status JobStatus      `json:"status"`
+	Event  Event          `json:"event"`
 }
 
 type PrimitiveCoverage struct {

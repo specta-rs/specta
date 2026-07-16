@@ -1245,7 +1245,9 @@ fn exported_type_name(exporter: &Exporter, ndt: &NamedDataType) -> Cow<'static, 
     match exporter.layout {
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
-            s.push('_');
+            if !s.is_empty() {
+                s.push('_');
+            }
             s.push_str(&ndt.name);
             Cow::Owned(s)
         }

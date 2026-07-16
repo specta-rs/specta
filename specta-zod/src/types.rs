@@ -45,6 +45,17 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Any<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
 /// Cast a Rust type to `z.unknown()`.
 pub struct Unknown<T = ()>(T);
 
@@ -83,6 +94,17 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Unknown<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
 /// Cast a Rust type to `z.never()`.
 pub struct Never<T = ()>(T);
 
@@ -118,5 +140,16 @@ impl<T: serde::Serialize> serde::Serialize for Never<T> {
         S: serde::Serializer,
     {
         T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Never<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
     }
 }
