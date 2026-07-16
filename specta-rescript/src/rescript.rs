@@ -7,7 +7,7 @@ use specta::{
 
 use crate::{
     error::{Error, Result},
-    primitives::{export_type, is_valid_type_name, type_name},
+    primitives::{export_type, is_rescript_builtin_type, is_valid_type_name, type_name},
     toposort::topological_sort,
 };
 
@@ -142,8 +142,13 @@ fn validate_type_names(types: &Types) -> Result<()> {
     let mut names = HashMap::<String, String>::new();
     for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
         let name = type_name(&ty.name);
-        if !is_valid_type_name(&name) {
+        let standard_result = ty.name == "Result" && ty.module_path == "std::result";
+        if !is_valid_type_name(&name) || (is_rescript_builtin_type(&name) && !standard_result) {
             return Err(Error::InvalidTypeName(name));
+        }
+
+        if standard_result {
+            continue;
         }
 
         let owner = format!("{}::{}", ty.module_path, ty.name);

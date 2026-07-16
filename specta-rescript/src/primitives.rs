@@ -30,6 +30,13 @@ pub(crate) fn is_valid_type_name(name: &str) -> bool {
     is_valid_identifier(name, |ch| matches!(ch, 'a'..='z' | '_')) && !is_rescript_keyword(name)
 }
 
+pub(crate) fn is_rescript_builtin_type(name: &str) -> bool {
+    matches!(
+        name,
+        "array" | "bool" | "dict" | "float" | "int" | "option" | "result" | "string" | "unit"
+    )
+}
+
 fn is_rescript_keyword(name: &str) -> bool {
     matches!(
         name,

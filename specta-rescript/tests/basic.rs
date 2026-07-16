@@ -277,6 +277,20 @@ fn test_rescript_keywords_are_rejected() {
 }
 
 #[test]
+fn test_rescript_builtin_type_names_are_rejected() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename = "option")]
+    struct BuiltinType;
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<BuiltinType>()),
+        Err(specta_rescript::Error::InvalidTypeName(name)) if name == "option"
+    ));
+}
+
+#[test]
 fn test_auxiliary_record_name_collisions_are_rejected() {
     #[derive(Type)]
     struct CollisionEnumDataFields {
