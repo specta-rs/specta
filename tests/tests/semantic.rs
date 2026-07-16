@@ -80,6 +80,20 @@ fn semantic_custom_transforms_snapshot_nested_runtime_expressions() {
 }
 
 #[test]
+fn semantic_intersection_deduplicates_identical_runtime_transforms() {
+    let semantic = semantic_config();
+    let mut types = Types::default();
+    let dt = SemanticPayload::definition(&mut types);
+    let intersection = DataType::Intersection(vec![dt.clone(), dt]);
+
+    let (_, runtime) = semantic
+        .apply_deserialize(&types, &intersection, "payload")
+        .expect("semantic transform should apply");
+
+    assert_eq!(runtime.matches("site:new URL(payload.site)").count(), 1);
+}
+
+#[test]
 fn semantic_lossless_numbers_snapshot_export_and_transforms() {
     let semantic = Configuration::empty()
         .enable_lossless_bigints()
