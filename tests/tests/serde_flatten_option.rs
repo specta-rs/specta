@@ -128,6 +128,32 @@ struct ParentKeyCollidesWithFlattenedEnumAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlattenWrapper<T> {
+    #[serde(flatten)]
+    inner: T,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithFlattenedAliasCollision {
+    Value {
+        outer_key: String,
+        #[serde(flatten)]
+        inner: AliasedFlattenPayload,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -586,6 +612,66 @@ fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
     assert!(
         !parent.contains("never"),
         "the flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesThroughFlattenedWrapper {
+        outer_key: "outer".into(),
+        wrapper: FlattenWrapper {
+            inner: AliasedFlattenPayload {
+                value: "inner".into(),
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind flattened wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the flattened wrapper use must relax nested alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_internal_tag_flattened_payloads_do_not_exclude_sibling_keys() {
+    let value = InternalTagWithFlattenedAliasCollision::Value {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "t": "Value", "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithFlattenedAliasCollision>(),
+            specta_serde::Format,
+        )
+        .expect("internal-tag flattened aliases should export");
+    let variant = rendered
+        .split_once("export type InternalTagWithFlattenedAliasCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+    assert!(
+        !variant.contains("never"),
+        "the internal-tag flattened use must relax alias exclusions:\n{rendered}"
     );
 }
 

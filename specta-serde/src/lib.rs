@@ -1180,11 +1180,10 @@ fn flattened_payload_datatype(
     let Some(mut payload) = referenced.ty.clone() else {
         return Ok(ty);
     };
-    if !datatype_has_field_aliases(&payload) {
+    substitute_generics(&mut payload, named_reference_generics(reference));
+    if !datatype_has_flattened_aliases(&payload, original_types, &mut HashSet::new()) {
         return Ok(ty);
     }
-
-    substitute_generics(&mut payload, named_reference_generics(reference));
     match &mut payload {
         DataType::Struct(strct) => {
             strct.attributes.insert(FLATTENED_PAYLOAD_MARKER, true);
@@ -1206,23 +1205,58 @@ fn flattened_payload_datatype(
     Ok(payload)
 }
 
-fn datatype_has_field_aliases(ty: &DataType) -> bool {
-    let fields_have_aliases = |fields: &Fields| match fields {
-        Fields::Named(fields) => fields
-            .fields
-            .iter()
-            .any(|(_, field)| field.ty.is_some() && field_has_aliases(field)),
-        Fields::Unit | Fields::Unnamed(_) => false,
-    };
-
+fn datatype_has_flattened_aliases(
+    ty: &DataType,
+    types: &Types,
+    visited: &mut HashSet<TypeIdentity>,
+) -> bool {
     match ty {
-        DataType::Struct(strct) => fields_have_aliases(&strct.fields),
+        DataType::Struct(strct) => fields_have_flattened_aliases(&strct.fields, types, visited),
         DataType::Enum(enm) => enm
             .variants
             .iter()
-            .any(|(_, variant)| fields_have_aliases(&variant.fields)),
+            .any(|(_, variant)| fields_have_flattened_aliases(&variant.fields, types, visited)),
         _ => false,
     }
+}
+
+fn fields_have_flattened_aliases(
+    fields: &Fields,
+    types: &Types,
+    visited: &mut HashSet<TypeIdentity>,
+) -> bool {
+    let Fields::Named(fields) = fields else {
+        return false;
+    };
+
+    fields.fields.iter().any(|(_, field)| {
+        if field.ty.is_some() && field_has_aliases(field) {
+            return true;
+        }
+        if !field_is_flattened(field) {
+            return false;
+        }
+
+        let Some(ty) = field.ty.as_ref() else {
+            return false;
+        };
+        let (ty, _) = strip_nullable(ty.clone());
+        let DataType::Reference(Reference::Named(reference)) = ty else {
+            return false;
+        };
+        let Some(referenced) = types.get(&reference) else {
+            return false;
+        };
+        let identity = TypeIdentity::from_ndt(referenced);
+        if !visited.insert(identity) {
+            return false;
+        }
+        let Some(mut payload) = referenced.ty.clone() else {
+            return false;
+        };
+        substitute_generics(&mut payload, named_reference_generics(&reference));
+        datatype_has_flattened_aliases(&payload, types, visited)
+    })
 }
 
 /// Strips zero or more layers of `Nullable` (i.e. `Option`) off a `DataType`,
@@ -2594,6 +2628,13 @@ fn transform_internal_variant(
                             // union branch rather than an unconditional
                             // intersection part.
                             let (ty, was_nullable) = strip_nullable(ty);
+                            let ty = flattened_payload_datatype(
+                                ty,
+                                mode,
+                                original_types,
+                                &HashMap::new(),
+                                &HashSet::new(),
+                            )?;
                             if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER)
                                 || was_nullable
                             {
