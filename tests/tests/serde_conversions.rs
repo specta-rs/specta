@@ -833,7 +833,18 @@ fn format_unifies_aliases() {
         )
         .expect("Format should include canonical and aliased variant names");
 
+    let multiple_fields = Typescript::default()
+        .export(
+            &Types::default().register::<FieldMultipleAliases>(),
+            specta_serde::Format,
+        )
+        .expect("Format should make every accepted field name mutually exclusive");
+
     insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
+    insta::assert_snapshot!(
+        "serde-conversions-format-unified-multiple-field-aliases",
+        multiple_fields
+    );
     insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
 }
 

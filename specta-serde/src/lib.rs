@@ -1264,7 +1264,11 @@ fn lower_field_aliases_for_phase(
         let mut accepted_names = Vec::with_capacity(attrs.aliases.len() + 1);
         accepted_names.push(name);
         accepted_names.extend(attrs.aliases.into_iter().map(Cow::Owned));
-        parts.push(alias_field_union(accepted_names, field));
+        parts.push(alias_field_union(
+            accepted_names,
+            field,
+            matches!(mode, PhaseRewrite::Unified),
+        ));
     }
 
     let base = match base.build() {
@@ -1286,19 +1290,32 @@ fn field_has_aliases(field: &Field) -> bool {
         .is_some_and(|attrs| !attrs.aliases.is_empty())
 }
 
-fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
+fn alias_field_union(
+    names: Vec<Cow<'static, str>>,
+    field: Field,
+    exclude_other_names: bool,
+) -> DataType {
     let mut aliases = Enum::default();
     let empty_variant = Variant::unnamed().build();
 
-    for name in names {
+    for name in &names {
         let mut field = field.clone();
         field.attributes.remove(parser::FIELD_ALIASES);
+
+        let mut fields = vec![(name.clone(), field)];
+        if exclude_other_names {
+            fields.extend(names.iter().filter(|other| *other != name).map(|other| {
+                let mut excluded = Field::new(never_datatype());
+                excluded.optional = true;
+                (other.clone(), excluded)
+            }));
+        }
 
         aliases.variants.push((
             Cow::Borrowed(""),
             clone_variant_with_unnamed_fields(
                 &empty_variant,
-                vec![Field::new(named_fields_datatype(vec![(name, field)]))],
+                vec![Field::new(named_fields_datatype(fields))],
             ),
         ));
     }
@@ -1308,6 +1325,12 @@ fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
     aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
 
     DataType::Enum(aliases)
+}
+
+fn never_datatype() -> DataType {
+    let mut never = Enum::default();
+    never.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    DataType::Enum(never)
 }
 
 fn field_is_flattened(field: &Field) -> bool {
