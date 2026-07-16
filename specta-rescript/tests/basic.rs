@@ -620,20 +620,18 @@ fn test_one_element_tuple_error() {
 }
 
 #[test]
-fn test_serde_externally_tagged_unit_enum_is_rejected() {
+fn test_serde_externally_tagged_unit_enum_is_renamed() {
     #[derive(Type, serde::Serialize)]
-    #[serde(rename_all = "kebab-case")]
+    #[serde(rename_all = "camelCase")]
     enum RenamedUnitVariant {
-        FooBar,
+        InProgress,
     }
 
-    assert!(matches!(
-        ReScript::default()
-            .with_serde()
-            .export(&Types::default().register::<RenamedUnitVariant>()),
-        Err(specta_rescript::Error::UnsupportedType(message))
-            if message.contains("externally tagged enums")
-    ));
+    let out = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<RenamedUnitVariant>())
+        .unwrap();
+    assert!(out.contains("type renamedUnitVariant = [#inProgress]"));
 }
 
 // ---------------------------------------------------------------------------

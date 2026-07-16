@@ -16,7 +16,7 @@ use crate::{
 pub struct ReScript {
     /// Header comment placed at the top of the generated file.
     pub header: Cow<'static, str>,
-    /// Whether to apply serde transformations. `true` by default.
+    /// Whether to apply serde transformations. `false` by default.
     pub serde: bool,
 }
 
@@ -62,7 +62,7 @@ impl ReScript {
             let processed = specta_serde::Format
                 .map_types(types)
                 .map_err(|e| Error::format("serde apply failed", e))?;
-            preserve_standard_result(types, processed)
+            preserve_serde_unit_enums(types, preserve_standard_result(types, processed))
         } else {
             Cow::Borrowed(types)
         };
@@ -170,6 +170,14 @@ fn validate_serde_datatype(dt: &DataType) -> Result<()> {
                         .to_string(),
                 ));
             }
+            if enumeration
+                .variants
+                .iter()
+                .filter(|(_, variant)| !variant.skip)
+                .all(|(_, variant)| matches!(variant.fields, Fields::Unit))
+            {
+                return Ok(());
+            }
             Err(Error::UnsupportedType(
                 "Serde externally tagged enums cannot be represented as ReScript variants"
                     .to_string(),
@@ -222,6 +230,40 @@ fn preserve_standard_result<'a>(original: &Types, processed: Cow<'a, Types>) -> 
         } else {
             ty
         }
+    }))
+}
+
+fn preserve_serde_unit_enums<'a>(original: &Types, processed: Cow<'a, Types>) -> Cow<'a, Types> {
+    let locations = original
+        .into_unsorted_iter()
+        .filter(|ty| {
+            matches!(
+                &ty.ty,
+                Some(DataType::Enum(enumeration))
+                    if enumeration
+                        .variants
+                        .iter()
+                        .filter(|(_, variant)| !variant.skip)
+                        .all(|(_, variant)| matches!(variant.fields, Fields::Unit))
+            )
+        })
+        .map(|ty| (ty.location.file(), ty.location.line(), ty.location.column()))
+        .collect::<Vec<_>>();
+
+    if locations.is_empty() {
+        return processed;
+    }
+
+    Cow::Owned(processed.into_owned().map(|mut ty| {
+        let location = (ty.location.file(), ty.location.line(), ty.location.column());
+        if locations.contains(&location)
+            && let Some(DataType::Enum(enumeration)) = &mut ty.ty
+        {
+            for (_, variant) in &mut enumeration.variants {
+                variant.fields = Fields::Unit;
+            }
+        }
+        ty
     }))
 }
 
