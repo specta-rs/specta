@@ -1581,15 +1581,48 @@ fn collect_flattened_keys(
             {
                 Some(EnumRepr::External) => {
                     for (name, variant) in &enm.variants {
-                        let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
+                        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)
                             .ok()
-                            .flatten()
-                            .is_some_and(|attrs| variant_is_skipped_for_mode(&attrs, mode));
+                            .flatten();
+                        let skipped = attrs
+                            .as_ref()
+                            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
                         if !skipped {
-                            keys.exact.insert(
-                                serialized_variant_name(name, variant, &container_attrs, mode)
-                                    .unwrap_or_else(|_| name.to_string()),
-                            );
+                            if attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
+                                let rename_rule = enum_variant_field_rename_rule(
+                                    &container_attrs,
+                                    variant,
+                                    mode,
+                                    name,
+                                )
+                                .ok()
+                                .flatten();
+                                match &variant.fields {
+                                    Fields::Named(_) => collect_field_keys(
+                                        &variant.fields,
+                                        rename_rule,
+                                        mode,
+                                        types,
+                                        visited,
+                                        keys,
+                                    ),
+                                    Fields::Unnamed(fields) => {
+                                        for field in &fields.fields {
+                                            if let Some(ty) = &field.ty {
+                                                collect_flattened_keys(
+                                                    ty, mode, types, visited, keys,
+                                                );
+                                            }
+                                        }
+                                    }
+                                    Fields::Unit => {}
+                                }
+                            } else {
+                                keys.exact.insert(
+                                    serialized_variant_name(name, variant, &container_attrs, mode)
+                                        .unwrap_or_else(|_| name.to_string()),
+                                );
+                            }
                         }
                     }
                     return;
@@ -1673,7 +1706,7 @@ fn collect_field_keys(
         return;
     };
     for (name, field) in &named.fields {
-        if field.ty.is_none() {
+        if field.ty.is_none() || should_skip_field_for_mode(field, mode).unwrap_or(false) {
             continue;
         }
         if field_is_flattened(field) {

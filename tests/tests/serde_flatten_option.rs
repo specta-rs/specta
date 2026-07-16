@@ -175,6 +175,22 @@ struct FlattenedOldKey {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct SkippedFlattenedOldKey {
+    #[serde(skip_serializing, skip_deserializing)]
+    old: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSkippedFlattenedKey {
+    #[serde(alias = "old")]
+    value: String,
+    #[serde(flatten)]
+    flattened: SkippedFlattenedOldKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct MultipleAliasesWithOneFlattenCollision {
     #[serde(alias = "old", alias = "legacy")]
     value: String,
@@ -211,6 +227,22 @@ struct AliasWithFlattenedMap {
 #[specta(collect = false)]
 enum FlattenedExternalTag {
     Kind { payload: String },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedVariantUntagged {
+    #[serde(untagged)]
+    Value { old: String },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideFlattenedVariantUntagged {
+    #[serde(alias = "old")]
+    value: String,
+    #[serde(flatten)]
+    untagged: FlattenedVariantUntagged,
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
@@ -881,6 +913,25 @@ fn flatten_collisions_relax_only_the_colliding_alias() {
 }
 
 #[test]
+fn skipped_flattened_fields_do_not_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSkippedFlattenedKey>(),
+            specta_serde::Format,
+        )
+        .expect("skipped flattened keys should export");
+    let ty = rendered
+        .split_once("export type AliasBesideSkippedFlattenedKey = ")
+        .expect("skipped-key parent should be exported")
+        .1;
+
+    assert!(
+        ty.contains("old?: never"),
+        "a skipped flattened field cannot supply the alias key:\n{rendered}"
+    );
+}
+
+#[test]
 fn literal_wire_keys_cannot_collide_with_flatten_bookkeeping() {
     let rendered = Typescript::default()
         .export(
@@ -934,6 +985,25 @@ fn flattened_external_enum_tags_relax_alias_exclusions() {
     assert!(
         !ty.contains("Kind?: never"),
         "the flattened enum emits its external tag key:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_variant_untagged_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideFlattenedVariantUntagged>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened untagged variants should export");
+    let ty = rendered
+        .split_once("export type AliasBesideFlattenedVariantUntagged = ")
+        .expect("untagged-variant parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old?: never"),
+        "the untagged variant emits its payload key directly:\n{rendered}"
     );
 }
 
