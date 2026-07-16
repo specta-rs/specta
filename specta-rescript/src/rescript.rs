@@ -1,6 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, path::Path};
 
-use specta::{Format as FormatTrait, Types};
+use specta::{
+    Format as FormatTrait, Types,
+    datatype::{DataType, Fields},
+};
 
 use crate::{
     error::{Error, Result},
@@ -53,9 +56,10 @@ impl ReScript {
     /// Export all types in the collection to a ReScript string.
     pub fn export(&self, types: &Types) -> Result<String> {
         let processed: Cow<Types> = if self.serde {
-            specta_serde::Format
+            let processed = specta_serde::Format
                 .map_types(types)
-                .map_err(|e| Error::format("serde apply failed", e))?
+                .map_err(|e| Error::format("serde apply failed", e))?;
+            preserve_standard_result(types, processed)
         } else {
             Cow::Borrowed(types)
         };
@@ -116,20 +120,67 @@ impl ReScript {
     }
 }
 
+fn preserve_standard_result<'a>(original: &Types, processed: Cow<'a, Types>) -> Cow<'a, Types> {
+    let Some(result) = original
+        .into_unsorted_iter()
+        .find(|ty| ty.name == "Result" && ty.module_path == "std::result")
+        .cloned()
+    else {
+        return processed;
+    };
+
+    Cow::Owned(processed.into_owned().map(|ty| {
+        if ty.name == result.name && ty.module_path == result.module_path {
+            result.clone()
+        } else {
+            ty
+        }
+    }))
+}
+
 fn validate_type_names(types: &Types) -> Result<()> {
-    let mut names = HashMap::new();
+    let mut names = HashMap::<String, String>::new();
     for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
         let name = type_name(&ty.name);
         if !is_valid_type_name(&name) {
             return Err(Error::InvalidTypeName(name));
         }
-        if let Some(first) = names.insert(name.clone(), ty) {
-            return Err(Error::DuplicateTypeName {
-                name,
-                first: format!("{}::{}", first.module_path, first.name),
-                second: format!("{}::{}", ty.module_path, ty.name),
-            });
+
+        let owner = format!("{}::{}", ty.module_path, ty.name);
+        insert_type_name(&mut names, name.clone(), owner.clone())?;
+
+        let Some(DataType::Enum(enumeration)) = &ty.ty else {
+            continue;
+        };
+        for (variant_name, variant) in &enumeration.variants {
+            let Fields::Named(fields) = &variant.fields else {
+                continue;
+            };
+            if variant.skip || !fields.fields.iter().any(|(_, field)| field.ty.is_some()) {
+                continue;
+            }
+
+            insert_type_name(
+                &mut names,
+                format!("{name}{variant_name}Fields"),
+                format!("{owner}::{variant_name} (generated record)"),
+            )?;
         }
+    }
+    Ok(())
+}
+
+fn insert_type_name(
+    names: &mut HashMap<String, String>,
+    name: String,
+    owner: String,
+) -> Result<()> {
+    if let Some(first) = names.insert(name.clone(), owner.clone()) {
+        return Err(Error::DuplicateTypeName {
+            name,
+            first,
+            second: owner,
+        });
     }
     Ok(())
 }

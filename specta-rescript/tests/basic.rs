@@ -232,6 +232,73 @@ fn test_standard_result_uses_builtin_without_alias() {
 }
 
 #[test]
+fn test_standard_result_with_serde_uses_builtin() {
+    #[derive(Type, serde::Serialize)]
+    struct WithResult {
+        value: Result<String, String>,
+    }
+
+    let out = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<WithResult>())
+        .unwrap();
+    assert!(
+        out.contains("value: result<string, string>"),
+        "output: {out}"
+    );
+    assert!(!out.contains("type result"), "output: {out}");
+}
+
+#[test]
+fn test_rescript_keywords_are_rejected() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(rename = "type")]
+    struct KeywordType;
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<KeywordType>()),
+        Err(specta_rescript::Error::InvalidTypeName(name)) if name == "type"
+    ));
+
+    #[derive(Type, serde::Serialize)]
+    struct KeywordField {
+        #[serde(rename = "let")]
+        value: String,
+    }
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<KeywordField>()),
+        Err(specta_rescript::Error::InvalidRecordLabel(name)) if name == "let"
+    ));
+}
+
+#[test]
+fn test_auxiliary_record_name_collisions_are_rejected() {
+    #[derive(Type)]
+    struct CollisionEnumDataFields {
+        other: String,
+    }
+
+    #[derive(Type)]
+    enum CollisionEnum {
+        Data { value: String },
+    }
+
+    let types = Types::default()
+        .register::<CollisionEnum>()
+        .register::<CollisionEnumDataFields>();
+    assert!(matches!(
+        ReScript::default().export(&types),
+        Err(specta_rescript::Error::DuplicateTypeName { name, .. })
+            if name == "collisionEnumDataFields"
+    ));
+}
+
+#[test]
 fn test_named_variant_with_only_skipped_fields_is_unit() {
     #[derive(Type)]
     enum SkippedFields {

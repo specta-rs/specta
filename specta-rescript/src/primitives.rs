@@ -27,7 +27,41 @@ pub(crate) fn type_name(name: &str) -> String {
 }
 
 pub(crate) fn is_valid_type_name(name: &str) -> bool {
-    is_valid_identifier(name, |ch| matches!(ch, 'a'..='z' | '_'))
+    is_valid_identifier(name, |ch| matches!(ch, 'a'..='z' | '_')) && !is_rescript_keyword(name)
+}
+
+fn is_rescript_keyword(name: &str) -> bool {
+    matches!(
+        name,
+        "and"
+            | "as"
+            | "assert"
+            | "await"
+            | "break"
+            | "constraint"
+            | "continue"
+            | "else"
+            | "exception"
+            | "external"
+            | "false"
+            | "for"
+            | "if"
+            | "in"
+            | "include"
+            | "let"
+            | "module"
+            | "mutable"
+            | "of"
+            | "open"
+            | "private"
+            | "rec"
+            | "switch"
+            | "true"
+            | "try"
+            | "type"
+            | "when"
+            | "while"
+    )
 }
 
 fn is_valid_variant_constructor(name: &str) -> bool {
