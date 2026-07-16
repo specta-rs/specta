@@ -166,6 +166,30 @@ fn test_unit_struct() {
 }
 
 #[test]
+fn test_empty_named_struct_is_rejected() {
+    #[derive(Type)]
+    struct EmptyNamed {}
+
+    assert!(matches!(
+        export_err::<EmptyNamed>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Empty named structs")
+    ));
+}
+
+#[test]
+fn test_optional_unnamed_field_is_rejected() {
+    #[derive(Type)]
+    struct OptionalTuple(i32, #[specta(optional)] i32);
+
+    assert!(matches!(
+        export_err::<OptionalTuple>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Optional unnamed fields")
+    ));
+}
+
+#[test]
 fn test_serde_record_label_is_validated() {
     #[derive(Type, serde::Serialize)]
     struct RenamedField {

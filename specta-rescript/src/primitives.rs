@@ -144,13 +144,23 @@ fn unnamed_field_types(
     scope: Scope<'_>,
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<Option<Vec<String>>> {
-    let active: Vec<_> = uf.fields.iter().filter_map(|f| f.ty.as_ref()).collect();
+    let active: Vec<_> = uf
+        .fields
+        .iter()
+        .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
+        .collect();
     if active.is_empty() {
         return Ok(None);
     }
+    if active.iter().any(|(field, _)| field.optional) {
+        return Err(Error::UnsupportedType(
+            "Optional unnamed fields cannot be represented in ReScript tuples or variants"
+                .to_string(),
+        ));
+    }
     active
         .iter()
-        .map(|ty| datatype_to_rescript(types, scope, ty))
+        .map(|(_, ty)| datatype_to_rescript(types, scope, ty))
         .collect::<Result<Vec<_>>>()
         .map(Some)
 }
@@ -376,7 +386,9 @@ fn render_struct_body(
         Fields::Named(nf) => {
             let parts = render_named_fields(types, scope, nf)?;
             if parts.is_empty() {
-                Ok("unit".to_string())
+                Err(Error::UnsupportedType(
+                    "Empty named structs cannot be represented as ReScript records".to_string(),
+                ))
             } else {
                 Ok(format!("{{\n{},\n}}", parts.join(",\n")))
             }
