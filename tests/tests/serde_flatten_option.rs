@@ -169,6 +169,37 @@ struct AliasWithUnrelatedFlatten {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlattenedOldKey {
+    old: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct MultipleAliasesWithOneFlattenCollision {
+    #[serde(alias = "old", alias = "legacy")]
+    value: String,
+    #[serde(flatten)]
+    flattened: FlattenedOldKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedFormerSentinelKey {
+    #[serde(rename = "specta_serde:any_flattened_key")]
+    key: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasesBesideFormerSentinelKey {
+    #[serde(alias = "old", alias = "legacy")]
+    value: String,
+    #[serde(flatten)]
+    flattened: FlattenedFormerSentinelKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct AliasWithFlattenedMap {
     #[serde(alias = "old_value")]
     value: String,
@@ -266,6 +297,14 @@ struct ParentKeyCollidesThroughFlattenedWrapper {
     outer_key: String,
     #[serde(flatten)]
     wrapper: FlattenWrapper<AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughDoubleFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<FlattenWrapper<AliasedFlattenPayload>>,
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
@@ -717,7 +756,8 @@ fn flattened_keys_do_not_become_alias_exclusions() {
             specta_serde::Format,
         )
         .expect("flattened aliases should export without excluding flattened keys");
-    assert!(!rendered.contains("never"), "{rendered}");
+    assert!(!rendered.contains("old_value?: never"), "{rendered}");
+    assert!(rendered.contains("value?: never"), "{rendered}");
 }
 
 #[test]
@@ -822,6 +862,44 @@ fn unrelated_flattened_keys_preserve_alias_exclusions() {
 }
 
 #[test]
+fn flatten_collisions_relax_only_the_colliding_alias() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<MultipleAliasesWithOneFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("one of multiple aliases may collide with a flattened key");
+    let ty = rendered
+        .split_once("export type MultipleAliasesWithOneFlattenCollision = ")
+        .expect("multi-alias parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old?: never") && ty.contains("legacy?: never"),
+        "only the colliding alias exclusion should be relaxed:\n{rendered}"
+    );
+}
+
+#[test]
+fn literal_wire_keys_cannot_collide_with_flatten_bookkeeping() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasesBesideFormerSentinelKey>(),
+            specta_serde::Format,
+        )
+        .expect("literal wire keys should remain distinct from bookkeeping");
+    let ty = rendered
+        .split_once("export type AliasesBesideFormerSentinelKey = ")
+        .expect("literal-key parent should be exported")
+        .1;
+
+    assert!(
+        ty.contains("old?: never") && ty.contains("legacy?: never"),
+        "unrelated alias exclusions should remain intact:\n{rendered}"
+    );
+}
+
+#[test]
 fn flattened_maps_relax_alias_exclusions_for_arbitrary_keys() {
     let rendered = Typescript::default()
         .export(
@@ -903,6 +981,25 @@ fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
     assert!(
         !parent.contains("outer_key?: never"),
         "the flattened wrapper use must relax nested alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn nested_instantiations_of_the_same_flatten_wrapper_are_expanded() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughDoubleFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("nested generic wrapper instantiations should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughDoubleFlattenedWrapper = ")
+        .expect("double-wrapper parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the nested generic wrapper must expose its flattened aliases:\n{rendered}"
     );
 }
 

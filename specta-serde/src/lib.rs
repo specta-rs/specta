@@ -129,7 +129,6 @@ use repr::EnumRepr;
 
 const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
 const FLATTENED_PAYLOAD_MARKER: &str = "specta_serde:flattened_payload";
-const FLATTENED_ANY_KEY_MARKER: &str = "specta_serde:any_flattened_key";
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -835,6 +834,18 @@ struct TypeIdentity {
     column: u32,
 }
 
+#[derive(Default)]
+struct FlattenedKeys {
+    exact: HashSet<String>,
+    any: bool,
+}
+
+impl FlattenedKeys {
+    fn contains(&self, key: &str) -> bool {
+        self.any || self.exact.contains(key)
+    }
+}
+
 impl TypeIdentity {
     fn from_ndt(ty: &specta::datatype::NamedDataType) -> Self {
         let location = ty.location;
@@ -874,7 +885,7 @@ fn rewrite_datatype_for_phase_inner(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
     container_name: Option<&str>,
-    expanding_flattened: &mut HashSet<TypeIdentity>,
+    expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
 ) -> Result<(), Error> {
     if let Some(resolved) = resolve_phased_type(ty, mode, "type")? {
         *ty = resolved;
@@ -1185,7 +1196,7 @@ fn lower_flattened_struct_inner(
     original_types: &Types,
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
-    expanding_flattened: &mut HashSet<TypeIdentity>,
+    expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
 ) -> Result<Option<DataType>, Error> {
     let Fields::Named(named) = &mut strct.fields else {
         return Ok(None);
@@ -1199,14 +1210,14 @@ fn lower_flattened_struct_inner(
         return Ok(None);
     }
 
-    let mut surrounding_keys = HashSet::new();
+    let mut surrounding_keys = FlattenedKeys::default();
     let mut flattened_key_counts = HashMap::<String, usize>::new();
     for (name, field) in &named.fields {
         if field.ty.is_none() {
             continue;
         }
         if field_is_flattened(field) {
-            let mut keys = HashSet::new();
+            let mut keys = FlattenedKeys::default();
             collect_flattened_keys(
                 field.ty.as_ref().expect("checked above"),
                 mode,
@@ -1214,15 +1225,16 @@ fn lower_flattened_struct_inner(
                 &mut HashSet::new(),
                 &mut keys,
             );
-            for key in keys {
+            for key in keys.exact {
                 *flattened_key_counts.entry(key).or_default() += 1;
             }
+            surrounding_keys.any |= keys.any;
         } else {
-            surrounding_keys.insert(name.to_string());
-            collect_field_accepted_names(field, &mut surrounding_keys);
+            surrounding_keys.exact.insert(name.to_string());
+            collect_field_accepted_names(field, &mut surrounding_keys.exact);
         }
     }
-    surrounding_keys.extend(
+    surrounding_keys.exact.extend(
         flattened_key_counts
             .into_iter()
             .filter_map(|(key, count)| (count > 1).then_some(key)),
@@ -1269,7 +1281,7 @@ fn lower_flattened_struct_inner(
     };
     if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
         base.attributes = strct.attributes.clone();
-        let mut flattened_keys = HashSet::new();
+        let mut flattened_keys = FlattenedKeys::default();
         for ty in mandatory.iter().chain(&optional) {
             collect_flattened_keys(
                 ty,
@@ -1317,7 +1329,7 @@ fn flattened_payload_datatype_inner(
     original_types: &Types,
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
-    expanding_flattened: &mut HashSet<TypeIdentity>,
+    expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
 ) -> Result<DataType, Error> {
     let DataType::Reference(Reference::Named(reference)) = &ty else {
         return Ok(ty);
@@ -1353,7 +1365,7 @@ fn flattened_payload_datatype_inner(
         _ => return Ok(ty),
     }
 
-    let identity = TypeIdentity::from_ndt(referenced);
+    let identity = (TypeIdentity::from_ndt(referenced), format!("{payload:?}"));
     if !expanding_flattened.insert(identity.clone()) {
         return Ok(ty);
     }
@@ -1539,7 +1551,7 @@ fn collect_flattened_keys(
     mode: PhaseRewrite,
     types: &Types,
     visited: &mut HashSet<TypeIdentity>,
-    keys: &mut HashSet<String>,
+    keys: &mut FlattenedKeys,
 ) {
     if let Ok(Some(converted)) = conversion_datatype_for_mode(ty, mode)
         && converted != *ty
@@ -1574,7 +1586,7 @@ fn collect_flattened_keys(
                             .flatten()
                             .is_some_and(|attrs| variant_is_skipped_for_mode(&attrs, mode));
                         if !skipped {
-                            keys.insert(
+                            keys.exact.insert(
                                 serialized_variant_name(name, variant, &container_attrs, mode)
                                     .unwrap_or_else(|_| name.to_string()),
                             );
@@ -1583,18 +1595,18 @@ fn collect_flattened_keys(
                     return;
                 }
                 Some(EnumRepr::Adjacent { tag, content }) => {
-                    keys.insert(tag.into_owned());
+                    keys.exact.insert(tag.into_owned());
                     if enm
                         .variants
                         .iter()
                         .any(|(_, variant)| !matches!(variant.fields, Fields::Unit))
                     {
-                        keys.insert(content.into_owned());
+                        keys.exact.insert(content.into_owned());
                     }
                     return;
                 }
                 Some(EnumRepr::Internal { tag }) => {
-                    keys.insert(tag.into_owned());
+                    keys.exact.insert(tag.into_owned());
                 }
                 Some(EnumRepr::Untagged) | None => {}
             }
@@ -1625,7 +1637,7 @@ fn collect_flattened_keys(
         }
         DataType::Nullable(inner) => collect_flattened_keys(inner, mode, types, visited, keys),
         DataType::Map(_) => {
-            keys.insert(FLATTENED_ANY_KEY_MARKER.to_string());
+            keys.any = true;
         }
         DataType::Reference(Reference::Named(reference)) => {
             if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
@@ -1655,7 +1667,7 @@ fn collect_field_keys(
     mode: PhaseRewrite,
     types: &Types,
     visited: &mut HashSet<TypeIdentity>,
-    keys: &mut HashSet<String>,
+    keys: &mut FlattenedKeys,
 ) {
     let Fields::Named(named) = fields else {
         return;
@@ -1676,12 +1688,12 @@ fn collect_field_keys(
             let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)
                 .ok()
                 .flatten();
-            keys.insert(
+            keys.exact.insert(
                 phase_field_key(name, attrs.as_ref(), rename_all_rule, mode)
                     .unwrap_or_else(|_| name.to_string()),
             );
             if let Some(attrs) = attrs {
-                keys.extend(attrs.aliases);
+                keys.exact.extend(attrs.aliases);
             }
         }
     }
@@ -1693,12 +1705,12 @@ fn collect_field_accepted_names(field: &Field, keys: &mut HashSet<String>) {
     }
 }
 
-fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
+fn relax_alias_exclusions(ty: &mut DataType, keys: &FlattenedKeys) {
     match ty {
         DataType::Struct(strct) => {
             if let Fields::Named(named) = &mut strct.fields {
                 named.fields.retain(|(name, field)| {
-                    !((keys.contains(FLATTENED_ANY_KEY_MARKER) || keys.contains(name.as_ref()))
+                    !(keys.contains(name.as_ref())
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
             }
@@ -1708,8 +1720,7 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
                 match &mut variant.fields {
                     Fields::Named(fields) => {
                         fields.fields.retain(|(name, field)| {
-                            !((keys.contains(FLATTENED_ANY_KEY_MARKER)
-                                || keys.contains(name.as_ref()))
+                            !(keys.contains(name.as_ref())
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
                     }
@@ -1738,7 +1749,7 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
     fields: &mut Fields,
     mode: PhaseRewrite,
     exclude_other_names: bool,
-    relaxed_names: Option<&HashSet<String>>,
+    relaxed_names: Option<&FlattenedKeys>,
 ) -> Result<Option<DataType>, Error> {
     if !matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize) {
         return Ok(None);
@@ -1777,16 +1788,11 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         let mut accepted_names = Vec::with_capacity(attrs.aliases.len() + 1);
         accepted_names.push(name);
         accepted_names.extend(attrs.aliases.into_iter().map(Cow::Owned));
-        let relax_exclusions = relaxed_names.is_some_and(|names| {
-            names.contains(FLATTENED_ANY_KEY_MARKER)
-                || accepted_names
-                    .iter()
-                    .any(|name| names.contains(name.as_ref()))
-        });
         parts.push(alias_field_union(
             accepted_names,
             field,
-            exclude_other_names && matches!(mode, PhaseRewrite::Unified) && !relax_exclusions,
+            exclude_other_names && matches!(mode, PhaseRewrite::Unified),
+            relaxed_names,
         ));
     }
 
@@ -1813,6 +1819,7 @@ fn alias_field_union(
     names: Vec<Cow<'static, str>>,
     field: Field,
     exclude_other_names: bool,
+    relaxed_names: Option<&FlattenedKeys>,
 ) -> DataType {
     let mut aliases = Enum::default();
     let empty_variant = Variant::unnamed().build();
@@ -1823,11 +1830,19 @@ fn alias_field_union(
 
         let mut fields = vec![(name.clone(), field)];
         if exclude_other_names {
-            fields.extend(names.iter().filter(|other| *other != name).map(|other| {
-                let mut excluded = Field::new(never_datatype());
-                excluded.optional = true;
-                (other.clone(), excluded)
-            }));
+            fields.extend(
+                names
+                    .iter()
+                    .filter(|other| *other != name)
+                    .filter(|other| {
+                        !relaxed_names.is_some_and(|relaxed| relaxed.contains(other.as_ref()))
+                    })
+                    .map(|other| {
+                        let mut excluded = Field::new(never_datatype());
+                        excluded.optional = true;
+                        (other.clone(), excluded)
+                    }),
+            );
         }
 
         aliases.variants.push((
@@ -3069,19 +3084,19 @@ fn transform_internal_variant(
                         leftover.push((name, field));
                     }
                 }
-                let mut surrounding_keys = fields
-                    .iter()
-                    .map(|(name, _)| name.to_string())
-                    .collect::<HashSet<_>>();
+                let mut surrounding_keys = FlattenedKeys {
+                    exact: fields.iter().map(|(name, _)| name.to_string()).collect(),
+                    any: false,
+                };
                 for (name, field) in &leftover {
                     if field.ty.is_some() {
-                        surrounding_keys.insert(name.to_string());
-                        collect_field_accepted_names(field, &mut surrounding_keys);
+                        surrounding_keys.exact.insert(name.to_string());
+                        collect_field_accepted_names(field, &mut surrounding_keys.exact);
                     }
                 }
                 let mut flattened_key_counts = HashMap::<String, usize>::new();
                 for ty in mandatory_parts.iter().chain(&optional_parts) {
-                    let mut keys = HashSet::new();
+                    let mut keys = FlattenedKeys::default();
                     collect_flattened_keys(
                         ty,
                         mode,
@@ -3089,11 +3104,12 @@ fn transform_internal_variant(
                         &mut HashSet::new(),
                         &mut keys,
                     );
-                    for key in keys {
+                    for key in keys.exact {
                         *flattened_key_counts.entry(key).or_default() += 1;
                     }
+                    surrounding_keys.any |= keys.any;
                 }
-                surrounding_keys.extend(
+                surrounding_keys.exact.extend(
                     flattened_key_counts
                         .into_iter()
                         .filter_map(|(key, count)| (count > 1).then_some(key)),
@@ -3105,7 +3121,7 @@ fn transform_internal_variant(
                 let mut mandatory = Vec::with_capacity(mandatory_parts.len() + 2);
                 mandatory.push(named_fields_datatype(fields));
                 if !leftover.is_empty() {
-                    let mut flattened_keys = HashSet::new();
+                    let mut flattened_keys = FlattenedKeys::default();
                     for ty in mandatory_parts.iter().chain(&optional_parts) {
                         collect_flattened_keys(
                             ty,
@@ -3204,10 +3220,10 @@ fn transform_internal_variant(
                 } else {
                     payload.replacement.unwrap_or(payload_ty)
                 };
-                let surrounding_keys = fields
-                    .iter()
-                    .map(|(name, _)| name.to_string())
-                    .collect::<HashSet<_>>();
+                let surrounding_keys = FlattenedKeys {
+                    exact: fields.iter().map(|(name, _)| name.to_string()).collect(),
+                    any: false,
+                };
                 relax_alias_exclusions(&mut payload_ty, &surrounding_keys);
                 return Ok(clone_variant_with_unnamed_fields(
                     variant,
