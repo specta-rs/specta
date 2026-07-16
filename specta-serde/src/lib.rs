@@ -1608,6 +1608,47 @@ fn collect_flattened_keys(
     }
     match ty {
         DataType::Struct(strct) => {
+            let container_attrs = SerdeContainerAttrs::from_attributes(&strct.attributes)
+                .ok()
+                .flatten();
+            if container_attrs
+                .as_ref()
+                .is_some_and(|attrs| attrs.transparent)
+            {
+                let fields: Vec<_> = match &strct.fields {
+                    Fields::Named(fields) => fields.fields.iter().map(|(_, field)| field).collect(),
+                    Fields::Unnamed(fields) => fields.fields.iter().collect(),
+                    Fields::Unit => Vec::new(),
+                };
+                let mut live = fields
+                    .into_iter()
+                    .filter(|field| !should_skip_field_for_mode(field, mode).unwrap_or(false));
+                if let (Some(field), None) = (live.next(), live.next())
+                    && let Some(ty) = &field.ty
+                {
+                    collect_flattened_keys(ty, mode, types, visited, keys);
+                }
+                return;
+            }
+
+            if let Some(tag) = container_attrs
+                .as_ref()
+                .and_then(|attrs| attrs.tag.as_ref())
+                && matches!(strct.fields, Fields::Named(_))
+            {
+                keys.exact.insert(tag.to_string());
+            }
+
+            if let Fields::Unnamed(fields) = &strct.fields {
+                if let [field] = fields.fields.as_slice()
+                    && !should_skip_field_for_mode(field, mode).unwrap_or(false)
+                    && let Some(ty) = &field.ty
+                {
+                    collect_flattened_keys(ty, mode, types, visited, keys);
+                }
+                return;
+            }
+
             let rename_rule = container_rename_all_rule(
                 &strct.attributes,
                 mode,

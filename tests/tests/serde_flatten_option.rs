@@ -316,6 +316,61 @@ struct ParentKeyBesideExternalNewtype {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(tag = "kind")]
+struct TaggedFlattenPayload {
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideTaggedFlattenPayload {
+    #[serde(alias = "kind")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: TaggedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenNewtype(AliasedFlattenPayload);
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughNewtypeStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenNewtype,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false, transparent = false)]
+#[serde(transparent)]
+struct TransparentNamedFlattenWrapper {
+    payload: AliasedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughTransparentNamedStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: TransparentNamedFlattenWrapper,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedTupleFlattenWrapper(#[serde(skip)] String, AliasedFlattenPayload);
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyBesideSkippedTupleStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: SkippedTupleFlattenWrapper,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct ParentKeyCollidesWithFlattenedEnumAlias {
     outer_key: String,
     #[serde(flatten)]
@@ -892,6 +947,80 @@ fn aliases_inside_flattened_external_newtypes_remain_exclusive() {
     assert!(
         rendered.contains("} & FlattenedExternalNewtypeAlias;"),
         "the externally tagged enum must remain nested:\n{rendered}"
+    );
+}
+
+#[test]
+fn generated_flattened_struct_tags_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideTaggedFlattenPayload>(),
+            specta_serde::Format,
+        )
+        .expect("tagged flattened struct aliases should export");
+    let parent = rendered
+        .split_once("export type AliasBesideTaggedFlattenPayload = ")
+        .expect("tagged flattened parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("kind?: never"),
+        "the generated flattened tag must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_newtype_struct_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughNewtypeStruct>(),
+            specta_serde::Format,
+        )
+        .expect("flattened newtype struct aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughNewtypeStruct = ")
+        .expect("newtype struct parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the newtype payload key must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn transparent_named_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughTransparentNamedStruct>(),
+            specta_serde::Format,
+        )
+        .expect("transparent named flattened aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughTransparentNamedStruct = ")
+        .expect("transparent named parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the transparent payload key must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_tuple_fields_do_not_turn_tuple_structs_into_newtypes() {
+    let error = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyBesideSkippedTupleStruct>(),
+            specta_serde::Format,
+        )
+        .expect_err("a declared multi-field tuple struct remains a sequence");
+
+    assert!(
+        error
+            .to_string()
+            .contains("tuple structs serialize as a sequence"),
+        "the tuple must not be mistaken for its surviving field: {error}"
     );
 }
 
