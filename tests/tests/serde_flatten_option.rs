@@ -110,6 +110,24 @@ struct ParentKeyCollidesWithFlattenedAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(untagged)]
+enum AliasedFlattenEnumPayload {
+    Value {
+        #[serde(alias = "outer_key")]
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithFlattenedEnumAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: AliasedFlattenEnumPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -502,6 +520,41 @@ fn flattened_keys_do_not_become_alias_exclusions() {
 }
 
 #[test]
+fn aliases_inside_flattened_enum_payloads_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithFlattenedEnumAlias {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenEnumPayload::Value {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithFlattenedEnumAlias>(),
+            specta_serde::Format,
+        )
+        .expect("flattened enum aliases should not exclude parent keys");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenEnumPayload = {\n\tvalue: string,\n\touter_key?: never,\n} | {\n\touter_key: string,\n\tvalue?: never,\n};"
+        ),
+        "ordinary enum uses must retain alias exclusions:\n{rendered}"
+    );
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithFlattenedEnumAlias = ")
+        .expect("parent enum type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the flattened enum use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
 fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
     let value = ParentKeyCollidesWithFlattenedAlias {
         outer_key: "outer".into(),
@@ -520,7 +573,20 @@ fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
             specta_serde::Format,
         )
         .expect("flattened payload aliases should not exclude parent keys");
-    assert!(!rendered.contains("never"), "{rendered}");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenPayload = {\n\tvalue: string,\n\touter_key?: never,\n} | {\n\touter_key: string,\n\tvalue?: never,\n};"
+        ),
+        "ordinary uses must retain alias exclusions:\n{rendered}"
+    );
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithFlattenedAlias = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the flattened use must relax alias exclusions:\n{rendered}"
+    );
 }
 
 #[test]
