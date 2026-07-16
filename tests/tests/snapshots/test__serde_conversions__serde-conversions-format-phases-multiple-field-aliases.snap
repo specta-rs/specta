@@ -7,10 +7,16 @@ export type FieldMultipleAliases = FieldMultipleAliases_Serialize | FieldMultipl
 
 export type FieldMultipleAliases_Deserialize = {
 	value: string,
+	old_value?: never,
+	legacy_value?: never,
 } | {
 	old_value: string,
+	value?: never,
+	legacy_value?: never,
 } | {
 	legacy_value: string,
+	value?: never,
+	old_value?: never,
 };
 
 export type FieldMultipleAliases_Serialize = {

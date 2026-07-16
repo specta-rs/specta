@@ -287,6 +287,35 @@ enum AliasedFlattenEnumPayload {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+#[serde(untagged)]
+enum FlattenedUntaggedNewtypeAlias {
+    Value(AliasedFlattenPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedExternalNewtypeAlias {
+    Value(AliasedFlattenPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughUntaggedNewtype {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenedUntaggedNewtypeAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyBesideExternalNewtype {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenedExternalNewtypeAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct ParentKeyCollidesWithFlattenedEnumAlias {
     outer_key: String,
     #[serde(flatten)]
@@ -760,7 +789,7 @@ fn conditional_flatten_exports_optional_union() {
         "export type InternalFlattenConditional_Serialize = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
         "export type InternalFlattenConditional_Deserialize = {\n\tt: \"A\",\n} & Inner1;",
         "export type InternalFlattenConditionalAlias_Serialize = {\n\tt: \"A\",\n} & {\n\tvalue: string,\n} & Inner1 | {\n\tt: \"A\",\n} & {\n\tvalue: string,\n};",
-        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1;",
+        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n}) & Inner1;",
     ] {
         assert!(
             phased.contains(expected),
@@ -824,6 +853,45 @@ fn aliases_inside_flattened_enum_payloads_do_not_exclude_parent_keys() {
     assert!(
         !parent.contains("outer_key?: never"),
         "the flattened enum use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_untagged_newtypes_are_relaxed() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughUntaggedNewtype>(),
+            specta_serde::Format,
+        )
+        .expect("flattened untagged newtype aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughUntaggedNewtype = ")
+        .expect("untagged-newtype parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the untagged newtype payload alias must be relaxed:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_flattened_external_newtypes_remain_exclusive() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyBesideExternalNewtype>(),
+            specta_serde::Format,
+        )
+        .expect("flattened externally tagged newtype aliases should export");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenPayload = {\n\tvalue: string,\n\touter_key?: never,"
+        ),
+        "the nested payload alias must remain exclusive:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("} & FlattenedExternalNewtypeAlias;"),
+        "the externally tagged enum must remain nested:\n{rendered}"
     );
 }
 

@@ -7,8 +7,10 @@ export type FieldAlias = FieldAlias_Serialize | FieldAlias_Deserialize;
 
 export type FieldAlias_Deserialize = {
 	value: string,
+	old_value?: never,
 } | {
 	old_value: string,
+	value?: never,
 };
 
 export type FieldAlias_Serialize = {

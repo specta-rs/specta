@@ -1393,9 +1393,56 @@ fn datatype_has_flattened_aliases(
         DataType::Struct(strct) => {
             fields_have_flattened_aliases(&strct.fields, mode, types, visited)
         }
-        DataType::Enum(enm) => enm.variants.iter().any(|(_, variant)| {
-            fields_have_flattened_aliases(&variant.fields, mode, types, visited)
-        }),
+        DataType::Enum(enm) => {
+            let representation_flattens_payloads = matches!(
+                EnumRepr::from_attrs(&enm.attributes),
+                Ok(EnumRepr::Untagged | EnumRepr::Internal { .. })
+            );
+            enm.variants.iter().any(|(_, variant)| {
+                let variant_is_untagged = SerdeVariantAttrs::from_attributes(&variant.attributes)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|attrs| attrs.untagged);
+                if !representation_flattens_payloads && !variant_is_untagged {
+                    return false;
+                }
+
+                match &variant.fields {
+                    Fields::Named(_) => {
+                        fields_have_flattened_aliases(&variant.fields, mode, types, visited)
+                    }
+                    Fields::Unnamed(fields) => fields.fields.iter().any(|field| {
+                        field.ty.as_ref().is_some_and(|ty| {
+                            datatype_has_flattened_aliases(ty, mode, types, visited)
+                        })
+                    }),
+                    Fields::Unit => false,
+                }
+            })
+        }
+        DataType::Nullable(inner) => datatype_has_flattened_aliases(inner, mode, types, visited),
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                return datatype_has_flattened_aliases(dt, mode, types, visited);
+            }
+            let Some(referenced) = types.get(reference) else {
+                return false;
+            };
+            let identity = TypeIdentity::from_ndt(referenced);
+            if !visited.insert(identity.clone()) {
+                return false;
+            }
+            let has_aliases = referenced.ty.as_ref().is_some_and(|ty| {
+                let mut ty = ty.clone();
+                substitute_generics(&mut ty, named_reference_generics(reference));
+                if let Ok(Some(converted)) = conversion_datatype_for_mode(&ty, mode) {
+                    ty = converted;
+                }
+                datatype_has_flattened_aliases(&ty, mode, types, visited)
+            });
+            visited.remove(&identity);
+            has_aliases
+        }
         _ => false,
     }
 }
@@ -1824,7 +1871,8 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         parts.push(alias_field_union(
             accepted_names,
             field,
-            exclude_other_names && matches!(mode, PhaseRewrite::Unified),
+            exclude_other_names
+                && matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize),
             relaxed_names,
         ));
     }
