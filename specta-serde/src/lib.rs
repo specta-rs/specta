@@ -1243,7 +1243,7 @@ fn lower_field_aliases_for_phase(
     if !named
         .fields
         .iter()
-        .any(|(_, field)| field_has_aliases(field))
+        .any(|(_, field)| field.ty.is_some() && field_has_aliases(field))
     {
         return Ok(None);
     }
