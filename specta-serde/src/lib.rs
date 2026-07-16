@@ -4473,6 +4473,9 @@ fn apply_field_attrs(
         return Ok(());
     }
     let mut optional = field.optional;
+    if mode == PhaseRewrite::Deserialize && field.attributes.contains_key(NULLABLE_FIELD) {
+        optional = true;
+    }
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
         if field_is_optional_for_mode(Some(&attrs), container_default, mode) {
             optional = true;

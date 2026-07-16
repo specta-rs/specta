@@ -13,6 +13,10 @@ use specta::{Format as _, Type, Types, datatype::DataType};
 use specta_serde::{Phase, PhasesFormat, select_phase_datatype};
 use specta_typescript::Typescript;
 
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
 #[derive(Type, Serialize, Deserialize, Default)]
 #[specta(collect = false)]
 struct WithFieldDefault {
@@ -50,6 +54,24 @@ struct NoDefault {
 struct WithDefaultAndSkipIf {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     a: Option<i32>,
+}
+
+/// Serde's `missing_field` helper accepts an omitted `Option<T>` field as
+/// `None`, even without `#[serde(default)]`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OptionSkippedWhenNone {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    featured: Option<bool>,
+}
+
+/// A nullable Specta override does not alter serde's missing-field behavior.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NullableOverrideSkippedWhenNone {
+    #[serde(skip_serializing_if = "is_false")]
+    #[specta(type = Option<bool>)]
+    featured: bool,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -415,6 +437,45 @@ fn default_with_skip_serializing_if_shape_is_unchanged() {
         .expect("PhasesFormat should support `default` + `skip_serializing_if`");
 
     insta::assert_snapshot!("serde-default-phases-default-with-skip-if", rendered);
+}
+
+#[test]
+fn option_skip_serializing_if_is_optional_only_when_deserializing() {
+    let input: OptionSkippedWhenNone = serde_json::from_str("{}").unwrap();
+    assert_eq!(input.featured, None);
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OptionSkippedWhenNone>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support omitted Option fields");
+
+    assert!(
+        rendered.contains("featured?: boolean | null"),
+        "deserialize shape must accept omitted nullable fields: {rendered}"
+    );
+    assert!(
+        rendered.contains("OptionSkippedWhenNone_Serialize = {\n\tfeatured?: boolean,\n};"),
+        "serialize shape must continue omitting null: {rendered}"
+    );
+}
+
+#[test]
+fn nullable_override_does_not_make_deserialize_field_optional() {
+    assert!(serde_json::from_str::<NullableOverrideSkippedWhenNone>("{}").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<NullableOverrideSkippedWhenNone>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support nullable overrides");
+
+    assert!(
+        rendered.contains("featured: boolean | null"),
+        "a nullable override must not make a non-Option field optional: {rendered}"
+    );
 }
 
 /// Split propagation through generic instantiation: `GenericParent_Serialize`

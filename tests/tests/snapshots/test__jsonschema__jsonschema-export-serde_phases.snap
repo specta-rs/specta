@@ -1,5 +1,6 @@
 ---
 source: tests/tests/jsonschema.rs
+assertion_line: 17
 expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).unwrap()"
 ---
 {
@@ -3953,10 +3954,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "boolean"
         }
       },
-      "required": [
-        "a",
-        "c"
-      ],
       "title": "Optional_Deserialize",
       "type": "object"
     },
