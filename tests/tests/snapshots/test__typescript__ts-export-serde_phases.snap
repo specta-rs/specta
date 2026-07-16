@@ -34,8 +34,10 @@ export type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Serialize | Ad
 
 export type AdjacentlyTaggedWithAlias_Deserialize = { type: "A"; data: {
 	field: string,
+	bruh?: never,
 } | {
 	bruh: string,
+	field?: never,
 } } | { type: "B"; data: {
 	other: number,
 } };
@@ -534,8 +536,10 @@ export type InternallyTaggedWithAlias_Deserialize = {
 	type: "A",
 } & ({
 	field: string,
+	bruh?: never,
 } | {
 	bruh: string,
+	field?: never,
 }) | { type: "B"; other: number };
 
 export type InternallyTaggedWithAlias_Serialize = { type: "A"; field: string } | { type: "B"; other: number };
@@ -1387,8 +1391,10 @@ export type StructWithAliasAndRename = StructWithAliasAndRename_Serialize | Stru
 
 export type StructWithAliasAndRename_Deserialize = {
 	renamed_field: string,
+	bruh?: never,
 } | {
 	bruh: string,
+	renamed_field?: never,
 };
 
 export type StructWithAliasAndRename_Serialize = {
@@ -1397,8 +1403,10 @@ export type StructWithAliasAndRename_Serialize = {
 
 export type StructWithAlias_Deserialize = {
 	field: string,
+	bruh?: never,
 } | {
 	bruh: string,
+	field?: never,
 };
 
 export type StructWithAlias_Serialize = {
@@ -1409,12 +1417,24 @@ export type StructWithMultipleAliases = StructWithMultipleAliases_Serialize | St
 
 export type StructWithMultipleAliases_Deserialize = {
 	field: string,
+	bruh?: never,
+	alternative?: never,
+	another?: never,
 } | {
 	bruh: string,
+	field?: never,
+	alternative?: never,
+	another?: never,
 } | {
 	alternative: string,
+	field?: never,
+	bruh?: never,
+	another?: never,
 } | {
 	another: string,
+	field?: never,
+	bruh?: never,
+	alternative?: never,
 };
 
 export type StructWithMultipleAliases_Serialize = {
@@ -1506,8 +1526,10 @@ export type UntaggedWithAlias = UntaggedWithAlias_Serialize | UntaggedWithAlias_
 
 export type UntaggedWithAlias_Deserialize = {
 	field: string,
+	bruh?: never,
 } | {
 	bruh: string,
+	field?: never,
 } | { other: number };
 
 export type UntaggedWithAlias_Serialize = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
