@@ -55,6 +55,9 @@ impl ReScript {
 
     /// Export all types in the collection to a ReScript string.
     pub fn export(&self, types: &Types) -> Result<String> {
+        if self.serde {
+            validate_serde_enum_representations(types)?;
+        }
         let processed: Cow<Types> = if self.serde {
             let processed = specta_serde::Format
                 .map_types(types)
@@ -155,13 +158,19 @@ fn validate_serde_datatype(dt: &DataType) -> Result<()> {
         }
         DataType::Struct(structure) => validate_serde_fields(&structure.fields),
         DataType::Enum(enumeration) => {
-            if enumeration
+            let untagged = enumeration
                 .attributes
                 .get_named_as::<bool>("serde:container:untagged")
-                == Some(&true)
-            {
+                == Some(&true);
+            if untagged {
                 return Err(Error::UnsupportedType(
                     "Serde untagged enums cannot be represented as ReScript variants".to_string(),
+                ));
+            }
+            if enumeration.attributes.contains_key("serde:container:tag") {
+                return Err(Error::UnsupportedType(
+                    "Serde internally and adjacently tagged enums cannot be represented as ReScript variants"
+                        .to_string(),
                 ));
             }
             enumeration

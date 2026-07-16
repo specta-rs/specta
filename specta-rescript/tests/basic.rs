@@ -312,6 +312,34 @@ fn test_serde_untagged_enum_is_rejected() {
 }
 
 #[test]
+fn test_serde_tagged_enums_are_rejected() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(tag = "kind")]
+    enum InternallyTagged {
+        Text { value: String },
+        Empty,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[serde(tag = "kind", content = "data")]
+    enum AdjacentlyTagged {
+        Text(String),
+        Empty,
+    }
+
+    for types in [
+        Types::default().register::<InternallyTagged>(),
+        Types::default().register::<AdjacentlyTagged>(),
+    ] {
+        assert!(matches!(
+            ReScript::default().with_serde().export(&types),
+            Err(specta_rescript::Error::UnsupportedType(message))
+                if message.contains("tagged enums")
+        ));
+    }
+}
+
+#[test]
 fn test_standard_result_with_serde_uses_builtin() {
     #[derive(Type, serde::Serialize)]
     struct WithResult {
