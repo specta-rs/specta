@@ -1015,8 +1015,13 @@ fn rewrite_datatype_for_phase_inner(
                 )?;
 
                 let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
-                    if named.fields.iter().any(|(_, field)| field_is_flattened(field))
-                        && named.fields.iter().any(|(_, field)| field_has_aliases(field)));
+                    if named.fields.iter().any(|(_, field)| field_is_flattened(field)))
+                    && fields_have_flattened_aliases(
+                        &variant.fields,
+                        mode,
+                        original_types,
+                        &mut FlattenedAliasVisits::default(),
+                    );
 
                 let lowered = if has_flattened_aliases {
                     if matches!(&repr, EnumRepr::Internal { .. }) {
@@ -1352,7 +1357,12 @@ fn flattened_payload_datatype_inner(
             payload = converted_payload;
         }
     }
-    if !datatype_has_flattened_aliases(&payload, mode, original_types, &mut HashSet::new()) {
+    if !datatype_has_flattened_aliases(
+        &payload,
+        mode,
+        original_types,
+        &mut FlattenedAliasVisits::default(),
+    ) {
         return Ok(ty);
     }
     match &mut payload {
@@ -1387,7 +1397,7 @@ fn datatype_has_flattened_aliases(
     ty: &DataType,
     mode: PhaseRewrite,
     types: &Types,
-    visited: &mut HashSet<TypeIdentity>,
+    visited: &mut FlattenedAliasVisits,
 ) -> bool {
     match ty {
         DataType::Struct(strct) => {
@@ -1428,8 +1438,14 @@ fn datatype_has_flattened_aliases(
             let Some(referenced) = types.get(reference) else {
                 return false;
             };
-            let identity = TypeIdentity::from_ndt(referenced);
-            if !visited.insert(identity.clone()) {
+            let identity = (
+                TypeIdentity::from_ndt(referenced),
+                named_reference_generics(reference)
+                    .iter()
+                    .map(|(_, ty)| ty.clone())
+                    .collect(),
+            );
+            if !visited.enter(identity.clone()) {
                 return false;
             }
             let has_aliases = referenced.ty.as_ref().is_some_and(|ty| {
@@ -1440,7 +1456,7 @@ fn datatype_has_flattened_aliases(
                 }
                 datatype_has_flattened_aliases(&ty, mode, types, visited)
             });
-            visited.remove(&identity);
+            visited.exit(&identity);
             has_aliases
         }
         _ => false,
@@ -1451,7 +1467,7 @@ fn fields_have_flattened_aliases(
     fields: &Fields,
     mode: PhaseRewrite,
     types: &Types,
-    visited: &mut HashSet<TypeIdentity>,
+    visited: &mut FlattenedAliasVisits,
 ) -> bool {
     let Fields::Named(fields) = fields else {
         return false;
@@ -1475,12 +1491,18 @@ fn fields_have_flattened_aliases(
         let Some(referenced) = types.get(&reference) else {
             return false;
         };
-        let identity = TypeIdentity::from_ndt(referenced);
-        if !visited.insert(identity.clone()) {
+        let identity = (
+            TypeIdentity::from_ndt(referenced),
+            named_reference_generics(&reference)
+                .iter()
+                .map(|(_, ty)| ty.clone())
+                .collect(),
+        );
+        if !visited.enter(identity.clone()) {
             return false;
         }
         let Some(mut payload) = referenced.ty.clone() else {
-            visited.remove(&identity);
+            visited.exit(&identity);
             return false;
         };
         substitute_generics(&mut payload, named_reference_generics(&reference));
@@ -1495,9 +1517,88 @@ fn fields_have_flattened_aliases(
             }
         }
         let has_aliases = datatype_has_flattened_aliases(&payload, mode, types, visited);
-        visited.remove(&identity);
+        visited.exit(&identity);
         has_aliases
     })
+}
+
+#[derive(Default)]
+struct FlattenedAliasVisits {
+    active: Vec<(TypeIdentity, Vec<DataType>)>,
+}
+
+impl FlattenedAliasVisits {
+    fn enter(&mut self, identity: (TypeIdentity, Vec<DataType>)) -> bool {
+        if self.active.iter().any(|active| active == &identity)
+            || self.active.iter().any(|(base, previous)| {
+                base == &identity.0
+                    && previous.len() == identity.1.len()
+                    && previous
+                        .iter()
+                        .zip(&identity.1)
+                        .all(|(previous, current)| datatype_contains(current, previous))
+                    && previous
+                        .iter()
+                        .zip(&identity.1)
+                        .any(|(previous, current)| previous != current)
+            })
+        {
+            return false;
+        }
+        self.active.push(identity);
+        true
+    }
+
+    fn exit(&mut self, identity: &(TypeIdentity, Vec<DataType>)) {
+        let popped = self.active.pop();
+        debug_assert_eq!(popped.as_ref(), Some(identity));
+    }
+}
+
+fn datatype_contains(haystack: &DataType, needle: &DataType) -> bool {
+    if haystack == needle {
+        return true;
+    }
+    match haystack {
+        DataType::Struct(strct) => fields_contain(&strct.fields, needle),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain(&variant.fields, needle)),
+        DataType::Tuple(tuple) => tuple
+            .elements
+            .iter()
+            .any(|ty| datatype_contains(ty, needle)),
+        DataType::List(list) => datatype_contains(&list.ty, needle),
+        DataType::Map(map) => {
+            datatype_contains(map.key_ty(), needle) || datatype_contains(map.value_ty(), needle)
+        }
+        DataType::Intersection(types) => types.iter().any(|ty| datatype_contains(ty, needle)),
+        DataType::Nullable(inner) => datatype_contains(inner, needle),
+        DataType::Reference(Reference::Named(reference)) => {
+            named_reference_generics(reference)
+                .iter()
+                .any(|(_, ty)| datatype_contains(ty, needle))
+                || matches!(&reference.inner, NamedReferenceType::Inline { dt, .. } if datatype_contains(dt, needle))
+        }
+        DataType::Primitive(_)
+        | DataType::Generic(_)
+        | DataType::Reference(Reference::Opaque(_)) => false,
+    }
+}
+
+fn fields_contain(fields: &Fields, needle: &DataType) -> bool {
+    let contains = |field: &Field| {
+        field
+            .ty
+            .as_ref()
+            .is_some_and(|ty| datatype_contains(ty, needle))
+    };
+    match fields {
+        Fields::Named(fields) => fields.fields.iter().any(|(_, field)| contains(field)),
+        Fields::Unnamed(fields) => fields.fields.iter().any(contains),
+        Fields::Unit => false,
+    }
 }
 
 /// Strips zero or more layers of `Nullable` (i.e. `Option`) off a `DataType`,

@@ -343,6 +343,23 @@ struct ParentKeyCollidesThroughNewtypeStruct {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct PairFlattenWrapper<A, B> {
+    #[serde(skip)]
+    marker: std::marker::PhantomData<A>,
+    #[serde(flatten)]
+    inner: B,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentThroughNestedPairWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: PairFlattenWrapper<String, PairFlattenWrapper<String, AliasedFlattenPayload>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -367,6 +384,16 @@ struct ParentKeyBesideSkippedTupleStruct {
     outer_key: String,
     #[serde(flatten)]
     inner: SkippedTupleFlattenWrapper,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumVariantWithFlattenedAlias {
+    Value {
+        outer_key: String,
+        #[serde(flatten)]
+        inner: AliasedFlattenPayload,
+    },
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
@@ -989,6 +1016,25 @@ fn flattened_newtype_struct_payload_keys_relax_alias_exclusions() {
 }
 
 #[test]
+fn unchanged_generic_arguments_do_not_block_finite_wrapper_descent() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentThroughNestedPairWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("nested multi-parameter wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentThroughNestedPairWrapper = ")
+        .expect("nested pair-wrapper parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "an unchanged generic argument must not hide the nested alias:\n{rendered}"
+    );
+}
+
+#[test]
 fn transparent_named_payload_keys_relax_alias_exclusions() {
     let rendered = Typescript::default()
         .export(
@@ -1262,11 +1308,37 @@ fn nested_instantiations_of_the_same_flatten_wrapper_are_expanded() {
     let parent = rendered
         .split_once("export type ParentKeyCollidesThroughDoubleFlattenedWrapper = ")
         .expect("double-wrapper parent should be exported")
-        .1;
+        .1
+        .split_once(";\n")
+        .expect("parent declaration should terminate")
+        .0;
 
     assert!(
         !parent.contains("outer_key?: never"),
         "the nested generic wrapper must expose its flattened aliases:\n{rendered}"
+    );
+    assert!(
+        !parent.contains("FlattenWrapper"),
+        "the contextual nested wrapper must be expanded rather than hidden behind a reference:\n{rendered}"
+    );
+}
+
+#[test]
+fn enum_variant_flattened_references_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<EnumVariantWithFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("enum variant flattened aliases should export");
+    let variant = rendered
+        .split_once("export type EnumVariantWithFlattenedAlias = ")
+        .expect("enum should be exported")
+        .1;
+
+    assert!(
+        !variant.contains("outer_key?: never"),
+        "the contextual enum variant must relax the flattened alias exclusion:\n{rendered}"
     );
 }
 
