@@ -945,7 +945,7 @@ fn rewrite_datatype_for_phase(
                 *ty = intersection;
                 return Ok(());
             }
-            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode)? {
+            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode, true)? {
                 *ty = intersection;
             }
         }
@@ -987,7 +987,7 @@ fn rewrite_datatype_for_phase(
                         lower_flattened_struct(&mut strct, mode)?
                     }
                 } else {
-                    lower_field_aliases_for_phase(&mut variant.fields, mode)?
+                    lower_field_aliases_for_phase(&mut variant.fields, mode, true)?
                 };
 
                 if let Some(lowered) = lowered {
@@ -1133,7 +1133,7 @@ fn lower_flattened_struct(
     };
     if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
         base.attributes = strct.attributes.clone();
-        let base = lower_field_aliases_for_phase(&mut base.fields, mode)?
+        let base = lower_field_aliases_for_phase(&mut base.fields, mode, false)?
             .unwrap_or(DataType::Struct(base));
         mandatory.insert(0, base);
     }
@@ -1230,6 +1230,7 @@ fn flatten_intersection_with_optionals(
 fn lower_field_aliases_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
+    exclude_other_names: bool,
 ) -> Result<Option<DataType>, Error> {
     if !matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize) {
         return Ok(None);
@@ -1251,6 +1252,10 @@ fn lower_field_aliases_for_phase(
     let mut parts = Vec::new();
 
     for (name, field) in std::mem::take(&mut named.fields) {
+        if field.ty.is_none() {
+            continue;
+        }
+
         let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
             base.field_mut(name, field);
             continue;
@@ -1267,7 +1272,7 @@ fn lower_field_aliases_for_phase(
         parts.push(alias_field_union(
             accepted_names,
             field,
-            matches!(mode, PhaseRewrite::Unified),
+            exclude_other_names && matches!(mode, PhaseRewrite::Unified),
         ));
     }
 
@@ -2526,7 +2531,7 @@ fn transform_internal_variant(
                         unreachable!("named_fields_datatype always builds a struct")
                     };
                     mandatory.push(
-                        lower_field_aliases_for_phase(&mut leftover.fields, mode)?
+                        lower_field_aliases_for_phase(&mut leftover.fields, mode, false)?
                             .unwrap_or(DataType::Struct(leftover)),
                     );
                 }
@@ -3080,7 +3085,7 @@ fn internal_tag_payload_compatibility(
                         std::mem::swap(&mut payload.fields, &mut rewritten_variant.fields);
                         lower_flattened_struct(&mut payload, mode)?
                     } else {
-                        lower_field_aliases_for_phase(&mut rewritten_variant.fields, mode)?
+                        lower_field_aliases_for_phase(&mut rewritten_variant.fields, mode, true)?
                     };
                     if let Some(payload) = lowered {
                         rewritten_variant.fields = clone_variant_with_unnamed_fields(
@@ -3674,7 +3679,7 @@ fn external_enum_tagged_payload_datatype(
             std::mem::swap(&mut payload.fields, &mut variant.fields);
             lower_flattened_struct(&mut payload, mode)?
         } else {
-            lower_field_aliases_for_phase(&mut variant.fields, mode)?
+            lower_field_aliases_for_phase(&mut variant.fields, mode, true)?
         };
         if let Some(payload) = lowered {
             variant.fields =

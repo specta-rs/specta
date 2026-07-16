@@ -181,6 +181,15 @@ struct FieldMultipleAliases {
     value: String,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct HiddenFieldAlias {
+    visible: String,
+    #[specta(skip)]
+    #[serde(alias = "old_cache")]
+    cache: String,
+}
+
 mod alias_collision {
     // The collision is intentional: serde gives the earlier alias precedence.
     #![allow(unreachable_patterns)]
@@ -840,11 +849,19 @@ fn format_unifies_aliases() {
         )
         .expect("Format should make every accepted field name mutually exclusive");
 
+    let hidden_field = Typescript::default()
+        .export(
+            &Types::default().register::<HiddenFieldAlias>(),
+            specta_serde::Format,
+        )
+        .expect("hidden aliased fields should not affect the exported shape");
+
     insta::assert_snapshot!("serde-conversions-format-unified-field-alias", field);
     insta::assert_snapshot!(
         "serde-conversions-format-unified-multiple-field-aliases",
         multiple_fields
     );
+    assert!(!hidden_field.contains("cache"), "{hidden_field}");
     insta::assert_snapshot!("serde-conversions-format-unified-variant-alias", variant);
 }
 

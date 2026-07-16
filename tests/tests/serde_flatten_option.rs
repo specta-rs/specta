@@ -80,6 +80,21 @@ enum InternalFlattenConditionalAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct AliasFlattenInner {
+    old_value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasFlattenCollision {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    inner: AliasFlattenInner,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -423,7 +438,7 @@ fn conditional_flatten_exports_optional_union() {
     for expected in [
         "export type FlatConditional = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
         "export type InternalFlattenConditional = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
-        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n});",
+        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n});",
     ] {
         assert!(
             rendered.contains(expected),
@@ -447,6 +462,28 @@ fn conditional_flatten_exports_optional_union() {
             "expected:\n{expected}\n\ngot:\n{phased}"
         );
     }
+}
+
+#[test]
+fn flattened_keys_do_not_become_alias_exclusions() {
+    let value = AliasFlattenCollision {
+        value: "canonical".into(),
+        inner: AliasFlattenInner {
+            old_value: "flattened".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "value": "canonical", "old_value": "flattened" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("flattened aliases should export without excluding flattened keys");
+    assert!(!rendered.contains("never"), "{rendered}");
 }
 
 #[test]
