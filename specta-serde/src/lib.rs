@@ -1386,6 +1386,11 @@ fn rewrite_fields_for_phase(
 
             for (name, field) in &mut named.fields {
                 apply_field_attrs(field, mode, container_default)?;
+                if mode == PhaseRewrite::Deserialize
+                    && field.attributes.contains_key(NULLABLE_FIELD)
+                {
+                    field.optional = true;
+                }
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
                 let key =
@@ -4473,9 +4478,6 @@ fn apply_field_attrs(
         return Ok(());
     }
     let mut optional = field.optional;
-    if mode == PhaseRewrite::Deserialize && field.attributes.contains_key(NULLABLE_FIELD) {
-        optional = true;
-    }
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
         if field_is_optional_for_mode(Some(&attrs), container_default, mode) {
             optional = true;

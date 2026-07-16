@@ -76,6 +76,13 @@ struct NullableOverrideSkippedWhenNone {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct TupleOptionSkippedWhenNone(
+    u32,
+    #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
+);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct Wrapper<T> {
     inner: T,
 }
@@ -475,6 +482,23 @@ fn nullable_override_does_not_make_deserialize_field_optional() {
     assert!(
         rendered.contains("featured: boolean | null"),
         "a nullable override must not make a non-Option field optional: {rendered}"
+    );
+}
+
+#[test]
+fn tuple_option_is_not_optional_when_deserializing() {
+    assert!(serde_json::from_str::<TupleOptionSkippedWhenNone>("[1]").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TupleOptionSkippedWhenNone>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support tuple fields");
+
+    assert!(
+        rendered.contains("[number, string | null]"),
+        "deserialize tuple shape must retain its required Option element: {rendered}"
     );
 }
 
