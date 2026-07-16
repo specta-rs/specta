@@ -1228,7 +1228,6 @@ fn lower_flattened_struct_inner(
     );
 
     let fields = std::mem::take(&mut named.fields);
-    let inline_aliased_payloads = !strct.attributes.contains_key(FLATTENED_PAYLOAD_MARKER);
     let mut base = Struct::named();
     let mut mandatory = Vec::new();
     let mut optional = Vec::new();
@@ -1243,18 +1242,14 @@ fn lower_flattened_struct_inner(
                 // unconditionally into the intersection - see
                 // `flatten_intersection_with_optionals` for why.
                 let (ty, was_nullable) = strip_nullable(ty);
-                let mut ty = if inline_aliased_payloads {
-                    flattened_payload_datatype_inner(
-                        ty,
-                        mode,
-                        original_types,
-                        generated,
-                        split_types,
-                        expanding_flattened,
-                    )?
-                } else {
-                    ty
-                };
+                let mut ty = flattened_payload_datatype_inner(
+                    ty,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    expanding_flattened,
+                )?;
                 relax_alias_exclusions(&mut ty, &surrounding_keys);
                 if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER) || was_nullable {
                     optional.push(ty);
@@ -1572,7 +1567,19 @@ fn collect_flattened_keys(
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, name)
                         .ok()
                         .flatten();
-                collect_field_keys(&variant.fields, rename_rule, mode, types, visited, keys);
+                match &variant.fields {
+                    Fields::Named(_) => {
+                        collect_field_keys(&variant.fields, rename_rule, mode, types, visited, keys)
+                    }
+                    Fields::Unnamed(fields) => {
+                        for field in &fields.fields {
+                            if let Some(ty) = &field.ty {
+                                collect_flattened_keys(ty, mode, types, visited, keys);
+                            }
+                        }
+                    }
+                    Fields::Unit => {}
+                }
             }
         }
         DataType::Intersection(elements) => {
@@ -1651,11 +1658,6 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
                     !(keys.contains(name.as_ref())
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
-                for (_, field) in &mut named.fields {
-                    if let Some(ty) = &mut field.ty {
-                        relax_alias_exclusions(ty, keys);
-                    }
-                }
             }
         }
         DataType::Enum(enm) => {
@@ -1666,11 +1668,6 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
                             !(keys.contains(name.as_ref())
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
-                        for (_, field) in &mut fields.fields {
-                            if let Some(ty) = &mut field.ty {
-                                relax_alias_exclusions(ty, keys);
-                            }
-                        }
                     }
                     Fields::Unnamed(fields) => {
                         for field in &mut fields.fields {

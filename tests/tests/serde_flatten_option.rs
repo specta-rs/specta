@@ -169,6 +169,27 @@ struct AliasWithUnrelatedFlatten {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct NestedAliasedObject {
+    #[serde(alias = "outer_key")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedPayloadWithNestedAlias {
+    nested: NestedAliasedObject,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OuterKeyBesideNestedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    payload: FlattenedPayloadWithNestedAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(untagged)]
 enum AliasedFlattenEnumPayload {
     Value {
@@ -752,6 +773,22 @@ fn unrelated_flattened_keys_preserve_alias_exclusions() {
 }
 
 #[test]
+fn flattened_alias_relaxation_does_not_cross_object_scopes() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OuterKeyBesideNestedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("nested aliases should export");
+
+    assert!(
+        rendered.contains("value: string,\n\touter_key?: never,")
+            && rendered.contains("outer_key: string,\n\tvalue?: never,"),
+        "nested alias exclusions should remain intact:\n{rendered}"
+    );
+}
+
+#[test]
 fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
     let value = ParentKeyCollidesThroughFlattenedWrapper {
         outer_key: "outer".into(),
@@ -856,7 +893,7 @@ fn aliases_through_nested_flattened_conversions_do_not_exclude_parent_keys() {
         .expect("parent type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the nested converted flattened use must relax alias exclusions:\n{rendered}"
     );
 }
@@ -898,7 +935,7 @@ fn flattened_alias_detection_tracks_sibling_generic_instantiations() {
         .expect("parent type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the second generic instantiation must retain alias detection:\n{rendered}"
     );
 }
