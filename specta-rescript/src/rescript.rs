@@ -67,9 +67,6 @@ impl ReScript {
             Cow::Borrowed(types)
         };
 
-        if self.serde {
-            validate_serde_enum_representations(&processed)?;
-        }
         validate_type_names(&processed)?;
 
         let mut out = String::new();
@@ -143,6 +140,7 @@ impl ReScript {
 fn validate_serde_enum_representations(types: &Types) -> Result<()> {
     types
         .into_unsorted_iter()
+        .filter(|ty| !(ty.name == "Result" && ty.module_path == "std::result"))
         .filter_map(|ty| ty.ty.as_ref())
         .try_for_each(validate_serde_datatype)
 }
@@ -173,10 +171,10 @@ fn validate_serde_datatype(dt: &DataType) -> Result<()> {
                         .to_string(),
                 ));
             }
-            enumeration
-                .variants
-                .iter()
-                .try_for_each(|(_, variant)| validate_serde_fields(&variant.fields))
+            Err(Error::UnsupportedType(
+                "Serde externally tagged enums cannot be represented as ReScript variants"
+                    .to_string(),
+            ))
         }
         DataType::Tuple(tuple) => tuple.elements.iter().try_for_each(validate_serde_datatype),
         DataType::Intersection(types) => types.iter().try_for_each(validate_serde_datatype),

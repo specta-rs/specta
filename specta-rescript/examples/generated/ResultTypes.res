@@ -35,13 +35,13 @@ type batchResponse = {
   failed_count: bigint,
 }
 
-/**
- * Richer error type
- */
 type commandErrorValidationFields = {
   field: string,
   message: string,
 }
+/**
+ * Richer error type
+ */
 type commandError =
   | NotFound(string)
   | Unauthorized

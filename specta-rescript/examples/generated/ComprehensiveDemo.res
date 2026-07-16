@@ -149,13 +149,6 @@ type taskMetadata = {
   dependencies: array<bigint>,
 }
 
-/**
- * Comprehensive demonstration of all specta-rescript functionality.
- *
- * Models a task management system to exercise every supported type
- * pattern in a realistic application scenario.
- * Current status of a task.
- */
 type taskStatusInProgressFields = {
   /**
    * ISO-8601 UTC timestamp when work started.
@@ -182,6 +175,13 @@ type taskStatusCancelledFields = {
   reason: string,
   cancelled_at: string,
 }
+/**
+ * Comprehensive demonstration of all specta-rescript functionality.
+ *
+ * Models a task management system to exercise every supported type
+ * pattern in a realistic application scenario.
+ * Current status of a task.
+ */
 type taskStatus =
   /**
    * Waiting to be picked up.
@@ -234,9 +234,6 @@ type userProfile = {
   timezone: string,
 }
 
-/**
- * User role with permission levels.
- */
 type userRoleModeratorFields = {
   permissions: array<string>,
   department: string,
@@ -245,6 +242,9 @@ type userRoleAdminFields = {
   level: adminLevel,
   departments: array<string>,
 }
+/**
+ * User role with permission levels.
+ */
 type userRole =
   /**
    * Standard user with no elevated access.

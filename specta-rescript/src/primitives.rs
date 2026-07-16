@@ -650,7 +650,9 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 let (auxiliary, variant_lines) =
                     render_enum_variants(types, &scope, e, &rescript_name, &generics_decl)?;
 
+                let enum_metadata = std::mem::take(&mut out);
                 out.extend(auxiliary.iter().map(|aux| format!("{}\n", aux)));
+                out.push_str(&enum_metadata);
                 out.push_str(&format!("type {}{} =\n", rescript_name, generics_decl));
                 out.extend(variant_lines.iter().map(|l| {
                     if l.starts_with("  /**") {

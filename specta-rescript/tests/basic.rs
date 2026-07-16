@@ -264,20 +264,19 @@ fn test_serde_type_name_is_validated() {
 }
 
 #[test]
-fn test_serde_data_variant_constructor_is_validated() {
+fn test_serde_externally_tagged_data_enum_is_rejected() {
     #[derive(Type, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     enum RenamedVariant {
         FooBar(String),
     }
 
-    let error = ReScript::default()
-        .with_serde()
-        .export(&Types::default().register::<RenamedVariant>())
-        .unwrap_err();
     assert!(matches!(
-        error,
-        specta_rescript::Error::InvalidVariantConstructor(name) if name == "fooBar"
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<RenamedVariant>()),
+        Err(specta_rescript::Error::UnsupportedType(message))
+            if message.contains("externally tagged enums")
     ));
 }
 
@@ -548,26 +547,20 @@ fn test_one_element_tuple_error() {
 }
 
 #[test]
-fn test_serde_polymorphic_variant_is_validated() {
+fn test_serde_externally_tagged_unit_enum_is_rejected() {
     #[derive(Type, serde::Serialize)]
     #[serde(rename_all = "kebab-case")]
     enum RenamedUnitVariant {
         FooBar,
     }
 
-    let error = ReScript::default()
-        .with_serde()
-        .export(&Types::default().register::<RenamedUnitVariant>())
-        .unwrap_err();
-    assert!(
-        matches!(
-            &error,
-            specta_rescript::Error::InvalidVariantConstructor(name)
-                | specta_rescript::Error::InvalidPolymorphicVariant(name)
-                if name == "foo-bar"
-        ),
-        "error: {error:?}"
-    );
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<RenamedUnitVariant>()),
+        Err(specta_rescript::Error::UnsupportedType(message))
+            if message.contains("externally tagged enums")
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -625,6 +618,28 @@ fn test_field_and_variant_docs() {
     assert!(out.contains("Type docs cannot close * /"), "output: {out}");
     assert!(out.contains("A field cannot close * /"), "output: {out}");
     assert!(out.contains("A variant cannot close * /"), "output: {out}");
+}
+
+#[test]
+fn test_enum_docs_follow_generated_helper_records() {
+    /// Documentation for the enum declaration.
+    #[derive(Type)]
+    enum DocumentedDataEnum {
+        Value { value: String },
+    }
+
+    let out = export::<DocumentedDataEnum>();
+    let helper = out
+        .find("type documentedDataEnumValueFields")
+        .expect("generated helper record");
+    let docs = out
+        .find("Documentation for the enum declaration")
+        .expect("enum documentation");
+    let enumeration = out
+        .find("type documentedDataEnum =")
+        .expect("enum declaration");
+
+    assert!(helper < docs && docs < enumeration, "output: {out}");
 }
 
 #[test]
