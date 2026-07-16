@@ -266,6 +266,31 @@ enum InternalTagWithFlattenedAliasCollision {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FlattenedSiblingAlias {
+    #[serde(alias = "x")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedSiblingKey {
+    x: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithSiblingFlattenCollision {
+    Value {
+        #[serde(flatten)]
+        aliased: FlattenedSiblingAlias,
+        #[serde(flatten)]
+        keyed: FlattenedSiblingKey,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct InternalTagAliasPayload {
     #[serde(alias = "t")]
     value: String,
@@ -966,6 +991,25 @@ fn aliases_inside_internal_tag_flattened_payloads_do_not_exclude_sibling_keys() 
     assert!(
         !variant.contains("outer_key?: never"),
         "the internal-tag flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn internal_tag_flattened_payloads_relax_sibling_key_collisions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithSiblingFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("sibling flattened alias collisions should export");
+    let variant = rendered
+        .split_once("export type InternalTagWithSiblingFlattenCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+
+    assert!(
+        !variant.contains("x?: never"),
+        "a sibling flattened key must relax the alias exclusion:\n{rendered}"
     );
 }
 

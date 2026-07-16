@@ -3034,6 +3034,25 @@ fn transform_internal_variant(
                         collect_field_accepted_names(field, &mut surrounding_keys);
                     }
                 }
+                let mut flattened_key_counts = HashMap::<String, usize>::new();
+                for ty in mandatory_parts.iter().chain(&optional_parts) {
+                    let mut keys = HashSet::new();
+                    collect_flattened_keys(
+                        ty,
+                        mode,
+                        original_types,
+                        &mut HashSet::new(),
+                        &mut keys,
+                    );
+                    for key in keys {
+                        *flattened_key_counts.entry(key).or_default() += 1;
+                    }
+                }
+                surrounding_keys.extend(
+                    flattened_key_counts
+                        .into_iter()
+                        .filter_map(|(key, count)| (count > 1).then_some(key)),
+                );
                 for ty in mandatory_parts.iter_mut().chain(&mut optional_parts) {
                     relax_alias_exclusions(ty, &surrounding_keys);
                 }
