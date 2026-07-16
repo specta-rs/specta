@@ -115,10 +115,7 @@ TestEnum: "Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } |
 } }) & { Multiple?: never; Single?: never }
 RefStruct: TestEnum
 InlinerStruct: {
-	inline_this: {
-		ref_struct: SimpleStruct,
-		val: number,
-	},
+	inline_this: InlineStruct_Serialize,
 	dont_inline_this: RefStruct,
 }
 GenericStruct<i32>: {
