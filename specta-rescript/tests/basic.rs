@@ -543,7 +543,36 @@ fn test_recursive_unnamed_struct_is_rejected() {
     assert!(matches!(
         export_err::<RecursiveTuple>(),
         specta_rescript::Error::UnsupportedType(message)
-            if message.contains("Recursive unnamed structs")
+            if message.contains("Recursive type aliases")
+    ));
+}
+
+#[test]
+fn test_recursive_transparent_alias_is_rejected() {
+    #[derive(Type)]
+    #[specta(type = Option<Box<RecursiveAlias>>)]
+    struct RecursiveAlias;
+
+    assert!(matches!(
+        export_err::<RecursiveAlias>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Recursive type aliases")
+    ));
+}
+
+#[test]
+#[allow(non_camel_case_types)]
+fn test_colliding_generic_parameter_names_are_rejected() {
+    #[derive(Type)]
+    struct CaseSensitiveGenerics<T, t> {
+        upper: T,
+        lower: t,
+    }
+
+    assert!(matches!(
+        export_err::<CaseSensitiveGenerics<String, i32>>(),
+        specta_rescript::Error::InvalidType(message)
+            if message.contains("both render as '\'t'")
     ));
 }
 

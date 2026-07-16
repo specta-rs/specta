@@ -85,16 +85,15 @@ impl ReScript {
                 });
             if recursive
                 && group.iter().any(|ty| {
-                    matches!(
+                    !matches!(
                         &ty.ty,
                         Some(DataType::Struct(structure))
-                            if matches!(structure.fields, Fields::Unnamed(_))
-                    )
+                            if matches!(structure.fields, Fields::Named(_))
+                    ) && !matches!(&ty.ty, Some(DataType::Enum(_)))
                 })
             {
                 return Err(Error::UnsupportedType(
-                    "Recursive unnamed structs cannot be represented as ReScript type aliases"
-                        .to_string(),
+                    "Recursive type aliases cannot be represented in ReScript".to_string(),
                 ));
             }
             let mut first_declaration = true;
@@ -229,6 +228,8 @@ fn preserve_standard_result<'a>(original: &Types, processed: Cow<'a, Types>) -> 
 fn validate_type_names(types: &Types) -> Result<()> {
     let mut names = HashMap::<String, String>::new();
     for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
+        validate_generic_names(ty)?;
+
         let name = type_name(&ty.name);
         let standard_result = ty.name == "Result" && ty.module_path == "std::result";
         if !is_valid_type_name(&name) || (is_rescript_builtin_type(&name) && !standard_result) {
@@ -258,6 +259,20 @@ fn validate_type_names(types: &Types) -> Result<()> {
                 format!("{name}{variant_name}Fields"),
                 format!("{owner}::{variant_name} (generated record)"),
             )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_generic_names(ty: &specta::datatype::NamedDataType) -> Result<()> {
+    let mut names = HashMap::<String, &str>::new();
+    for generic in ty.generics.iter() {
+        let rendered = generic.name.to_lowercase();
+        if let Some(first) = names.insert(rendered.clone(), &generic.name) {
+            return Err(Error::InvalidType(format!(
+                "Generic parameters '{first}' and '{}' on '{}::{}' both render as '\'{rendered}'",
+                generic.name, ty.module_path, ty.name
+            )));
         }
     }
     Ok(())
