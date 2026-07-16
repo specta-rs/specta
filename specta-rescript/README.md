@@ -71,7 +71,7 @@ Output:
 type userRole = [#Guest | #Moderator | #Admin]
 
 type user = {
-  id: int,
+  id: bigint,
   name: string,
   email: option<string>,
   role: userRole,

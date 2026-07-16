@@ -45,7 +45,8 @@ The `lib/` directory produced by `rescript build` is gitignored.
 
 | Input (Rust) | Output (ReScript) | Description |
 |---|---|---|
-| `i8`, `i16`, `i32`, `i64`, `u8`..`u64`, `isize`, `usize` | `int` | All integer types |
+| `i8`, `i16`, `i32`, `u8`, `u16` | `int` | 32-bit ReScript integer |
+| `i64`, `u32`, `u64`, `isize`, `usize` | `bigint` | Values may exceed ReScript `int` |
 | `f32`, `f64` | `float` | Float types |
 | `bool` | `bool` | Boolean |
 | `char`, `String` | `string` | String types |
