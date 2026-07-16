@@ -93,11 +93,38 @@ struct AliasFlattenCollision {
     inner: AliasFlattenInner,
 }
 
-#[derive(Debug, Type, Serialize, Deserialize)]
+#[derive(Clone, Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct AliasedFlattenPayload {
     #[serde(alias = "outer_key")]
     value: String,
+}
+
+#[derive(Clone, Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(into = "AliasedFlattenPayload", from = "AliasedFlattenPayload")]
+struct ConvertedAliasedFlattenPayload {
+    value: String,
+}
+
+impl From<ConvertedAliasedFlattenPayload> for AliasedFlattenPayload {
+    fn from(value: ConvertedAliasedFlattenPayload) -> Self {
+        Self { value: value.value }
+    }
+}
+
+impl From<AliasedFlattenPayload> for ConvertedAliasedFlattenPayload {
+    fn from(value: AliasedFlattenPayload) -> Self {
+        Self { value: value.value }
+    }
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithConvertedFlattenedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: ConvertedAliasedFlattenPayload,
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
@@ -131,6 +158,29 @@ struct ParentKeyCollidesWithFlattenedEnumAlias {
 struct FlattenWrapper<T> {
     #[serde(flatten)]
     inner: T,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct PlainFlattenPayload {
+    plain: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DuoFlattenWrapper<A, B> {
+    #[serde(flatten)]
+    first: FlattenWrapper<A>,
+    #[serde(flatten)]
+    second: FlattenWrapper<B>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesInSecondGenericInstantiation {
+    outer_key: String,
+    #[serde(flatten)]
+    duo: DuoFlattenWrapper<PlainFlattenPayload, AliasedFlattenPayload>,
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
@@ -657,6 +707,77 @@ fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
     assert!(
         !parent.contains("never"),
         "the flattened wrapper use must relax nested alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_conversions_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithConvertedFlattenedAlias {
+        outer_key: "outer".into(),
+        inner: ConvertedAliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithConvertedFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind flattened conversions should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithConvertedFlattenedAlias = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the converted flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_alias_detection_tracks_sibling_generic_instantiations() {
+    let value = ParentKeyCollidesInSecondGenericInstantiation {
+        outer_key: "outer".into(),
+        duo: DuoFlattenWrapper {
+            first: FlattenWrapper {
+                inner: PlainFlattenPayload {
+                    plain: "plain".into(),
+                },
+            },
+            second: FlattenWrapper {
+                inner: AliasedFlattenPayload {
+                    value: "inner".into(),
+                },
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({
+            "outer_key": "outer",
+            "plain": "plain",
+            "value": "inner",
+        })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesInSecondGenericInstantiation>(),
+            specta_serde::Format,
+        )
+        .expect("each flattened generic instantiation should be inspected");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesInSecondGenericInstantiation = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the second generic instantiation must retain alias detection:\n{rendered}"
     );
 }
 

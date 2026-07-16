@@ -1174,13 +1174,24 @@ fn flattened_payload_datatype(
     let DataType::Reference(Reference::Named(reference)) = &ty else {
         return Ok(ty);
     };
-    let Some(referenced) = original_types.get(reference) else {
+    let Some(mut referenced) = original_types.get(reference) else {
         return Ok(ty);
     };
     let Some(mut payload) = referenced.ty.clone() else {
         return Ok(ty);
     };
     substitute_generics(&mut payload, named_reference_generics(reference));
+    if let Some(converted) = conversion_datatype_for_mode(&payload, mode)? {
+        payload = converted;
+        if let DataType::Reference(Reference::Named(reference)) = &payload
+            && let Some(converted) = original_types.get(reference)
+            && let Some(mut converted_payload) = converted.ty.clone()
+        {
+            substitute_generics(&mut converted_payload, named_reference_generics(reference));
+            referenced = converted;
+            payload = converted_payload;
+        }
+    }
     if !datatype_has_flattened_aliases(&payload, original_types, &mut HashSet::new()) {
         return Ok(ty);
     }
@@ -1248,14 +1259,17 @@ fn fields_have_flattened_aliases(
             return false;
         };
         let identity = TypeIdentity::from_ndt(referenced);
-        if !visited.insert(identity) {
+        if !visited.insert(identity.clone()) {
             return false;
         }
         let Some(mut payload) = referenced.ty.clone() else {
+            visited.remove(&identity);
             return false;
         };
         substitute_generics(&mut payload, named_reference_generics(&reference));
-        datatype_has_flattened_aliases(&payload, types, visited)
+        let has_aliases = datatype_has_flattened_aliases(&payload, types, visited);
+        visited.remove(&identity);
+        has_aliases
     })
 }
 
