@@ -190,6 +190,34 @@ fn test_optional_unnamed_field_is_rejected() {
 }
 
 #[test]
+fn test_optional_named_field_uses_optional_record_key() {
+    #[derive(Type)]
+    struct OptionalNamed {
+        #[specta(optional)]
+        value: Option<String>,
+    }
+
+    let out = export::<OptionalNamed>();
+    assert!(out.contains("value?: option<string>"), "output: {out}");
+    assert!(!out.contains("option<option<string>>"), "output: {out}");
+}
+
+#[test]
+fn test_serde_default_field_uses_optional_record_key() {
+    #[derive(Type, serde::Serialize)]
+    struct SerdeDefault {
+        #[serde(default)]
+        value: String,
+    }
+
+    let out = ReScript::default()
+        .with_serde()
+        .export(&Types::default().register::<SerdeDefault>())
+        .unwrap();
+    assert!(out.contains("value?: string"), "output: {out}");
+}
+
+#[test]
 fn test_empty_unnamed_fields_are_rejected() {
     #[derive(Type)]
     struct EmptyTuple();

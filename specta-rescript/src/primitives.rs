@@ -443,16 +443,12 @@ fn render_named_fields(
                 return Err(Error::InvalidRecordLabel(name.to_string()));
             }
             let ty_str = datatype_to_rescript(types, scope, ty)?;
-            let final_ty = if field.optional {
-                format!("option<{}>", ty_str)
-            } else {
-                ty_str
-            };
             let mut out = render_docs(&field.docs, "  ");
             if let Some(dep) = &field.deprecated {
                 out.push_str(&render_deprecated(dep, "  "));
             }
-            out.push_str(&format!("  {}: {}", name, final_ty));
+            let optional = if field.optional { "?" } else { "" };
+            out.push_str(&format!("  {name}{optional}: {ty_str}"));
             Ok(out)
         })
         .collect()
