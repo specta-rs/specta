@@ -1842,6 +1842,14 @@ fn collect_flattened_keys(
                 Some(EnumRepr::Untagged) | None => {}
             }
             for (name, variant) in &enm.variants {
+                let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
+                    .ok()
+                    .flatten()
+                    .as_ref()
+                    .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
+                if skipped {
+                    continue;
+                }
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, name)
                         .ok()

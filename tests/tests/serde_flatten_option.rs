@@ -405,6 +405,50 @@ struct AliasBesidePhasedAdjacentContent {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[serde(skip)]
+    Hidden {
+        inactive_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSkippedUntaggedVariant {
+    #[serde(alias = "inactive_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithPhaseSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[serde(skip_serializing)]
+    DeserializeOnly {
+        phased_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesidePhasedSkippedUntaggedVariant {
+    #[serde(alias = "phased_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithPhaseSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1143,6 +1187,55 @@ fn skipped_adjacent_newtype_content_is_collected_per_phase() {
     assert!(
         !deserialize.contains("content?: never"),
         "deserialize accepts the adjacent content key:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_untagged_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSkippedUntaggedVariant>(),
+            specta_serde::Format,
+        )
+        .expect("untagged enum with a skipped variant should export");
+    let parent = rendered
+        .split_once("export type AliasBesideSkippedUntaggedVariant = ")
+        .expect("untagged parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("inactive_key?: never"),
+        "a skipped variant key must not relax the alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn phase_skipped_untagged_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesidePhasedSkippedUntaggedVariant>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-skipped untagged variant should export");
+    let deserialize = rendered
+        .split_once("export type AliasBesidePhasedSkippedUntaggedVariant_Deserialize = ")
+        .expect("deserialize parent should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    let serialize = rendered
+        .split_once("export type UntaggedWithPhaseSkippedCollisionKey_Serialize = ")
+        .expect("serialize enum should be exported")
+        .1;
+
+    assert!(
+        !deserialize.contains("phased_key?: never"),
+        "the deserialize-active key must relax alias exclusivity:\n{rendered}"
+    );
+    assert!(
+        !serialize.contains("phased_key: string"),
+        "the serialize phase must omit the skipped variant:\n{rendered}"
     );
 }
 
