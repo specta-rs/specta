@@ -145,6 +145,30 @@ struct ParentKeyCollidesWithFlattenedAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct RecursiveFlattenedAlias {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    next: Option<Box<RecursiveFlattenedAlias>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct UnrelatedFlattenedPayload {
+    y: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasWithUnrelatedFlatten {
+    #[serde(alias = "old_x")]
+    x: String,
+    #[serde(flatten)]
+    payload: UnrelatedFlattenedPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(untagged)]
 enum AliasedFlattenEnumPayload {
     Value {
@@ -194,6 +218,15 @@ struct ParentKeyCollidesInSecondGenericInstantiation {
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct ParentKeyCollidesThroughFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentAliasCollidesThroughFlattenedWrapper {
+    #[serde(alias = "value")]
     outer_key: String,
     #[serde(flatten)]
     wrapper: FlattenWrapper<AliasedFlattenPayload>,
@@ -569,7 +602,7 @@ fn conditional_flatten_exports_optional_union() {
     for expected in [
         "export type FlatConditional = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
         "export type InternalFlattenConditional = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
-        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n});",
+        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n});",
     ] {
         assert!(
             rendered.contains(expected),
@@ -647,7 +680,7 @@ fn aliases_inside_flattened_enum_payloads_do_not_exclude_parent_keys() {
         .expect("parent enum type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the flattened enum use must relax alias exclusions:\n{rendered}"
     );
 }
@@ -682,8 +715,39 @@ fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
         .expect("parent type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn recursive_flattened_aliases_do_not_recurse_during_export() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<RecursiveFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("recursive flattened aliases should export");
+
+    assert!(
+        rendered.contains("export type RecursiveFlattenedAlias"),
+        "recursive type should be present:\n{rendered}"
+    );
+}
+
+#[test]
+fn unrelated_flattened_keys_preserve_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasWithUnrelatedFlatten>(),
+            specta_serde::Format,
+        )
+        .expect("alias with unrelated flatten should export");
+
+    assert!(
+        rendered.contains("x: string,\n\told_x?: never,")
+            && rendered.contains("old_x: string,\n\tx?: never,"),
+        "ordinary alias exclusions should be preserved:\n{rendered}"
     );
 }
 
@@ -713,8 +777,27 @@ fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
         .expect("parent type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the flattened wrapper use must relax nested alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn parent_aliases_detect_keys_through_flattened_generic_wrappers() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentAliasCollidesThroughFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("parent alias collisions through generic wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentAliasCollidesThroughFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("value?: never"),
+        "the flattened generic key must relax the parent alias exclusion:\n{rendered}"
     );
 }
 
@@ -742,7 +825,7 @@ fn aliases_through_flattened_conversions_do_not_exclude_parent_keys() {
         .expect("parent type should be exported")
         .1;
     assert!(
-        !parent.contains("never"),
+        !parent.contains("outer_key?: never"),
         "the converted flattened use must relax alias exclusions:\n{rendered}"
     );
 }
@@ -844,7 +927,7 @@ fn aliases_inside_internal_tag_flattened_payloads_do_not_exclude_sibling_keys() 
         .expect("internal-tag type should be exported")
         .1;
     assert!(
-        !variant.contains("never"),
+        !variant.contains("outer_key?: never"),
         "the internal-tag flattened use must relax alias exclusions:\n{rendered}"
     );
 }
@@ -875,7 +958,7 @@ fn aliases_inside_internal_tag_newtype_payloads_do_not_exclude_tag_keys() {
         .expect("internal-tag type should be exported")
         .1;
     assert!(
-        !variant.contains("never"),
+        !variant.contains("t?: never"),
         "the internally tagged use must relax tag-key exclusions:\n{rendered}"
     );
 }
