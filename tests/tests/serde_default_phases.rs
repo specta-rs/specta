@@ -98,6 +98,20 @@ struct OptionWithDeserializeCodec {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct OptionChild {
+    value: Option<i32>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OptionParent {
+    #[serde(default)]
+    flag: bool,
+    child: OptionChild,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct Wrapper<T> {
     inner: T,
 }
@@ -532,6 +546,20 @@ fn option_with_deserialize_codec_is_not_optional() {
         rendered.contains("featured: boolean | null"),
         "a deserialize codec must keep an Option field required: {rendered}"
     );
+}
+
+#[test]
+fn option_children_split_for_deserialize() {
+    assert!(serde_json::from_str::<OptionParent>(r#"{"child":{}}"#).is_ok());
+
+    let rendered = Typescript::default()
+        .export(&Types::default().register::<OptionParent>(), PhasesFormat)
+        .expect("PhasesFormat should split Option-bearing child types");
+
+    assert!(rendered.contains(
+        "OptionParent_Deserialize = {\n\tflag?: boolean,\n\tchild: OptionChild_Deserialize,"
+    ));
+    assert!(rendered.contains("OptionChild_Deserialize = {\n\tvalue?: number | null,"));
 }
 
 /// Split propagation through generic instantiation: `GenericParent_Serialize`
