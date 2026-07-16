@@ -190,6 +190,29 @@ fn test_optional_unnamed_field_is_rejected() {
 }
 
 #[test]
+fn test_empty_unnamed_fields_are_rejected() {
+    #[derive(Type)]
+    struct EmptyTuple();
+
+    #[derive(Type)]
+    enum EmptyTupleVariant {
+        Empty(),
+        Unit,
+    }
+
+    for error in [
+        export_err::<EmptyTuple>(),
+        export_err::<EmptyTupleVariant>(),
+    ] {
+        assert!(matches!(
+            error,
+            specta_rescript::Error::UnsupportedType(message)
+                if message.contains("Empty unnamed fields")
+        ));
+    }
+}
+
+#[test]
 fn test_skipped_unnamed_field_is_rejected() {
     #[derive(Type)]
     struct SkippedTuple(#[specta(skip)] i32, String);

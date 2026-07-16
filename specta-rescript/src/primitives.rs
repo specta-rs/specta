@@ -145,7 +145,9 @@ fn unnamed_field_types(
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<Option<Vec<String>>> {
     if uf.fields.is_empty() {
-        return Ok(None);
+        return Err(Error::UnsupportedType(
+            "Empty unnamed fields cannot be represented as ReScript tuples or variants".to_string(),
+        ));
     }
     if uf.fields.iter().any(|field| field.ty.is_none()) {
         return Err(Error::UnsupportedType(
