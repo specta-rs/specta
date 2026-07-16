@@ -5,6 +5,7 @@ use specta::{
     Type, Types,
     datatype::{NamedDataType, Primitive},
 };
+use specta_typescript::Typescript;
 use specta_util::Remapper;
 use specta_zod::{Layout, Zod};
 
@@ -148,6 +149,50 @@ enum UntaggedMatchingField {
     Empty {},
 }
 
+// The TypeScript fixture consumes a generic constrained by this type. The
+// previous intersection-of-unions lowering expanded it into 2^16 branches.
+#[derive(Type, Serialize, Deserialize)]
+struct AliasHeavy {
+    #[serde(alias = "first_old")]
+    first: String,
+    #[serde(alias = "second_old")]
+    second: String,
+    #[serde(alias = "third_old")]
+    third: String,
+    #[serde(alias = "fourth_old")]
+    fourth: String,
+    #[serde(alias = "fifth_old")]
+    fifth: String,
+    #[serde(alias = "sixth_old")]
+    sixth: String,
+    #[serde(alias = "seventh_old")]
+    seventh: String,
+    #[serde(alias = "eighth_old")]
+    eighth: String,
+    #[serde(alias = "ninth_old")]
+    ninth: String,
+    #[serde(alias = "tenth_old")]
+    tenth: String,
+    #[serde(alias = "eleventh_old")]
+    eleventh: String,
+    #[serde(alias = "twelfth_old")]
+    twelfth: String,
+    #[serde(alias = "thirteenth_old")]
+    thirteenth: String,
+    #[serde(alias = "fourteenth_old")]
+    fourteenth: String,
+    #[serde(alias = "fifteenth_old")]
+    fifteenth: String,
+    #[serde(alias = "sixteenth_old")]
+    sixteenth: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct OptionalAlias {
+    #[serde(default, alias = "value_old")]
+    value: Option<String>,
+}
+
 mod r#type {
     use super::*;
 
@@ -282,5 +327,15 @@ fn main() {
         .layout(Layout::Files)
         .with_raw("export const runtime = true;")
         .export_to(out.join("files"), &types, specta_serde::Format)
+        .unwrap();
+    let alias_types = Types::default()
+        .register::<AliasHeavy>()
+        .register::<OptionalAlias>();
+    Typescript::default()
+        .export_to(
+            out.join("serde-aliases.ts"),
+            &alias_types,
+            specta_serde::Format,
+        )
         .unwrap();
 }

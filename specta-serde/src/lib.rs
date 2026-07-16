@@ -128,6 +128,9 @@ use phased::PhasedTy;
 use repr::EnumRepr;
 
 const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
+// This synthetic enum is rendered specially by exporters that can preserve
+// field-alias exclusivity without expanding intersections of unions.
+const FIELD_ALIAS_UNION_MARKER: &str = "specta:serde_field_alias_union";
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -1307,6 +1310,7 @@ fn alias_field_union(names: Vec<Cow<'static, str>>, field: Field) -> DataType {
     // This synthetic union is already in its final exported shape; see
     // `ENUM_REPR_REWRITTEN_MARKER`.
     aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    aliases.attributes.insert(FIELD_ALIAS_UNION_MARKER, true);
 
     DataType::Enum(aliases)
 }
