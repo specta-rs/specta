@@ -129,6 +129,14 @@ struct ParentKeyCollidesWithConvertedFlattenedAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct ParentKeyCollidesThroughConvertedFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<ConvertedAliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct ParentKeyCollidesWithFlattenedAlias {
     outer_key: String,
     #[serde(flatten)]
@@ -736,6 +744,37 @@ fn aliases_through_flattened_conversions_do_not_exclude_parent_keys() {
     assert!(
         !parent.contains("never"),
         "the converted flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_nested_flattened_conversions_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesThroughConvertedFlattenedWrapper {
+        outer_key: "outer".into(),
+        wrapper: FlattenWrapper {
+            inner: ConvertedAliasedFlattenPayload {
+                value: "inner".into(),
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughConvertedFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind nested flattened conversions should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughConvertedFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("never"),
+        "the nested converted flattened use must relax alias exclusions:\n{rendered}"
     );
 }
 

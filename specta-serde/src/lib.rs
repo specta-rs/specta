@@ -1192,7 +1192,7 @@ fn flattened_payload_datatype(
             payload = converted_payload;
         }
     }
-    if !datatype_has_flattened_aliases(&payload, original_types, &mut HashSet::new()) {
+    if !datatype_has_flattened_aliases(&payload, mode, original_types, &mut HashSet::new()) {
         return Ok(ty);
     }
     match &mut payload {
@@ -1218,21 +1218,24 @@ fn flattened_payload_datatype(
 
 fn datatype_has_flattened_aliases(
     ty: &DataType,
+    mode: PhaseRewrite,
     types: &Types,
     visited: &mut HashSet<TypeIdentity>,
 ) -> bool {
     match ty {
-        DataType::Struct(strct) => fields_have_flattened_aliases(&strct.fields, types, visited),
-        DataType::Enum(enm) => enm
-            .variants
-            .iter()
-            .any(|(_, variant)| fields_have_flattened_aliases(&variant.fields, types, visited)),
+        DataType::Struct(strct) => {
+            fields_have_flattened_aliases(&strct.fields, mode, types, visited)
+        }
+        DataType::Enum(enm) => enm.variants.iter().any(|(_, variant)| {
+            fields_have_flattened_aliases(&variant.fields, mode, types, visited)
+        }),
         _ => false,
     }
 }
 
 fn fields_have_flattened_aliases(
     fields: &Fields,
+    mode: PhaseRewrite,
     types: &Types,
     visited: &mut HashSet<TypeIdentity>,
 ) -> bool {
@@ -1267,7 +1270,17 @@ fn fields_have_flattened_aliases(
             return false;
         };
         substitute_generics(&mut payload, named_reference_generics(&reference));
-        let has_aliases = datatype_has_flattened_aliases(&payload, types, visited);
+        if let Ok(Some(converted)) = conversion_datatype_for_mode(&payload, mode) {
+            payload = converted;
+            if let DataType::Reference(Reference::Named(reference)) = &payload
+                && let Some(converted) = types.get(reference)
+                && let Some(mut converted_payload) = converted.ty.clone()
+            {
+                substitute_generics(&mut converted_payload, named_reference_generics(reference));
+                payload = converted_payload;
+            }
+        }
+        let has_aliases = datatype_has_flattened_aliases(&payload, mode, types, visited);
         visited.remove(&identity);
         has_aliases
     })
