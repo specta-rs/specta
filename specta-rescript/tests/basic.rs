@@ -190,6 +190,44 @@ fn test_optional_unnamed_field_is_rejected() {
 }
 
 #[test]
+fn test_skipped_unnamed_field_is_rejected() {
+    #[derive(Type)]
+    struct SkippedTuple(#[specta(skip)] i32, String);
+
+    assert!(matches!(
+        export_err::<SkippedTuple>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Skipped unnamed fields")
+    ));
+}
+
+#[test]
+fn test_result_detection_validates_unnamed_fields() {
+    #[derive(Type)]
+    enum OptionalResult {
+        Ok(#[specta(optional)] String),
+        Err(String),
+    }
+
+    #[derive(Type)]
+    enum SkippedResult {
+        Ok(#[specta(skip)] i32, String),
+        Err(String),
+    }
+
+    assert!(matches!(
+        export_err::<OptionalResult>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Optional unnamed fields")
+    ));
+    assert!(matches!(
+        export_err::<SkippedResult>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Skipped unnamed fields")
+    ));
+}
+
+#[test]
 fn test_serde_record_label_is_validated() {
     #[derive(Type, serde::Serialize)]
     struct RenamedField {

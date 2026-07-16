@@ -137,30 +137,40 @@ fn build_scope(ndt: &NamedDataType) -> Vec<(Generic, Cow<'static, str>)> {
         .collect()
 }
 
-/// Renders the active (non-None) field types of an unnamed fields list.
-/// Returns `None` if there are no active fields, `Some(rendered_types)` otherwise.
+/// Renders the field types of an unnamed fields list.
+/// Returns `None` if there are no fields, `Some(rendered_types)` otherwise.
 fn unnamed_field_types(
     types: &Types,
     scope: Scope<'_>,
     uf: &specta::datatype::UnnamedFields,
 ) -> Result<Option<Vec<String>>> {
-    let active: Vec<_> = uf
-        .fields
-        .iter()
-        .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
-        .collect();
-    if active.is_empty() {
+    if uf.fields.is_empty() {
         return Ok(None);
     }
-    if active.iter().any(|(field, _)| field.optional) {
+    if uf.fields.iter().any(|field| field.ty.is_none()) {
+        return Err(Error::UnsupportedType(
+            "Skipped unnamed fields cannot be represented in ReScript tuples or variants"
+                .to_string(),
+        ));
+    }
+    if uf.fields.iter().any(|field| field.optional) {
         return Err(Error::UnsupportedType(
             "Optional unnamed fields cannot be represented in ReScript tuples or variants"
                 .to_string(),
         ));
     }
-    active
+    uf.fields
         .iter()
-        .map(|(_, ty)| datatype_to_rescript(types, scope, ty))
+        .map(|field| {
+            datatype_to_rescript(
+                types,
+                scope,
+                field
+                    .ty
+                    .as_ref()
+                    .expect("skipped unnamed fields were rejected above"),
+            )
+        })
         .collect::<Result<Vec<_>>>()
         .map(Some)
 }
@@ -172,7 +182,7 @@ fn unnamed_field_types(
 /// Detect whether an Enum represents Rust's `Result<T, E>`.
 ///
 /// Criteria: exactly two non-skipped variants named "Ok" and "Err",
-/// each with exactly one non-skipped unnamed field.
+/// each with exactly one required, non-skipped unnamed field.
 ///
 /// When true, we emit `result<ok_ty, err_ty>` using ReScript's built-in
 /// result type. Note that ReScript's result uses `Ok`/`Error` constructors
@@ -185,9 +195,9 @@ fn is_result_enum(e: &specta::datatype::Enum) -> bool {
     a.0 == "Ok"
         && b.0 == "Err"
         && [a, b].iter().all(|v| {
-            matches!(&v.1.fields, Fields::Unnamed(uf) if {
-                uf.fields.iter().filter(|f| f.ty.is_some()).count() == 1
-            })
+            matches!(&v.1.fields, Fields::Unnamed(uf) if uf.fields.len() == 1
+                && uf.fields[0].ty.is_some()
+                && !uf.fields[0].optional)
         })
 }
 
