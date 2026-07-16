@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, path::Path};
 
 use specta::{
     Format as FormatTrait, Types,
-    datatype::{DataType, Fields},
+    datatype::{DataType, Fields, NamedReferenceType, Reference},
 };
 
 use crate::{
@@ -64,6 +64,9 @@ impl ReScript {
             Cow::Borrowed(types)
         };
 
+        if self.serde {
+            validate_serde_enum_representations(&processed)?;
+        }
         validate_type_names(&processed)?;
 
         let mut out = String::new();
@@ -131,6 +134,70 @@ impl ReScript {
         }
         std::fs::write(path, content)?;
         Ok(())
+    }
+}
+
+fn validate_serde_enum_representations(types: &Types) -> Result<()> {
+    types
+        .into_unsorted_iter()
+        .filter_map(|ty| ty.ty.as_ref())
+        .try_for_each(validate_serde_datatype)
+}
+
+fn validate_serde_datatype(dt: &DataType) -> Result<()> {
+    match dt {
+        DataType::Primitive(_) | DataType::Generic(_) => Ok(()),
+        DataType::Nullable(inner) => validate_serde_datatype(inner),
+        DataType::List(list) => validate_serde_datatype(&list.ty),
+        DataType::Map(map) => {
+            validate_serde_datatype(map.key_ty())?;
+            validate_serde_datatype(map.value_ty())
+        }
+        DataType::Struct(structure) => validate_serde_fields(&structure.fields),
+        DataType::Enum(enumeration) => {
+            if enumeration
+                .attributes
+                .get_named_as::<bool>("serde:container:untagged")
+                == Some(&true)
+            {
+                return Err(Error::UnsupportedType(
+                    "Serde untagged enums cannot be represented as ReScript variants".to_string(),
+                ));
+            }
+            enumeration
+                .variants
+                .iter()
+                .try_for_each(|(_, variant)| validate_serde_fields(&variant.fields))
+        }
+        DataType::Tuple(tuple) => tuple.elements.iter().try_for_each(validate_serde_datatype),
+        DataType::Intersection(types) => types.iter().try_for_each(validate_serde_datatype),
+        DataType::Reference(Reference::Named(named)) => match &named.inner {
+            NamedReferenceType::Inline { dt, .. } => validate_serde_datatype(dt),
+            NamedReferenceType::Reference { generics, .. } => generics
+                .iter()
+                .try_for_each(|(_, ty)| validate_serde_datatype(ty)),
+            NamedReferenceType::Recursive(recursive) => recursive
+                .generics()
+                .iter()
+                .try_for_each(|(_, ty)| validate_serde_datatype(ty)),
+        },
+        DataType::Reference(Reference::Opaque(_)) => Ok(()),
+    }
+}
+
+fn validate_serde_fields(fields: &Fields) -> Result<()> {
+    match fields {
+        Fields::Unit => Ok(()),
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .try_for_each(validate_serde_datatype),
+        Fields::Named(fields) => fields
+            .fields
+            .iter()
+            .filter_map(|(_, field)| field.ty.as_ref())
+            .try_for_each(validate_serde_datatype),
     }
 }
 

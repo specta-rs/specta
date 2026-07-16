@@ -294,6 +294,24 @@ fn test_standard_result_uses_builtin_without_alias() {
 }
 
 #[test]
+fn test_serde_untagged_enum_is_rejected() {
+    #[derive(Type, serde::Serialize)]
+    #[serde(untagged)]
+    enum UntaggedValue {
+        Text(String),
+        Number(i32),
+    }
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<UntaggedValue>()),
+        Err(specta_rescript::Error::UnsupportedType(message))
+            if message.contains("Serde untagged enums")
+    ));
+}
+
+#[test]
 fn test_standard_result_with_serde_uses_builtin() {
     #[derive(Type, serde::Serialize)]
     struct WithResult {
