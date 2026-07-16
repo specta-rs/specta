@@ -2737,11 +2737,23 @@ fn transform_internal_variant(
             };
 
             if !payload.is_effectively_empty {
+                let contextual_payload = flattened_payload_datatype(
+                    payload_ty.clone(),
+                    mode,
+                    original_types,
+                    &HashMap::new(),
+                    &HashSet::new(),
+                )?;
+                let payload_ty = if contextual_payload != payload_ty {
+                    contextual_payload
+                } else {
+                    payload.replacement.unwrap_or(payload_ty)
+                };
                 return Ok(clone_variant_with_unnamed_fields(
                     variant,
                     vec![Field::new(DataType::Intersection(vec![
                         named_fields_datatype(fields),
-                        payload.replacement.unwrap_or(payload_ty),
+                        payload_ty,
                     ]))],
                 ));
             }

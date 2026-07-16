@@ -154,6 +154,20 @@ enum InternalTagWithFlattenedAliasCollision {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct InternalTagAliasPayload {
+    #[serde(alias = "t")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagNewtypeAliasCollision {
+    Value(InternalTagAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -672,6 +686,37 @@ fn aliases_inside_internal_tag_flattened_payloads_do_not_exclude_sibling_keys() 
     assert!(
         !variant.contains("never"),
         "the internal-tag flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_internal_tag_newtype_payloads_do_not_exclude_tag_keys() {
+    let value = InternalTagNewtypeAliasCollision::Value(InternalTagAliasPayload {
+        value: "payload".into(),
+    });
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "t": "Value", "value": "payload" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNewtypeAliasCollision>(),
+            specta_serde::Format,
+        )
+        .expect("internal-tag newtype aliases should export");
+    assert!(
+        rendered
+            .contains("export type InternalTagAliasPayload = {\n\tvalue: string,\n\tt?: never,"),
+        "ordinary payload uses must retain alias exclusions:\n{rendered}"
+    );
+    let variant = rendered
+        .split_once("export type InternalTagNewtypeAliasCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+    assert!(
+        !variant.contains("never"),
+        "the internally tagged use must relax tag-key exclusions:\n{rendered}"
     );
 }
 
