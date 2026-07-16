@@ -208,6 +208,16 @@ fn is_result_enum(e: &specta::datatype::Enum) -> bool {
         })
 }
 
+fn ensure_enum_has_variants(e: &specta::datatype::Enum) -> Result<()> {
+    if e.variants.iter().all(|(_, variant)| variant.skip) {
+        return Err(Error::UnsupportedType(
+            "Enums without variants cannot be represented as ReScript variants".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Extract the single active field type from a variant assumed to have exactly
 /// one unnamed field. Panics if the invariant is violated (only call after
 /// `is_result_enum` confirmed the shape).
@@ -295,6 +305,7 @@ pub fn datatype_to_rescript(types: &Types, scope: Scope<'_>, dt: &DataType) -> R
                 let err_str = datatype_to_rescript(types, scope, err_ty)?;
                 return Ok(format!("result<{}, {}>", ok_str, err_str));
             }
+            ensure_enum_has_variants(e)?;
             let all_unit = e
                 .variants
                 .iter()
@@ -608,6 +619,8 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 return Ok(out);
             }
 
+            ensure_enum_has_variants(e)?;
+
             // All unit variants -> polymorphic variants
             let all_unit = e
                 .variants
@@ -616,12 +629,6 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 .all(|(_, v)| matches!(v.fields, Fields::Unit));
 
             if all_unit {
-                if e.variants.iter().all(|(_, variant)| variant.skip) {
-                    return Err(Error::UnsupportedType(
-                        "Enums without variants cannot be represented as ReScript variants"
-                            .to_string(),
-                    ));
-                }
                 for (name, _) in e.variants.iter().filter(|(_, variant)| !variant.skip) {
                     if !is_valid_polymorphic_variant(name) {
                         return Err(Error::InvalidPolymorphicVariant(name.to_string()));

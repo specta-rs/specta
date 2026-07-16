@@ -689,9 +689,23 @@ fn test_empty_unit_enum_is_rejected() {
         Skipped,
     }
 
+    #[derive(Type)]
+    struct InlineEmptyUnitEnum {
+        #[specta(inline)]
+        value: EmptyUnitEnum,
+    }
+
+    #[derive(Type)]
+    struct InlineFullySkippedUnitEnum {
+        #[specta(inline)]
+        value: FullySkippedUnitEnum,
+    }
+
     for error in [
         export_err::<EmptyUnitEnum>(),
         export_err::<FullySkippedUnitEnum>(),
+        export_err::<InlineEmptyUnitEnum>(),
+        export_err::<InlineFullySkippedUnitEnum>(),
     ] {
         assert!(matches!(
             error,
