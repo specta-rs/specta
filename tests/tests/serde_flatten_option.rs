@@ -95,6 +95,21 @@ struct AliasFlattenCollision {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct AliasedFlattenPayload {
+    #[serde(alias = "outer_key")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithFlattenedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: AliasedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -483,6 +498,28 @@ fn flattened_keys_do_not_become_alias_exclusions() {
             specta_serde::Format,
         )
         .expect("flattened aliases should export without excluding flattened keys");
+    assert!(!rendered.contains("never"), "{rendered}");
+}
+
+#[test]
+fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithFlattenedAlias {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("flattened payload aliases should not exclude parent keys");
     assert!(!rendered.contains("never"), "{rendered}");
 }
 

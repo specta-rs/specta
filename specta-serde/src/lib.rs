@@ -128,6 +128,7 @@ use phased::PhasedTy;
 use repr::EnumRepr;
 
 const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
+const FLATTENED_PAYLOAD_MARKER: &str = "specta_serde:flattened_payload";
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -166,6 +167,7 @@ impl specta::Format for Format {
         let mut out = types.clone();
         let generated = HashMap::<TypeIdentity, SplitGeneratedTypes>::new();
         let split_types = HashSet::<TypeIdentity>::new();
+        let flattened_payloads = flattened_payload_types(types);
         let mut rewrite_err = None;
 
         out.iter_mut(|ndt| {
@@ -174,6 +176,7 @@ impl specta::Format for Format {
             }
 
             let ndt_name = ndt.name.to_string();
+            mark_flattened_payload(ndt, &flattened_payloads);
 
             // Compute the container rename before `rewrite_datatype_for_phase` runs: some
             // rewrites (e.g. enum representation lowering) clear the container's serde
@@ -249,6 +252,7 @@ impl specta::Format for PhasesFormat {
         validate::validate_for_mode(types, validate::ApplyMode::Phases)?;
 
         let originals = types.into_unsorted_iter().collect::<Vec<_>>();
+        let flattened_payloads = flattened_payload_types(types);
         let mut dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
         let mut reverse_dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
 
@@ -424,6 +428,8 @@ impl specta::Format for PhasesFormat {
             if split_types.contains(&key) || generated_types.contains(&key) {
                 return;
             }
+
+            mark_flattened_payload(ndt, &flattened_payloads);
 
             // As above: apply the container rename before `rewrite_datatype_for_phase`
             // mutates (and, for some enum representations, clears) the container's
@@ -847,6 +853,83 @@ impl TypeIdentity {
     }
 }
 
+fn flattened_payload_types(types: &Types) -> HashSet<TypeIdentity> {
+    let mut flattened = HashSet::new();
+    for ndt in types.into_unsorted_iter() {
+        if let Some(ty) = &ndt.ty {
+            collect_flattened_payload_types(ty, types, &mut flattened);
+        }
+    }
+    flattened
+}
+
+fn collect_flattened_payload_types(
+    ty: &DataType,
+    types: &Types,
+    flattened: &mut HashSet<TypeIdentity>,
+) {
+    let fields = match ty {
+        DataType::Struct(strct) => std::slice::from_ref(&strct.fields),
+        DataType::Enum(enm) => {
+            for (_, variant) in &enm.variants {
+                collect_flattened_payload_fields(&variant.fields, types, flattened);
+            }
+            return;
+        }
+        _ => return,
+    };
+
+    for fields in fields {
+        collect_flattened_payload_fields(fields, types, flattened);
+    }
+}
+
+fn collect_flattened_payload_fields(
+    fields: &Fields,
+    types: &Types,
+    flattened: &mut HashSet<TypeIdentity>,
+) {
+    let Fields::Named(fields) = fields else {
+        return;
+    };
+
+    for (_, field) in &fields.fields {
+        let Some(ty) = &field.ty else {
+            continue;
+        };
+
+        if field_is_flattened(field) {
+            let mut ty = ty;
+            while let DataType::Nullable(inner) = ty {
+                ty = inner;
+            }
+            if let DataType::Reference(Reference::Named(reference)) = ty
+                && let Some(ndt) = types.get(reference)
+            {
+                flattened.insert(TypeIdentity::from_ndt(ndt));
+            }
+        }
+
+        collect_flattened_payload_types(ty, types, flattened);
+    }
+}
+
+fn mark_flattened_payload(ndt: &mut NamedDataType, flattened: &HashSet<TypeIdentity>) {
+    if !flattened.contains(&TypeIdentity::from_ndt(ndt)) {
+        return;
+    }
+
+    match ndt.ty.as_mut() {
+        Some(DataType::Struct(strct)) => {
+            strct.attributes.insert(FLATTENED_PAYLOAD_MARKER, true);
+        }
+        Some(DataType::Enum(enm)) => {
+            enm.attributes.insert(FLATTENED_PAYLOAD_MARKER, true);
+        }
+        _ => {}
+    }
+}
+
 fn rewrite_datatype_for_phase(
     ty: &mut DataType,
     mode: PhaseRewrite,
@@ -945,7 +1028,10 @@ fn rewrite_datatype_for_phase(
                 *ty = intersection;
                 return Ok(());
             }
-            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode, true)? {
+            let exclude_aliases = !s.attributes.contains_key(FLATTENED_PAYLOAD_MARKER);
+            if let Some(intersection) =
+                lower_field_aliases_for_phase(&mut s.fields, mode, exclude_aliases)?
+            {
                 *ty = intersection;
             }
         }
