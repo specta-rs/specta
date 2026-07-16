@@ -39,7 +39,6 @@
 
 - ✅ **Stable**: Production-ready with comprehensive test coverage
 - 🚧 **Partial**: Basic functionality implemented, complex types in progress
-- 🚧 **Planned**: In development or planned for future release
 
 ## Implementation Status
 
