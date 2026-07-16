@@ -423,7 +423,7 @@ fn conditional_flatten_exports_optional_union() {
     for expected in [
         "export type FlatConditional = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
         "export type InternalFlattenConditional = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
-        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n});",
+        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ((({\n\tvalue: string,\n} & {\n\told_value: string,\n}) extends infer T extends object ? { [K in keyof T]: { [P in K]: T[P] } & { [P in Exclude<keyof T, K>]?: never } }[keyof T] : never)) & Inner1 | {\n\tt: \"A\",\n} & ((({\n\tvalue: string,\n} & {\n\told_value: string,\n}) extends infer T extends object ? { [K in keyof T]: { [P in K]: T[P] } & { [P in Exclude<keyof T, K>]?: never } }[keyof T] : never));",
     ] {
         assert!(
             rendered.contains(expected),
@@ -440,7 +440,7 @@ fn conditional_flatten_exports_optional_union() {
         "export type InternalFlattenConditional_Serialize = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
         "export type InternalFlattenConditional_Deserialize = {\n\tt: \"A\",\n} & Inner1;",
         "export type InternalFlattenConditionalAlias_Serialize = {\n\tt: \"A\",\n} & {\n\tvalue: string,\n} & Inner1 | {\n\tt: \"A\",\n} & {\n\tvalue: string,\n};",
-        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1;",
+        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ((({\n\tvalue: string,\n} & {\n\told_value: string,\n}) extends infer T extends object ? { [K in keyof T]: { [P in K]: T[P] } & { [P in Exclude<keyof T, K>]?: never } }[keyof T] : never)) & Inner1;",
     ] {
         assert!(
             phased.contains(expected),
