@@ -616,6 +616,12 @@ pub fn export_type(types: &Types, dt: &NamedDataType) -> Result<String> {
                 .all(|(_, v)| matches!(v.fields, Fields::Unit));
 
             if all_unit {
+                if e.variants.iter().all(|(_, variant)| variant.skip) {
+                    return Err(Error::UnsupportedType(
+                        "Enums without variants cannot be represented as ReScript variants"
+                            .to_string(),
+                    ));
+                }
                 for (name, _) in e.variants.iter().filter(|(_, variant)| !variant.skip) {
                     if !is_valid_polymorphic_variant(name) {
                         return Err(Error::InvalidPolymorphicVariant(name.to_string()));

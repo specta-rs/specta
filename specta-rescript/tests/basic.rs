@@ -678,6 +678,29 @@ fn test_serde_keyword_unit_variant_is_rejected() {
     ));
 }
 
+#[test]
+fn test_empty_unit_enum_is_rejected() {
+    #[derive(Type)]
+    enum EmptyUnitEnum {}
+
+    #[derive(Type)]
+    enum FullySkippedUnitEnum {
+        #[specta(skip)]
+        Skipped,
+    }
+
+    for error in [
+        export_err::<EmptyUnitEnum>(),
+        export_err::<FullySkippedUnitEnum>(),
+    ] {
+        assert!(matches!(
+            error,
+            specta_rescript::Error::UnsupportedType(message)
+                if message.contains("Enums without variants")
+        ));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Deprecated rendering
 // ---------------------------------------------------------------------------
