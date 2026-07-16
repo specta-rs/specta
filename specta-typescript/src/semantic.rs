@@ -763,7 +763,7 @@ impl Configuration {
             DataType::Intersection(items) => {
                 let mut ty = items.clone();
                 let mut changed = false;
-                let parts = items
+                let mut parts = items
                     .iter()
                     .enumerate()
                     .filter_map(|(idx, item)| {
@@ -782,6 +782,8 @@ impl Configuration {
                         Some(runtime)
                     })
                     .collect::<Vec<_>>();
+
+                parts.dedup();
 
                 match parts.as_slice() {
                     [] => None,
