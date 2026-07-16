@@ -169,6 +169,30 @@ struct AliasWithUnrelatedFlatten {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct AliasWithFlattenedMap {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    rest: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedExternalTag {
+    Kind { payload: String },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideFlattenedExternalTag {
+    #[serde(alias = "Kind")]
+    value: String,
+    #[serde(flatten)]
+    tagged: FlattenedExternalTag,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct NestedAliasedObject {
     #[serde(alias = "outer_key")]
     value: String,
@@ -794,6 +818,44 @@ fn unrelated_flattened_keys_preserve_alias_exclusions() {
         rendered.contains("x: string,\n\told_x?: never,")
             && rendered.contains("old_x: string,\n\tx?: never,"),
         "ordinary alias exclusions should be preserved:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_maps_relax_alias_exclusions_for_arbitrary_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasWithFlattenedMap>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened maps should export");
+    let ty = rendered
+        .split_once("export type AliasWithFlattenedMap = ")
+        .expect("map parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old_value?: never"),
+        "the flattened map can provide the alias key:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_external_enum_tags_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideFlattenedExternalTag>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened external enums should export");
+    let ty = rendered
+        .split_once("export type AliasBesideFlattenedExternalTag = ")
+        .expect("external-tag parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("Kind?: never"),
+        "the flattened enum emits its external tag key:\n{rendered}"
     );
 }
 

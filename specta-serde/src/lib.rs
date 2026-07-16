@@ -129,6 +129,7 @@ use repr::EnumRepr;
 
 const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
 const FLATTENED_PAYLOAD_MARKER: &str = "specta_serde:flattened_payload";
+const FLATTENED_ANY_KEY_MARKER: &str = "specta_serde:any_flattened_key";
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -1562,6 +1563,41 @@ fn collect_flattened_keys(
             let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)
                 .ok()
                 .flatten();
+            match (!enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER))
+                .then(|| EnumRepr::from_attrs(&enm.attributes).ok())
+                .flatten()
+            {
+                Some(EnumRepr::External) => {
+                    for (name, variant) in &enm.variants {
+                        let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|attrs| variant_is_skipped_for_mode(&attrs, mode));
+                        if !skipped {
+                            keys.insert(
+                                serialized_variant_name(name, variant, &container_attrs, mode)
+                                    .unwrap_or_else(|_| name.to_string()),
+                            );
+                        }
+                    }
+                    return;
+                }
+                Some(EnumRepr::Adjacent { tag, content }) => {
+                    keys.insert(tag.into_owned());
+                    if enm
+                        .variants
+                        .iter()
+                        .any(|(_, variant)| !matches!(variant.fields, Fields::Unit))
+                    {
+                        keys.insert(content.into_owned());
+                    }
+                    return;
+                }
+                Some(EnumRepr::Internal { tag }) => {
+                    keys.insert(tag.into_owned());
+                }
+                Some(EnumRepr::Untagged) | None => {}
+            }
             for (name, variant) in &enm.variants {
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, name)
@@ -1588,7 +1624,14 @@ fn collect_flattened_keys(
             }
         }
         DataType::Nullable(inner) => collect_flattened_keys(inner, mode, types, visited, keys),
+        DataType::Map(_) => {
+            keys.insert(FLATTENED_ANY_KEY_MARKER.to_string());
+        }
         DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                collect_flattened_keys(dt, mode, types, visited, keys);
+                return;
+            }
             let Some(ndt) = types.get(reference) else {
                 return;
             };
@@ -1655,7 +1698,7 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
         DataType::Struct(strct) => {
             if let Fields::Named(named) = &mut strct.fields {
                 named.fields.retain(|(name, field)| {
-                    !(keys.contains(name.as_ref())
+                    !((keys.contains(FLATTENED_ANY_KEY_MARKER) || keys.contains(name.as_ref()))
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
             }
@@ -1665,7 +1708,8 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &HashSet<String>) {
                 match &mut variant.fields {
                     Fields::Named(fields) => {
                         fields.fields.retain(|(name, field)| {
-                            !(keys.contains(name.as_ref())
+                            !((keys.contains(FLATTENED_ANY_KEY_MARKER)
+                                || keys.contains(name.as_ref()))
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
                     }
@@ -1734,9 +1778,10 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         accepted_names.push(name);
         accepted_names.extend(attrs.aliases.into_iter().map(Cow::Owned));
         let relax_exclusions = relaxed_names.is_some_and(|names| {
-            accepted_names
-                .iter()
-                .any(|name| names.contains(name.as_ref()))
+            names.contains(FLATTENED_ANY_KEY_MARKER)
+                || accepted_names
+                    .iter()
+                    .any(|name| names.contains(name.as_ref()))
         });
         parts.push(alias_field_union(
             accepted_names,
