@@ -404,6 +404,27 @@ fn test_rescript_keywords_are_rejected() {
             .export(&Types::default().register::<KeywordField>()),
         Err(specta_rescript::Error::InvalidRecordLabel(name)) if name == "let"
     ));
+
+    #[derive(Type)]
+    struct Match;
+
+    assert!(matches!(
+        export_err::<Match>(),
+        specta_rescript::Error::InvalidTypeName(name) if name == "match"
+    ));
+
+    #[derive(Type, serde::Serialize)]
+    struct LegacyKeywordField {
+        #[serde(rename = "class")]
+        value: String,
+    }
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<LegacyKeywordField>()),
+        Err(specta_rescript::Error::InvalidRecordLabel(name)) if name == "class"
+    ));
 }
 
 #[test]
