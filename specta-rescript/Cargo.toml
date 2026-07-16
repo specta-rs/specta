@@ -9,7 +9,7 @@ repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta-rescript/latest/specta-rescript"
 keywords = ["specta", "rescript", "typesafe"]
 categories = ["web-programming"]
-readme = "../README.md"
+readme = "README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
