@@ -360,6 +360,51 @@ struct ParentThroughNestedPairWrapper {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentAliasThroughDoubleFlattenWrapper {
+    #[serde(alias = "value")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: FlattenWrapper<FlattenWrapper<AliasedFlattenPayload>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "tag", content = "payload")]
+enum AdjacentWithSkippedContent {
+    Unit,
+    #[serde(skip)]
+    Hidden {
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideAdjacentWithoutContent {
+    #[serde(alias = "payload")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: AdjacentWithSkippedContent,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "tag", content = "content")]
+enum AdjacentWithSerializeSkippedNewtype {
+    Value(#[serde(skip_serializing)] String),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesidePhasedAdjacentContent {
+    #[serde(alias = "content")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: AdjacentWithSerializeSkippedNewtype,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1031,6 +1076,73 @@ fn unchanged_generic_arguments_do_not_block_finite_wrapper_descent() {
     assert!(
         !parent.contains("outer_key?: never"),
         "an unchanged generic argument must not hide the nested alias:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_key_collection_tracks_nested_generic_instantiations() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentAliasThroughDoubleFlattenWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("parent aliases through nested wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentAliasThroughDoubleFlattenWrapper = ")
+        .expect("nested-wrapper alias parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("value?: never"),
+        "nested wrapper keys must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_adjacent_variants_do_not_contribute_content_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideAdjacentWithoutContent>(),
+            specta_serde::Format,
+        )
+        .expect("adjacent enum with skipped content should export");
+    let parent = rendered
+        .split_once("export type AliasBesideAdjacentWithoutContent = ")
+        .expect("adjacent parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("payload?: never"),
+        "skipped variants must not relax the content-key exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_adjacent_newtype_content_is_collected_per_phase() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesidePhasedAdjacentContent>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific adjacent content should export");
+    let serialize = rendered
+        .split_once("export type AliasBesidePhasedAdjacentContent_Serialize = ")
+        .expect("serialize shape should be exported")
+        .1;
+    let deserialize = rendered
+        .split_once("export type AliasBesidePhasedAdjacentContent_Deserialize = ")
+        .expect("deserialize shape should be exported")
+        .1
+        .split_once("\n\n")
+        .map_or_else(|| rendered.as_str(), |(shape, _)| shape);
+
+    assert!(
+        !serialize.contains("content: string"),
+        "serialize omits the skipped newtype content key:\n{rendered}"
+    );
+    assert!(
+        !deserialize.contains("content?: never"),
+        "deserialize accepts the adjacent content key:\n{rendered}"
     );
 }
 

@@ -1227,7 +1227,7 @@ fn lower_flattened_struct_inner(
                 field.ty.as_ref().expect("checked above"),
                 mode,
                 original_types,
-                &mut HashSet::new(),
+                &mut FlattenedAliasVisits::default(),
                 &mut keys,
             );
             for key in keys.exact {
@@ -1292,7 +1292,7 @@ fn lower_flattened_struct_inner(
                 ty,
                 mode,
                 original_types,
-                &mut HashSet::new(),
+                &mut FlattenedAliasVisits::default(),
                 &mut flattened_keys,
             );
         }
@@ -1698,7 +1698,7 @@ fn collect_flattened_keys(
     ty: &DataType,
     mode: PhaseRewrite,
     types: &Types,
-    visited: &mut HashSet<TypeIdentity>,
+    visited: &mut FlattenedAliasVisits,
     keys: &mut FlattenedKeys,
 ) {
     if let Ok(Some(converted)) = conversion_datatype_for_mode(ty, mode)
@@ -1818,11 +1818,20 @@ fn collect_flattened_keys(
                 }
                 Some(EnumRepr::Adjacent { tag, content }) => {
                     keys.exact.insert(tag.into_owned());
-                    if enm
-                        .variants
-                        .iter()
-                        .any(|(_, variant)| !matches!(variant.fields, Fields::Unit))
-                    {
+                    if enm.variants.iter().any(|(_, variant)| {
+                        let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
+                            .ok()
+                            .flatten()
+                            .as_ref()
+                            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
+                        let hidden = variant_payload_is_hidden(variant, mode).unwrap_or(true);
+                        let skipped_newtype =
+                            sole_field_is_serde_skipped(variant, mode).unwrap_or(false);
+                        !skipped
+                            && !hidden
+                            && !matches!(variant.fields, Fields::Unit)
+                            && (!skipped_newtype || !matches!(mode, PhaseRewrite::Serialize))
+                    }) {
                         keys.exact.insert(content.into_owned());
                     }
                     return;
@@ -1869,14 +1878,20 @@ fn collect_flattened_keys(
             let Some(ndt) = types.get(reference) else {
                 return;
             };
-            let identity = TypeIdentity::from_ndt(ndt);
-            if visited.insert(identity.clone()) {
+            let identity = (
+                TypeIdentity::from_ndt(ndt),
+                named_reference_generics(reference)
+                    .iter()
+                    .map(|(_, ty)| ty.clone())
+                    .collect(),
+            );
+            if visited.enter(identity.clone()) {
                 if let Some(ty) = &ndt.ty {
                     let mut ty = ty.clone();
                     substitute_generics(&mut ty, named_reference_generics(reference));
                     collect_flattened_keys(&ty, mode, types, visited, keys);
                 }
-                visited.remove(&identity);
+                visited.exit(&identity);
             }
         }
         _ => {}
@@ -1888,7 +1903,7 @@ fn collect_field_keys(
     rename_all_rule: Option<RenameRule>,
     mode: PhaseRewrite,
     types: &Types,
-    visited: &mut HashSet<TypeIdentity>,
+    visited: &mut FlattenedAliasVisits,
     keys: &mut FlattenedKeys,
 ) {
     let Fields::Named(named) = fields else {
@@ -3324,7 +3339,7 @@ fn transform_internal_variant(
                         ty,
                         mode,
                         original_types,
-                        &mut HashSet::new(),
+                        &mut FlattenedAliasVisits::default(),
                         &mut keys,
                     );
                     for key in keys.exact {
@@ -3350,7 +3365,7 @@ fn transform_internal_variant(
                             ty,
                             mode,
                             original_types,
-                            &mut HashSet::new(),
+                            &mut FlattenedAliasVisits::default(),
                             &mut flattened_keys,
                         );
                     }
@@ -3360,7 +3375,7 @@ fn transform_internal_variant(
                             None,
                             mode,
                             original_types,
-                            &mut HashSet::new(),
+                            &mut FlattenedAliasVisits::default(),
                             &mut flattened_keys,
                         );
                     }
