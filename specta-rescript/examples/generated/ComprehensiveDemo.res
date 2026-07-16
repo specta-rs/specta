@@ -11,17 +11,17 @@ type adminLevel = [#Junior | #Senior | #Lead]
 type attachment = {
   id: string,
   filename: string,
-  size: int,
+  size: bigint,
   mime_type: string,
   uploaded_at: string,
-  uploaded_by: int,
+  uploaded_by: bigint,
 }
 
 /**
  * Display and locale preferences.
  */
 type displaySettings = {
-  items_per_page: int,
+  items_per_page: bigint,
   date_format: string,
   compact_mode: bool,
 }
@@ -50,9 +50,9 @@ type notificationSettings = {
  */
 type page<'t> = {
   items: array<'t>,
-  total: int,
-  page: int,
-  page_size: int,
+  total: bigint,
+  page: bigint,
+  page_size: bigint,
   has_next: bool,
   has_prev: bool,
 }
@@ -61,10 +61,10 @@ type page<'t> = {
  * Pagination metadata included in list responses.
  */
 type paginationInfo = {
-  page: int,
-  per_page: int,
-  total_pages: int,
-  total_items: int,
+  page: bigint,
+  per_page: bigint,
+  total_pages: bigint,
+  total_items: bigint,
 }
 
 /**
@@ -90,8 +90,8 @@ type privacySettings = {
  * A code review comment on a task.
  */
 type reviewComment = {
-  id: int,
-  author: int,
+  id: bigint,
+  author: bigint,
   content: string,
   created_at: string,
   is_resolved: bool,
@@ -105,7 +105,7 @@ type serviceStatus = {
   name: string,
   status: healthStatus,
   last_check: string,
-  error_count: int,
+  error_count: bigint,
 }
 
 /**
@@ -117,11 +117,11 @@ type subTaskStatus = [#Pending | #InProgress | #Completed | #Skipped]
  * A small unit of work within a parent task.
  */
 type subTask = {
-  id: int,
+  id: bigint,
   title: string,
   description: option<string>,
   status: subTaskStatus,
-  assignee: option<int>,
+  assignee: option<bigint>,
   created_at: string,
   completed_at: option<string>,
 }
@@ -141,12 +141,12 @@ type systemHealth = {
  * Metadata tracking creation and modification history.
  */
 type taskMetadata = {
-  created_by: int,
-  last_modified_by: int,
-  version: int,
+  created_by: bigint,
+  last_modified_by: bigint,
+  version: bigint,
   attachments: array<attachment>,
-  watchers: array<int>,
-  dependencies: array<int>,
+  watchers: array<bigint>,
+  dependencies: array<bigint>,
 }
 
 /**
@@ -168,7 +168,7 @@ type taskStatusInProgressFields = {
 }
 type taskStatusBlockedFields = {
   reason: string,
-  blocked_by: array<int>,
+  blocked_by: array<bigint>,
 }
 type taskStatusReviewFields = {
   reviewer: string,
@@ -263,7 +263,7 @@ type userRole =
  * A user account.
  */
 type user = {
-  id: int,
+  id: bigint,
   username: string,
   email: string,
   profile: userProfile,
@@ -278,7 +278,7 @@ type user = {
  * A work item tracked through the task management system.
  */
 type task = {
-  id: int,
+  id: bigint,
   title: string,
   description: option<string>,
   status: taskStatus,

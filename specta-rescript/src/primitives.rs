@@ -33,7 +33,16 @@ pub(crate) fn is_valid_type_name(name: &str) -> bool {
 pub(crate) fn is_rescript_builtin_type(name: &str) -> bool {
     matches!(
         name,
-        "array" | "bool" | "dict" | "float" | "int" | "option" | "result" | "string" | "unit"
+        "array"
+            | "bigint"
+            | "bool"
+            | "dict"
+            | "float"
+            | "int"
+            | "option"
+            | "result"
+            | "string"
+            | "unit"
     )
 }
 
@@ -192,16 +201,12 @@ fn single_unnamed_field_type(variant: &specta::datatype::Variant) -> &DataType {
 
 fn primitive_to_rescript(p: &Primitive) -> Result<String> {
     match p {
-        Primitive::i8
-        | Primitive::i16
-        | Primitive::i32
-        | Primitive::i64
-        | Primitive::isize
-        | Primitive::u8
-        | Primitive::u16
-        | Primitive::u32
-        | Primitive::u64
-        | Primitive::usize => Ok("int".to_string()),
+        Primitive::i8 | Primitive::i16 | Primitive::i32 | Primitive::u8 | Primitive::u16 => {
+            Ok("int".to_string())
+        }
+        Primitive::i64 | Primitive::isize | Primitive::u32 | Primitive::u64 | Primitive::usize => {
+            Ok("bigint".to_string())
+        }
         Primitive::f32 | Primitive::f64 => Ok("float".to_string()),
         Primitive::char | Primitive::str => Ok("string".to_string()),
         Primitive::bool => Ok("bool".to_string()),

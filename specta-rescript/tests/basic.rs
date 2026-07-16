@@ -49,7 +49,7 @@ fn test_basic_struct() {
     let out = export::<User>();
     assert!(out.contains("type user = {"), "output: {out}");
     assert!(out.contains("name: string"), "output: {out}");
-    assert!(out.contains("age: int"), "output: {out}");
+    assert!(out.contains("age: bigint"), "output: {out}");
 }
 
 #[test]
@@ -366,6 +366,33 @@ fn test_u128_error() {
     }
     let err = export_err::<WithU128>();
     assert!(matches!(err, specta_rescript::Error::UnsupportedType(_)));
+}
+
+#[test]
+fn test_wide_integers_use_bigint() {
+    #[derive(Type)]
+    struct WideIntegers {
+        signed: i64,
+        unsigned: u32,
+        pointer_sized: usize,
+    }
+
+    let out = export::<WideIntegers>();
+    assert!(out.contains("signed: bigint"), "output: {out}");
+    assert!(out.contains("unsigned: bigint"), "output: {out}");
+    assert!(out.contains("pointer_sized: bigint"), "output: {out}");
+}
+
+#[test]
+fn test_recursive_unnamed_struct_is_rejected() {
+    #[derive(Type)]
+    struct RecursiveTuple(Box<RecursiveTuple>);
+
+    assert!(matches!(
+        export_err::<RecursiveTuple>(),
+        specta_rescript::Error::UnsupportedType(message)
+            if message.contains("Recursive unnamed structs")
+    ));
 }
 
 #[test]

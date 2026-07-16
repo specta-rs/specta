@@ -80,6 +80,20 @@ impl ReScript {
                         .as_ref()
                         .is_some_and(|dt| crate::toposort::is_self_recursive(dt, &processed, ty))
                 });
+            if recursive
+                && group.iter().any(|ty| {
+                    matches!(
+                        &ty.ty,
+                        Some(DataType::Struct(structure))
+                            if matches!(structure.fields, Fields::Unnamed(_))
+                    )
+                })
+            {
+                return Err(Error::UnsupportedType(
+                    "Recursive unnamed structs cannot be represented as ReScript type aliases"
+                        .to_string(),
+                ));
+            }
             let mut first_declaration = true;
             for ndt in group {
                 let mut rendered = export_type(&processed, ndt)?;

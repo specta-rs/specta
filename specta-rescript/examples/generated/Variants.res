@@ -5,10 +5,10 @@
  */
 type apiErrorInternalErrorFields = {
   message: string,
-  code: int,
+  code: bigint,
 }
 type apiErrorRateLimitFields = {
-  retry_after_secs: int,
+  retry_after_secs: bigint,
 }
 type apiError =
   /**

@@ -29,7 +29,7 @@ type apiResponseErrorFields<'t> = {
   /**
    * Machine-readable error code for programmatic handling.
    */
-  code: int,
+  code: bigint,
   /**
    * Optional additional details about the error.
    */
@@ -87,7 +87,7 @@ type user = {
   /**
    * Unique identifier, assigned at registration and never changed.
    */
-  id: int,
+  id: bigint,
   /**
    * The user's chosen username (unique, case-insensitive).
    */

@@ -21,7 +21,7 @@ type myResult<'t, 'e> = result<'t, 'e>
  * Tauri-style command payload
  */
 type userData = {
-  id: int,
+  id: bigint,
   name: string,
   email: string,
 }
@@ -31,8 +31,8 @@ type userData = {
  */
 type batchResponse = {
   results: array<myResult<userData, appError>>,
-  total: int,
-  failed_count: int,
+  total: bigint,
+  failed_count: bigint,
 }
 
 /**
@@ -73,5 +73,5 @@ type searchResult = {
    * option<string> — None means no next page
    */
   next_cursor: option<string>,
-  total_count: int,
+  total_count: bigint,
 }

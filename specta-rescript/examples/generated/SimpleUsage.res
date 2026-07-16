@@ -11,7 +11,7 @@ type createUserRequest = {
 }
 
 type user = {
-  id: int,
+  id: bigint,
   name: string,
   email: option<string>,
   role: userRole,

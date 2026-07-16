@@ -31,7 +31,7 @@ The `lib/` directory produced by `rescript build` is gitignored.
 
 | Input (Rust) | Output (ReScript) | Description |
 |---|---|---|
-| `struct User { id: u32, name: String, ... }` | `type user = { id: int, name: string, ... }` | Named struct |
+| `struct User { id: u32, name: String, ... }` | `type user = { id: bigint, name: string, ... }` | Named struct |
 | `enum UserRole { Guest, Moderator, Admin }` | `type userRole = [ #Guest \| #Moderator \| #Admin ]` | All-unit enum -> polymorphic variants |
 | `enum ApiResponse<T> { Ok(T), Err(String) }` | `type apiResponse<'t> = result<'t, string>` | Result-shaped enum -> built-in `result` |
 | `struct CreateUserRequest { role: UserRole, ... }` | `type createUserRequest = { role: userRole, ... }` | Struct referencing another named type |

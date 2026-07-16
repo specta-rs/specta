@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// All supported primitive types
 #[derive(Type)]
 struct Primitives {
-    // Integer types — all map to ReScript `int`
+    // Integer types map to ReScript `int` or `bigint` based on their range.
     small_int: i8,
     unsigned_small: u8,
     short_int: i16,
@@ -139,7 +139,7 @@ fn main() {
     println!("Basic types exported to BasicTypes.res");
 
     println!("\nKey Features Demonstrated:");
-    println!("• All integer types -> int");
+    println!("• Integer types -> int or bigint, depending on their range");
     println!("• f32/f64 -> float");
     println!("• bool -> bool");
     println!("• char/String -> string");

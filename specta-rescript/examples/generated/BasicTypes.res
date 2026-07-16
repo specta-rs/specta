@@ -16,7 +16,7 @@ type address = {
 type collections = {
   tags: array<string>,
   scores: array<float>,
-  ids: array<int>,
+  ids: array<bigint>,
   matrix: array<array<float>>,
   tags_per_user: array<array<string>>,
   rgb: array<int>,
@@ -35,11 +35,11 @@ type primitives = {
   short_int: int,
   unsigned_short: int,
   regular_int: int,
-  unsigned_int: int,
-  long_int: int,
-  unsigned_long: int,
-  signed_size: int,
-  unsigned_size: int,
+  unsigned_int: bigint,
+  long_int: bigint,
+  unsigned_long: bigint,
+  signed_size: bigint,
+  unsigned_size: bigint,
   single_precision: float,
   double_precision: float,
   is_active: bool,
@@ -54,7 +54,7 @@ type userProfile = {
 }
 
 type user = {
-  id: int,
+  id: bigint,
   email: string,
   profile: userProfile,
   address: option<address>,

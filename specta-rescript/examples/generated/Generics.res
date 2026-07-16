@@ -6,7 +6,7 @@
 type apiResponse<'t, 'e> = {
   data: option<'t>,
   error: option<'e>,
-  status_code: int,
+  status_code: bigint,
   request_id: string,
 }
 
@@ -14,10 +14,10 @@ type apiResponse<'t, 'e> = {
  * Concrete types used with generics
  */
 type article = {
-  id: int,
+  id: bigint,
   title: string,
   content: string,
-  author_id: int,
+  author_id: bigint,
 }
 
 /**
@@ -38,7 +38,7 @@ type wrapper<'t> = {
 type cachedValue<'t> = {
   inner: wrapper<'t>,
   cached_at: string,
-  ttl_secs: option<int>,
+  ttl_secs: option<bigint>,
 }
 
 /**
@@ -54,9 +54,9 @@ type container<'t> =
  */
 type page<'t> = {
   items: array<'t>,
-  total: int,
-  page: int,
-  page_size: int,
+  total: bigint,
+  page: bigint,
+  page_size: bigint,
   has_next: bool,
   has_prev: bool,
 }

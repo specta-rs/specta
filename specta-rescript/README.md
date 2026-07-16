@@ -84,8 +84,8 @@ type apiResult<'t, 'e> = result<'t, 'e>
 
 | Rust | ReScript | Notes |
 |---|---|---|
-| `i8`, `i16`, `i32`, `i64` | `int` | |
-| `u8`, `u16`, `u32`, `u64`, `isize`, `usize` | `int` | |
+| `i8`, `i16`, `i32`, `u8`, `u16` | `int` | 32-bit ReScript integer |
+| `i64`, `u32`, `u64`, `isize`, `usize` | `bigint` | Values may exceed ReScript `int` |
 | `f32`, `f64` | `float` | |
 | `bool` | `bool` | |
 | `char`, `String` | `string` | |
