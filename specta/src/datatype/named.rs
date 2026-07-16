@@ -346,10 +346,8 @@ fn file_path_to_module_path(file_path: &str) -> Option<String> {
     // Try different prefixes
     let (prefix, path) = if let Some(p) = normalized.strip_prefix("src/") {
         ("crate", p)
-    } else if let Some(p) = normalized.strip_prefix("tests/") {
-        ("tests", p)
     } else {
-        return None;
+        ("tests", normalized.strip_prefix("tests/")?)
     };
 
     let path = path.strip_suffix(".rs")?;
