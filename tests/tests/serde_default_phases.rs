@@ -17,6 +17,13 @@ fn is_false(value: &bool) -> bool {
     !value
 }
 
+fn deserialize_option<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::deserialize(deserializer)
+}
+
 #[derive(Type, Serialize, Deserialize, Default)]
 #[specta(collect = false)]
 struct WithFieldDefault {
@@ -80,6 +87,14 @@ struct TupleOptionSkippedWhenNone(
     u32,
     #[serde(skip_serializing_if = "Option::is_none")] Option<String>,
 );
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OptionWithDeserializeCodec {
+    #[serde(deserialize_with = "deserialize_option")]
+    #[specta(type = Option<bool>)]
+    featured: Option<bool>,
+}
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -499,6 +514,23 @@ fn tuple_option_is_not_optional_when_deserializing() {
     assert!(
         rendered.contains("[number, string | null]"),
         "deserialize tuple shape must retain its required Option element: {rendered}"
+    );
+}
+
+#[test]
+fn option_with_deserialize_codec_is_not_optional() {
+    assert!(serde_json::from_str::<OptionWithDeserializeCodec>("{}").is_err());
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OptionWithDeserializeCodec>(),
+            PhasesFormat,
+        )
+        .expect("PhasesFormat should support deserialize codecs");
+
+    assert!(
+        rendered.contains("featured: boolean | null"),
+        "a deserialize codec must keep an Option field required: {rendered}"
     );
 }
 

@@ -1386,13 +1386,16 @@ fn rewrite_fields_for_phase(
 
             for (name, field) in &mut named.fields {
                 apply_field_attrs(field, mode, container_default)?;
+
+                let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
                 if mode == PhaseRewrite::Deserialize
                     && field.attributes.contains_key(NULLABLE_FIELD)
+                    && !serde_attrs
+                        .as_ref()
+                        .is_some_and(|attrs| attrs.has_deserialize_with || attrs.has_with)
                 {
                     field.optional = true;
                 }
-
-                let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
                 let key =
                     phase_field_key(name.as_ref(), serde_attrs.as_ref(), rename_all_rule, mode)?;
                 if key != name.as_ref() {
