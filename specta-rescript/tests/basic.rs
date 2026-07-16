@@ -662,6 +662,22 @@ fn test_serde_externally_tagged_unit_enum_is_renamed() {
     assert!(out.contains("type renamedUnitVariant = [#inProgress]"));
 }
 
+#[test]
+fn test_serde_keyword_unit_variant_is_rejected() {
+    #[derive(Type, serde::Serialize)]
+    enum KeywordUnitVariant {
+        #[serde(rename = "type")]
+        Type,
+    }
+
+    assert!(matches!(
+        ReScript::default()
+            .with_serde()
+            .export(&Types::default().register::<KeywordUnitVariant>()),
+        Err(specta_rescript::Error::InvalidPolymorphicVariant(name)) if name == "type"
+    ));
+}
+
 // ---------------------------------------------------------------------------
 // Deprecated rendering
 // ---------------------------------------------------------------------------

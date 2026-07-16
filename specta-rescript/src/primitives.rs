@@ -90,7 +90,7 @@ fn is_valid_variant_constructor(name: &str) -> bool {
 }
 
 fn is_valid_polymorphic_variant(name: &str) -> bool {
-    is_valid_identifier(name, |ch| ch.is_ascii_alphabetic())
+    is_valid_identifier(name, |ch| ch.is_ascii_alphabetic()) && !is_rescript_keyword(name)
 }
 
 fn is_valid_identifier(name: &str, valid_start: impl FnOnce(char) -> bool) -> bool {
