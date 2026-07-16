@@ -1,6 +1,6 @@
 use specta::{
     Type, Types,
-    datatype::{NamedDataType, Primitive},
+    datatype::{DataType, Field, NamedDataType, Primitive, Struct},
 };
 use specta_rescript::ReScript;
 
@@ -421,6 +421,28 @@ fn test_duplicate_rescript_type_names_are_rejected() {
     assert!(matches!(
         ReScript::default().export(&types),
         Err(specta_rescript::Error::DuplicateTypeName { name, .. }) if name == "duplicate"
+    ));
+}
+
+#[test]
+fn test_hidden_named_references_are_rejected() {
+    let mut types = Types::default();
+    let hidden = NamedDataType::new("Hidden", &mut types, |_, _| {});
+    NamedDataType::new("UsesHidden", &mut types, |_, datatype| {
+        datatype.ty = Some(
+            Struct::named()
+                .field(
+                    "hidden",
+                    Field::new(DataType::Reference(hidden.reference(Vec::new()))),
+                )
+                .build(),
+        );
+    });
+
+    assert!(matches!(
+        ReScript::default().without_serde().export(&types),
+        Err(specta_rescript::Error::UnsupportedType(message))
+            if message.contains("Hidden") && message.contains("no definition")
     ));
 }
 

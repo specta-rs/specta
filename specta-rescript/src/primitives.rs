@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use specta::{
     Types,
     datatype::{
-        DataType, Deprecated, Fields, Generic, NamedDataType, NamedReferenceType, Primitive,
-        Reference,
+        DataType, Deprecated, Fields, Generic, NamedDataType, NamedReference, NamedReferenceType,
+        Primitive, Reference,
     },
 };
 
@@ -353,9 +353,7 @@ fn reference_to_rescript(types: &Types, scope: Scope<'_>, r: &Reference) -> Resu
         Reference::Named(n) => match &n.inner {
             NamedReferenceType::Inline { dt, .. } => datatype_to_rescript(types, scope, dt),
             NamedReferenceType::Reference { generics, .. } => {
-                let ndt = types.get(n).ok_or_else(|| {
-                    Error::InvalidType("Reference to unknown named type".to_string())
-                })?;
+                let ndt = resolve_exportable_named_type(types, n)?;
                 let base_name = type_name(&ndt.name);
                 let rendered_generics = generics
                     .iter()
@@ -364,14 +362,17 @@ fn reference_to_rescript(types: &Types, scope: Scope<'_>, r: &Reference) -> Resu
                 Ok(format!("{}{}", base_name, wrap_generics(rendered_generics)))
             }
             NamedReferenceType::Recursive(recursive) => {
-                let ndt = types.get(n);
-                let name = ndt.map(|n| n.name.as_ref()).unwrap_or("unknown");
+                let ndt = resolve_exportable_named_type(types, n)?;
                 let generics = recursive
                     .generics()
                     .iter()
                     .map(|(_, dt)| datatype_to_rescript(types, scope, dt))
                     .collect::<Result<Vec<_>>>()?;
-                Ok(format!("{}{}", type_name(name), wrap_generics(generics)))
+                Ok(format!(
+                    "{}{}",
+                    type_name(&ndt.name),
+                    wrap_generics(generics)
+                ))
             }
         },
         Reference::Opaque(o) => Err(Error::UnsupportedType(format!(
@@ -379,6 +380,22 @@ fn reference_to_rescript(types: &Types, scope: Scope<'_>, r: &Reference) -> Resu
             o.type_name()
         ))),
     }
+}
+
+fn resolve_exportable_named_type<'a>(
+    types: &'a Types,
+    reference: &NamedReference,
+) -> Result<&'a NamedDataType> {
+    let ndt = types
+        .get(reference)
+        .ok_or_else(|| Error::InvalidType("Reference to unknown named type".to_string()))?;
+    if ndt.ty.is_none() {
+        return Err(Error::UnsupportedType(format!(
+            "Referenced named type '{}' has no definition to export",
+            ndt.name
+        )));
+    }
+    Ok(ndt)
 }
 
 // ---------------------------------------------------------------------------
