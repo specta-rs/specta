@@ -1959,44 +1959,57 @@ fn collect_field_keys(
 }
 
 fn relax_alias_exclusions(ty: &mut DataType, keys: &FlattenedKeys) {
+    relax_alias_exclusions_inner(ty, keys);
+}
+
+fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool {
     match ty {
         DataType::Struct(strct) => {
             if let Fields::Named(named) = &mut strct.fields {
+                let previous_len = named.fields.len();
                 named.fields.retain(|(name, field)| {
                     !(keys.contains(name.as_ref())
                         && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
+                previous_len != named.fields.len()
+            } else {
+                false
             }
         }
         DataType::Enum(enm) => {
+            let mut relaxed = false;
             for (_, variant) in &mut enm.variants {
                 match &mut variant.fields {
                     Fields::Named(fields) => {
+                        let previous_len = fields.fields.len();
                         fields.fields.retain(|(name, field)| {
                             !(keys.contains(name.as_ref())
                                 && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
+                        relaxed |= previous_len != fields.fields.len();
                     }
                     Fields::Unnamed(fields) => {
                         for field in &mut fields.fields {
                             if let Some(ty) = &mut field.ty {
-                                relax_alias_exclusions(ty, keys);
+                                relaxed |= relax_alias_exclusions_inner(ty, keys);
                             }
                         }
                     }
                     Fields::Unit => {}
                 }
             }
-        }
-        DataType::Intersection(elements) => {
-            for element in elements {
-                relax_alias_exclusions(element, keys);
+            if relaxed {
+                enm.attributes.remove(DEFERRED_ALIAS_UNION_MARKER);
             }
+            relaxed
         }
-        DataType::Nullable(inner) => relax_alias_exclusions(inner, keys),
-        _ => {}
+        DataType::Intersection(elements) => elements.iter_mut().fold(false, |relaxed, element| {
+            relax_alias_exclusions_inner(element, keys) || relaxed
+        }),
+        DataType::Nullable(inner) => relax_alias_exclusions_inner(inner, keys),
+        _ => false,
     }
 }
 
@@ -2113,7 +2126,51 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         parts.insert(0, DataType::Struct(base));
     }
 
+    let alias_union_count = parts
+        .iter()
+        .filter(|part| {
+            matches!(part, DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER))
+        })
+        .count();
+    if alias_union_count > 1 {
+        for part in &mut parts {
+            if let DataType::Enum(enm) = part
+                && enm.attributes.contains_key(ALIAS_UNION_MARKER)
+                && alias_union_is_fully_exclusive(enm)
+            {
+                enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
+            }
+        }
+    }
+
     Ok(Some(DataType::Intersection(parts)))
+}
+
+fn alias_union_is_fully_exclusive(enm: &Enum) -> bool {
+    let spelling_count = enm.variants.len();
+    spelling_count > 1
+        && enm.variants.iter().all(|(_, variant)| {
+            let Fields::Unnamed(fields) = &variant.fields else {
+                return false;
+            };
+            let [field] = fields.fields.as_slice() else {
+                return false;
+            };
+            let Some(DataType::Struct(strct)) = &field.ty else {
+                return false;
+            };
+            let Fields::Named(fields) = &strct.fields else {
+                return false;
+            };
+
+            fields.fields.len() == spelling_count
+                && fields
+                    .fields
+                    .iter()
+                    .filter(|(_, field)| field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+                    .count()
+                    == spelling_count - 1
+        })
 }
 
 fn field_has_aliases(field: &Field) -> bool {
@@ -2686,6 +2743,9 @@ const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 /// contextual flatten relaxation.
 const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
+/// Marks independent alias unions that an exporter may preserve symbolically
+/// instead of distributing their enclosing intersection into a Cartesian union.
+const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,

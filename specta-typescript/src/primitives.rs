@@ -25,6 +25,8 @@ use crate::{
 const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
+const FIELD_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
+const FIELD_ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 fn path_string(location: &[Cow<'static, str>]) -> String {
     location.join(".")
@@ -3090,6 +3092,10 @@ fn enum_dt(
 ) -> Result<(), Error> {
     let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
 
+    if e.attributes.get_named_as(FIELD_ALIAS_UNION_MARKER) == Some(&true) {
+        return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);
+    }
+
     if e.variants.is_empty() {
         s.push_str(NEVER);
         return Ok(());
@@ -3156,6 +3162,63 @@ fn enum_dt(
         .collect::<Vec<_>>();
 
     push_union(s, variants);
+
+    Ok(())
+}
+
+/// Renders serde field aliases as a deferred mapped XOR instead of an
+/// intersection of unions. The latter distributes into one union member for
+/// every combination of aliased fields, which quickly reaches TS2590.
+///
+/// The mapped type retains the original semantics: each required field must
+/// use exactly one accepted spelling, optional fields may be omitted, and two
+/// spellings of the same field cannot be supplied together.
+fn alias_field_union_dt(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &Types,
+    e: &Enum,
+    location: Vec<Cow<'static, str>>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    let mut fields = Vec::with_capacity(e.variants.len());
+
+    for (name, variant) in active_variants(e) {
+        let mut variant = (*variant).clone();
+        if let Fields::Unnamed(unnamed) = &mut variant.fields
+            && let Some(DataType::Struct(strct)) = unnamed
+                .fields
+                .first_mut()
+                .and_then(|field| field.ty.as_mut())
+            && let Fields::Named(named) = &mut strct.fields
+        {
+            named
+                .fields
+                .retain(|(_, field)| !field.attributes.contains_key(FIELD_ALIAS_EXCLUSION_MARKER));
+        }
+
+        let mut variant_location = location.clone();
+        variant_location.push(name.clone());
+        let field = enum_variant_datatype(
+            exporter,
+            None,
+            types,
+            name.clone(),
+            &variant,
+            variant_location,
+            prefix,
+            generics,
+            None,
+        )?
+        .unwrap_or_else(|| NEVER.to_string());
+        fields.push(field);
+    }
+
+    let source = fields.join(" & ");
+    s.push_str("((");
+    s.push_str(&source);
+    s.push_str(") extends infer T extends object ? { [K in keyof T]: { [P in keyof T as P extends K ? P : never]: T[P] } & { [P in keyof T as P extends K ? never : P]?: never } }[keyof T] & object : never)");
 
     Ok(())
 }
