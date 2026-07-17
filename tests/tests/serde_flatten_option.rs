@@ -194,6 +194,8 @@ struct AliasBesideSkippedFlattenedKey {
 struct MultipleAliasesWithOneFlattenCollision {
     #[serde(alias = "old", alias = "legacy")]
     value: String,
+    #[serde(alias = "old_other")]
+    other: String,
     #[serde(flatten)]
     flattened: FlattenedOldKey,
 }

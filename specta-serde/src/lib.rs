@@ -2113,13 +2113,19 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         parts.insert(0, DataType::Struct(base));
     }
 
-    if parts
+    let alias_union_count = parts
         .iter()
         .filter(|part| {
             matches!(part, DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER))
         })
-        .count()
-        > 1
+        .count();
+    if alias_union_count > 1
+        && parts.iter().all(|part| match part {
+            DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER) => {
+                alias_union_is_fully_exclusive(enm)
+            }
+            _ => true,
+        })
     {
         for part in &mut parts {
             if let DataType::Enum(enm) = part
@@ -2131,6 +2137,33 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
     }
 
     Ok(Some(DataType::Intersection(parts)))
+}
+
+fn alias_union_is_fully_exclusive(enm: &Enum) -> bool {
+    let spelling_count = enm.variants.len();
+    spelling_count > 1
+        && enm.variants.iter().all(|(_, variant)| {
+            let Fields::Unnamed(fields) = &variant.fields else {
+                return false;
+            };
+            let [field] = fields.fields.as_slice() else {
+                return false;
+            };
+            let Some(DataType::Struct(strct)) = &field.ty else {
+                return false;
+            };
+            let Fields::Named(fields) = &strct.fields else {
+                return false;
+            };
+
+            fields.fields.len() == spelling_count
+                && fields
+                    .fields
+                    .iter()
+                    .filter(|(_, field)| field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+                    .count()
+                    == spelling_count - 1
+        })
 }
 
 fn field_has_aliases(field: &Field) -> bool {
