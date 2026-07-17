@@ -1249,7 +1249,6 @@ fn lower_flattened_struct_inner(
             surrounding_keys.any |= keys.any;
         } else {
             surrounding_keys.exact.insert(name.to_string());
-            collect_field_accepted_names(field, &mut surrounding_keys.exact);
         }
     }
     surrounding_keys.exact.extend(
@@ -1955,16 +1954,7 @@ fn collect_field_keys(
                 phase_field_key(name, attrs.as_ref(), rename_all_rule, mode)
                     .unwrap_or_else(|_| name.to_string()),
             );
-            if let Some(attrs) = attrs {
-                keys.exact.extend(attrs.aliases);
-            }
         }
-    }
-}
-
-fn collect_field_accepted_names(field: &Field, keys: &mut HashSet<String>) {
-    if let Ok(Some(attrs)) = SerdeFieldAttrs::from_attributes(&field.attributes) {
-        keys.extend(attrs.aliases);
     }
 }
 
@@ -3363,7 +3353,6 @@ fn transform_internal_variant(
                 for (name, field) in &leftover {
                     if field.ty.is_some() {
                         surrounding_keys.exact.insert(name.to_string());
-                        collect_field_accepted_names(field, &mut surrounding_keys.exact);
                     }
                 }
                 let mut flattened_key_counts = HashMap::<String, usize>::new();

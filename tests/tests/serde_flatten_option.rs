@@ -515,6 +515,22 @@ struct OrderedFlattenedAliasCollision {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedSharedAlias {
+    #[serde(alias = "legacy")]
+    inner: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SharedAliasBesideFlattenedField {
+    #[serde(alias = "legacy")]
+    outer: String,
+    #[serde(flatten)]
+    flattened: FlattenedSharedAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1228,7 +1244,7 @@ fn flattened_key_collection_tracks_nested_generic_instantiations() {
         .1;
 
     assert!(
-        !parent.contains("value?: never"),
+        parent.contains("canonical: string,\n} | {\n\tvalue: string,"),
         "nested wrapper keys must relax the parent alias exclusion:\n{rendered}"
     );
 }
@@ -1445,6 +1461,32 @@ fn later_flattened_siblings_do_not_relax_deserialize_aliases() {
     assert!(
         deserialize.contains("outer_key?: never"),
         "deserialize must preserve exclusions against later siblings:\n{rendered}"
+    );
+}
+
+#[test]
+fn deserialize_only_aliases_are_not_flattened_emitted_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<SharedAliasBesideFlattenedField>(),
+            specta_serde::Format,
+        )
+        .expect("shared aliases beside flattening should export");
+    let parent = rendered
+        .split_once("export type SharedAliasBesideFlattenedField = ")
+        .expect("shared-alias parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("legacy?: never"),
+        "a deserialize-only alias is not emitted by the flattened field:\n{rendered}"
+    );
+    assert!(
+        serde_json::from_value::<SharedAliasBesideFlattenedField>(
+            serde_json::json!({ "outer": "outer", "legacy": "flattened" })
+        )
+        .is_err(),
+        "serde consumes the shared alias as a duplicate outer spelling"
     );
 }
 
@@ -1770,7 +1812,7 @@ fn parent_aliases_detect_keys_through_flattened_generic_wrappers() {
         .1;
 
     assert!(
-        !parent.contains("value?: never"),
+        parent.contains("outer_key: string,\n} | {\n\tvalue: string,"),
         "the flattened generic key must relax the parent alias exclusion:\n{rendered}"
     );
 }
