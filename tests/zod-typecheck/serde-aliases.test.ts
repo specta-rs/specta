@@ -22,6 +22,8 @@ const canonicalOptional: OptionalAlias = { value: "" };
 const aliasOptional: OptionalAlias = { value_old: "" };
 // @ts-expect-error serde rejects duplicate spellings for an optional field too.
 const duplicateOptional: OptionalAlias = { value: "", value_old: "" };
+// @ts-expect-error serde requires an object even when every field is optional.
+const undefinedOptional: OptionalAlias = undefined;
 
 void readFirst(canonical);
 void aliases;
@@ -31,3 +33,4 @@ void absentOptional;
 void canonicalOptional;
 void aliasOptional;
 void duplicateOptional;
+void undefinedOptional;
