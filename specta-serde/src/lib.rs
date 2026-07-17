@@ -2000,6 +2000,58 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &FlattenedKeys) {
     }
 }
 
+fn suppress_alias_branches_for_reserved_keys(ty: &mut DataType, keys: &FlattenedKeys) {
+    match ty {
+        DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER) => {
+            enm.variants.retain(|(_, variant)| {
+                let Fields::Unnamed(fields) = &variant.fields else {
+                    return true;
+                };
+                let [field] = fields.fields.as_slice() else {
+                    return true;
+                };
+                let Some(DataType::Struct(strct)) = &field.ty else {
+                    return true;
+                };
+                let Fields::Named(fields) = &strct.fields else {
+                    return true;
+                };
+                !fields.fields.iter().any(|(name, field)| {
+                    keys.contains(name.as_ref())
+                        && !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
+                })
+            });
+        }
+        DataType::Enum(enm)
+            if matches!(
+                EnumRepr::from_attrs(&enm.attributes),
+                Ok(EnumRepr::Untagged)
+            ) =>
+        {
+            for (_, variant) in &mut enm.variants {
+                match &mut variant.fields {
+                    Fields::Named(_) => {}
+                    Fields::Unnamed(fields) => {
+                        for field in &mut fields.fields {
+                            if let Some(ty) = &mut field.ty {
+                                suppress_alias_branches_for_reserved_keys(ty, keys);
+                            }
+                        }
+                    }
+                    Fields::Unit => {}
+                }
+            }
+        }
+        DataType::Intersection(elements) => {
+            for element in elements {
+                suppress_alias_branches_for_reserved_keys(element, keys);
+            }
+        }
+        DataType::Nullable(inner) => suppress_alias_branches_for_reserved_keys(inner, keys),
+        _ => {}
+    }
+}
+
 fn lower_field_aliases_for_phase_with_relaxed_names(
     fields: &mut Fields,
     mode: PhaseRewrite,
@@ -2114,6 +2166,7 @@ fn alias_field_union(
     // This synthetic union is already in its final exported shape; see
     // `ENUM_REPR_REWRITTEN_MARKER`.
     aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    aliases.attributes.insert(ALIAS_UNION_MARKER, true);
 
     DataType::Enum(aliases)
 }
@@ -2632,6 +2685,7 @@ const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 /// mutually exclusive. Genuine user-authored uninhabited fields must survive
 /// contextual flatten relaxation.
 const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
+const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
@@ -3487,6 +3541,7 @@ fn transform_internal_variant(
                     exact: fields.iter().map(|(name, _)| name.to_string()).collect(),
                     any: false,
                 };
+                suppress_alias_branches_for_reserved_keys(&mut payload_ty, &surrounding_keys);
                 relax_alias_exclusions(&mut payload_ty, &surrounding_keys);
                 return Ok(clone_variant_with_unnamed_fields(
                     variant,

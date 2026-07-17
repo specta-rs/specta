@@ -682,6 +682,50 @@ enum InternalTagNewtypeAliasCollision {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct InternalTagNestedAliasPayload {
+    nested: InternalTagAliasPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagNestedAlias {
+    Value(InternalTagNestedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternalTagUntaggedAliasPayload {
+    Object {
+        #[serde(alias = "t")]
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithUntaggedAliasPayload {
+    Value(InternalTagUntaggedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternalTagUntaggedNestedAliasPayload {
+    Object { nested: InternalTagAliasPayload },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithUntaggedNestedAliasPayload {
+    Value(InternalTagUntaggedNestedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -1995,6 +2039,121 @@ fn aliases_inside_internal_tag_newtype_payloads_do_not_exclude_tag_keys() {
     assert!(
         !variant.contains("t?: never"),
         "the internally tagged use must relax tag-key exclusions:\n{rendered}"
+    );
+
+    assert!(
+        serde_json::from_value::<InternalTagNewtypeAliasCollision>(
+            serde_json::json!({ "t": "Value" })
+        )
+        .is_err(),
+        "the consumed internal tag cannot populate the payload alias"
+    );
+    assert!(
+        serde_json::from_value::<InternalTagNewtypeAliasCollision>(
+            serde_json::json!({ "t": "Value", "value": "payload" })
+        )
+        .is_ok(),
+        "the canonical payload key must remain usable"
+    );
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNewtypeAliasCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific internal-tag aliases should export");
+    let deserialize = phased
+        .split_once("export type InternalTagNewtypeAliasCollision_Deserialize = ")
+        .expect("deserialize internal-tag type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        !deserialize.contains("t?: never") && !deserialize.contains("t: string"),
+        "deserialize must retain the canonical branch and suppress the consumed alias branch:\n{phased}"
+    );
+}
+
+#[test]
+fn internal_tags_do_not_suppress_aliases_in_nested_objects() {
+    assert!(
+        serde_json::from_value::<InternalTagNestedAlias>(serde_json::json!({
+            "t": "Value",
+            "nested": { "t": "payload" }
+        }))
+        .is_ok(),
+        "an internal tag only consumes its key in the immediate payload object"
+    );
+
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNestedAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("nested internal-tag aliases should export");
+    assert!(
+        phased.contains("value: string") && phased.contains("t: string"),
+        "the nested object's alias branch must remain available:\n{phased}"
+    );
+}
+
+#[test]
+fn internal_tags_suppress_consumed_aliases_in_untagged_payloads() {
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedAliasPayload>(serde_json::json!({
+            "t": "Value"
+        }))
+        .is_err(),
+        "the internal tag cannot populate an untagged payload alias"
+    );
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedAliasPayload>(serde_json::json!({
+            "t": "Value",
+            "value": "payload"
+        }))
+        .is_ok(),
+        "the untagged payload's canonical key must remain usable"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithUntaggedAliasPayload>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("internal-tagged untagged payload aliases should export");
+    let deserialize = rendered
+        .split_once("export type InternalTagWithUntaggedAliasPayload_Deserialize = ")
+        .expect("deserialize type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        !deserialize.contains("t?: never") && !deserialize.contains("t: string"),
+        "the consumed alias branch must be suppressed without excluding the tag:\n{rendered}"
+    );
+}
+
+#[test]
+fn internal_tags_preserve_nested_aliases_in_untagged_payloads() {
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedNestedAliasPayload>(serde_json::json!({
+            "t": "Value",
+            "nested": { "t": "payload" }
+        }))
+        .is_ok(),
+        "untagged alternatives do not merge their named fields' nested object namespaces"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithUntaggedNestedAliasPayload>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("nested aliases inside untagged payloads should export");
+    assert!(
+        rendered.contains("value: string") && rendered.contains("t: string"),
+        "the nested alias branch must remain available:\n{rendered}"
     );
 }
 
