@@ -42,9 +42,9 @@ type AdjacentlyTaggedWithAlias = AdjacentlyTaggedWithAlias_Deserialize | Adjacen
 
 _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeA", {"type": "_specta_typing.Literal[\"A\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata | _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2"})
 
-_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata", {"field": "_specta_builtins.str"})
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata", {"field": "_specta_builtins.str", "bruh": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2", {"bruh": "_specta_builtins.str"})
+_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeAdata_2", {"bruh": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"]})
 
 _specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeB", {"type": "_specta_typing.Literal[\"B\"]", "data": "_specta_typed_dict_test__types__AdjacentlyTaggedWithAlias_DeserializeBdata"})
 
@@ -523,9 +523,9 @@ type InternallyTaggedMInner = None
 
 type InternallyTaggedWithAlias = InternallyTaggedWithAlias_Deserialize | InternallyTaggedWithAlias_Serialize
 
-_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0", {"field": "_specta_builtins.str", "type": "_specta_typing.Literal[\"A\"]"})
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection0", {"bruh": _specta_typing.NotRequired["_specta_typing.Never"], "field": "_specta_builtins.str", "type": "_specta_typing.Literal[\"A\"]"})
 
-_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1", {"bruh": "_specta_builtins.str", "type": "_specta_typing.Literal[\"A\"]"})
+_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1 = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeAintersection1", {"bruh": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"], "type": "_specta_typing.Literal[\"A\"]"})
 
 _specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__InternallyTaggedWithAlias_DeserializeB", {"type": "_specta_typing.Literal[\"B\"]", "other": "_specta_builtins.int"})
 
@@ -933,18 +933,18 @@ type StructWithAlias = StructWithAlias_Deserialize | StructWithAlias_Serialize
 
 type StructWithAliasAndRename = StructWithAliasAndRename_Deserialize | StructWithAliasAndRename_Serialize
 
-_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize", {"renamed_field": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize", {"renamed_field": "_specta_builtins.str", "bruh": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2", {"bruh": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2", {"bruh": "_specta_builtins.str", "renamed_field": _specta_typing.NotRequired["_specta_typing.Never"]})
 
 type StructWithAliasAndRename_Deserialize = _specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize | _specta_typed_dict_test__types__StructWithAliasAndRename_Deserialize_2
 
 class StructWithAliasAndRename_Serialize(_specta_typing.TypedDict):
     renamed_field: _specta_builtins.str
 
-_specta_typed_dict_test__types__StructWithAlias_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize", {"field": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithAlias_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize", {"field": "_specta_builtins.str", "bruh": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__StructWithAlias_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize_2", {"bruh": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithAlias_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithAlias_Deserialize_2", {"bruh": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"]})
 
 type StructWithAlias_Deserialize = _specta_typed_dict_test__types__StructWithAlias_Deserialize | _specta_typed_dict_test__types__StructWithAlias_Deserialize_2
 
@@ -953,13 +953,13 @@ class StructWithAlias_Serialize(_specta_typing.TypedDict):
 
 type StructWithMultipleAliases = StructWithMultipleAliases_Deserialize | StructWithMultipleAliases_Serialize
 
-_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize", {"field": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize", {"field": "_specta_builtins.str", "bruh": _specta_typing.NotRequired["_specta_typing.Never"], "alternative": _specta_typing.NotRequired["_specta_typing.Never"], "another": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2", {"bruh": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2", {"bruh": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"], "alternative": _specta_typing.NotRequired["_specta_typing.Never"], "another": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3", {"alternative": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3", {"alternative": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"], "bruh": _specta_typing.NotRequired["_specta_typing.Never"], "another": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4", {"another": "_specta_builtins.str"})
+_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4 = _specta_typing.TypedDict("_specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4", {"another": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"], "bruh": _specta_typing.NotRequired["_specta_typing.Never"], "alternative": _specta_typing.NotRequired["_specta_typing.Never"]})
 
 type StructWithMultipleAliases_Deserialize = _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_2 | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_3 | _specta_typed_dict_test__types__StructWithMultipleAliases_Deserialize_4
 
@@ -1059,9 +1059,9 @@ type UntaggedVariantsWithoutValue = _specta_builtins.int | _specta_builtins.str 
 
 type UntaggedWithAlias = UntaggedWithAlias_Deserialize | UntaggedWithAlias_Serialize
 
-_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA", {"field": "_specta_builtins.str"})
+_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA", {"field": "_specta_builtins.str", "bruh": _specta_typing.NotRequired["_specta_typing.Never"]})
 
-_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2", {"bruh": "_specta_builtins.str"})
+_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2 = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeA_2", {"bruh": "_specta_builtins.str", "field": _specta_typing.NotRequired["_specta_typing.Never"]})
 
 _specta_typed_dict_test__types__UntaggedWithAlias_DeserializeB = _specta_typing.TypedDict("_specta_typed_dict_test__types__UntaggedWithAlias_DeserializeB", {"other": "_specta_builtins.int"})
 

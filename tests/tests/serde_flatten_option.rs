@@ -80,6 +80,652 @@ enum InternalFlattenConditionalAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct AliasFlattenInner {
+    old_value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasFlattenCollision {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    inner: AliasFlattenInner,
+}
+
+#[derive(Clone, Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasedFlattenPayload {
+    #[serde(alias = "outer_key")]
+    value: String,
+}
+
+#[derive(Clone, Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(into = "AliasedFlattenPayload", from = "AliasedFlattenPayload")]
+struct ConvertedAliasedFlattenPayload {
+    value: String,
+}
+
+impl From<ConvertedAliasedFlattenPayload> for AliasedFlattenPayload {
+    fn from(value: ConvertedAliasedFlattenPayload) -> Self {
+        Self { value: value.value }
+    }
+}
+
+impl From<AliasedFlattenPayload> for ConvertedAliasedFlattenPayload {
+    fn from(value: AliasedFlattenPayload) -> Self {
+        Self { value: value.value }
+    }
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithConvertedFlattenedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: ConvertedAliasedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughConvertedFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<ConvertedAliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithFlattenedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: AliasedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RecursiveFlattenedAlias {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    next: Option<Box<RecursiveFlattenedAlias>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct UnrelatedFlattenedPayload {
+    y: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasWithUnrelatedFlatten {
+    #[serde(alias = "old_x")]
+    x: String,
+    #[serde(flatten)]
+    payload: UnrelatedFlattenedPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedOldKey {
+    old: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedFlattenedOldKey {
+    #[serde(skip_serializing, skip_deserializing)]
+    old: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSkippedFlattenedKey {
+    #[serde(alias = "old")]
+    value: String,
+    #[serde(flatten)]
+    flattened: SkippedFlattenedOldKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct MultipleAliasesWithOneFlattenCollision {
+    #[serde(alias = "old", alias = "legacy")]
+    value: String,
+    #[serde(flatten)]
+    flattened: FlattenedOldKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedFormerSentinelKey {
+    #[serde(rename = "specta_serde:any_flattened_key")]
+    key: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasesBesideFormerSentinelKey {
+    #[serde(alias = "old", alias = "legacy")]
+    value: String,
+    #[serde(flatten)]
+    flattened: FlattenedFormerSentinelKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasWithFlattenedMap {
+    #[serde(alias = "old_value")]
+    value: String,
+    #[serde(flatten)]
+    rest: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedExternalTag {
+    Kind { payload: String },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedVariantUntagged {
+    #[serde(untagged)]
+    Value { old: String },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideFlattenedVariantUntagged {
+    #[serde(alias = "old")]
+    value: String,
+    #[serde(flatten)]
+    untagged: FlattenedVariantUntagged,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideFlattenedExternalTag {
+    #[serde(alias = "Kind")]
+    value: String,
+    #[serde(flatten)]
+    tagged: FlattenedExternalTag,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct NestedAliasedObject {
+    #[serde(alias = "outer_key")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedPayloadWithNestedAlias {
+    nested: NestedAliasedObject,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OuterKeyBesideNestedAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    payload: FlattenedPayloadWithNestedAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum AliasedFlattenEnumPayload {
+    Value {
+        #[serde(alias = "outer_key")]
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum FlattenedUntaggedNewtypeAlias {
+    Value(AliasedFlattenPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum FlattenedExternalNewtypeAlias {
+    Value(AliasedFlattenPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughUntaggedNewtype {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenedUntaggedNewtypeAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyBesideExternalNewtype {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenedExternalNewtypeAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+struct TaggedFlattenPayload {
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideTaggedFlattenPayload {
+    #[serde(alias = "kind")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: TaggedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenNewtype(AliasedFlattenPayload);
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughNewtypeStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: FlattenNewtype,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct PairFlattenWrapper<A, B> {
+    #[serde(skip)]
+    marker: std::marker::PhantomData<A>,
+    #[serde(flatten)]
+    inner: B,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentThroughNestedPairWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: PairFlattenWrapper<String, PairFlattenWrapper<String, AliasedFlattenPayload>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentAliasThroughDoubleFlattenWrapper {
+    #[serde(alias = "value")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: FlattenWrapper<FlattenWrapper<AliasedFlattenPayload>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "tag", content = "payload")]
+enum AdjacentWithSkippedContent {
+    Unit,
+    #[serde(skip)]
+    Hidden {
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideAdjacentWithoutContent {
+    #[serde(alias = "payload")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: AdjacentWithSkippedContent,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "tag", content = "content")]
+enum AdjacentWithSerializeSkippedNewtype {
+    Value(#[serde(skip_serializing)] String),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesidePhasedAdjacentContent {
+    #[serde(alias = "content")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: AdjacentWithSerializeSkippedNewtype,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[serde(skip)]
+    Hidden {
+        inactive_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSkippedUntaggedVariant {
+    #[serde(alias = "inactive_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithPhaseSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[serde(skip_serializing)]
+    DeserializeOnly {
+        phased_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesidePhasedSkippedUntaggedVariant {
+    #[serde(alias = "phased_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithPhaseSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+struct TaggedStructWithTagAlias {
+    #[serde(alias = "kind")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum Uninhabited {}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedAliasWithUninhabitedField {
+    #[specta(inline)]
+    impossible: Uninhabited,
+    #[serde(alias = "alternative")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentCollidingWithUninhabitedField {
+    impossible: String,
+    #[serde(flatten)]
+    inner: FlattenedAliasWithUninhabitedField,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithSpectaSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[specta(skip)]
+    Hidden {
+        specta_only_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSpectaSkippedVariant {
+    #[serde(alias = "specta_only_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithSpectaSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct LaterFlattenedAliasKey {
+    outer_key: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OrderedFlattenedAliasCollision {
+    #[serde(flatten)]
+    first: AliasedFlattenPayload,
+    #[serde(flatten)]
+    later: LaterFlattenedAliasKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedSharedAlias {
+    #[serde(alias = "legacy")]
+    inner: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SharedAliasBesideFlattenedField {
+    #[serde(alias = "legacy")]
+    outer: String,
+    #[serde(flatten)]
+    flattened: FlattenedSharedAlias,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false, transparent = false)]
+#[serde(transparent)]
+struct TransparentNamedFlattenWrapper {
+    payload: AliasedFlattenPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughTransparentNamedStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: TransparentNamedFlattenWrapper,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkippedTupleFlattenWrapper(#[serde(skip)] String, AliasedFlattenPayload);
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyBesideSkippedTupleStruct {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: SkippedTupleFlattenWrapper,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumVariantWithFlattenedAlias {
+    Value {
+        outer_key: String,
+        #[serde(flatten)]
+        inner: AliasedFlattenPayload,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithFlattenedEnumAlias {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: AliasedFlattenEnumPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenWrapper<T> {
+    #[serde(flatten)]
+    inner: T,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct PlainFlattenPayload {
+    plain: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DuoFlattenWrapper<A, B> {
+    #[serde(flatten)]
+    first: FlattenWrapper<A>,
+    #[serde(flatten)]
+    second: FlattenWrapper<B>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesInSecondGenericInstantiation {
+    outer_key: String,
+    #[serde(flatten)]
+    duo: DuoFlattenWrapper<PlainFlattenPayload, AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesThroughDoubleFlattenedWrapper {
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<FlattenWrapper<AliasedFlattenPayload>>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentAliasCollidesThroughFlattenedWrapper {
+    #[serde(alias = "value")]
+    outer_key: String,
+    #[serde(flatten)]
+    wrapper: FlattenWrapper<AliasedFlattenPayload>,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithFlattenedAliasCollision {
+    Value {
+        outer_key: String,
+        #[serde(flatten)]
+        inner: AliasedFlattenPayload,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedSiblingAlias {
+    #[serde(alias = "x")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedSiblingKey {
+    x: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithSiblingFlattenCollision {
+    Value {
+        #[serde(flatten)]
+        aliased: FlattenedSiblingAlias,
+        #[serde(flatten)]
+        keyed: FlattenedSiblingKey,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct InternalTagAliasPayload {
+    #[serde(alias = "t")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagNewtypeAliasCollision {
+    Value(InternalTagAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct InternalTagNestedAliasPayload {
+    nested: InternalTagAliasPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagNestedAlias {
+    Value(InternalTagNestedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternalTagUntaggedAliasPayload {
+    Object {
+        #[serde(alias = "t")]
+        value: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithUntaggedAliasPayload {
+    Value(InternalTagUntaggedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternalTagUntaggedNestedAliasPayload {
+    Object { nested: InternalTagAliasPayload },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum InternalTagWithUntaggedNestedAliasPayload {
+    Value(InternalTagUntaggedNestedAliasPayload),
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlatTwoOpt {
     a: i32,
     #[serde(flatten)]
@@ -423,7 +1069,7 @@ fn conditional_flatten_exports_optional_union() {
     for expected in [
         "export type FlatConditional = {\n\ta: number,\n} & Inner1 | {\n\ta: number,\n};",
         "export type InternalFlattenConditional = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
-        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n});",
+        "export type InternalFlattenConditionalAlias = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n}) & Inner1 | {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n});",
     ] {
         assert!(
             rendered.contains(expected),
@@ -440,13 +1086,1075 @@ fn conditional_flatten_exports_optional_union() {
         "export type InternalFlattenConditional_Serialize = {\n\tt: \"A\",\n} & Inner1 | {\n\tt: \"A\",\n};",
         "export type InternalFlattenConditional_Deserialize = {\n\tt: \"A\",\n} & Inner1;",
         "export type InternalFlattenConditionalAlias_Serialize = {\n\tt: \"A\",\n} & {\n\tvalue: string,\n} & Inner1 | {\n\tt: \"A\",\n} & {\n\tvalue: string,\n};",
-        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n} | {\n\told_value: string,\n}) & Inner1;",
+        "export type InternalFlattenConditionalAlias_Deserialize = {\n\tt: \"A\",\n} & ({\n\tvalue: string,\n\told_value?: never,\n} | {\n\told_value: string,\n\tvalue?: never,\n}) & Inner1;",
     ] {
         assert!(
             phased.contains(expected),
             "expected:\n{expected}\n\ngot:\n{phased}"
         );
     }
+}
+
+#[test]
+fn flattened_keys_do_not_become_alias_exclusions() {
+    let value = AliasFlattenCollision {
+        value: "canonical".into(),
+        inner: AliasFlattenInner {
+            old_value: "flattened".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "value": "canonical", "old_value": "flattened" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("flattened aliases should export without excluding flattened keys");
+    assert!(!rendered.contains("old_value?: never"), "{rendered}");
+    assert!(rendered.contains("value?: never"), "{rendered}");
+
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<AliasFlattenCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific flattened aliases should export");
+    let deserialize = phased
+        .split_once("export type AliasFlattenCollision_Deserialize = ")
+        .expect("deserialize collision type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        deserialize.contains("old_value?: never"),
+        "deserialize must reject canonical-plus-alias duplicates:\n{phased}"
+    );
+    assert!(
+        serde_json::from_value::<AliasFlattenCollision>(
+            serde_json::json!({ "value": "canonical", "old_value": "flattened" })
+        )
+        .is_err(),
+        "serde treats the flattened key as a duplicate outer alias on input"
+    );
+}
+
+#[test]
+fn aliases_inside_flattened_enum_payloads_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithFlattenedEnumAlias {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenEnumPayload::Value {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithFlattenedEnumAlias>(),
+            specta_serde::Format,
+        )
+        .expect("flattened enum aliases should not exclude parent keys");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenEnumPayload = {\n\tvalue: string,\n\touter_key?: never,\n} | {\n\touter_key: string,\n\tvalue?: never,\n};"
+        ),
+        "ordinary enum uses must retain alias exclusions:\n{rendered}"
+    );
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithFlattenedEnumAlias = ")
+        .expect("parent enum type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the flattened enum use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_untagged_newtypes_are_relaxed() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughUntaggedNewtype>(),
+            specta_serde::Format,
+        )
+        .expect("flattened untagged newtype aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughUntaggedNewtype = ")
+        .expect("untagged-newtype parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the untagged newtype payload alias must be relaxed:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_flattened_external_newtypes_remain_exclusive() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyBesideExternalNewtype>(),
+            specta_serde::Format,
+        )
+        .expect("flattened externally tagged newtype aliases should export");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenPayload = {\n\tvalue: string,\n\touter_key?: never,"
+        ),
+        "the nested payload alias must remain exclusive:\n{rendered}"
+    );
+    assert!(
+        rendered.contains("} & FlattenedExternalNewtypeAlias;"),
+        "the externally tagged enum must remain nested:\n{rendered}"
+    );
+}
+
+#[test]
+fn generated_flattened_struct_tags_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideTaggedFlattenPayload>(),
+            specta_serde::Format,
+        )
+        .expect("tagged flattened struct aliases should export");
+    let parent = rendered
+        .split_once("export type AliasBesideTaggedFlattenPayload = ")
+        .expect("tagged flattened parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("kind?: never"),
+        "the generated flattened tag must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_newtype_struct_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughNewtypeStruct>(),
+            specta_serde::Format,
+        )
+        .expect("flattened newtype struct aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughNewtypeStruct = ")
+        .expect("newtype struct parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the newtype payload key must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn unchanged_generic_arguments_do_not_block_finite_wrapper_descent() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentThroughNestedPairWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("nested multi-parameter wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentThroughNestedPairWrapper = ")
+        .expect("nested pair-wrapper parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "an unchanged generic argument must not hide the nested alias:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_key_collection_tracks_nested_generic_instantiations() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentAliasThroughDoubleFlattenWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("parent aliases through nested wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentAliasThroughDoubleFlattenWrapper = ")
+        .expect("nested-wrapper alias parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("canonical: string,\n} | {\n\tvalue: string,"),
+        "nested wrapper keys must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_adjacent_variants_do_not_contribute_content_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideAdjacentWithoutContent>(),
+            specta_serde::Format,
+        )
+        .expect("adjacent enum with skipped content should export");
+    let parent = rendered
+        .split_once("export type AliasBesideAdjacentWithoutContent = ")
+        .expect("adjacent parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("payload?: never"),
+        "skipped variants must not relax the content-key exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_adjacent_newtype_content_is_collected_per_phase() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesidePhasedAdjacentContent>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific adjacent content should export");
+    let serialize = rendered
+        .split_once("export type AliasBesidePhasedAdjacentContent_Serialize = ")
+        .expect("serialize shape should be exported")
+        .1;
+    let deserialize = rendered
+        .split_once("export type AliasBesidePhasedAdjacentContent_Deserialize = ")
+        .expect("deserialize shape should be exported")
+        .1
+        .split_once("\n\n")
+        .map_or_else(|| rendered.as_str(), |(shape, _)| shape);
+
+    assert!(
+        !serialize.contains("content: string"),
+        "serialize omits the skipped newtype content key:\n{rendered}"
+    );
+    assert!(
+        deserialize.contains("content?: never"),
+        "deserialize must reject the flattened key beside its outer alias:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_untagged_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSkippedUntaggedVariant>(),
+            specta_serde::Format,
+        )
+        .expect("untagged enum with a skipped variant should export");
+    let parent = rendered
+        .split_once("export type AliasBesideSkippedUntaggedVariant = ")
+        .expect("untagged parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("inactive_key?: never"),
+        "a skipped variant key must not relax the alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn phase_skipped_untagged_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesidePhasedSkippedUntaggedVariant>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-skipped untagged variant should export");
+    let deserialize = rendered
+        .split_once("export type AliasBesidePhasedSkippedUntaggedVariant_Deserialize = ")
+        .expect("deserialize parent should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    let serialize = rendered
+        .split_once("export type UntaggedWithPhaseSkippedCollisionKey_Serialize = ")
+        .expect("serialize enum should be exported")
+        .1;
+
+    assert!(
+        deserialize.contains("phased_key?: never"),
+        "the deserialize-active key must retain outer alias exclusivity:\n{rendered}"
+    );
+    assert!(
+        !serialize.contains("phased_key: string"),
+        "the serialize phase must omit the skipped variant:\n{rendered}"
+    );
+}
+
+#[test]
+fn generated_struct_tags_relax_field_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TaggedStructWithTagAlias>(),
+            specta_serde::Format,
+        )
+        .expect("tagged struct with a tag alias should export");
+    let tagged = rendered
+        .split_once("export type TaggedStructWithTagAlias = ")
+        .expect("tagged struct should be exported")
+        .1;
+
+    assert!(
+        !tagged.contains("kind?: never"),
+        "the generated tag must relax the colliding alias exclusion:\n{rendered}"
+    );
+    assert!(
+        tagged.contains("kind: string"),
+        "serde accepts the generated tag as the aliased field spelling:\n{rendered}"
+    );
+    assert_eq!(
+        serde_json::to_value(TaggedStructWithTagAlias {
+            value: "value".into(),
+        })
+        .unwrap(),
+        serde_json::json!({ "kind": "TaggedStructWithTagAlias", "value": "value" })
+    );
+    assert_eq!(
+        serde_json::from_value::<TaggedStructWithTagAlias>(
+            serde_json::json!({ "kind": "TaggedStructWithTagAlias" })
+        )
+        .unwrap()
+        .value,
+        "TaggedStructWithTagAlias",
+        "serde exposes the generated tag through the matching field alias"
+    );
+}
+
+#[test]
+fn flatten_relaxation_preserves_genuine_uninhabited_fields() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentCollidingWithUninhabitedField>(),
+            specta_serde::Format,
+        )
+        .expect("flattened aliases with uninhabited fields should export");
+    let parent = rendered
+        .split_once("export type ParentCollidingWithUninhabitedField = ")
+        .expect("uninhabited parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("impossible: never"),
+        "a genuine uninhabited field must not be removed as an alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn specta_skipped_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSpectaSkippedVariant>(),
+            specta_serde::Format,
+        )
+        .expect("enum with a Specta-skipped variant should export");
+    let parent = rendered
+        .split_once("export type AliasBesideSpectaSkippedVariant = ")
+        .expect("Specta-skipped parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("specta_only_key?: never"),
+        "a Specta-skipped variant key must not relax alias exclusivity:\n{rendered}"
+    );
+}
+
+#[test]
+fn later_flattened_siblings_do_not_relax_deserialize_aliases() {
+    let value = OrderedFlattenedAliasCollision {
+        first: AliasedFlattenPayload {
+            value: "canonical".into(),
+        },
+        later: LaterFlattenedAliasKey {
+            outer_key: "later".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "value": "canonical", "outer_key": "later" })
+    );
+    assert!(
+        serde_json::from_value::<OrderedFlattenedAliasCollision>(
+            serde_json::json!({ "value": "canonical", "outer_key": "later" })
+        )
+        .is_err(),
+        "the first flattened field consumes the later key as a duplicate alias"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OrderedFlattenedAliasCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("ordered flattened aliases should export");
+    let deserialize = rendered
+        .split_once("export type OrderedFlattenedAliasCollision_Deserialize = ")
+        .expect("deserialize ordered collision should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        deserialize.contains("outer_key?: never"),
+        "deserialize must preserve exclusions against later siblings:\n{rendered}"
+    );
+}
+
+#[test]
+fn deserialize_only_aliases_are_not_flattened_emitted_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<SharedAliasBesideFlattenedField>(),
+            specta_serde::Format,
+        )
+        .expect("shared aliases beside flattening should export");
+    let parent = rendered
+        .split_once("export type SharedAliasBesideFlattenedField = ")
+        .expect("shared-alias parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("legacy?: never"),
+        "a deserialize-only alias is not emitted by the flattened field:\n{rendered}"
+    );
+    assert!(
+        serde_json::from_value::<SharedAliasBesideFlattenedField>(
+            serde_json::json!({ "outer": "outer", "legacy": "flattened" })
+        )
+        .is_err(),
+        "serde consumes the shared alias as a duplicate outer spelling"
+    );
+}
+
+#[test]
+fn transparent_named_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughTransparentNamedStruct>(),
+            specta_serde::Format,
+        )
+        .expect("transparent named flattened aliases should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughTransparentNamedStruct = ")
+        .expect("transparent named parent should be exported")
+        .1;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the transparent payload key must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_tuple_fields_do_not_turn_tuple_structs_into_newtypes() {
+    let error = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyBesideSkippedTupleStruct>(),
+            specta_serde::Format,
+        )
+        .expect_err("a declared multi-field tuple struct remains a sequence");
+
+    assert!(
+        error
+            .to_string()
+            .contains("tuple structs serialize as a sequence"),
+        "the tuple must not be mistaken for its surviving field: {error}"
+    );
+}
+
+#[test]
+fn aliases_inside_flattened_payloads_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithFlattenedAlias {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("flattened payload aliases should not exclude parent keys");
+    assert!(
+        rendered.contains(
+            "export type AliasedFlattenPayload = {\n\tvalue: string,\n\touter_key?: never,\n} | {\n\touter_key: string,\n\tvalue?: never,\n};"
+        ),
+        "ordinary uses must retain alias exclusions:\n{rendered}"
+    );
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithFlattenedAlias = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn recursive_flattened_aliases_do_not_recurse_during_export() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<RecursiveFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("recursive flattened aliases should export");
+
+    assert!(
+        rendered.contains("export type RecursiveFlattenedAlias"),
+        "recursive type should be present:\n{rendered}"
+    );
+}
+
+#[test]
+fn unrelated_flattened_keys_preserve_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasWithUnrelatedFlatten>(),
+            specta_serde::Format,
+        )
+        .expect("alias with unrelated flatten should export");
+
+    assert!(
+        rendered.contains("x: string,\n\told_x?: never,")
+            && rendered.contains("old_x: string,\n\tx?: never,"),
+        "ordinary alias exclusions should be preserved:\n{rendered}"
+    );
+}
+
+#[test]
+fn flatten_collisions_relax_only_the_colliding_alias() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<MultipleAliasesWithOneFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("one of multiple aliases may collide with a flattened key");
+    let ty = rendered
+        .split_once("export type MultipleAliasesWithOneFlattenCollision = ")
+        .expect("multi-alias parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old?: never") && ty.contains("legacy?: never"),
+        "only the colliding alias exclusion should be relaxed:\n{rendered}"
+    );
+}
+
+#[test]
+fn skipped_flattened_fields_do_not_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSkippedFlattenedKey>(),
+            specta_serde::Format,
+        )
+        .expect("skipped flattened keys should export");
+    let ty = rendered
+        .split_once("export type AliasBesideSkippedFlattenedKey = ")
+        .expect("skipped-key parent should be exported")
+        .1;
+
+    assert!(
+        ty.contains("old?: never"),
+        "a skipped flattened field cannot supply the alias key:\n{rendered}"
+    );
+}
+
+#[test]
+fn literal_wire_keys_cannot_collide_with_flatten_bookkeeping() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasesBesideFormerSentinelKey>(),
+            specta_serde::Format,
+        )
+        .expect("literal wire keys should remain distinct from bookkeeping");
+    let ty = rendered
+        .split_once("export type AliasesBesideFormerSentinelKey = ")
+        .expect("literal-key parent should be exported")
+        .1;
+
+    assert!(
+        ty.contains("old?: never") && ty.contains("legacy?: never"),
+        "unrelated alias exclusions should remain intact:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_maps_relax_alias_exclusions_for_arbitrary_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasWithFlattenedMap>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened maps should export");
+    let ty = rendered
+        .split_once("export type AliasWithFlattenedMap = ")
+        .expect("map parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old_value?: never"),
+        "the flattened map can provide the alias key:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_external_enum_tags_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideFlattenedExternalTag>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened external enums should export");
+    let ty = rendered
+        .split_once("export type AliasBesideFlattenedExternalTag = ")
+        .expect("external-tag parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("Kind?: never"),
+        "the flattened enum emits its external tag key:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_variant_untagged_payload_keys_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideFlattenedVariantUntagged>(),
+            specta_serde::Format,
+        )
+        .expect("aliases beside flattened untagged variants should export");
+    let ty = rendered
+        .split_once("export type AliasBesideFlattenedVariantUntagged = ")
+        .expect("untagged-variant parent should be exported")
+        .1;
+
+    assert!(
+        !ty.contains("old?: never"),
+        "the untagged variant emits its payload key directly:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_alias_relaxation_does_not_cross_object_scopes() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OuterKeyBesideNestedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("nested aliases should export");
+
+    assert!(
+        rendered.contains("value: string,\n\touter_key?: never,")
+            && rendered.contains("outer_key: string,\n\tvalue?: never,"),
+        "nested alias exclusions should remain intact:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_generic_wrappers_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesThroughFlattenedWrapper {
+        outer_key: "outer".into(),
+        wrapper: FlattenWrapper {
+            inner: AliasedFlattenPayload {
+                value: "inner".into(),
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind flattened wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the flattened wrapper use must relax nested alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn nested_instantiations_of_the_same_flatten_wrapper_are_expanded() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughDoubleFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("nested generic wrapper instantiations should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughDoubleFlattenedWrapper = ")
+        .expect("double-wrapper parent should be exported")
+        .1
+        .split_once(";\n")
+        .expect("parent declaration should terminate")
+        .0;
+
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the nested generic wrapper must expose its flattened aliases:\n{rendered}"
+    );
+    assert!(
+        !parent.contains("FlattenWrapper"),
+        "the contextual nested wrapper must be expanded rather than hidden behind a reference:\n{rendered}"
+    );
+}
+
+#[test]
+fn enum_variant_flattened_references_relax_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<EnumVariantWithFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("enum variant flattened aliases should export");
+    let variant = rendered
+        .split_once("export type EnumVariantWithFlattenedAlias = ")
+        .expect("enum should be exported")
+        .1;
+
+    assert!(
+        !variant.contains("outer_key?: never"),
+        "the contextual enum variant must relax the flattened alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn parent_aliases_detect_keys_through_flattened_generic_wrappers() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentAliasCollidesThroughFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("parent alias collisions through generic wrappers should export");
+    let parent = rendered
+        .split_once("export type ParentAliasCollidesThroughFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+
+    assert!(
+        parent.contains("outer_key: string,\n} | {\n\tvalue: string,"),
+        "the flattened generic key must relax the parent alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_flattened_conversions_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesWithConvertedFlattenedAlias {
+        outer_key: "outer".into(),
+        inner: ConvertedAliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithConvertedFlattenedAlias>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind flattened conversions should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesWithConvertedFlattenedAlias = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the converted flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_through_nested_flattened_conversions_do_not_exclude_parent_keys() {
+    let value = ParentKeyCollidesThroughConvertedFlattenedWrapper {
+        outer_key: "outer".into(),
+        wrapper: FlattenWrapper {
+            inner: ConvertedAliasedFlattenPayload {
+                value: "inner".into(),
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesThroughConvertedFlattenedWrapper>(),
+            specta_serde::Format,
+        )
+        .expect("aliases behind nested flattened conversions should export");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesThroughConvertedFlattenedWrapper = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the nested converted flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn flattened_alias_detection_tracks_sibling_generic_instantiations() {
+    let value = ParentKeyCollidesInSecondGenericInstantiation {
+        outer_key: "outer".into(),
+        duo: DuoFlattenWrapper {
+            first: FlattenWrapper {
+                inner: PlainFlattenPayload {
+                    plain: "plain".into(),
+                },
+            },
+            second: FlattenWrapper {
+                inner: AliasedFlattenPayload {
+                    value: "inner".into(),
+                },
+            },
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({
+            "outer_key": "outer",
+            "plain": "plain",
+            "value": "inner",
+        })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesInSecondGenericInstantiation>(),
+            specta_serde::Format,
+        )
+        .expect("each flattened generic instantiation should be inspected");
+    let parent = rendered
+        .split_once("export type ParentKeyCollidesInSecondGenericInstantiation = ")
+        .expect("parent type should be exported")
+        .1;
+    assert!(
+        !parent.contains("outer_key?: never"),
+        "the second generic instantiation must retain alias detection:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_internal_tag_flattened_payloads_do_not_exclude_sibling_keys() {
+    let value = InternalTagWithFlattenedAliasCollision::Value {
+        outer_key: "outer".into(),
+        inner: AliasedFlattenPayload {
+            value: "inner".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "t": "Value", "outer_key": "outer", "value": "inner" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithFlattenedAliasCollision>(),
+            specta_serde::Format,
+        )
+        .expect("internal-tag flattened aliases should export");
+    let variant = rendered
+        .split_once("export type InternalTagWithFlattenedAliasCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+    assert!(
+        !variant.contains("outer_key?: never"),
+        "the internal-tag flattened use must relax alias exclusions:\n{rendered}"
+    );
+}
+
+#[test]
+fn internal_tag_flattened_payloads_relax_sibling_key_collisions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithSiblingFlattenCollision>(),
+            specta_serde::Format,
+        )
+        .expect("sibling flattened alias collisions should export");
+    let variant = rendered
+        .split_once("export type InternalTagWithSiblingFlattenCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+
+    assert!(
+        !variant.contains("x?: never"),
+        "a sibling flattened key must relax the alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn aliases_inside_internal_tag_newtype_payloads_do_not_exclude_tag_keys() {
+    let value = InternalTagNewtypeAliasCollision::Value(InternalTagAliasPayload {
+        value: "payload".into(),
+    });
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "t": "Value", "value": "payload" })
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNewtypeAliasCollision>(),
+            specta_serde::Format,
+        )
+        .expect("internal-tag newtype aliases should export");
+    assert!(
+        rendered
+            .contains("export type InternalTagAliasPayload = {\n\tvalue: string,\n\tt?: never,"),
+        "ordinary payload uses must retain alias exclusions:\n{rendered}"
+    );
+    let variant = rendered
+        .split_once("export type InternalTagNewtypeAliasCollision = ")
+        .expect("internal-tag type should be exported")
+        .1;
+    assert!(
+        !variant.contains("t?: never"),
+        "the internally tagged use must relax tag-key exclusions:\n{rendered}"
+    );
+
+    assert!(
+        serde_json::from_value::<InternalTagNewtypeAliasCollision>(
+            serde_json::json!({ "t": "Value" })
+        )
+        .is_err(),
+        "the consumed internal tag cannot populate the payload alias"
+    );
+    assert!(
+        serde_json::from_value::<InternalTagNewtypeAliasCollision>(
+            serde_json::json!({ "t": "Value", "value": "payload" })
+        )
+        .is_ok(),
+        "the canonical payload key must remain usable"
+    );
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNewtypeAliasCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific internal-tag aliases should export");
+    let deserialize = phased
+        .split_once("export type InternalTagNewtypeAliasCollision_Deserialize = ")
+        .expect("deserialize internal-tag type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        !deserialize.contains("t?: never") && !deserialize.contains("t: string"),
+        "deserialize must retain the canonical branch and suppress the consumed alias branch:\n{phased}"
+    );
+}
+
+#[test]
+fn internal_tags_do_not_suppress_aliases_in_nested_objects() {
+    assert!(
+        serde_json::from_value::<InternalTagNestedAlias>(serde_json::json!({
+            "t": "Value",
+            "nested": { "t": "payload" }
+        }))
+        .is_ok(),
+        "an internal tag only consumes its key in the immediate payload object"
+    );
+
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagNestedAlias>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("nested internal-tag aliases should export");
+    assert!(
+        phased.contains("value: string") && phased.contains("t: string"),
+        "the nested object's alias branch must remain available:\n{phased}"
+    );
+}
+
+#[test]
+fn internal_tags_suppress_consumed_aliases_in_untagged_payloads() {
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedAliasPayload>(serde_json::json!({
+            "t": "Value"
+        }))
+        .is_err(),
+        "the internal tag cannot populate an untagged payload alias"
+    );
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedAliasPayload>(serde_json::json!({
+            "t": "Value",
+            "value": "payload"
+        }))
+        .is_ok(),
+        "the untagged payload's canonical key must remain usable"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithUntaggedAliasPayload>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("internal-tagged untagged payload aliases should export");
+    let deserialize = rendered
+        .split_once("export type InternalTagWithUntaggedAliasPayload_Deserialize = ")
+        .expect("deserialize type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        !deserialize.contains("t?: never") && !deserialize.contains("t: string"),
+        "the consumed alias branch must be suppressed without excluding the tag:\n{rendered}"
+    );
+}
+
+#[test]
+fn internal_tags_preserve_nested_aliases_in_untagged_payloads() {
+    assert!(
+        serde_json::from_value::<InternalTagWithUntaggedNestedAliasPayload>(serde_json::json!({
+            "t": "Value",
+            "nested": { "t": "payload" }
+        }))
+        .is_ok(),
+        "untagged alternatives do not merge their named fields' nested object namespaces"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<InternalTagWithUntaggedNestedAliasPayload>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("nested aliases inside untagged payloads should export");
+    assert!(
+        rendered.contains("value: string") && rendered.contains("t: string"),
+        "the nested alias branch must remain available:\n{rendered}"
+    );
 }
 
 #[test]

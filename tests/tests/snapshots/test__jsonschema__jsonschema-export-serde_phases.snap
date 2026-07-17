@@ -195,6 +195,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "bruh": false,
                         "field": {
                           "type": "string"
                         }
@@ -209,7 +210,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                       "properties": {
                         "bruh": {
                           "type": "string"
-                        }
+                        },
+                        "field": false
                       },
                       "required": [
                         "bruh"
@@ -3086,6 +3088,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                     {
                       "additionalProperties": false,
                       "properties": {
+                        "bruh": false,
                         "field": {
                           "type": "string"
                         }
@@ -3100,7 +3103,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                       "properties": {
                         "bruh": {
                           "type": "string"
-                        }
+                        },
+                        "field": false
                       },
                       "required": [
                         "bruh"
@@ -8327,6 +8331,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
+                "bruh": false,
                 "renamed_field": {
                   "type": "string"
                 }
@@ -8341,7 +8346,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "properties": {
                 "bruh": {
                   "type": "string"
-                }
+                },
+                "renamed_field": false
               },
               "required": [
                 "bruh"
@@ -8374,6 +8380,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
+                "bruh": false,
                 "field": {
                   "type": "string"
                 }
@@ -8388,7 +8395,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "properties": {
                 "bruh": {
                   "type": "string"
-                }
+                },
+                "field": false
               },
               "required": [
                 "bruh"
@@ -8450,6 +8458,9 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
+                "alternative": false,
+                "another": false,
+                "bruh": false,
                 "field": {
                   "type": "string"
                 }
@@ -8462,9 +8473,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
+                "alternative": false,
+                "another": false,
                 "bruh": {
                   "type": "string"
-                }
+                },
+                "field": false
               },
               "required": [
                 "bruh"
@@ -8476,7 +8490,10 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
               "properties": {
                 "alternative": {
                   "type": "string"
-                }
+                },
+                "another": false,
+                "bruh": false,
+                "field": false
               },
               "required": [
                 "alternative"
@@ -8486,9 +8503,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
             {
               "additionalProperties": false,
               "properties": {
+                "alternative": false,
                 "another": {
                   "type": "string"
-                }
+                },
+                "bruh": false,
+                "field": false
               },
               "required": [
                 "another"
@@ -9035,6 +9055,7 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                 {
                   "additionalProperties": false,
                   "properties": {
+                    "bruh": false,
                     "field": {
                       "type": "string"
                     }
@@ -9049,7 +9070,8 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
                   "properties": {
                     "bruh": {
                       "type": "string"
-                    }
+                    },
+                    "field": false
                   },
                   "required": [
                     "bruh"
