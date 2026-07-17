@@ -250,6 +250,125 @@ struct CatalogCapability {
     context_window: Option<u32>,
 }
 
+macro_rules! optional_alias_part {
+    ($name:ident, $field:ident: $ty:ty, $alias:literal) => {
+        #[derive(Type, Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct $name {
+            #[serde(default, alias = $alias)]
+            $field: Option<$ty>,
+        }
+    };
+}
+
+optional_alias_part!(ThinkingEffort, effort_levels: Vec<String>, "effort_levels");
+optional_alias_part!(ThinkingReasoning, include_reasoning_in_response: bool, "include_reasoning_in_response");
+optional_alias_part!(ThinkingOutput, counts_against_output: bool, "counts_against_output");
+optional_alias_part!(ThinkingSummary, supports_summary: bool, "supports_summary");
+optional_alias_part!(ThinkingBudget, supports_budget: bool, "supports_budget");
+optional_alias_part!(ThinkingMinimum, minimum_effort: String, "minimum_effort");
+optional_alias_part!(ThinkingMaximum, maximum_effort: String, "maximum_effort");
+optional_alias_part!(ThinkingDefault, default_effort: String, "default_effort");
+optional_alias_part!(ThinkingFormat, summary_format: String, "summary_format");
+optional_alias_part!(ThinkingUnit, budget_unit: String, "budget_unit");
+optional_alias_part!(ThinkingTokens, reasoning_tokens: u32, "reasoning_tokens");
+optional_alias_part!(ThinkingVisible, visible_tokens: u32, "visible_tokens");
+optional_alias_part!(ThinkingStreaming, supports_streaming: bool, "supports_streaming");
+optional_alias_part!(ThinkingTraces, supports_traces: bool, "supports_traces");
+optional_alias_part!(ThinkingRedaction, supports_redaction: bool, "supports_redaction");
+optional_alias_part!(ThinkingEncryption, supports_encryption: bool, "supports_encryption");
+optional_alias_part!(ThinkingCache, caches_reasoning: bool, "caches_reasoning");
+optional_alias_part!(ThinkingParallel, supports_parallel: bool, "supports_parallel");
+optional_alias_part!(ThinkingToolUse, supports_tool_use: bool, "supports_tool_use");
+optional_alias_part!(ThinkingRetention, retention_days: u32, "retention_days");
+
+#[derive(Type, Serialize, Deserialize)]
+struct ThinkingConfig {
+    #[serde(flatten)]
+    effort: ThinkingEffort,
+    #[serde(flatten)]
+    reasoning: ThinkingReasoning,
+    #[serde(flatten)]
+    output: ThinkingOutput,
+    #[serde(flatten)]
+    summary: ThinkingSummary,
+    #[serde(flatten)]
+    budget: ThinkingBudget,
+    #[serde(flatten)]
+    minimum: ThinkingMinimum,
+    #[serde(flatten)]
+    maximum: ThinkingMaximum,
+    #[serde(flatten)]
+    default: ThinkingDefault,
+    #[serde(flatten)]
+    format: ThinkingFormat,
+    #[serde(flatten)]
+    unit: ThinkingUnit,
+    #[serde(flatten)]
+    tokens: ThinkingTokens,
+    #[serde(flatten)]
+    visible: ThinkingVisible,
+    #[serde(flatten)]
+    streaming: ThinkingStreaming,
+    #[serde(flatten)]
+    traces: ThinkingTraces,
+    #[serde(flatten)]
+    redaction: ThinkingRedaction,
+    #[serde(flatten)]
+    encryption: ThinkingEncryption,
+    #[serde(flatten)]
+    cache: ThinkingCache,
+    #[serde(flatten)]
+    parallel: ThinkingParallel,
+    #[serde(flatten)]
+    tool_use: ThinkingToolUse,
+    #[serde(flatten)]
+    retention: ThinkingRetention,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct ExtensibleThinkingConfig {
+    #[serde(flatten)]
+    config: ThinkingConfig,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum CanonicalModelThinking {
+    Configured(ThinkingConfig),
+    Extensible(ExtensibleThinkingConfig),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogMetadata {
+    #[serde(default, alias = "display_label")]
+    display_label: Option<String>,
+    #[serde(default, alias = "release_stage")]
+    release_stage: Option<String>,
+    #[serde(default, alias = "documentation_url")]
+    documentation_url: Option<String>,
+    #[serde(default, alias = "deprecation_date")]
+    deprecation_date: Option<String>,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogLimits {
+    #[serde(default, alias = "max_input_tokens")]
+    max_input_tokens: Option<u32>,
+    #[serde(default, alias = "max_output_tokens")]
+    max_output_tokens: Option<u32>,
+    #[serde(default, alias = "max_images")]
+    max_images: Option<u32>,
+    #[serde(default, alias = "max_tools")]
+    max_tools: Option<u32>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CatalogEntry {
@@ -261,6 +380,12 @@ struct CatalogEntry {
     model_pricing: Option<CanonicalModelPricing>,
     #[serde(default, alias = "model_capability")]
     model_capability: Option<CatalogCapability>,
+    #[serde(default, alias = "model_thinking")]
+    model_thinking: Option<CanonicalModelThinking>,
+    #[serde(default, alias = "model_limits")]
+    model_limits: Option<CatalogLimits>,
+    #[serde(default, alias = "model_metadata")]
+    model_metadata: Option<CatalogMetadata>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -416,6 +541,9 @@ fn main() {
         .register::<CatalogProvider>()
         .register::<CanonicalModelPricing>()
         .register::<CatalogCapability>()
+        .register::<CanonicalModelThinking>()
+        .register::<CatalogLimits>()
+        .register::<CatalogMetadata>()
         .register::<Pick>();
     Typescript::default()
         .export_to(
