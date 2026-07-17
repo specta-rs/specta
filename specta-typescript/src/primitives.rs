@@ -25,7 +25,8 @@ use crate::{
 const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
-const FIELD_ALIAS_UNION_MARKER: &str = "specta:serde_field_alias_union";
+const FIELD_ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
+const FIELD_ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 fn path_string(location: &[Cow<'static, str>]) -> String {
     location.join(".")
@@ -3184,6 +3185,19 @@ fn alias_field_union_dt(
     let mut fields = Vec::with_capacity(e.variants.len());
 
     for (name, variant) in active_variants(e) {
+        let mut variant = (*variant).clone();
+        if let Fields::Unnamed(unnamed) = &mut variant.fields
+            && let Some(DataType::Struct(strct)) = unnamed
+                .fields
+                .first_mut()
+                .and_then(|field| field.ty.as_mut())
+            && let Fields::Named(named) = &mut strct.fields
+        {
+            named
+                .fields
+                .retain(|(_, field)| !field.attributes.contains_key(FIELD_ALIAS_EXCLUSION_MARKER));
+        }
+
         let mut variant_location = location.clone();
         variant_location.push(name.clone());
         let field = enum_variant_datatype(
@@ -3191,7 +3205,7 @@ fn alias_field_union_dt(
             None,
             types,
             name.clone(),
-            variant,
+            &variant,
             variant_location,
             prefix,
             generics,

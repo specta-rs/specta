@@ -247,10 +247,8 @@ impl Types {
     where
         F: FnMut(&mut NamedDataType),
     {
-        for (_, ndt) in self.types.iter_mut() {
-            if let Some(ndt) = ndt {
-                f(ndt);
-            }
+        for ndt in self.types.values_mut().flatten() {
+            f(ndt);
         }
     }
 
@@ -259,7 +257,7 @@ impl Types {
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for (_, slot) in self.types.iter_mut() {
+        for slot in self.types.values_mut() {
             if let Some(ndt) = slot.take() {
                 *slot = Some(f(ndt));
             }
