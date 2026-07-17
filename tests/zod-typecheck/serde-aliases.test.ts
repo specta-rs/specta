@@ -41,6 +41,11 @@ const mappedEntries = raw.entries.map(entry => ({
   inputCost: entry.modelPricing?.inputCost ?? entry.modelPricing?.input_cost,
   provider: entry.providerInfo?.displayName ?? entry.providerInfo?.display_name,
   tools: entry.modelCapability?.supportsTools ?? entry.modelCapability?.supports_tools,
+  thinking: entry.modelThinking && "configured" in entry.modelThinking
+    ? entry.modelThinking.configured?.effortLevels ?? entry.modelThinking.configured?.effort_levels
+    : entry.modelThinking?.extensible.effort_levels,
+  limits: entry.modelLimits?.maxInputTokens ?? entry.modelLimits?.max_input_tokens,
+  label: entry.modelMetadata?.displayLabel ?? entry.modelMetadata?.display_label,
 }));
 
 function consumeEntry(entry: Pick<CatalogEntry, "modelId" | "modelPricing">) {
@@ -48,6 +53,8 @@ function consumeEntry(entry: Pick<CatalogEntry, "modelId" | "modelPricing">) {
 }
 
 const structurallyAssigned: { modelId?: string | null } = raw.entries[0];
+type EntryPresentation = Pick<CatalogEntry, "modelId" | "modelPricing" | "modelThinking" | "modelLimits" | "modelMetadata">;
+const presentation: EntryPresentation = raw.entries[0];
 
 type QueryResult<T> = { data: T };
 function consumeQuery<T extends { entries: CatalogEntry[] }>(query: QueryResult<T>) {
@@ -60,4 +67,5 @@ const queriedEntries = consumeQuery(queryResult);
 void duplicateOptional;
 void mappedEntries;
 void structurallyAssigned;
+void presentation;
 void queriedEntries;

@@ -875,7 +875,9 @@ fn rewrite_datatype_for_phase(
         split_types,
         container_name,
         &mut HashSet::new(),
-    )
+    )?;
+    defer_fully_optional_alias_unions(ty);
+    Ok(())
 }
 
 fn rewrite_datatype_for_phase_inner(
@@ -2173,6 +2175,133 @@ fn alias_union_is_fully_exclusive(enm: &Enum) -> bool {
         })
 }
 
+/// Restores symbolic lowering for optional aliases after every enclosing serde
+/// rewrite has finished. Flatten and enum lowering can move alias unions into
+/// newly synthesized intersections after the local field pass that normally
+/// marks independent alias groups, so this must walk the final graph.
+fn defer_fully_optional_alias_unions(ty: &mut DataType) {
+    match ty {
+        DataType::Struct(strct) => {
+            if let Fields::Named(fields) = &mut strct.fields {
+                for (_, field) in &mut fields.fields {
+                    if let Some(ty) = &mut field.ty {
+                        defer_fully_optional_alias_unions(ty);
+                    }
+                }
+            } else if let Fields::Unnamed(fields) = &mut strct.fields {
+                for field in &mut fields.fields {
+                    if let Some(ty) = &mut field.ty {
+                        defer_fully_optional_alias_unions(ty);
+                    }
+                }
+            }
+        }
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                match &mut variant.fields {
+                    Fields::Named(fields) => {
+                        for (_, field) in &mut fields.fields {
+                            if let Some(ty) = &mut field.ty {
+                                defer_fully_optional_alias_unions(ty);
+                            }
+                        }
+                    }
+                    Fields::Unnamed(fields) => {
+                        for field in &mut fields.fields {
+                            if let Some(ty) = &mut field.ty {
+                                defer_fully_optional_alias_unions(ty);
+                            }
+                        }
+                    }
+                    Fields::Unit => {}
+                }
+            }
+
+            if enm.attributes.contains_key(ALIAS_UNION_MARKER)
+                && alias_union_is_fully_optional(enm)
+                && (alias_union_is_fully_exclusive(enm) || alias_union_has_no_exclusions(enm))
+            {
+                enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in &mut tuple.elements {
+                defer_fully_optional_alias_unions(ty);
+            }
+        }
+        DataType::List(list) => defer_fully_optional_alias_unions(&mut list.ty),
+        DataType::Map(map) => {
+            defer_fully_optional_alias_unions(map.key_ty_mut());
+            defer_fully_optional_alias_unions(map.value_ty_mut());
+        }
+        DataType::Intersection(types) => {
+            for ty in types {
+                defer_fully_optional_alias_unions(ty);
+            }
+        }
+        DataType::Nullable(inner) => defer_fully_optional_alias_unions(inner),
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                defer_fully_optional_alias_unions(dt);
+            }
+            for (_, ty) in named_reference_generics_mut(reference) {
+                defer_fully_optional_alias_unions(ty);
+            }
+        }
+        DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_)
+        | DataType::Primitive(_) => {}
+    }
+}
+
+fn alias_union_is_fully_optional(enm: &Enum) -> bool {
+    !enm.variants.is_empty()
+        && enm.variants.iter().all(|(_, variant)| {
+            let Fields::Unnamed(fields) = &variant.fields else {
+                return false;
+            };
+            let [field] = fields.fields.as_slice() else {
+                return false;
+            };
+            let Some(DataType::Struct(strct)) = &field.ty else {
+                return false;
+            };
+            let Fields::Named(fields) = &strct.fields else {
+                return false;
+            };
+
+            fields
+                .fields
+                .iter()
+                .any(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+                && fields.fields.iter().all(|(_, field)| {
+                    field.attributes.contains_key(ALIAS_EXCLUSION_MARKER) || field.optional
+                })
+        })
+}
+
+fn alias_union_has_no_exclusions(enm: &Enum) -> bool {
+    enm.variants.iter().all(|(_, variant)| {
+        let Fields::Unnamed(fields) = &variant.fields else {
+            return false;
+        };
+        let [field] = fields.fields.as_slice() else {
+            return false;
+        };
+        let Some(DataType::Struct(strct)) = &field.ty else {
+            return false;
+        };
+        let Fields::Named(fields) = &strct.fields else {
+            return false;
+        };
+
+        fields
+            .fields
+            .iter()
+            .all(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+    })
+}
+
 fn field_has_aliases(field: &Field) -> bool {
     SerdeFieldAttrs::from_attributes(&field.attributes)
         .ok()
@@ -2743,8 +2872,8 @@ const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 /// contextual flatten relaxation.
 const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
-/// Marks independent alias unions that an exporter may preserve symbolically
-/// instead of distributing their enclosing intersection into a Cartesian union.
+/// Marks alias unions that an exporter may preserve symbolically instead of
+/// distributing their enclosing intersection into a Cartesian union.
 const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 fn rewrite_enum_repr_for_phase(
