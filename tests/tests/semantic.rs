@@ -33,6 +33,29 @@ struct CombinedPayload {
     nested: Vec<Option<Website>>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct StructWithF64 {
+    value: f64,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct IdentityFloatPayload {
+    value: f64,
+    nested: Option<StructWithF64>,
+    values: Vec<f64>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct MixedIdentityPayload {
+    value: f64,
+    nested: Option<StructWithF64>,
+    values: Vec<f64>,
+    site: Website,
+}
+
 fn semantic_config() -> Configuration {
     Configuration::empty().define::<Website>(
         |_| define("URL").into(),
@@ -107,10 +130,7 @@ fn semantic_lossless_numbers_snapshot_export_and_transforms() {
         .expect("lossless semantic numbers should export");
 
     insta::assert_snapshot!("semantic-lossless-numbers-export", rendered);
-    insta::assert_snapshot!(
-        "semantic-lossless-numbers-serialize-transform",
-        transformed_snapshot(&types, semantic.apply_serialize(&types, &dt, "payload"),)
-    );
+    assert_eq!(semantic.apply_serialize(&types, &dt, "payload"), None);
     insta::assert_snapshot!(
         "semantic-lossless-numbers-deserialize-transform",
         transformed_snapshot(&types, semantic.apply_deserialize(&types, &dt, "payload"),)
@@ -136,4 +156,35 @@ fn semantic_custom_rules_compose_with_lossless_builtin_remaps() {
         "semantic-composed-deserialize-transform",
         transformed_snapshot(&types, semantic.apply_deserialize(&types, &dt, "payload"),)
     );
+}
+
+#[test]
+fn semantic_lossless_floats_do_not_emit_identity_runtime_transforms() {
+    let semantic = Configuration::default().enable_lossless_floats();
+    let mut types = Types::default();
+
+    for dt in [
+        f64::definition(&mut types),
+        IdentityFloatPayload::definition(&mut types),
+    ] {
+        assert_eq!(semantic.apply_serialize(&types, &dt, "payload"), None);
+        assert_eq!(semantic.apply_deserialize(&types, &dt, "payload"), None);
+    }
+}
+
+#[test]
+fn semantic_identity_descendants_are_pruned_from_real_runtime_transforms() {
+    let semantic = semantic_config().enable_lossless_floats();
+    let mut types = Types::default();
+    let dt = MixedIdentityPayload::definition(&mut types);
+
+    let (_, serialize) = semantic
+        .apply_serialize(&types, &dt, "payload")
+        .expect("Website serialization should require a runtime transform");
+    assert_eq!(serialize, "({...payload,site:payload.site.toString()})");
+
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &dt, "payload")
+        .expect("Website deserialization should require a runtime transform");
+    assert_eq!(deserialize, "({...payload,site:new URL(payload.site)})");
 }

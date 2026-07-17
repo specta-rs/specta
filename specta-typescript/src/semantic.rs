@@ -488,9 +488,9 @@ impl Configuration {
     /// deeply nested for structs, tuples, lists, nullable values, and
     /// intersections.
     ///
-    /// If no rule or built-in remap matches, `None` is returned. If a rule
-    /// matches but the type shape does not need to change, `Some((None,
-    /// runtime_str))` is returned.
+    /// If the graph contains no runtime transform, `None` is returned, including
+    /// when rules or built-in remaps only change the exported TypeScript type.
+    /// Type-only changes are handled by [`Configuration::apply_types`].
     ///
     pub fn apply_serialize(
         &self,
@@ -506,6 +506,7 @@ impl Configuration {
             js_ident,
             &mut Vec::new(),
         )
+        .filter(|(_, runtime)| runtime != js_ident)
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
@@ -526,6 +527,7 @@ impl Configuration {
             js_ident,
             &mut Vec::new(),
         )
+        .filter(|(_, runtime)| runtime != js_ident)
     }
 
     fn apply_inner(
@@ -720,9 +722,13 @@ impl Configuration {
 
                 Some((
                     changed.then_some(DataType::Map(ty)),
-                    format!(
-                        "Object.fromEntries(Object.entries({js_ident}).map(([k,{item}])=>[k,{runtime}]))"
-                    ),
+                    if runtime == item {
+                        js_ident.to_owned()
+                    } else {
+                        format!(
+                            "Object.fromEntries(Object.entries({js_ident}).map(([k,{item}])=>[k,{runtime}]))"
+                        )
+                    },
                 ))
             }
             DataType::List(list) => {
@@ -743,7 +749,11 @@ impl Configuration {
                 }
                 Some((
                     changed.then_some(DataType::List(ty)),
-                    format!("{js_ident}.map({item}=>{runtime})"),
+                    if runtime == item {
+                        js_ident.to_owned()
+                    } else {
+                        format!("{js_ident}.map({item}=>{runtime})")
+                    },
                 ))
             }
             DataType::Nullable(inner) => {
@@ -757,7 +767,11 @@ impl Configuration {
                 )?;
                 Some((
                     next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
-                    format!("{js_ident}==null?{js_ident}:{runtime}"),
+                    if runtime == js_ident {
+                        js_ident.to_owned()
+                    } else {
+                        format!("{js_ident}==null?{js_ident}:{runtime}")
+                    },
                 ))
             }
             DataType::Intersection(items) => {
