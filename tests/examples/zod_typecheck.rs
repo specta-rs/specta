@@ -195,6 +195,11 @@ struct OptionalAlias {
     other: Option<String>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+struct Pick {
+    value: String,
+}
+
 mod r#type {
     use super::*;
 
@@ -332,7 +337,8 @@ fn main() {
         .unwrap();
     let alias_types = Types::default()
         .register::<AliasHeavy>()
-        .register::<OptionalAlias>();
+        .register::<OptionalAlias>()
+        .register::<Pick>();
     Typescript::default()
         .export_to(
             out.join("serde-aliases.ts"),
