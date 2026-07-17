@@ -488,9 +488,10 @@ impl Configuration {
     /// deeply nested for structs, tuples, lists, nullable values, and
     /// intersections.
     ///
-    /// If the graph contains no runtime transform, `None` is returned, including
-    /// when rules or built-in remaps only change the exported TypeScript type.
-    /// Type-only changes are handled by [`Configuration::apply_types`].
+    /// If a registered graph contains no runtime transform, `None` is returned;
+    /// its type-only changes are handled by [`Configuration::apply_types`]. For
+    /// inline inputs, a type-only result is retained with an identity runtime
+    /// expression because there is no registered type for `apply_types` to rewrite.
     ///
     pub fn apply_serialize(
         &self,
@@ -506,7 +507,7 @@ impl Configuration {
             js_ident,
             &mut Vec::new(),
         )
-        .filter(|(_, runtime)| runtime != js_ident)
+        .filter(|(next_ty, runtime)| next_ty.is_some() || runtime != js_ident)
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
@@ -527,7 +528,7 @@ impl Configuration {
             js_ident,
             &mut Vec::new(),
         )
-        .filter(|(_, runtime)| runtime != js_ident)
+        .filter(|(next_ty, runtime)| next_ty.is_some() || runtime != js_ident)
     }
 
     fn apply_inner(

@@ -163,13 +163,42 @@ fn semantic_lossless_floats_do_not_emit_identity_runtime_transforms() {
     let semantic = Configuration::default().enable_lossless_floats();
     let mut types = Types::default();
 
-    for dt in [
+    for inline in [
         f64::definition(&mut types),
-        IdentityFloatPayload::definition(&mut types),
+        Vec::<f64>::definition(&mut types),
+        Option::<f64>::definition(&mut types),
     ] {
-        assert_eq!(semantic.apply_serialize(&types, &dt, "payload"), None);
-        assert_eq!(semantic.apply_deserialize(&types, &dt, "payload"), None);
+        for transform in [
+            semantic.apply_serialize(&types, &inline, "payload"),
+            semantic.apply_deserialize(&types, &inline, "payload"),
+        ] {
+            let (remapped, runtime) =
+                transform.expect("inline floats must retain their type remap");
+            assert!(remapped.is_some());
+            assert_eq!(runtime, "payload");
+        }
     }
+
+    let registered = IdentityFloatPayload::definition(&mut types);
+    for transform in [
+        semantic.apply_serialize(&types, &registered, "payload"),
+        semantic.apply_deserialize(&types, &registered, "payload"),
+    ] {
+        assert_eq!(transform, None);
+    }
+}
+
+#[test]
+fn semantic_inline_identity_bigint_retains_its_type_remap() {
+    let semantic = Configuration::empty().enable_lossless_bigints();
+    let mut types = Types::default();
+    let dt = u64::definition(&mut types);
+
+    let (remapped, runtime) = semantic
+        .apply_serialize(&types, &dt, "payload")
+        .expect("inline bigints must retain their type remap");
+    assert!(remapped.is_some());
+    assert_eq!(runtime, "payload");
 }
 
 #[test]
