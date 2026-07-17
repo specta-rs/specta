@@ -18,7 +18,7 @@ that protect generated output.
 - `specta-typescript/` and `specta-swift/` are the stable exporters. They are
   good references for exporter structure, generated-output tests, and error
   reporting.
-- `specta-openapi/`, `specta-jsonschema/`, `specta-zod/`, `specta-go/`, and
+- `specta-openapi/`, `specta-jsonschema/`, `specta-zod/`, `specta-valibot/`, `specta-go/`, and
   `specta-kotlin/` are format crates at different stages of completeness.
 - `specta-util/` contains end-user helpers with fewer semver guarantees than the
   core crates.

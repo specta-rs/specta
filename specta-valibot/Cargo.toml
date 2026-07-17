@@ -1,0 +1,37 @@
+[package]
+name = "specta-valibot"
+description = "Export your Rust types to Valibot schemas for TypeScript"
+version = "0.0.4"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-valibot/latest/specta-valibot"
+keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
+categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
+
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+# Implement `serde::Serialize` and `serde::Deserialize` for Valibot-specific wrapper types
+# (Any, Unknown, Never)
+serde = ["dep:serde"]
+
+[dependencies]
+specta = { version = "=2.0.0-rc.26", path = "../specta" }
+serde = { version = "1", default-features = false, optional = true }
+specta-typescript = { version = "=0.0.13", path = "../specta-typescript" }
+
+[dev-dependencies]
+specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive", "collect"] }
+specta-serde = { version = "=0.0.13", path = "../specta-serde" }
+specta-util = { path = "../specta-util" }

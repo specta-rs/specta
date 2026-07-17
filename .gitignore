@@ -20,6 +20,7 @@ node_modules
 
 /tests/.temp
 /tests/zod-typecheck/generated
+/tests/valibot-typecheck/generated
 
 # Used by examples as a place to export files.
 /specta-typescript/out
