@@ -478,6 +478,28 @@ struct ParentCollidingWithUninhabitedField {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithSpectaSkippedCollisionKey {
+    Live {
+        other: String,
+    },
+    #[specta(skip)]
+    Hidden {
+        specta_only_key: String,
+    },
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct AliasBesideSpectaSkippedVariant {
+    #[serde(alias = "specta_only_key")]
+    canonical: String,
+    #[serde(flatten)]
+    inner: UntaggedWithSpectaSkippedCollisionKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1348,6 +1370,25 @@ fn flatten_relaxation_preserves_genuine_uninhabited_fields() {
     assert!(
         parent.contains("impossible: never"),
         "a genuine uninhabited field must not be removed as an alias exclusion:\n{rendered}"
+    );
+}
+
+#[test]
+fn specta_skipped_variants_do_not_contribute_flattened_keys() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<AliasBesideSpectaSkippedVariant>(),
+            specta_serde::Format,
+        )
+        .expect("enum with a Specta-skipped variant should export");
+    let parent = rendered
+        .split_once("export type AliasBesideSpectaSkippedVariant = ")
+        .expect("Specta-skipped parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("specta_only_key?: never"),
+        "a Specta-skipped variant key must not relax alias exclusivity:\n{rendered}"
     );
 }
 

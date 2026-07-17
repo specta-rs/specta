@@ -1786,9 +1786,10 @@ fn collect_flattened_keys(
                         let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)
                             .ok()
                             .flatten();
-                        let skipped = attrs
-                            .as_ref()
-                            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
+                        let skipped = variant.skip
+                            || attrs
+                                .as_ref()
+                                .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
                         if !skipped {
                             if attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
                                 let rename_rule = enum_variant_field_rename_rule(
@@ -1832,11 +1833,12 @@ fn collect_flattened_keys(
                 Some(EnumRepr::Adjacent { tag, content }) => {
                     keys.exact.insert(tag.into_owned());
                     if enm.variants.iter().any(|(_, variant)| {
-                        let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
-                            .ok()
-                            .flatten()
-                            .as_ref()
-                            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
+                        let skipped = variant.skip
+                            || SerdeVariantAttrs::from_attributes(&variant.attributes)
+                                .ok()
+                                .flatten()
+                                .as_ref()
+                                .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
                         let hidden = variant_payload_is_hidden(variant, mode).unwrap_or(true);
                         let skipped_newtype =
                             sole_field_is_serde_skipped(variant, mode).unwrap_or(false);
@@ -1855,11 +1857,12 @@ fn collect_flattened_keys(
                 Some(EnumRepr::Untagged) | None => {}
             }
             for (name, variant) in &enm.variants {
-                let skipped = SerdeVariantAttrs::from_attributes(&variant.attributes)
-                    .ok()
-                    .flatten()
-                    .as_ref()
-                    .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
+                let skipped = variant.skip
+                    || SerdeVariantAttrs::from_attributes(&variant.attributes)
+                        .ok()
+                        .flatten()
+                        .as_ref()
+                        .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode));
                 if skipped {
                     continue;
                 }
