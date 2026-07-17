@@ -1969,6 +1969,7 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &FlattenedKeys) {
             if let Fields::Named(named) = &mut strct.fields {
                 named.fields.retain(|(name, field)| {
                     !(keys.contains(name.as_ref())
+                        && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
             }
@@ -1979,6 +1980,7 @@ fn relax_alias_exclusions(ty: &mut DataType, keys: &FlattenedKeys) {
                     Fields::Named(fields) => {
                         fields.fields.retain(|(name, field)| {
                             !(keys.contains(name.as_ref())
+                                && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
                     }
@@ -2099,6 +2101,7 @@ fn alias_field_union(
                     .map(|other| {
                         let mut excluded = Field::new(never_datatype());
                         excluded.optional = true;
+                        excluded.attributes.insert(ALIAS_EXCLUSION_MARKER, true);
                         (other.clone(), excluded)
                     }),
             );
@@ -2629,6 +2632,11 @@ const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_paylo
 /// `Field::optional` cannot carry this distinction because serde defaults can
 /// also set it, while defaults do not make flattened payloads optional.
 const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
+
+/// Marks optional `never` fields synthesized solely to make alias spellings
+/// mutually exclusive. Genuine user-authored uninhabited fields must survive
+/// contextual flatten relaxation.
+const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,

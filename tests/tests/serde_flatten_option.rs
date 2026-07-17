@@ -457,6 +457,27 @@ struct TaggedStructWithTagAlias {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum Uninhabited {}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedAliasWithUninhabitedField {
+    #[specta(inline)]
+    impossible: Uninhabited,
+    #[serde(alias = "alternative")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentCollidingWithUninhabitedField {
+    impossible: String,
+    #[serde(flatten)]
+    inner: FlattenedAliasWithUninhabitedField,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1283,6 +1304,25 @@ fn generated_struct_tags_relax_field_alias_exclusions() {
         .value,
         "TaggedStructWithTagAlias",
         "serde exposes the generated tag through the matching field alias"
+    );
+}
+
+#[test]
+fn flatten_relaxation_preserves_genuine_uninhabited_fields() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentCollidingWithUninhabitedField>(),
+            specta_serde::Format,
+        )
+        .expect("flattened aliases with uninhabited fields should export");
+    let parent = rendered
+        .split_once("export type ParentCollidingWithUninhabitedField = ")
+        .expect("uninhabited parent should be exported")
+        .1;
+
+    assert!(
+        parent.contains("impossible: never"),
+        "a genuine uninhabited field must not be removed as an alias exclusion:\n{rendered}"
     );
 }
 
