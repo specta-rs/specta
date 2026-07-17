@@ -1652,7 +1652,9 @@ fn flatten_collisions_relax_only_the_colliding_alias() {
         .1;
 
     assert!(
-        !ty.contains("old?: never") && ty.contains("legacy?: never"),
+        !ty.contains("old?: never")
+            && ty.contains("legacy?: never")
+            && ty.contains("extends infer T extends object"),
         "only the colliding alias exclusion should be relaxed:\n{rendered}"
     );
 }

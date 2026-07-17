@@ -2119,17 +2119,11 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
             matches!(part, DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER))
         })
         .count();
-    if alias_union_count > 1
-        && parts.iter().all(|part| match part {
-            DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER) => {
-                alias_union_is_fully_exclusive(enm)
-            }
-            _ => true,
-        })
-    {
+    if alias_union_count > 1 {
         for part in &mut parts {
             if let DataType::Enum(enm) = part
                 && enm.attributes.contains_key(ALIAS_UNION_MARKER)
+                && alias_union_is_fully_exclusive(enm)
             {
                 enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
             }
