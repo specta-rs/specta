@@ -227,6 +227,27 @@ fn semantic_registered_identity_rule_does_not_emit_a_runtime_transform() {
 }
 
 #[test]
+fn semantic_definitionless_identity_rule_retains_its_type_remap() {
+    let semantic = identity_semantic_config();
+    let mut types = Types::default();
+    let dt = Website::definition(&mut types);
+    let types = types.map(|mut ndt| {
+        ndt.ty = None;
+        ndt
+    });
+
+    for transform in [
+        semantic.apply_serialize(&types, &dt, "payload"),
+        semantic.apply_deserialize(&types, &dt, "payload"),
+    ] {
+        let (remapped, runtime) =
+            transform.expect("definitionless rules must retain their type remap");
+        assert!(remapped.is_some());
+        assert_eq!(runtime, "payload");
+    }
+}
+
+#[test]
 fn semantic_registered_generic_retains_identity_use_site_remaps() {
     let semantic = Configuration::empty().enable_lossless_floats();
     let mut types = Types::default();

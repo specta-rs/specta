@@ -906,7 +906,7 @@ fn prune_identity_root(
         dt,
         DataType::Reference(Reference::Named(reference))
             if !matches!(reference.inner, NamedReferenceType::Inline { .. })
-                && types.get(reference).is_some()
+                && types.get(reference).is_some_and(|ndt| ndt.ty.is_some())
     );
 
     result.filter(|(next_ty, runtime)| {
