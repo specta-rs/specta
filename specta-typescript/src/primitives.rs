@@ -25,7 +25,7 @@ use crate::{
 const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
-const FIELD_ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
+const FIELD_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 const FIELD_ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 fn path_string(location: &[Cow<'static, str>]) -> String {

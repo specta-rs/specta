@@ -2113,6 +2113,23 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
         parts.insert(0, DataType::Struct(base));
     }
 
+    if parts
+        .iter()
+        .filter(|part| {
+            matches!(part, DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER))
+        })
+        .count()
+        > 1
+    {
+        for part in &mut parts {
+            if let DataType::Enum(enm) = part
+                && enm.attributes.contains_key(ALIAS_UNION_MARKER)
+            {
+                enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
+            }
+        }
+    }
+
     Ok(Some(DataType::Intersection(parts)))
 }
 
@@ -2686,6 +2703,9 @@ const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 /// contextual flatten relaxation.
 const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
+/// Marks independent alias unions that an exporter may preserve symbolically
+/// instead of distributing their enclosing intersection into a Cartesian union.
+const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
