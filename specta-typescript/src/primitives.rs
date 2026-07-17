@@ -3218,7 +3218,7 @@ fn alias_field_union_dt(
     let source = fields.join(" & ");
     s.push_str("((");
     s.push_str(&source);
-    s.push_str(") extends infer T extends object ? { [K in keyof T]: { [P in K]: T[P] } & { [P in Exclude<keyof T, K>]?: never } }[keyof T] : never)");
+    s.push_str(") extends infer T extends object ? { [K in keyof T]: Pick<T, K> & { [P in Exclude<keyof T, K>]?: never } }[keyof T] : never)");
 
     Ok(())
 }

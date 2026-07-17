@@ -191,6 +191,8 @@ struct AliasHeavy {
 struct OptionalAlias {
     #[serde(default, alias = "value_old")]
     value: Option<String>,
+    #[serde(default, alias = "other_old")]
+    other: Option<String>,
 }
 
 mod r#type {
