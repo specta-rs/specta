@@ -499,15 +499,15 @@ impl Configuration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(
+        let result = self.apply_inner(
             |rule| &rule.serialize,
             serialize_bigint,
             types,
             dt,
             js_ident,
             &mut Vec::new(),
-        )
-        .filter(|(next_ty, runtime)| next_ty.is_some() || runtime != js_ident)
+        );
+        prune_identity_root(types, dt, js_ident, result)
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
@@ -520,15 +520,15 @@ impl Configuration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(
+        let result = self.apply_inner(
             |rule| &rule.deserialize,
             deserialize_bigint,
             types,
             dt,
             js_ident,
             &mut Vec::new(),
-        )
-        .filter(|(next_ty, runtime)| next_ty.is_some() || runtime != js_ident)
+        );
+        prune_identity_root(types, dt, js_ident, result)
     }
 
     fn apply_inner(
@@ -894,6 +894,22 @@ impl Configuration {
             Some((Some(remapped), runtime))
         }
     }
+}
+
+fn prune_identity_root(
+    types: &Types,
+    dt: &DataType,
+    js_ident: &str,
+    result: Option<(Option<DataType>, String)>,
+) -> Option<(Option<DataType>, String)> {
+    let registered_root = matches!(
+        dt,
+        DataType::Reference(Reference::Named(reference))
+            if !matches!(reference.inner, NamedReferenceType::Inline { .. })
+                && types.get(reference).is_some()
+    );
+
+    result.filter(|(next_ty, runtime)| runtime != js_ident || next_ty.is_some() && !registered_root)
 }
 
 fn is_lossless_bigint_primitive(dt: &DataType) -> bool {

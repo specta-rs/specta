@@ -64,6 +64,14 @@ fn semantic_config() -> Configuration {
     )
 }
 
+fn identity_semantic_config() -> Configuration {
+    Configuration::empty().define::<Website>(
+        |_| define("URL").into(),
+        Some(Transform::identity()),
+        Some(Transform::identity()),
+    )
+}
+
 fn transformed_snapshot(types: &Types, transform: Option<(Option<DataType>, String)>) -> String {
     let (ty, runtime) = transform.expect("semantic transform should apply");
     let ty = ty
@@ -172,8 +180,9 @@ fn semantic_lossless_floats_do_not_emit_identity_runtime_transforms() {
             semantic.apply_serialize(&types, &inline, "payload"),
             semantic.apply_deserialize(&types, &inline, "payload"),
         ] {
-            let (remapped, runtime) =
-                transform.expect("inline floats must retain their type remap");
+            let (remapped, runtime) = transform.unwrap_or_else(|| {
+                panic!("inline floats must retain their type remap: {inline:?}")
+            });
             assert!(remapped.is_some());
             assert_eq!(runtime, "payload");
         }
@@ -199,6 +208,16 @@ fn semantic_inline_identity_bigint_retains_its_type_remap() {
         .expect("inline bigints must retain their type remap");
     assert!(remapped.is_some());
     assert_eq!(runtime, "payload");
+}
+
+#[test]
+fn semantic_registered_identity_rule_does_not_emit_a_runtime_transform() {
+    let semantic = identity_semantic_config();
+    let mut types = Types::default();
+    let dt = Website::definition(&mut types);
+
+    assert_eq!(semantic.apply_serialize(&types, &dt, "payload"), None);
+    assert_eq!(semantic.apply_deserialize(&types, &dt, "payload"), None);
 }
 
 #[test]
