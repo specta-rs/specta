@@ -488,9 +488,10 @@ impl Configuration {
     /// deeply nested for structs, tuples, lists, nullable values, and
     /// intersections.
     ///
-    /// If no rule or built-in remap matches, `None` is returned. If a rule
-    /// matches but the type shape does not need to change, `Some((None,
-    /// runtime_str))` is returned.
+    /// If a registered graph contains no runtime transform, `None` is returned;
+    /// its type-only changes are handled by [`Configuration::apply_types`]. For
+    /// inline inputs, a type-only result is retained with an identity runtime
+    /// expression because there is no registered type for `apply_types` to rewrite.
     ///
     pub fn apply_serialize(
         &self,
@@ -498,14 +499,15 @@ impl Configuration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(
+        let result = self.apply_inner(
             |rule| &rule.serialize,
             serialize_bigint,
             types,
             dt,
             js_ident,
             &mut Vec::new(),
-        )
+        );
+        prune_identity_root(types, dt, js_ident, result)
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
@@ -518,14 +520,15 @@ impl Configuration {
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        self.apply_inner(
+        let result = self.apply_inner(
             |rule| &rule.deserialize,
             deserialize_bigint,
             types,
             dt,
             js_ident,
             &mut Vec::new(),
-        )
+        );
+        prune_identity_root(types, dt, js_ident, result)
     }
 
     fn apply_inner(
@@ -720,9 +723,13 @@ impl Configuration {
 
                 Some((
                     changed.then_some(DataType::Map(ty)),
-                    format!(
-                        "Object.fromEntries(Object.entries({js_ident}).map(([k,{item}])=>[k,{runtime}]))"
-                    ),
+                    if runtime == item {
+                        js_ident.to_owned()
+                    } else {
+                        format!(
+                            "Object.fromEntries(Object.entries({js_ident}).map(([k,{item}])=>[k,{runtime}]))"
+                        )
+                    },
                 ))
             }
             DataType::List(list) => {
@@ -743,7 +750,11 @@ impl Configuration {
                 }
                 Some((
                     changed.then_some(DataType::List(ty)),
-                    format!("{js_ident}.map({item}=>{runtime})"),
+                    if runtime == item {
+                        js_ident.to_owned()
+                    } else {
+                        format!("{js_ident}.map({item}=>{runtime})")
+                    },
                 ))
             }
             DataType::Nullable(inner) => {
@@ -757,7 +768,11 @@ impl Configuration {
                 )?;
                 Some((
                     next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
-                    format!("{js_ident}==null?{js_ident}:{runtime}"),
+                    if runtime == js_ident {
+                        js_ident.to_owned()
+                    } else {
+                        format!("{js_ident}==null?{js_ident}:{runtime}")
+                    },
                 ))
             }
             DataType::Intersection(items) => {
@@ -879,6 +894,50 @@ impl Configuration {
             Some((Some(remapped), runtime))
         }
     }
+}
+
+fn prune_identity_root(
+    types: &Types,
+    dt: &DataType,
+    js_ident: &str,
+    result: Option<(Option<DataType>, String)>,
+) -> Option<(Option<DataType>, String)> {
+    let registered_root = matches!(
+        dt,
+        DataType::Reference(Reference::Named(reference))
+            if !matches!(reference.inner, NamedReferenceType::Inline { .. })
+                && types.get(reference).is_some_and(|ndt| ndt.ty.is_some())
+    );
+
+    result.filter(|(next_ty, runtime)| {
+        runtime != js_ident
+            || next_ty
+                .as_ref()
+                .is_some_and(|next_ty| !registered_root || registered_generics_changed(dt, next_ty))
+    })
+}
+
+fn registered_generics_changed(dt: &DataType, next_ty: &DataType) -> bool {
+    let (
+        DataType::Reference(Reference::Named(source)),
+        DataType::Reference(Reference::Named(remapped)),
+    ) = (dt, next_ty)
+    else {
+        return false;
+    };
+    let (
+        NamedReferenceType::Reference {
+            generics: source, ..
+        },
+        NamedReferenceType::Reference {
+            generics: remapped, ..
+        },
+    ) = (&source.inner, &remapped.inner)
+    else {
+        return false;
+    };
+
+    source != remapped
 }
 
 fn is_lossless_bigint_primitive(dt: &DataType) -> bool {
