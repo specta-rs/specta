@@ -449,6 +449,14 @@ struct AliasBesidePhasedSkippedUntaggedVariant {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+struct TaggedStructWithTagAlias {
+    #[serde(alias = "kind")]
+    value: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1236,6 +1244,45 @@ fn phase_skipped_untagged_variants_do_not_contribute_flattened_keys() {
     assert!(
         !serialize.contains("phased_key: string"),
         "the serialize phase must omit the skipped variant:\n{rendered}"
+    );
+}
+
+#[test]
+fn generated_struct_tags_relax_field_alias_exclusions() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<TaggedStructWithTagAlias>(),
+            specta_serde::Format,
+        )
+        .expect("tagged struct with a tag alias should export");
+    let tagged = rendered
+        .split_once("export type TaggedStructWithTagAlias = ")
+        .expect("tagged struct should be exported")
+        .1;
+
+    assert!(
+        !tagged.contains("kind?: never"),
+        "the generated tag must relax the colliding alias exclusion:\n{rendered}"
+    );
+    assert!(
+        tagged.contains("kind: string"),
+        "serde accepts the generated tag as the aliased field spelling:\n{rendered}"
+    );
+    assert_eq!(
+        serde_json::to_value(TaggedStructWithTagAlias {
+            value: "value".into(),
+        })
+        .unwrap(),
+        serde_json::json!({ "kind": "TaggedStructWithTagAlias", "value": "value" })
+    );
+    assert_eq!(
+        serde_json::from_value::<TaggedStructWithTagAlias>(
+            serde_json::json!({ "kind": "TaggedStructWithTagAlias" })
+        )
+        .unwrap()
+        .value,
+        "TaggedStructWithTagAlias",
+        "serde exposes the generated tag through the matching field alias"
     );
 }
 

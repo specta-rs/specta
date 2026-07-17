@@ -910,6 +910,10 @@ fn rewrite_datatype_for_phase_inner(
         DataType::Struct(s) => {
             let container_attrs = SerdeContainerAttrs::from_attributes(&s.attributes)?;
             let container_default = container_attrs.as_ref().is_some_and(|attrs| attrs.default);
+            let container_tag = container_attrs
+                .as_ref()
+                .and_then(|attrs| attrs.tag.as_ref())
+                .cloned();
             let container_transparent = container_attrs.is_some_and(|attrs| attrs.transparent);
             let container_rename_all = container_rename_all_rule(
                 &s.attributes,
@@ -985,7 +989,16 @@ fn rewrite_datatype_for_phase_inner(
                 *ty = intersection;
                 return Ok(());
             }
-            if let Some(intersection) = lower_field_aliases_for_phase(&mut s.fields, mode, true)? {
+            let relaxed_names = container_tag.map(|tag| FlattenedKeys {
+                exact: HashSet::from([tag]),
+                any: false,
+            });
+            if let Some(intersection) = lower_field_aliases_for_phase_with_relaxed_names(
+                &mut s.fields,
+                mode,
+                true,
+                relaxed_names.as_ref(),
+            )? {
                 *ty = intersection;
             }
         }
