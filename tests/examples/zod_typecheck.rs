@@ -196,6 +196,79 @@ struct OptionalAlias {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalModelPricing {
+    #[serde(default, alias = "input_cost")]
+    input_cost: Option<f64>,
+    #[serde(default, alias = "output_cost")]
+    output_cost: Option<f64>,
+    #[serde(default, alias = "cache_read_cost")]
+    cache_read_cost: Option<f64>,
+    #[serde(default, alias = "cache_write_cost")]
+    cache_write_cost: Option<f64>,
+    #[serde(default, alias = "image_cost")]
+    image_cost: Option<f64>,
+    #[serde(default, alias = "audio_cost")]
+    audio_cost: Option<f64>,
+    #[serde(default, alias = "request_cost")]
+    request_cost: Option<f64>,
+    #[serde(default, alias = "training_cost")]
+    training_cost: Option<f64>,
+    #[serde(default, alias = "batch_discount")]
+    batch_discount: Option<f64>,
+    #[serde(default, alias = "storage_cost")]
+    storage_cost: Option<f64>,
+    #[serde(default, alias = "embedding_cost")]
+    embedding_cost: Option<f64>,
+    #[serde(default, alias = "search_cost")]
+    search_cost: Option<f64>,
+    #[serde(default, alias = "reasoning_cost")]
+    reasoning_cost: Option<f64>,
+    #[serde(default, alias = "minimum_cost")]
+    minimum_cost: Option<f64>,
+    #[serde(default, alias = "currency_code")]
+    currency_code: Option<String>,
+    #[serde(default, alias = "billing_unit")]
+    billing_unit: Option<String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogProvider {
+    #[serde(default, alias = "display_name")]
+    display_name: Option<String>,
+    #[serde(default, alias = "base_url")]
+    base_url: Option<String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogCapability {
+    #[serde(default, alias = "supports_tools")]
+    supports_tools: Option<bool>,
+    #[serde(default, alias = "context_window")]
+    context_window: Option<u32>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogEntry {
+    #[serde(default, alias = "model_id")]
+    model_id: Option<String>,
+    #[serde(default, alias = "provider_info")]
+    provider_info: Option<CatalogProvider>,
+    #[serde(default, alias = "model_pricing")]
+    model_pricing: Option<CanonicalModelPricing>,
+    #[serde(default, alias = "model_capability")]
+    model_capability: Option<CatalogCapability>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct CatalogResponse {
+    entries: Vec<CatalogEntry>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
 struct Pick {
     value: String,
 }
@@ -338,6 +411,11 @@ fn main() {
     let alias_types = Types::default()
         .register::<AliasHeavy>()
         .register::<OptionalAlias>()
+        .register::<CatalogResponse>()
+        .register::<CatalogEntry>()
+        .register::<CatalogProvider>()
+        .register::<CanonicalModelPricing>()
+        .register::<CatalogCapability>()
         .register::<Pick>();
     Typescript::default()
         .export_to(
