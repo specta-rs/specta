@@ -1019,6 +1019,31 @@ fn flattened_keys_do_not_become_alias_exclusions() {
         .expect("flattened aliases should export without excluding flattened keys");
     assert!(!rendered.contains("old_value?: never"), "{rendered}");
     assert!(rendered.contains("value?: never"), "{rendered}");
+
+    let phased = Typescript::default()
+        .export(
+            &Types::default().register::<AliasFlattenCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phase-specific flattened aliases should export");
+    let deserialize = phased
+        .split_once("export type AliasFlattenCollision_Deserialize = ")
+        .expect("deserialize collision type should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        deserialize.contains("old_value?: never"),
+        "deserialize must reject canonical-plus-alias duplicates:\n{phased}"
+    );
+    assert!(
+        serde_json::from_value::<AliasFlattenCollision>(
+            serde_json::json!({ "value": "canonical", "old_value": "flattened" })
+        )
+        .is_err(),
+        "serde treats the flattened key as a duplicate outer alias on input"
+    );
 }
 
 #[test]
@@ -1214,8 +1239,8 @@ fn skipped_adjacent_newtype_content_is_collected_per_phase() {
         "serialize omits the skipped newtype content key:\n{rendered}"
     );
     assert!(
-        !deserialize.contains("content?: never"),
-        "deserialize accepts the adjacent content key:\n{rendered}"
+        deserialize.contains("content?: never"),
+        "deserialize must reject the flattened key beside its outer alias:\n{rendered}"
     );
 }
 
@@ -1259,8 +1284,8 @@ fn phase_skipped_untagged_variants_do_not_contribute_flattened_keys() {
         .1;
 
     assert!(
-        !deserialize.contains("phased_key?: never"),
-        "the deserialize-active key must relax alias exclusivity:\n{rendered}"
+        deserialize.contains("phased_key?: never"),
+        "the deserialize-active key must retain outer alias exclusivity:\n{rendered}"
     );
     assert!(
         !serialize.contains("phased_key: string"),

@@ -1313,7 +1313,7 @@ fn lower_flattened_struct_inner(
             &mut base.fields,
             mode,
             true,
-            Some(&flattened_keys),
+            matches!(mode, PhaseRewrite::Unified).then_some(&flattened_keys),
         )?
         .unwrap_or(DataType::Struct(base));
         mandatory.insert(0, base);
@@ -3416,7 +3416,7 @@ fn transform_internal_variant(
                             &mut leftover.fields,
                             mode,
                             true,
-                            Some(&flattened_keys),
+                            matches!(mode, PhaseRewrite::Unified).then_some(&flattened_keys),
                         )?
                         .unwrap_or(DataType::Struct(leftover)),
                     );
