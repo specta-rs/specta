@@ -41,8 +41,8 @@
 //! approximation and retain the original constraints in `x-specta-*`
 //! extensions. This affects nullable references — an `Option<T>` over a named
 //! type, which OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with
-//! exact 64-bit integer bounds, null-only types, heterogeneous tuples,
-//! constrained map keys, and closed flattened intersections.
+//! null-only types, heterogeneous tuples, constrained map keys, and closed
+//! flattened intersections.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -59,5 +59,4 @@ mod transform;
 
 pub use error::Error;
 pub use openapi::{OpenApi, OutputFormat, SchemaMode};
-pub use openapiv3::{Components, OpenAPI, ReferenceOr, Schema, SecurityScheme};
 pub use operation::{Method, Operation, Param};

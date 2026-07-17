@@ -8,15 +8,6 @@ pub enum Error {
     #[error(transparent)]
     JsonSchema(#[from] specta_jsonschema::Error),
 
-    /// An exported schema could not be represented by the OpenAPI 3.0 model.
-    #[error("invalid OpenAPI schema component {component:?}: {source}")]
-    InvalidSchema {
-        /// Component being converted.
-        component: String,
-        /// Deserialization error from the strongly typed OpenAPI model.
-        source: serde_json::Error,
-    },
-
     /// A Specta shape cannot be represented exactly by OpenAPI 3.0.
     #[error(
         "OpenAPI 3.0 cannot represent {feature} exactly in component {component:?}. \
@@ -85,6 +76,10 @@ pub enum Error {
     /// A component with the same name already exists in a target document.
     #[error("OpenAPI document already contains schema component {0:?}")]
     DuplicateComponent(String),
+
+    /// A target document is not a JSON object where an object is required.
+    #[error("cannot add components to a non-object OpenAPI document")]
+    InvalidTargetDocument,
 
     /// A directory could not be created.
     #[error("failed to create output directory {path:?}: {source}")]

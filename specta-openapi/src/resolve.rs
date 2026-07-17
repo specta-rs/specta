@@ -11,9 +11,8 @@
 //! for each field is the answer: a `$ref` for a named type, an inline schema for anything else. The
 //! probe is dropped from the components afterwards.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use openapiv3::{Components, ReferenceOr, Schema};
 use serde_json::Value;
 use specta::{
     Format, Types,
@@ -26,8 +25,9 @@ use crate::{Error, SchemaMode, operation::Operation, transform::components};
 /// with a real definition and change how the real ones are named.
 const PROBE: &str = "__specta_openapi_probe";
 
-/// What an operation's type is exported as: a reference to a component, or a schema in place.
-pub(crate) type Resolved = HashMap<DataType, ReferenceOr<Schema>>;
+/// What an operation's type is exported as: a `$ref` to a component, or a schema in place —
+/// whichever the exporter emitted for it.
+pub(crate) type Resolved = HashMap<DataType, Value>;
 
 /// Exports `types`, and resolves every type referenced by `operations`.
 ///
@@ -38,7 +38,7 @@ pub(crate) fn resolve(
     operations: &[Operation],
     format: impl Format,
     mode: SchemaMode,
-) -> Result<(Components, Resolved), Error> {
+) -> Result<(BTreeMap<String, Value>, Resolved), Error> {
     let mut referenced: Vec<DataType> = Vec::new();
     for operation in operations {
         for (dt, type_name) in operation.referenced_types() {
@@ -73,18 +73,17 @@ pub(crate) fn resolve(
     });
 
     let mut components = components(&probe_types, format, mode)?;
-    let Some(ReferenceOr::Item(schema)) = components.schemas.shift_remove(PROBE) else {
+    let Some(probe) = components.remove(PROBE) else {
         return Err(Error::UnresolvedOperationTypes);
     };
 
-    let probe = serde_json::to_value(&schema)?;
     let mut resolved = Resolved::new();
     for (index, dt) in referenced.into_iter().enumerate() {
         let property = probe
             .get("properties")
             .and_then(|properties| properties.get(field_name(index)))
             .ok_or(Error::UnresolvedOperationTypes)?;
-        resolved.insert(dt, schema_of(property)?);
+        resolved.insert(dt, property.clone());
     }
 
     Ok((components, resolved))
@@ -99,21 +98,6 @@ fn is_component(reference: &NamedReference) -> bool {
         reference.inner,
         specta::datatype::NamedReferenceType::Reference { .. }
     )
-}
-
-/// Reads back what the exporter emitted for one probe field.
-fn schema_of(property: &Value) -> Result<ReferenceOr<Schema>, Error> {
-    if let Some(reference) = property.get("$ref").and_then(Value::as_str) {
-        return Ok(ReferenceOr::Reference {
-            reference: reference.to_string(),
-        });
-    }
-    serde_json::from_value(property.clone())
-        .map(ReferenceOr::Item)
-        .map_err(|source| Error::InvalidSchema {
-            component: PROBE.to_string(),
-            source,
-        })
 }
 
 fn field_name(index: usize) -> String {

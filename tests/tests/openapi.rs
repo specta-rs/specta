@@ -153,14 +153,13 @@ fn openapi_exports_full_type_corpus() {
         .export(&types, specta_serde::Format)
         .expect("the shared type corpus should be representable in OpenAPI");
 
-    let document: openapiv3::OpenAPI =
-        serde_json::from_str(&output).expect("output should be a valid typed OpenAPI document");
-    assert_eq!(document.openapi, "3.0.3");
+    let document: serde_json::Value =
+        serde_json::from_str(&output).expect("output should be a valid OpenAPI document");
+    assert_eq!(document["openapi"], "3.0.3");
     assert!(
-        document
-            .components
+        document["components"]["schemas"]
+            .as_object()
             .expect("components should exist")
-            .schemas
             .len()
             > 20
     );
@@ -176,12 +175,11 @@ fn openapi_exports_serde_phases() {
         .schema_mode(SchemaMode::Compatible)
         .export(&types, specta_serde::PhasesFormat)
         .expect("serialize and deserialize phase types should be representable in OpenAPI");
-    let document: openapiv3::OpenAPI =
+    let document: serde_json::Value =
         serde_json::from_str(&output).expect("phase output should be valid OpenAPI");
-    let schemas = &document
-        .components
-        .expect("components should exist")
-        .schemas;
+    let schemas = document["components"]["schemas"]
+        .as_object()
+        .expect("components should exist");
     assert!(schemas.keys().any(|name| name.contains("Serialize")));
     assert!(schemas.keys().any(|name| name.contains("Deserialize")));
 }
@@ -198,7 +196,7 @@ fn openapi_preserves_shapes_metadata_and_generics() {
         .schema_mode(SchemaMode::Compatible)
         .export_document(&types, specta_serde::Format)
         .expect("representative shapes should export");
-    let value = serde_json::to_value(document).expect("document should serialize");
+    let value = document;
     let schemas = &value["components"]["schemas"];
 
     assert_eq!(
@@ -261,7 +259,7 @@ fn openapi_materializes_directly_registered_generic_root() {
             specta_serde::Format,
         )
         .expect("a directly registered concrete generic should export");
-    let value = serde_json::to_value(document).unwrap();
+    let value = document;
 
     assert_eq!(
         value["components"]["schemas"]["RootWrapper_String"]["properties"]["value"]["type"],
@@ -278,7 +276,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("strict mode should represent nullable primitive fields exactly");
-    let optional = serde_json::to_value(optional).unwrap();
     assert_eq!(
         optional["components"]["schemas"]["StrictOptionalPrimitive"]["properties"]["value"]["type"],
         "string"
@@ -302,7 +299,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("strict mode should represent homogeneous fixed tuples exactly");
-    let homogeneous = serde_json::to_value(homogeneous).unwrap();
     let homogeneous = &homogeneous["components"]["schemas"]["StrictHomogeneousTuple"];
     assert_eq!(homogeneous["items"]["type"], "integer");
     assert_eq!(homogeneous["minItems"], 2);
@@ -341,9 +337,8 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("compatible mode should preserve tuple detail in an extension");
-    let value = serde_json::to_value(compatible).unwrap();
     assert_eq!(
-        value["components"]["schemas"]["StrictTuple"]["x-specta-prefix-items"]
+        compatible["components"]["schemas"]["StrictTuple"]["x-specta-prefix-items"]
             .as_array()
             .map(Vec::len),
         Some(2)
@@ -365,7 +360,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("compatible mode should preserve enum-key constraints");
-    let enum_map = serde_json::to_value(enum_map).unwrap();
     assert_eq!(
         enum_map["components"]["schemas"]["EnumMap"]["x-specta-property-names"]["$ref"],
         "#/components/schemas/EnumKey"
@@ -386,7 +380,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("compatible mode should emit a legal nullable approximation");
-    let compatible_unit = serde_json::to_value(compatible_unit).unwrap();
     let compatible_unit = &compatible_unit["components"]["schemas"]["StrictUnit"];
     assert_eq!(compatible_unit["type"], "object");
     assert_eq!(compatible_unit["nullable"], true);
@@ -400,7 +393,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("mergeable flattened objects are represented exactly");
-    let flattened = serde_json::to_value(flattened).unwrap();
     let flattened = &flattened["components"]["schemas"]["StrictFlattened"];
     assert_eq!(flattened["additionalProperties"], false);
     assert!(flattened["properties"].get("a").is_some());
@@ -426,7 +418,6 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             specta_serde::Format,
         )
         .expect("compatible mode should approximate a nullable reference");
-    let compatible_reference = serde_json::to_value(compatible_reference).unwrap();
     assert!(
         compatible_reference["components"]["schemas"]["StrictOptionalReference"]["properties"]
             ["value"]
@@ -443,28 +434,25 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     }
 }
 
+/// Schema bounds are plain JSON numbers, so 64-bit integer bounds are stated
+/// exactly in either schema mode — the spec has no integer-width limit.
 #[test]
-fn openapi_preserves_exact_wide_integer_bounds_in_extensions() {
+fn openapi_emits_exact_wide_integer_bounds() {
     let types = Types::default().register::<WideIntegers>();
-    let error = OpenApi::default()
-        .schema_mode(SchemaMode::Strict)
-        .export_document(&types, specta_serde::Format)
-        .expect_err("OpenAPI 3.0 cannot represent every 64-bit integer bound exactly");
-    assert!(error.to_string().contains("exact 64-bit integer bounds"));
+    for mode in [SchemaMode::Strict, SchemaMode::Compatible] {
+        let document = OpenApi::default()
+            .schema_mode(mode)
+            .export_document(&types, specta_serde::Format)
+            .expect("64-bit integer bounds are exactly representable");
+        let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
 
-    let document = OpenApi::default()
-        .schema_mode(SchemaMode::Compatible)
-        .export_document(&types, specta_serde::Format)
-        .expect("compatible mode should retain exact bounds in extensions");
-    let document = serde_json::to_value(document).unwrap();
-    let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
-
-    assert_eq!(properties["signed"]["maximum"], i64::MAX);
-    assert_eq!(properties["signed"]["minimum"], i64::MIN);
-    assert!(properties["signed"].get("x-specta-maximum").is_none());
-    assert!(properties["unsigned"].get("maximum").is_none());
-    assert_eq!(properties["unsigned"]["x-specta-maximum"], u64::MAX);
-    assert_eq!(properties["unsigned"]["minimum"], 0.0);
+        assert_eq!(properties["signed"]["maximum"], i64::MAX);
+        assert_eq!(properties["signed"]["minimum"], i64::MIN);
+        assert!(properties["signed"].get("x-specta-maximum").is_none());
+        assert_eq!(properties["unsigned"]["maximum"], u64::MAX);
+        assert!(properties["unsigned"].get("x-specta-maximum").is_none());
+        assert_eq!(properties["unsigned"]["minimum"], 0.0);
+    }
 }
 
 #[test]
@@ -518,9 +506,9 @@ fn openapi_supports_yaml_export_to_and_document_merging() {
     let yaml = exporter
         .export(&types, specta_serde::Format)
         .expect("YAML export should succeed");
-    let parsed: openapiv3::OpenAPI =
+    let parsed: serde_json::Value =
         serde_yaml::from_str(&yaml).expect("YAML should be a valid OpenAPI document");
-    assert_eq!(parsed.openapi, "3.0.3");
+    assert_eq!(parsed["openapi"], "3.0.3");
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target")
@@ -532,7 +520,7 @@ fn openapi_supports_yaml_export_to_and_document_merging() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), yaml);
     std::fs::remove_file(path).unwrap();
 
-    let mut document = openapiv3::OpenAPI::default();
+    let mut document = serde_json::json!({});
     exporter
         .add_to_document(&mut document, &types, specta_serde::Format)
         .expect("components should merge into an empty document");
@@ -607,7 +595,7 @@ fn openapi_exports_operations_into_paths() {
         )
         .export_document(&recipe_types(), specta_serde::Format)
         .expect("operations should export");
-    let value = serde_json::to_value(&document).unwrap();
+    let value = document;
 
     let get = &value["paths"]["/recipes/{slug}"]["get"];
     assert_eq!(get["summary"], "Fetch one recipe");
@@ -638,11 +626,11 @@ fn openapi_exports_operations_into_paths() {
     assert!(post["responses"]["204"].get("content").is_none());
 
     // Every `$ref` an operation emits resolves to a component that was exported.
-    let schemas = document.components.as_ref().unwrap();
+    let schemas = value["components"]["schemas"].as_object().unwrap();
     for reference in collect_refs(&value["paths"]) {
         let name = reference.trim_start_matches("#/components/schemas/");
         assert!(
-            schemas.schemas.contains_key(name),
+            schemas.contains_key(name),
             "operation $ref {reference:?} does not resolve"
         );
     }
@@ -682,15 +670,15 @@ fn openapi_resolves_operations_against_disambiguated_component_names() {
         .operation(Operation::get("/b").response::<other::Recipe>(200, "inner"))
         .export_document(&types, specta_serde::Format)
         .expect("colliding names should still resolve");
-    let value = serde_json::to_value(&document).unwrap();
+    let value = document;
 
-    let schemas = document.components.as_ref().unwrap();
+    let schemas = value["components"]["schemas"].as_object().unwrap();
     let refs = collect_refs(&value["paths"]);
     assert_eq!(refs.len(), 2);
     for reference in &refs {
         let name = reference.trim_start_matches("#/components/schemas/");
         assert!(
-            schemas.schemas.contains_key(name),
+            schemas.contains_key(name),
             "disambiguated $ref {reference:?} does not resolve"
         );
     }
@@ -740,7 +728,7 @@ fn openapi_resolves_generic_operation_types() {
         .operation(Operation::get("/recipe").response::<Wrapper<Recipe>>(200, "wrapped recipe"))
         .export_document(&types, specta_serde::Format)
         .expect("generic instantiations should resolve");
-    let value = serde_json::to_value(&document).unwrap();
+    let value = document;
 
     // Each instantiation is its own component, so the two operations must not collapse onto one.
     let text =
@@ -756,11 +744,11 @@ fn openapi_resolves_generic_operation_types() {
         .to_string();
     assert_ne!(text, recipe);
 
-    let schemas = document.components.as_ref().unwrap();
+    let schemas = value["components"]["schemas"].as_object().unwrap();
     for reference in [&text, &recipe] {
         let name = reference.trim_start_matches("#/components/schemas/");
         assert!(
-            schemas.schemas.contains_key(name),
+            schemas.contains_key(name),
             "generic $ref {reference:?} does not resolve"
         );
     }
@@ -779,17 +767,17 @@ fn openapi_resolution_probe_does_not_leak_into_the_document() {
         .export_document(&types, specta_serde::Format)
         .expect("types should export");
 
-    let components = with_operations.components.as_ref().unwrap();
+    let components = &with_operations["components"];
     assert!(
-        components
-            .schemas
+        components["schemas"]
+            .as_object()
+            .unwrap()
             .keys()
             .all(|name| !name.contains("probe")),
         "the probe leaked into the components"
     );
     assert_eq!(
-        serde_json::to_value(&components).unwrap(),
-        serde_json::to_value(without_operations.components.as_ref().unwrap()).unwrap(),
+        components, &without_operations["components"],
         "describing operations changed the exported components"
     );
 }
@@ -812,7 +800,7 @@ fn openapi_inlines_operation_types_that_have_no_component() {
             specta_serde::Format,
         )
         .expect("an inlined type should be written in place");
-    let value = serde_json::to_value(&document).unwrap();
+    let value = document;
 
     let schema = &value["paths"]["/inlined"]["get"]["responses"]["200"]["content"]["application/json"]
         ["schema"];
@@ -836,7 +824,7 @@ fn openapi_types_parameters_from_their_extracted_type() {
         )
         .export_document(&recipe_types(), specta_serde::Format)
         .expect("typed parameters should export");
-    let value = serde_json::to_value(&document).unwrap();
+    let value = document;
     let parameters = &value["paths"]["/users/{id}"]["get"]["parameters"];
 
     assert_eq!(parameters[0]["name"], "id");
@@ -887,8 +875,7 @@ fn numeric_formats_and_compact_string_enums() {
     let document = OpenApi::default()
         .export_document(&types, specta_serde::Format)
         .unwrap();
-    let json = serde_json::to_value(&document).unwrap();
-    let schemas = &json["components"]["schemas"];
+    let schemas = &document["components"]["schemas"];
 
     let numeric = &schemas["NumericFormats"]["properties"];
     assert_eq!(numeric["small"]["format"], "int32");
@@ -931,8 +918,7 @@ fn parameters_carry_required_description_and_example() {
         )
         .export_document(&types, specta_serde::Format)
         .unwrap();
-    let json = serde_json::to_value(&document).unwrap();
-    let parameters = &json["paths"]["/v1/weather/forecast"]["get"]["parameters"];
+    let parameters = &document["paths"]["/v1/weather/forecast"]["get"]["parameters"];
 
     assert_eq!(parameters[0]["name"], "lat");
     assert_eq!(parameters[0]["required"], true);
@@ -943,8 +929,8 @@ fn parameters_carry_required_description_and_example() {
     assert_eq!(parameters[0]["example"], 35.0);
     assert_eq!(parameters[0]["schema"]["format"], "double");
 
-    // The bare convenience stays optional (openapiv3 omits `required: false`)
-    // with no annotations.
+    // The bare convenience stays optional (`required: false` is the spec
+    // default and is omitted) with no annotations.
     assert_eq!(parameters[1]["name"], "horizon_hours");
     assert_ne!(parameters[1]["required"], serde_json::json!(true));
     assert!(parameters[1].get("example").is_none());
@@ -977,7 +963,7 @@ fn content_types_security_and_document_metadata() {
         )
         .export_document(&types, specta_serde::Format)
         .unwrap();
-    let json = serde_json::to_value(&document).unwrap();
+    let json = document;
 
     assert_eq!(json["servers"][0]["url"], "https://api.orr.sh");
     assert_eq!(json["servers"][0]["description"], "Production");

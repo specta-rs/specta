@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use openapiv3::{Components, ReferenceOr, Schema};
 use serde_json::{Map, Value, json};
 use specta::{Format, Types};
 
@@ -10,7 +9,7 @@ pub(crate) fn components(
     types: &Types,
     format: impl Format,
     mode: SchemaMode,
-) -> Result<Components, Error> {
+) -> Result<BTreeMap<String, Value>, Error> {
     let mut schema = specta_jsonschema::JsonSchema::default()
         // OpenAPI generators map numeric formats to language types.
         .number_formats(true)
@@ -35,7 +34,7 @@ pub(crate) fn components(
         references.insert(definition_ref(name), component_name);
     }
 
-    let mut components = Components::default();
+    let mut components = BTreeMap::new();
     for (name, mut schema) in definitions {
         let component_name = references
             .get(&definition_ref(&name))
@@ -43,14 +42,7 @@ pub(crate) fn components(
             .unwrap_or_else(|| component_name(&name));
         rewrite_component_refs(&mut schema, &references);
         let schema = component_schema(transform(schema, &component_name, mode)?);
-        let schema =
-            serde_json::from_value::<Schema>(schema).map_err(|source| Error::InvalidSchema {
-                component: component_name.clone(),
-                source,
-            })?;
-        components
-            .schemas
-            .insert(component_name, ReferenceOr::Item(schema));
+        components.insert(component_name, schema);
     }
     Ok(components)
 }
@@ -186,9 +178,6 @@ fn transform_object(
         schema.insert("x-specta-type".to_string(), Value::String("null".into()));
     }
 
-    preserve_lossy_integer_bound(&mut schema, "minimum", component, mode)?;
-    preserve_lossy_integer_bound(&mut schema, "maximum", component, mode)?;
-
     // Collapse nullable unions before recursively transforming their branches.
     // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
     // it can be represented by OpenAPI 3.0's `nullable` keyword.
@@ -262,31 +251,6 @@ fn transform_object(
         ));
     }
     Ok(Value::Object(schema))
-}
-
-fn preserve_lossy_integer_bound(
-    schema: &mut Map<String, Value>,
-    keyword: &str,
-    component: &str,
-    mode: SchemaMode,
-) -> Result<(), Error> {
-    let Some(Value::Number(bound)) = schema.get(keyword) else {
-        return Ok(());
-    };
-    // `openapiv3` stores integer bounds as `i64`, so signed bounds remain
-    // exact. Larger unsigned bounds fall back to its floating-point schema
-    // representation and must not be silently rounded.
-    if bound.as_i64().is_some() || bound.as_u64().is_none() {
-        return Ok(());
-    }
-    if mode == SchemaMode::Strict {
-        return Err(unsupported(component, "exact 64-bit integer bounds"));
-    }
-
-    if let Some(bound) = schema.remove(keyword) {
-        schema.insert(format!("x-specta-{keyword}"), bound);
-    }
-    Ok(())
 }
 
 fn move_unsupported_keyword(

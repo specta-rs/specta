@@ -1,12 +1,9 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, collections::BTreeMap, path::Path};
 
-use indexmap::IndexMap;
-use openapiv3::{
-    Components, Contact, Info, OpenAPI, Paths, ReferenceOr, SecurityScheme, Server, Tag,
-};
+use serde_json::{Map, Value, json};
 use specta::{Format, Types};
 
-use crate::{Error, operation::Operation, resolve::resolve, transform::components};
+use crate::{Error, operation::Operation, resolve::resolve};
 
 /// How shapes unsupported by OpenAPI 3.0's schema dialect are handled.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -29,6 +26,24 @@ pub enum OutputFormat {
     Yaml,
 }
 
+#[derive(Debug, Clone)]
+struct Server {
+    url: String,
+    description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct Tag {
+    name: String,
+    description: String,
+}
+
+#[derive(Debug, Clone)]
+struct Contact {
+    name: String,
+    url: String,
+}
+
 /// OpenAPI 3.0 schema exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -42,7 +57,7 @@ pub struct OpenApi {
     servers: Vec<Server>,
     tags: Vec<Tag>,
     contact: Option<Contact>,
-    security_schemes: IndexMap<String, SecurityScheme>,
+    security_schemes: BTreeMap<String, Value>,
 }
 
 impl Default for OpenApi {
@@ -57,7 +72,7 @@ impl Default for OpenApi {
             servers: Vec::new(),
             tags: Vec::new(),
             contact: None,
-            security_schemes: IndexMap::new(),
+            security_schemes: BTreeMap::new(),
         }
     }
 }
@@ -90,7 +105,7 @@ impl OpenApi {
     pub fn server(mut self, url: impl Into<String>) -> Self {
         self.servers.push(Server {
             url: url.into(),
-            ..Default::default()
+            description: None,
         });
         self
     }
@@ -104,7 +119,6 @@ impl OpenApi {
         self.servers.push(Server {
             url: url.into(),
             description: Some(description.into()),
-            ..Default::default()
         });
         self
     }
@@ -112,9 +126,8 @@ impl OpenApi {
     /// Configure the API contact in the generated document's `info` object.
     pub fn contact(mut self, name: impl Into<String>, url: impl Into<String>) -> Self {
         self.contact = Some(Contact {
-            name: Some(name.into()),
-            url: Some(url.into()),
-            ..Default::default()
+            name: name.into(),
+            url: url.into(),
         });
         self
     }
@@ -124,17 +137,17 @@ impl OpenApi {
     pub fn tag(mut self, name: impl Into<String>, description: impl Into<String>) -> Self {
         self.tags.push(Tag {
             name: name.into(),
-            description: Some(description.into()),
-            ..Default::default()
+            description: description.into(),
         });
         self
     }
 
     /// Register a security scheme under `name`, which operations reference
-    /// with [`Operation::security`]. The full [`SecurityScheme`] surface is
-    /// [`openapiv3`]'s; [`bearer_security_scheme`](Self::bearer_security_scheme)
+    /// with [`Operation::security`]. The scheme is given as a
+    /// [Security Scheme Object](https://spec.openapis.org/oas/v3.0.3#security-scheme-object)
+    /// in JSON; [`bearer_security_scheme`](Self::bearer_security_scheme)
     /// covers the common token case.
-    pub fn security_scheme(mut self, name: impl Into<String>, scheme: SecurityScheme) -> Self {
+    pub fn security_scheme(mut self, name: impl Into<String>, scheme: Value) -> Self {
         self.security_schemes.insert(name.into(), scheme);
         self
     }
@@ -147,12 +160,11 @@ impl OpenApi {
     ) -> Self {
         self.security_scheme(
             name,
-            SecurityScheme::HTTP {
-                scheme: "bearer".to_string(),
-                bearer_format: Some(bearer_format.into()),
-                description: None,
-                extensions: IndexMap::new(),
-            },
+            json!({
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": bearer_format.into(),
+            }),
         )
     }
 
@@ -205,71 +217,117 @@ impl OpenApi {
         self
     }
 
-    /// Export the supplied types as a complete OpenAPI 3.0 document.
-    pub fn export_document(&self, types: &Types, format: impl Format) -> Result<OpenAPI, Error> {
-        let (components, resolved) = resolve(types, &self.operations, format, self.schema_mode)?;
+    /// Export the supplied types as a complete OpenAPI document, as JSON.
+    pub fn export_document(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
+        let (schemas, resolved) = resolve(types, &self.operations, format, self.schema_mode)?;
         let paths = if self.operations.is_empty() {
-            Paths::default()
+            Value::Object(Map::new())
         } else {
             crate::paths::paths(&self.operations, &resolved)?
         };
 
-        let mut components = components;
-        for (name, scheme) in &self.security_schemes {
-            components
-                .security_schemes
-                .insert(name.clone(), ReferenceOr::Item(scheme.clone()));
+        let mut components = Map::new();
+        if !schemas.is_empty() {
+            components.insert(
+                "schemas".to_string(),
+                Value::Object(schemas.into_iter().collect()),
+            );
+        }
+        if !self.security_schemes.is_empty() {
+            components.insert(
+                "securitySchemes".to_string(),
+                Value::Object(self.security_schemes.clone().into_iter().collect()),
+            );
         }
 
-        Ok(OpenAPI {
-            openapi: "3.0.3".to_string(),
-            info: Info {
-                title: self.title.to_string(),
-                description: self.description.as_ref().map(ToString::to_string),
-                version: self.version.to_string(),
-                contact: self.contact.clone(),
-                ..Default::default()
-            },
-            servers: self.servers.clone(),
-            tags: self.tags.clone(),
-            paths,
-            components: Some(components),
-            ..Default::default()
-        })
+        let mut info = Map::new();
+        info.insert("title".to_string(), json!(self.title));
+        info.insert("version".to_string(), json!(self.version));
+        if let Some(description) = &self.description {
+            info.insert("description".to_string(), json!(description));
+        }
+        if let Some(contact) = &self.contact {
+            info.insert(
+                "contact".to_string(),
+                json!({ "name": contact.name, "url": contact.url }),
+            );
+        }
+
+        let mut document = Map::new();
+        document.insert("openapi".to_string(), json!("3.0.3"));
+        document.insert("info".to_string(), Value::Object(info));
+        if !self.servers.is_empty() {
+            document.insert(
+                "servers".to_string(),
+                Value::Array(
+                    self.servers
+                        .iter()
+                        .map(|server| match &server.description {
+                            Some(description) => {
+                                json!({ "url": server.url, "description": description })
+                            }
+                            None => json!({ "url": server.url }),
+                        })
+                        .collect(),
+                ),
+            );
+        }
+        if !self.tags.is_empty() {
+            document.insert(
+                "tags".to_string(),
+                Value::Array(
+                    self.tags
+                        .iter()
+                        .map(|tag| json!({ "name": tag.name, "description": tag.description }))
+                        .collect(),
+                ),
+            );
+        }
+        document.insert("paths".to_string(), paths);
+        document.insert("components".to_string(), Value::Object(components));
+        Ok(Value::Object(document))
     }
 
-    /// Export only the reusable `components` object for merging into an
+    /// Export only the reusable schema components for merging into an
     /// application-owned OpenAPI document.
     pub fn export_components(
         &self,
         types: &Types,
         format: impl Format,
-    ) -> Result<Components, Error> {
-        components(types, format, self.schema_mode)
+    ) -> Result<BTreeMap<String, Value>, Error> {
+        crate::transform::components(types, format, self.schema_mode)
     }
 
     /// Add exported schemas to an existing document without replacing any
     /// existing schema component.
+    ///
+    /// The target is any OpenAPI document as JSON, whichever tool produced it.
     pub fn add_to_document(
         &self,
-        document: &mut OpenAPI,
+        document: &mut Value,
         types: &Types,
         format: impl Format,
     ) -> Result<(), Error> {
         let exported = self.export_components(types, format)?;
-        let target = &mut document
-            .components
-            .get_or_insert_with(Components::default)
-            .schemas;
 
-        if let Some(name) = exported
-            .schemas
-            .keys()
-            .find(|name| target.contains_key(*name))
-        {
+        let root = document
+            .as_object_mut()
+            .ok_or(Error::InvalidTargetDocument)?;
+        let components = root
+            .entry("components")
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or(Error::InvalidTargetDocument)?;
+        let target = components
+            .entry("schemas")
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or(Error::InvalidTargetDocument)?;
+
+        if let Some(name) = exported.keys().find(|name| target.contains_key(*name)) {
             return Err(Error::DuplicateComponent(name.clone()));
         }
-        target.extend(exported.schemas);
+        target.extend(exported);
         Ok(())
     }
 
