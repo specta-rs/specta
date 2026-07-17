@@ -500,6 +500,21 @@ struct AliasBesideSpectaSkippedVariant {
 }
 
 #[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct LaterFlattenedAliasKey {
+    outer_key: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OrderedFlattenedAliasCollision {
+    #[serde(flatten)]
+    first: AliasedFlattenPayload,
+    #[serde(flatten)]
+    later: LaterFlattenedAliasKey,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent = false)]
 #[serde(transparent)]
 struct TransparentNamedFlattenWrapper {
@@ -1389,6 +1404,47 @@ fn specta_skipped_variants_do_not_contribute_flattened_keys() {
     assert!(
         parent.contains("specta_only_key?: never"),
         "a Specta-skipped variant key must not relax alias exclusivity:\n{rendered}"
+    );
+}
+
+#[test]
+fn later_flattened_siblings_do_not_relax_deserialize_aliases() {
+    let value = OrderedFlattenedAliasCollision {
+        first: AliasedFlattenPayload {
+            value: "canonical".into(),
+        },
+        later: LaterFlattenedAliasKey {
+            outer_key: "later".into(),
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::json!({ "value": "canonical", "outer_key": "later" })
+    );
+    assert!(
+        serde_json::from_value::<OrderedFlattenedAliasCollision>(
+            serde_json::json!({ "value": "canonical", "outer_key": "later" })
+        )
+        .is_err(),
+        "the first flattened field consumes the later key as a duplicate alias"
+    );
+
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<OrderedFlattenedAliasCollision>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("ordered flattened aliases should export");
+    let deserialize = rendered
+        .split_once("export type OrderedFlattenedAliasCollision_Deserialize = ")
+        .expect("deserialize ordered collision should be exported")
+        .1
+        .split_once("\n\n")
+        .expect("deserialize declaration should terminate")
+        .0;
+    assert!(
+        deserialize.contains("outer_key?: never"),
+        "deserialize must preserve exclusions against later siblings:\n{rendered}"
     );
 }
 

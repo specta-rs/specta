@@ -1281,7 +1281,9 @@ fn lower_flattened_struct_inner(
                     split_types,
                     expanding_flattened,
                 )?;
-                relax_alias_exclusions(&mut ty, &surrounding_keys);
+                if matches!(mode, PhaseRewrite::Unified) {
+                    relax_alias_exclusions(&mut ty, &surrounding_keys);
+                }
                 if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER) || was_nullable {
                     optional.push(ty);
                 } else {
@@ -3384,8 +3386,10 @@ fn transform_internal_variant(
                         .into_iter()
                         .filter_map(|(key, count)| (count > 1).then_some(key)),
                 );
-                for ty in mandatory_parts.iter_mut().chain(&mut optional_parts) {
-                    relax_alias_exclusions(ty, &surrounding_keys);
+                if matches!(mode, PhaseRewrite::Unified) {
+                    for ty in mandatory_parts.iter_mut().chain(&mut optional_parts) {
+                        relax_alias_exclusions(ty, &surrounding_keys);
+                    }
                 }
 
                 let mut mandatory = Vec::with_capacity(mandatory_parts.len() + 2);
