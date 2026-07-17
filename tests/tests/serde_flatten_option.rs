@@ -145,6 +145,23 @@ struct ParentKeyCollidesWithFlattenedAlias {
 
 #[derive(Debug, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct NestedMultiAliasPayload {
+    #[serde(alias = "outer_key")]
+    value: String,
+    #[serde(alias = "old_other")]
+    other: String,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ParentKeyCollidesWithNestedMultiAliasPayload {
+    outer_key: String,
+    #[serde(flatten)]
+    inner: NestedMultiAliasPayload,
+}
+
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct RecursiveFlattenedAlias {
     #[serde(alias = "old_value")]
     value: String,
@@ -194,6 +211,8 @@ struct AliasBesideSkippedFlattenedKey {
 struct MultipleAliasesWithOneFlattenCollision {
     #[serde(alias = "old", alias = "legacy")]
     value: String,
+    #[serde(alias = "old_other")]
+    other: String,
     #[serde(flatten)]
     flattened: FlattenedOldKey,
 }
@@ -1650,8 +1669,30 @@ fn flatten_collisions_relax_only_the_colliding_alias() {
         .1;
 
     assert!(
-        !ty.contains("old?: never") && ty.contains("legacy?: never"),
+        !ty.contains("old?: never")
+            && ty.contains("legacy?: never")
+            && ty.contains("extends infer T extends object"),
         "only the colliding alias exclusion should be relaxed:\n{rendered}"
+    );
+}
+
+#[test]
+fn late_flatten_relaxation_clears_only_the_colliding_deferred_alias() {
+    let rendered = Typescript::default()
+        .export(
+            &Types::default().register::<ParentKeyCollidesWithNestedMultiAliasPayload>(),
+            specta_serde::Format,
+        )
+        .expect("nested multi-alias payload should export");
+    let ty = rendered
+        .split_once("export type ParentKeyCollidesWithNestedMultiAliasPayload = ")
+        .expect("nested multi-alias parent should be exported")
+        .1;
+
+    assert_eq!(
+        ty.matches("extends infer T extends object").count(),
+        1,
+        "only the unaffected alias union should remain deferred:\n{rendered}"
     );
 }
 
