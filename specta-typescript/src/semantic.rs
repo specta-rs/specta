@@ -909,7 +909,35 @@ fn prune_identity_root(
                 && types.get(reference).is_some()
     );
 
-    result.filter(|(next_ty, runtime)| runtime != js_ident || next_ty.is_some() && !registered_root)
+    result.filter(|(next_ty, runtime)| {
+        runtime != js_ident
+            || next_ty
+                .as_ref()
+                .is_some_and(|next_ty| !registered_root || registered_generics_changed(dt, next_ty))
+    })
+}
+
+fn registered_generics_changed(dt: &DataType, next_ty: &DataType) -> bool {
+    let (
+        DataType::Reference(Reference::Named(source)),
+        DataType::Reference(Reference::Named(remapped)),
+    ) = (dt, next_ty)
+    else {
+        return false;
+    };
+    let (
+        NamedReferenceType::Reference {
+            generics: source, ..
+        },
+        NamedReferenceType::Reference {
+            generics: remapped, ..
+        },
+    ) = (&source.inner, &remapped.inner)
+    else {
+        return false;
+    };
+
+    source != remapped
 }
 
 fn is_lossless_bigint_primitive(dt: &DataType) -> bool {

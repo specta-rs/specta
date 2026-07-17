@@ -56,6 +56,12 @@ struct MixedIdentityPayload {
     site: Website,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct Wrapper<T> {
+    value: T,
+}
+
 fn semantic_config() -> Configuration {
     Configuration::empty().define::<Website>(
         |_| define("URL").into(),
@@ -218,6 +224,23 @@ fn semantic_registered_identity_rule_does_not_emit_a_runtime_transform() {
 
     assert_eq!(semantic.apply_serialize(&types, &dt, "payload"), None);
     assert_eq!(semantic.apply_deserialize(&types, &dt, "payload"), None);
+}
+
+#[test]
+fn semantic_registered_generic_retains_identity_use_site_remaps() {
+    let semantic = Configuration::empty().enable_lossless_floats();
+    let mut types = Types::default();
+    let dt = Wrapper::<f64>::definition(&mut types);
+
+    for transform in [
+        semantic.apply_serialize(&types, &dt, "payload"),
+        semantic.apply_deserialize(&types, &dt, "payload"),
+    ] {
+        let (remapped, runtime) =
+            transform.expect("registered generic arguments must retain their type remap");
+        assert!(remapped.is_some());
+        assert_eq!(runtime, "payload");
+    }
 }
 
 #[test]
