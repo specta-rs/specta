@@ -3170,9 +3170,11 @@ fn enum_dt(
 /// intersection of unions. The latter distributes into one union member for
 /// every combination of aliased fields, which quickly reaches TS2590.
 ///
-/// The mapped type retains the original semantics: each required field must
-/// use exactly one accepted spelling, optional fields may be omitted, and two
-/// spellings of the same field cannot be supplied together.
+/// The mapped type retains the original semantics for required fields: each
+/// must use exactly one accepted spelling. Fully optional alias groups render
+/// as their plain object intersection instead. TypeScript cannot retain their
+/// duplicate-key rejection without forcing consumers to expand an exponential
+/// union, while serde's optional/omitted behavior remains represented.
 fn alias_field_union_dt(
     s: &mut String,
     exporter: &Exporter,
@@ -3183,6 +3185,7 @@ fn alias_field_union_dt(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     let mut fields = Vec::with_capacity(e.variants.len());
+    let mut all_optional = true;
 
     for (name, variant) in active_variants(e) {
         let mut variant = (*variant).clone();
@@ -3196,6 +3199,9 @@ fn alias_field_union_dt(
             named
                 .fields
                 .retain(|(_, field)| !field.attributes.contains_key(FIELD_ALIAS_EXCLUSION_MARKER));
+            all_optional &= named.fields.iter().all(|(_, field)| field.optional);
+        } else {
+            all_optional = false;
         }
 
         let mut variant_location = location.clone();
@@ -3216,6 +3222,11 @@ fn alias_field_union_dt(
     }
 
     let source = fields.join(" & ");
+    if all_optional {
+        s.push_str(&source);
+        return Ok(());
+    }
+
     s.push_str("((");
     s.push_str(&source);
     s.push_str(") extends infer T extends object ? { [K in keyof T]: { [P in keyof T as P extends K ? P : never]: T[P] } & { [P in keyof T as P extends K ? never : P]?: never } }[keyof T] & object : never)");

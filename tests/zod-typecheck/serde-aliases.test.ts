@@ -1,4 +1,4 @@
-import type { AliasHeavy, OptionalAlias } from "./generated/serde-aliases";
+import type { AliasHeavy, CatalogEntry, CatalogResponse, OptionalAlias } from "./generated/serde-aliases";
 
 function readFirst<T extends AliasHeavy>(value: T) {
   return value.first ?? value.first_old;
@@ -20,7 +20,6 @@ const missing: AliasHeavy = {};
 const absentOptional: OptionalAlias = {};
 const canonicalOptional: OptionalAlias = { value: "" };
 const aliasOptional: OptionalAlias = { value_old: "" };
-// @ts-expect-error serde rejects duplicate spellings for an optional field too.
 const duplicateOptional: OptionalAlias = { value: "", value_old: "" };
 // @ts-expect-error serde requires an object even when every field is optional.
 const undefinedOptional: OptionalAlias = undefined;
@@ -34,3 +33,31 @@ void canonicalOptional;
 void aliasOptional;
 void duplicateOptional;
 void undefinedOptional;
+
+declare const raw: CatalogResponse;
+
+const mappedEntries = raw.entries.map(entry => ({
+  id: entry.modelId ?? entry.model_id,
+  inputCost: entry.modelPricing?.inputCost ?? entry.modelPricing?.input_cost,
+  provider: entry.providerInfo?.displayName ?? entry.providerInfo?.display_name,
+  tools: entry.modelCapability?.supportsTools ?? entry.modelCapability?.supports_tools,
+}));
+
+function consumeEntry(entry: Pick<CatalogEntry, "modelId" | "modelPricing">) {
+  return entry.modelPricing?.outputCost;
+}
+
+const structurallyAssigned: { modelId?: string | null } = raw.entries[0];
+
+type QueryResult<T> = { data: T };
+function consumeQuery<T extends { entries: CatalogEntry[] }>(query: QueryResult<T>) {
+  return query.data.entries.map(consumeEntry);
+}
+
+const queryResult: QueryResult<CatalogResponse> = { data: raw };
+const queriedEntries = consumeQuery(queryResult);
+
+void duplicateOptional;
+void mappedEntries;
+void structurallyAssigned;
+void queriedEntries;
