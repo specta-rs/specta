@@ -1253,3 +1253,37 @@ fn openapi_documents_validate_against_the_official_meta_schemas() {
         );
     }
 }
+
+/// Well-known string-shaped types carry their JSON Schema `format`, keyed by
+/// the same identity `specta_typescript::semantic` matches on; overrides and
+/// plain strings stay bare.
+#[test]
+fn openapi_emits_string_formats_for_well_known_types() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Meeting {
+        starts_at: chrono::DateTime<chrono::Utc>,
+        day: chrono::NaiveDate,
+        agenda: String,
+        #[specta(type = String)]
+        overridden: chrono::DateTime<chrono::Utc>,
+    }
+
+    for version in [OasVersion::V3_0, OasVersion::V3_1] {
+        let document = OpenApi::default()
+            .oas_version(version)
+            .export_document(
+                &Types::default().register::<Meeting>(),
+                specta_serde::Format,
+            )
+            .expect("chrono fields should export");
+        let properties = &document["components"]["schemas"]["Meeting"]["properties"];
+        assert_eq!(properties["starts_at"]["format"], "date-time");
+        assert_eq!(properties["day"]["format"], "date");
+        assert!(properties["agenda"].get("format").is_none());
+        assert!(
+            properties["overridden"].get("format").is_none(),
+            "a type override must win over the format table"
+        );
+    }
+}

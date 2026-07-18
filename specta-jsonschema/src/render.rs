@@ -48,6 +48,7 @@ pub(crate) struct Renderer<'a> {
     name_counts: BTreeMap<Cow<'static, str>, usize>,
     allow_additional_properties: bool,
     number_formats: bool,
+    string_formats: bool,
 }
 
 impl<'a> Renderer<'a> {
@@ -56,6 +57,7 @@ impl<'a> Renderer<'a> {
         types: &'a Types,
         allow_additional_properties: bool,
         number_formats: bool,
+        string_formats: bool,
     ) -> Self {
         let mut name_counts = BTreeMap::new();
         for ndt in types.into_sorted_iter() {
@@ -72,6 +74,7 @@ impl<'a> Renderer<'a> {
             name_counts,
             allow_additional_properties,
             number_formats,
+            string_formats,
         }
     }
 
@@ -333,7 +336,9 @@ impl<'a> Renderer<'a> {
     ) -> Result<Value, Error> {
         match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => {
-                self.render_datatype(dt, parent_generics, path, depth + 1)
+                let mut schema = self.render_datatype(dt, parent_generics, path, depth + 1)?;
+                self.apply_string_format(reference, &mut schema);
+                Ok(schema)
             }
             NamedReferenceType::Recursive(cycle) => Err(Error::InfiniteRecursiveInlineType {
                 path: path.into(),
@@ -349,6 +354,33 @@ impl<'a> Renderer<'a> {
                 self.ensure_definition(ndt, key.clone(), generics, path)?;
                 Ok(object([("$ref", string(self.ref_path(&key)))]))
             }
+        }
+    }
+
+    /// JSON Schema string formats for well-known named types, keyed by the
+    /// same name and module-path identity that `specta_typescript::semantic`
+    /// matches on. Applied only when the type rendered as a plain string, so
+    /// type overrides and remaps always win. Types whose wire form does not
+    /// satisfy a format (`chrono::NaiveDateTime` has no offset) are absent.
+    fn apply_string_format(&self, reference: &NamedReference, schema: &mut Value) {
+        if !self.string_formats {
+            return;
+        }
+        let Some(ndt) = self.types.get(reference) else {
+            return;
+        };
+        let format = match (ndt.module_path.as_ref(), ndt.name.as_ref()) {
+            ("chrono", "DateTime") | ("jiff", "Timestamp") => "date-time",
+            ("chrono", "NaiveDate") | ("jiff::civil", "Date") => "date",
+            ("url", "Url") => "uri",
+            ("uuid", "Uuid") => "uuid",
+            _ => return,
+        };
+        if let Value::Object(object) = schema
+            && object.get("type").and_then(Value::as_str) == Some("string")
+            && !object.contains_key("format")
+        {
+            object.insert("format".to_string(), string(format));
         }
     }
 

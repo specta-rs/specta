@@ -103,3 +103,34 @@ fn jsonschema_skip_slot_tuple_phases() {
     );
     insta::assert_snapshot!("jsonschema-skip-slot-tuple-phases", rendered);
 }
+
+/// String formats are opt-in: plain JSON Schema output is unchanged unless
+/// the knob is set.
+#[test]
+fn jsonschema_string_formats_are_opt_in() {
+    #[derive(specta::Type)]
+    #[specta(collect = false)]
+    struct Stamped {
+        at: chrono::DateTime<chrono::Utc>,
+    }
+
+    let types = specta::Types::default().register::<Stamped>();
+    let plain = specta_jsonschema::JsonSchema::default()
+        .export_value(&types, specta_serde::Format)
+        .expect("plain export");
+    assert!(
+        plain["$defs"]["Stamped"]["properties"]["at"]
+            .get("format")
+            .is_none(),
+        "formats must not appear unless enabled"
+    );
+
+    let formatted = specta_jsonschema::JsonSchema::default()
+        .string_formats(true)
+        .export_value(&types, specta_serde::Format)
+        .expect("formatted export");
+    assert_eq!(
+        formatted["$defs"]["Stamped"]["properties"]["at"]["format"],
+        "date-time"
+    );
+}

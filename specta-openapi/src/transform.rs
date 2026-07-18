@@ -14,6 +14,8 @@ pub(crate) fn components(
     let mut schema = specta_jsonschema::JsonSchema::default()
         // OpenAPI generators map numeric formats to language types.
         .number_formats(true)
+        // Generators map string formats to language date/URL/UUID types.
+        .string_formats(true)
         .export_value(types, format)?;
     let definitions = schema
         .as_object_mut()
