@@ -2154,6 +2154,7 @@ dependencies = [
 name = "specta-openapi"
 version = "0.0.4"
 dependencies = [
+ "serde",
  "serde_json",
  "serde_yaml",
  "specta",

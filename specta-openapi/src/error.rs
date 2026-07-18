@@ -82,6 +82,15 @@ pub enum Error {
     #[error("cannot add components to a non-object OpenAPI document")]
     InvalidTargetDocument,
 
+    /// A request-body example could not be serialized to JSON.
+    #[error("failed to serialize the request-body example for {path:?}: {message}")]
+    ExampleSerialization {
+        /// Templated path of the operation carrying the example.
+        path: String,
+        /// Serialization error message.
+        message: String,
+    },
+
     /// A directory could not be created.
     #[error("failed to create output directory {path:?}: {source}")]
     CreateDir {

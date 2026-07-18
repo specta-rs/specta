@@ -1054,6 +1054,59 @@ fn parameters_carry_required_description_and_example() {
     assert!(parameters[1].get("example").is_none());
 }
 
+/// A request-body example is a real value of the body type, so the compiler
+/// keeps it true to the schema and serde keeps it true to the wire: the
+/// emitted example carries the type's serde renames, not the Rust field names.
+#[test]
+fn request_body_examples_are_typed_values() {
+    #[derive(Type, Serialize)]
+    #[specta(collect = false)]
+    #[serde(rename_all = "camelCase")]
+    struct SignupRequest {
+        email_address: String,
+    }
+
+    let document = OpenApi::default()
+        .operation(
+            Operation::post("/v1/accounts")
+                .request_body_with_example(SignupRequest {
+                    email_address: "trader@example.com".into(),
+                })
+                .response::<SignupRequest>(201, "Created"),
+        )
+        .export_document(
+            &Types::default().register::<SignupRequest>(),
+            specta_serde::Format,
+        )
+        .expect("typed body examples should export");
+
+    let media =
+        &document["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]["application/json"];
+    assert_eq!(media["example"]["emailAddress"], "trader@example.com");
+    assert_eq!(
+        media["schema"]["$ref"],
+        "#/components/schemas/SignupRequest"
+    );
+
+    // A body declared without an example carries none.
+    let bare = OpenApi::default()
+        .operation(
+            Operation::post("/v1/accounts")
+                .request_body::<SignupRequest>()
+                .response::<SignupRequest>(201, "Created"),
+        )
+        .export_document(
+            &Types::default().register::<SignupRequest>(),
+            specta_serde::Format,
+        )
+        .expect("bare bodies should export");
+    assert!(
+        bare["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]["application/json"]
+            .get("example")
+            .is_none()
+    );
+}
+
 /// Error responses can be served as `application/problem+json`, security
 /// schemes register on the document, and operations state their security
 /// alternatives, the anonymous option included.

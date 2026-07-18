@@ -166,6 +166,9 @@ pub struct Operation {
     pub(crate) tags: Vec<Cow<'static, str>>,
     pub(crate) parameters: Vec<Parameter>,
     pub(crate) request_body: Option<Body>,
+    /// Serialized eagerly; a failure is carried as the error message and
+    /// raised loudly at export rather than dropped.
+    pub(crate) request_body_example: Option<Result<serde_json::Value, String>>,
     pub(crate) responses: Vec<Response>,
     pub(crate) security: Vec<SecurityRequirement>,
 }
@@ -185,6 +188,7 @@ impl Operation {
             tags: Vec::new(),
             parameters: Vec::new(),
             request_body: None,
+            request_body_example: None,
             responses: Vec::new(),
             security: Vec::new(),
         }
@@ -268,6 +272,18 @@ impl Operation {
     /// Declares the JSON request body as `T`.
     pub fn request_body<T: Type>(mut self) -> Self {
         self.request_body = Some(capture::<T>());
+        self
+    }
+
+    /// Declares the JSON request body as `T` with an example: a real value of
+    /// the body type, serialized through the same serde path as production
+    /// traffic and carried in the media type's `example`. The compiler keeps
+    /// the example true to the schema — it cannot drift the way an untyped
+    /// annotation can.
+    pub fn request_body_with_example<T: Type + serde::Serialize>(mut self, example: T) -> Self {
+        self.request_body = Some(capture::<T>());
+        self.request_body_example =
+            Some(serde_json::to_value(&example).map_err(|error| error.to_string()));
         self
     }
 

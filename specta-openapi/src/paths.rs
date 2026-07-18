@@ -95,10 +95,21 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<Value, Error> {
         );
     }
     if let Some(body) = &operation.request_body {
+        let mut media = Map::new();
+        media.insert("schema".to_string(), schema_of(body, resolved)?);
+        if let Some(example) = &operation.request_body_example {
+            let example = example
+                .clone()
+                .map_err(|message| Error::ExampleSerialization {
+                    path: operation.path.to_string(),
+                    message,
+                })?;
+            media.insert("example".to_string(), example);
+        }
         object.insert(
             "requestBody".to_string(),
             json!({
-                "content": { JSON: { "schema": schema_of(body, resolved)? } },
+                "content": { JSON: media },
                 "required": true,
             }),
         );
