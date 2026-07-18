@@ -1,153 +1,186 @@
 //! Lowering of [`Operation`]s into the document's `paths` object.
 
+use serde_json::{Map, Value, json};
+
 use crate::{
     Error,
     operation::{Body, Method, Operation, ParameterLocation},
     resolve::Resolved,
 };
-use indexmap::IndexMap;
-use openapiv3::{
-    MediaType, Operation as OpenApiOperation, Parameter as OpenApiParameter, ParameterData,
-    ParameterSchemaOrContent, PathItem, Paths, ReferenceOr, RequestBody, Response, Responses,
-    StatusCode,
-};
 
 const JSON: &str = "application/json";
 
-pub(crate) fn paths(operations: &[Operation], resolved: &Resolved) -> Result<Paths, Error> {
-    let mut paths: IndexMap<String, ReferenceOr<PathItem>> = IndexMap::new();
+pub(crate) fn paths(operations: &[Operation], resolved: &Resolved) -> Result<Value, Error> {
+    let mut paths = Map::new();
 
     for operation in operations {
         let lowered = lower(operation, resolved)?;
-        let entry = paths
+        let item = paths
             .entry(operation.path.to_string())
-            .or_insert_with(|| ReferenceOr::Item(PathItem::default()));
-        let ReferenceOr::Item(item) = entry else {
+            .or_insert_with(|| Value::Object(Map::new()));
+        let Some(item) = item.as_object_mut() else {
             continue;
         };
 
-        let slot = match operation.method {
-            Method::Get => &mut item.get,
-            Method::Post => &mut item.post,
-            Method::Put => &mut item.put,
-            Method::Patch => &mut item.patch,
-            Method::Delete => &mut item.delete,
-            Method::Head => &mut item.head,
-            Method::Options => &mut item.options,
-            Method::Trace => &mut item.trace,
-        };
-        if slot.is_some() {
+        let method = method_key(operation.method);
+        if item.contains_key(method) {
             return Err(Error::DuplicateOperation {
-                method: format!("{:?}", operation.method).to_uppercase(),
+                method: method.to_uppercase(),
                 path: operation.path.to_string(),
             });
         }
-        *slot = Some(lowered);
+        item.insert(method.to_string(), lowered);
     }
 
-    Ok(Paths {
-        paths,
-        ..Default::default()
-    })
+    Ok(Value::Object(paths))
 }
 
-fn lower(operation: &Operation, resolved: &Resolved) -> Result<OpenApiOperation, Error> {
+fn method_key(method: Method) -> &'static str {
+    match method {
+        Method::Get => "get",
+        Method::Post => "post",
+        Method::Put => "put",
+        Method::Patch => "patch",
+        Method::Delete => "delete",
+        Method::Head => "head",
+        Method::Options => "options",
+        Method::Trace => "trace",
+    }
+}
+
+fn lower(operation: &Operation, resolved: &Resolved) -> Result<Value, Error> {
     if operation.responses.is_empty() {
         return Err(Error::OperationWithoutResponses {
             path: operation.path.to_string(),
         });
     }
 
-    let mut responses = Responses::default();
+    let mut responses = Map::new();
     for response in &operation.responses {
-        responses.responses.insert(
-            StatusCode::Code(response.status),
-            ReferenceOr::Item(Response {
-                description: response.description.to_string(),
-                content: content_of(response.body.as_ref(), resolved)?,
-                ..Default::default()
+        let mut object = Map::new();
+        object.insert("description".to_string(), json!(response.description));
+        if let Some(body) = &response.body {
+            let content_type = response.content_type.as_deref().unwrap_or(JSON);
+            object.insert(
+                "content".to_string(),
+                json!({ content_type: { "schema": response_schema_of(body, resolved)? } }),
+            );
+        }
+        responses.insert(response.status.to_string(), Value::Object(object));
+    }
+
+    let mut object = Map::new();
+    if !operation.tags.is_empty() {
+        object.insert("tags".to_string(), json!(operation.tags));
+    }
+    if let Some(summary) = &operation.summary {
+        object.insert("summary".to_string(), json!(summary));
+    }
+    if let Some(description) = &operation.description {
+        object.insert("description".to_string(), json!(description));
+    }
+    if let Some(operation_id) = &operation.operation_id {
+        object.insert("operationId".to_string(), json!(operation_id));
+    }
+    if !operation.parameters.is_empty() {
+        object.insert(
+            "parameters".to_string(),
+            Value::Array(
+                operation
+                    .parameters
+                    .iter()
+                    .map(|parameter| self::parameter(parameter, resolved))
+                    .collect::<Result<_, _>>()?,
+            ),
+        );
+    }
+    if let Some(body) = &operation.request_body {
+        let mut media = Map::new();
+        media.insert("schema".to_string(), request_schema_of(body, resolved)?);
+        if let Some(example) = &operation.request_body_example {
+            let example = example
+                .clone()
+                .map_err(|message| Error::ExampleSerialization {
+                    path: operation.path.to_string(),
+                    message,
+                })?;
+            media.insert("example".to_string(), example);
+        }
+        object.insert(
+            "requestBody".to_string(),
+            json!({
+                "content": { JSON: media },
+                "required": true,
             }),
         );
     }
+    object.insert("responses".to_string(), Value::Object(responses));
+    if !operation.security.is_empty() {
+        object.insert(
+            "security".to_string(),
+            Value::Array(
+                operation
+                    .security
+                    .iter()
+                    .map(|requirement| {
+                        Value::Object(
+                            requirement
+                                .iter()
+                                .map(|(name, scopes)| (name.to_string(), json!(scopes)))
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+        );
+    }
 
-    let request_body = match &operation.request_body {
-        Some(body) => Some(ReferenceOr::Item(RequestBody {
-            content: content_of(Some(body), resolved)?,
-            required: true,
-            ..Default::default()
-        })),
-        None => None,
-    };
-
-    Ok(OpenApiOperation {
-        tags: operation.tags.iter().map(ToString::to_string).collect(),
-        summary: operation.summary.as_ref().map(ToString::to_string),
-        description: operation.description.as_ref().map(ToString::to_string),
-        operation_id: operation.operation_id.as_ref().map(ToString::to_string),
-        parameters: operation
-            .parameters
-            .iter()
-            .map(|p| parameter(p, resolved))
-            .collect::<Result<Vec<_>, _>>()?,
-        request_body,
-        responses,
-        ..Default::default()
-    })
-}
-
-fn content_of(
-    body: Option<&Body>,
-    resolved: &Resolved,
-) -> Result<IndexMap<String, MediaType>, Error> {
-    let Some(body) = body else {
-        return Ok(IndexMap::new());
-    };
-    let schema = resolved
-        .get(&body.dt)
-        .ok_or(Error::UnresolvedOperationTypes)?;
-    Ok(IndexMap::from_iter([(
-        JSON.to_string(),
-        MediaType {
-            schema: Some(schema.clone()),
-            ..Default::default()
-        },
-    )]))
+    Ok(Value::Object(object))
 }
 
 /// Lowers a parameter, carrying the schema of whatever the extractor parses it into.
-fn parameter(
-    parameter: &crate::operation::Parameter,
-    resolved: &Resolved,
-) -> Result<ReferenceOr<OpenApiParameter>, Error> {
-    let schema = resolved
-        .get(&parameter.ty.dt)
-        .ok_or(Error::UnresolvedOperationTypes)?;
-    let data = ParameterData {
-        name: parameter.name.to_string(),
-        description: parameter.description.as_ref().map(ToString::to_string),
-        required: parameter.required,
-        deprecated: None,
-        format: ParameterSchemaOrContent::Schema(schema.clone()),
-        example: None,
-        examples: IndexMap::new(),
-        explode: None,
-        extensions: IndexMap::new(),
-    };
+fn parameter(parameter: &crate::operation::Parameter, resolved: &Resolved) -> Result<Value, Error> {
+    let mut object = Map::new();
+    object.insert("name".to_string(), json!(parameter.name));
+    object.insert(
+        "in".to_string(),
+        json!(match parameter.location {
+            ParameterLocation::Path => "path",
+            ParameterLocation::Query => "query",
+            ParameterLocation::Header => "header",
+        }),
+    );
+    if let Some(description) = &parameter.description {
+        object.insert("description".to_string(), json!(description));
+    }
+    if parameter.required {
+        object.insert("required".to_string(), json!(true));
+    }
+    if let Some(example) = &parameter.example {
+        object.insert("example".to_string(), example.clone());
+    }
+    object.insert(
+        "schema".to_string(),
+        request_schema_of(&parameter.ty, resolved)?,
+    );
+    Ok(Value::Object(object))
+}
 
-    Ok(ReferenceOr::Item(match parameter.location {
-        ParameterLocation::Path => OpenApiParameter::Path {
-            parameter_data: data,
-            style: Default::default(),
-        },
-        ParameterLocation::Query => OpenApiParameter::Query {
-            parameter_data: data,
-            allow_reserved: false,
-            style: Default::default(),
-            allow_empty_value: None,
-        },
-        ParameterLocation::Header => OpenApiParameter::Header {
-            parameter_data: data,
-            style: Default::default(),
-        },
-    }))
+/// What the exporter emitted for a request-side type - a body or parameter,
+/// resolved through the deserialize phase: a `$ref` when it has a component,
+/// its schema in place when it does not.
+fn request_schema_of(body: &Body, resolved: &Resolved) -> Result<Value, Error> {
+    resolved
+        .request(&body.dt)
+        .cloned()
+        .ok_or(Error::UnresolvedOperationTypes)
+}
+
+/// What the exporter emitted for a response-side type, resolved through the
+/// serialize phase.
+fn response_schema_of(body: &Body, resolved: &Resolved) -> Result<Value, Error> {
+    resolved
+        .response(&body.dt)
+        .cloned()
+        .ok_or(Error::UnresolvedOperationTypes)
 }

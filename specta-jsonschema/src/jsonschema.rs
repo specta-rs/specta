@@ -15,6 +15,8 @@ pub struct JsonSchema {
     description: Option<Cow<'static, str>>,
     comment: Option<Cow<'static, str>>,
     allow_additional_properties: bool,
+    number_formats: bool,
+    string_formats: bool,
 }
 
 impl JsonSchema {
@@ -64,6 +66,32 @@ impl JsonSchema {
         self
     }
 
+    /// Annotate numeric schemas with OpenAPI-style `format` values: `int32`
+    /// for integers that fit a signed 32-bit value, `int64` for wider ones,
+    /// and `float`/`double` for `f32`/`f64`.
+    ///
+    /// Off by default: `format` is an annotation keyword in JSON Schema, and
+    /// the numeric bounds already state the exact range. Generators that map
+    /// formats to language types (OpenAPI tooling in particular) can opt in.
+    pub fn number_formats(mut self, enabled: bool) -> Self {
+        self.number_formats = enabled;
+        self
+    }
+
+    /// Emit JSON Schema string `format` annotations for well-known named
+    /// types, keyed by the same name and module-path identity that
+    /// `specta_typescript::semantic`'s default rules match on:
+    /// `chrono::DateTime` and `jiff::Timestamp` as `date-time`,
+    /// `chrono::NaiveDate` and `jiff::civil::Date` as `date`, `url::Url` as
+    /// `uri`, and `uuid::Uuid` as `uuid`. Only types whose wire form
+    /// satisfies the format are listed (`chrono::NaiveDateTime` serializes
+    /// without an offset, so it carries no format). Off by default so plain
+    /// JSON Schema output is unchanged.
+    pub fn string_formats(mut self, enabled: bool) -> Self {
+        self.string_formats = enabled;
+        self
+    }
+
     /// Export the schema document as a pretty-printed JSON string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         Ok(serde_json::to_string_pretty(
@@ -88,7 +116,13 @@ impl JsonSchema {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let renderer = Renderer::new(self.schema_version, types, self.allow_additional_properties);
+        let renderer = Renderer::new(
+            self.schema_version,
+            types,
+            self.allow_additional_properties,
+            self.number_formats,
+            self.string_formats,
+        );
         let (definitions, _) = renderer.render_definitions(&roots)?;
 
         let mut root = Map::new();
@@ -144,6 +178,8 @@ impl JsonSchema {
             self.schema_version,
             mapped,
             self.allow_additional_properties,
+            self.number_formats,
+            self.string_formats,
         );
         let (definitions, mut roots) = renderer.render_definitions(&roots)?;
         let root_schema = roots.pop().unwrap_or(Value::Bool(true));

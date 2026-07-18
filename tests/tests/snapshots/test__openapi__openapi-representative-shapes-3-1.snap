@@ -1,6 +1,6 @@
 ---
 source: tests/tests/openapi.rs
-expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should serialize\")"
+expression: "serde_json::to_string_pretty(&document).expect(\"snapshot value should serialize\")"
 ---
 {
   "components": {
@@ -11,9 +11,7 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
             "additionalProperties": false,
             "properties": {
               "kind": {
-                "enum": [
-                  "Started"
-                ]
+                "const": "Started"
               }
             },
             "required": [
@@ -38,9 +36,7 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
                 "type": "object"
               },
               "kind": {
-                "enum": [
-                  "Progress"
-                ]
+                "const": "Progress"
               }
             },
             "required": [
@@ -56,9 +52,7 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
                 "type": "string"
               },
               "kind": {
-                "enum": [
-                  "Message"
-                ]
+                "const": "Message"
               }
             },
             "required": [
@@ -101,32 +95,28 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
             "type": "object"
           },
           "optionalValue": {
-            "nullable": true,
-            "type": "string",
-            "x-specta-nullable": true
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tuple": {
-            "items": {
-              "oneOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            },
+            "items": false,
             "maxItems": 2,
             "minItems": 2,
-            "type": "array",
-            "x-specta-prefix-items": [
+            "prefixItems": [
               {
                 "type": "string"
               },
               {
                 "type": "boolean"
               }
-            ]
+            ],
+            "type": "array"
           },
           "value": {
             "type": "string"
@@ -174,32 +164,28 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
             "type": "object"
           },
           "optionalValue": {
-            "nullable": true,
-            "type": "string",
-            "x-specta-nullable": true
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tuple": {
-            "items": {
-              "oneOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            },
+            "items": false,
             "maxItems": 2,
             "minItems": 2,
-            "type": "array",
-            "x-specta-prefix-items": [
+            "prefixItems": [
               {
                 "type": "string"
               },
               {
                 "type": "boolean"
               }
-            ]
+            ],
+            "type": "array"
           },
           "value": {
             "format": "int64",
@@ -220,11 +206,7 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "type": "object"
       },
       "EventAlias": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ApiEvent"
-          }
-        ],
+        "$ref": "#/components/schemas/ApiEvent",
         "title": "EventAlias"
       },
       "OverlappingUntagged": {
@@ -248,11 +230,7 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "additionalProperties": false,
         "properties": {
           "event": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ApiEvent"
-              }
-            ],
+            "$ref": "#/components/schemas/ApiEvent",
             "deprecated": true,
             "description": " Event payload documentation."
           }
@@ -294,6 +272,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
     "title": "Specta API",
     "version": "0.0.0"
   },
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "paths": {}
 }

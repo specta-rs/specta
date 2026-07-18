@@ -47,6 +47,8 @@ pub(crate) struct Renderer<'a> {
     in_progress_types: Vec<DefinitionSource>,
     name_counts: BTreeMap<Cow<'static, str>, usize>,
     allow_additional_properties: bool,
+    number_formats: bool,
+    string_formats: bool,
 }
 
 impl<'a> Renderer<'a> {
@@ -54,6 +56,8 @@ impl<'a> Renderer<'a> {
         schema_version: SchemaVersion,
         types: &'a Types,
         allow_additional_properties: bool,
+        number_formats: bool,
+        string_formats: bool,
     ) -> Self {
         let mut name_counts = BTreeMap::new();
         for ndt in types.into_sorted_iter() {
@@ -69,6 +73,8 @@ impl<'a> Renderer<'a> {
             in_progress_types: Vec::new(),
             name_counts,
             allow_additional_properties,
+            number_formats,
+            string_formats,
         }
     }
 
@@ -183,7 +189,7 @@ impl<'a> Renderer<'a> {
         }
 
         match dt {
-            DataType::Primitive(primitive) => Ok(primitive_schema(primitive)),
+            DataType::Primitive(primitive) => Ok(self.primitive_schema(primitive)),
             DataType::List(list) => self.render_list(list, generics, path, depth),
             DataType::Map(map) => self.render_map(map, generics, path, depth),
             DataType::Struct(strct) => self.render_struct(strct, generics, path, depth),
@@ -330,7 +336,9 @@ impl<'a> Renderer<'a> {
     ) -> Result<Value, Error> {
         match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => {
-                self.render_datatype(dt, parent_generics, path, depth + 1)
+                let mut schema = self.render_datatype(dt, parent_generics, path, depth + 1)?;
+                self.apply_string_format(reference, &mut schema);
+                Ok(schema)
             }
             NamedReferenceType::Recursive(cycle) => Err(Error::InfiniteRecursiveInlineType {
                 path: path.into(),
@@ -346,6 +354,33 @@ impl<'a> Renderer<'a> {
                 self.ensure_definition(ndt, key.clone(), generics, path)?;
                 Ok(object([("$ref", string(self.ref_path(&key)))]))
             }
+        }
+    }
+
+    /// JSON Schema string formats for well-known named types, keyed by the
+    /// same name and module-path identity that `specta_typescript::semantic`
+    /// matches on. Applied only when the type rendered as a plain string, so
+    /// type overrides and remaps always win. Types whose wire form does not
+    /// satisfy a format (`chrono::NaiveDateTime` has no offset) are absent.
+    fn apply_string_format(&self, reference: &NamedReference, schema: &mut Value) {
+        if !self.string_formats {
+            return;
+        }
+        let Some(ndt) = self.types.get(reference) else {
+            return;
+        };
+        let format = match (ndt.module_path.as_ref(), ndt.name.as_ref()) {
+            ("chrono", "DateTime") | ("jiff", "Timestamp") => "date-time",
+            ("chrono", "NaiveDate") | ("jiff::civil", "Date") => "date",
+            ("url", "Url") => "uri",
+            ("uuid", "Uuid") => "uuid",
+            _ => return,
+        };
+        if let Value::Object(object) = schema
+            && object.get("type").and_then(Value::as_str) == Some("string")
+            && !object.contains_key("format")
+        {
+            object.insert("format".to_string(), string(format));
         }
     }
 
@@ -507,7 +542,7 @@ impl<'a> Renderer<'a> {
         depth: usize,
     ) -> Result<Option<Value>, Error> {
         Ok(match dt {
-            DataType::Primitive(Primitive::char) => Some(primitive_schema(&Primitive::char)),
+            DataType::Primitive(Primitive::char) => Some(self.primitive_schema(&Primitive::char)),
             DataType::Primitive(Primitive::str) => None,
             DataType::Primitive(Primitive::bool) => Some(object([(
                 "enum",
@@ -691,7 +726,13 @@ impl<'a> Renderer<'a> {
                     let field_path = format!("{path}.{name}");
                     let mut schema = self.render_datatype(ty, generics, &field_path, depth + 1)?;
                     self.apply_metadata(&mut schema, None, &field.docs, field.deprecated.as_ref());
-                    properties.insert(name.to_string(), schema);
+                    // A repeated field name overwrites its property, so its
+                    // `required` entry must not repeat either: `required`
+                    // demands unique items in every JSON Schema dialect.
+                    if properties.insert(name.to_string(), schema).is_some() {
+                        required
+                            .retain(|existing: &Value| existing.as_str() != Some(name.as_ref()));
+                    }
                     if !field.optional {
                         required.push(string(name.as_ref()));
                     }
@@ -1230,6 +1271,40 @@ fn default_generics(ndt: &NamedDataType) -> Generics {
         }
     }
     generics
+}
+
+impl Renderer<'_> {
+    /// A primitive's schema, with an OpenAPI-style `format` annotation when
+    /// [`number formats`](crate::JsonSchema::number_formats) are enabled.
+    fn primitive_schema(&self, primitive: &Primitive) -> Value {
+        let mut schema = primitive_schema(primitive);
+        if self.number_formats
+            && let Some(format) = number_format(primitive)
+            && let Value::Object(object) = &mut schema
+        {
+            object.insert("format".to_string(), string(format));
+        }
+        schema
+    }
+}
+
+/// The OpenAPI `format` for a numeric primitive: `int32` when every value
+/// fits a signed 32-bit integer, `int64` for wider integers (`u64` included,
+/// by the OpenAPI convention; the bounds state the exact range), and
+/// `float`/`double` for the IEEE 754 sizes. Widths OpenAPI has no name for
+/// get none.
+fn number_format(primitive: &Primitive) -> Option<&'static str> {
+    match primitive {
+        Primitive::i8 | Primitive::i16 | Primitive::i32 | Primitive::u8 | Primitive::u16 => {
+            Some("int32")
+        }
+        Primitive::i64 | Primitive::isize | Primitive::u32 | Primitive::u64 | Primitive::usize => {
+            Some("int64")
+        }
+        Primitive::f32 => Some("float"),
+        Primitive::f64 => Some("double"),
+        _ => None,
+    }
 }
 
 fn primitive_schema(primitive: &Primitive) -> Value {

@@ -5709,7 +5709,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "&'static [i32]",
         "&'static [i32; 3]",
         "[i32; 3]",
-        "Vec<MyEnum>",
         "&'static [MyEnum]",
         "&'static [MyEnum; 6]",
         "[MyEnum; 2]",
@@ -5923,7 +5922,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "NamedConstGenericContainer",
         "InlineConstGenericContainer",
         "InlineRecursiveConstGenericContainer",
-        "TestCollectionRegister",
         "TestCollectionRegister"
       ],
       "title": "Primitives_Deserialize",
@@ -7203,7 +7201,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "&'static [i32]",
         "&'static [i32; 3]",
         "[i32; 3]",
-        "Vec<MyEnum>",
         "&'static [MyEnum]",
         "&'static [MyEnum; 6]",
         "[MyEnum; 2]",
@@ -7417,7 +7414,6 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "NamedConstGenericContainer",
         "InlineConstGenericContainer",
         "InlineRecursiveConstGenericContainer",
-        "TestCollectionRegister",
         "TestCollectionRegister"
       ],
       "title": "Primitives_Serialize",

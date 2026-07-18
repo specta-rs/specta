@@ -1,17 +1,22 @@
 use std::collections::BTreeMap;
 
-use openapiv3::{Components, ReferenceOr, Schema};
 use serde_json::{Map, Value, json};
 use specta::{Format, Types};
 
-use crate::{Error, SchemaMode};
+use crate::{Error, OasVersion, SchemaMode};
 
 pub(crate) fn components(
     types: &Types,
     format: impl Format,
     mode: SchemaMode,
-) -> Result<Components, Error> {
-    let mut schema = specta_jsonschema::JsonSchema::default().export_value(types, format)?;
+    version: OasVersion,
+) -> Result<BTreeMap<String, Value>, Error> {
+    let mut schema = specta_jsonschema::JsonSchema::default()
+        // OpenAPI generators map numeric formats to language types.
+        .number_formats(true)
+        // Generators map string formats to language date/URL/UUID types.
+        .string_formats(true)
+        .export_value(types, format)?;
     let definitions = schema
         .as_object_mut()
         .and_then(|root| root.remove("$defs").or_else(|| root.remove("definitions")))
@@ -32,22 +37,18 @@ pub(crate) fn components(
         references.insert(definition_ref(name), component_name);
     }
 
-    let mut components = Components::default();
+    let mut components = BTreeMap::new();
     for (name, mut schema) in definitions {
         let component_name = references
             .get(&definition_ref(&name))
             .cloned()
             .unwrap_or_else(|| component_name(&name));
         rewrite_component_refs(&mut schema, &references);
-        let schema = component_schema(transform(schema, &component_name, mode)?);
-        let schema =
-            serde_json::from_value::<Schema>(schema).map_err(|source| Error::InvalidSchema {
-                component: component_name.clone(),
-                source,
-            })?;
-        components
-            .schemas
-            .insert(component_name, ReferenceOr::Item(schema));
+        let mut schema = transform(schema, &component_name, mode, version)?;
+        if version == OasVersion::V3_0 {
+            schema = component_schema(schema);
+        }
+        components.insert(component_name, schema);
     }
     Ok(components)
 }
@@ -120,17 +121,23 @@ fn component_schema(value: Value) -> Value {
     Value::Object(schema)
 }
 
-fn transform(value: Value, component: &str, mode: SchemaMode) -> Result<Value, Error> {
+fn transform(
+    value: Value,
+    component: &str,
+    mode: SchemaMode,
+    version: OasVersion,
+) -> Result<Value, Error> {
     Ok(match value {
-        Value::Bool(true) => json!({}),
-        Value::Bool(false) => json!({ "not": {} }),
+        // JSON Schema's boolean schemas are valid 3.1; 3.0 requires objects.
+        Value::Bool(true) if version == OasVersion::V3_0 => json!({}),
+        Value::Bool(false) if version == OasVersion::V3_0 => json!({ "not": {} }),
         Value::Array(values) => Value::Array(
             values
                 .into_iter()
-                .map(|value| transform(value, component, mode))
+                .map(|value| transform(value, component, mode, version))
                 .collect::<Result<_, _>>()?,
         ),
-        Value::Object(schema) => transform_object(schema, component, mode)?,
+        Value::Object(schema) => transform_object(schema, component, mode, version)?,
         value => value,
     })
 }
@@ -139,25 +146,28 @@ fn transform_object(
     mut schema: Map<String, Value>,
     component: &str,
     mode: SchemaMode,
+    version: OasVersion,
 ) -> Result<Value, Error> {
     schema.remove("$schema");
     schema.remove("$comment");
-    move_unsupported_keyword(
-        &mut schema,
-        "propertyNames",
-        "x-specta-property-names",
-        "constrained map keys",
-        component,
-        mode,
-    )?;
-    move_unsupported_keyword(
-        &mut schema,
-        "unevaluatedProperties",
-        "x-specta-unevaluated-properties",
-        "closed flattened intersections",
-        component,
-        mode,
-    )?;
+    if version == OasVersion::V3_0 {
+        move_unsupported_keyword(
+            &mut schema,
+            "propertyNames",
+            "x-specta-property-names",
+            "constrained map keys",
+            component,
+            mode,
+        )?;
+        move_unsupported_keyword(
+            &mut schema,
+            "unevaluatedProperties",
+            "x-specta-unevaluated-properties",
+            "closed flattened intersections",
+            component,
+            mode,
+        )?;
+    }
     schema.remove("additionalItems");
 
     if let Some(Value::String(reference)) = schema.get_mut("$ref") {
@@ -166,11 +176,18 @@ fn transform_object(
             .replacen("#/definitions/", "#/components/schemas/", 1);
     }
 
-    if let Some(constant) = schema.remove("const") {
+    if version == OasVersion::V3_0
+        && let Some(constant) = schema.remove("const")
+    {
         schema.insert("enum".to_string(), Value::Array(vec![constant]));
     }
 
-    if schema.get("type").and_then(Value::as_str) == Some("null") {
+    compact_string_enum(&mut schema);
+
+    preserve_wide_integer_bound(&mut schema, "minimum");
+    preserve_wide_integer_bound(&mut schema, "maximum");
+
+    if version == OasVersion::V3_0 && schema.get("type").and_then(Value::as_str) == Some("null") {
         if mode == SchemaMode::Strict {
             return Err(unsupported(component, "null-only types"));
         }
@@ -181,107 +198,119 @@ fn transform_object(
         schema.insert("x-specta-type".to_string(), Value::String("null".into()));
     }
 
-    preserve_lossy_integer_bound(&mut schema, "minimum", component, mode)?;
-    preserve_lossy_integer_bound(&mut schema, "maximum", component, mode)?;
+    if version == OasVersion::V3_0 {
+        // Collapse nullable unions before recursively transforming their branches.
+        // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
+        // it can be represented by OpenAPI 3.0's `nullable` keyword.
+        while collapse_nullable_any_of(&mut schema) {}
 
-    // Collapse nullable unions before recursively transforming their branches.
-    // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
-    // it can be represented by OpenAPI 3.0's `nullable` keyword.
-    while collapse_nullable_any_of(&mut schema) {}
-
-    let prefix_items = schema.remove("prefixItems").or_else(|| {
-        schema
-            .get("items")
-            .is_some_and(Value::is_array)
-            .then(|| schema.remove("items"))
-            .flatten()
-    });
-    if let Some(Value::Array(items)) = prefix_items {
-        let heterogeneous = items
-            .first()
-            .is_some_and(|first| items.iter().skip(1).any(|item| item != first));
-        if heterogeneous && mode == SchemaMode::Strict {
-            return Err(unsupported(component, "heterogeneous positional tuples"));
+        let prefix_items = schema.remove("prefixItems").or_else(|| {
+            schema
+                .get("items")
+                .is_some_and(Value::is_array)
+                .then(|| schema.remove("items"))
+                .flatten()
+        });
+        if let Some(Value::Array(items)) = prefix_items {
+            let heterogeneous = items
+                .first()
+                .is_some_and(|first| items.iter().skip(1).any(|item| item != first));
+            if heterogeneous && mode == SchemaMode::Strict {
+                return Err(unsupported(component, "heterogeneous positional tuples"));
+            }
+            let mut items = items
+                .into_iter()
+                .map(|value| transform(value, component, mode, version))
+                .collect::<Result<Vec<_>, _>>()?;
+            if heterogeneous {
+                schema.insert(
+                    "x-specta-prefix-items".to_string(),
+                    Value::Array(items.clone()),
+                );
+            }
+            let item = match items.len() {
+                0 => json!({}),
+                1 => items.pop().unwrap_or_else(|| json!({})),
+                _ if heterogeneous => json!({ "oneOf": items }),
+                _ => items.pop().unwrap_or_else(|| json!({})),
+            };
+            schema.insert("items".to_string(), item);
         }
-        let mut items = items
-            .into_iter()
-            .map(|value| transform(value, component, mode))
-            .collect::<Result<Vec<_>, _>>()?;
-        if heterogeneous {
-            schema.insert(
-                "x-specta-prefix-items".to_string(),
-                Value::Array(items.clone()),
-            );
-        }
-        let item = match items.len() {
-            0 => json!({}),
-            1 => items.pop().unwrap_or_else(|| json!({})),
-            _ if heterogeneous => json!({ "oneOf": items }),
-            _ => items.pop().unwrap_or_else(|| json!({})),
-        };
-        schema.insert("items".to_string(), item);
+    } else if schema.get("items").is_some_and(Value::is_array)
+        && !schema.contains_key("prefixItems")
+        && let Some(items) = schema.remove("items")
+    {
+        // 2020-12 spells positional items `prefixItems`.
+        schema.insert("prefixItems".to_string(), items);
     }
 
     for key in ["items", "not"] {
         if let Some(value) = schema.get_mut(key) {
-            *value = transform(value.take(), component, mode)?;
+            *value = transform(value.take(), component, mode, version)?;
         }
     }
     if let Some(value @ Value::Object(_)) = schema.get_mut("additionalProperties") {
-        *value = transform(value.take(), component, mode)?;
+        *value = transform(value.take(), component, mode, version)?;
     }
     for key in ["properties"] {
         if let Some(Value::Object(values)) = schema.get_mut(key) {
             for value in values.values_mut() {
-                *value = transform(value.take(), component, mode)?;
+                *value = transform(value.take(), component, mode, version)?;
             }
         }
     }
     for key in ["oneOf", "allOf", "anyOf"] {
         if let Some(Value::Array(values)) = schema.get_mut(key) {
             for value in values {
-                *value = transform(value.take(), component, mode)?;
+                *value = transform(value.take(), component, mode, version)?;
+            }
+        }
+    }
+    if version == OasVersion::V3_1 {
+        if let Some(Value::Array(values)) = schema.get_mut("prefixItems") {
+            for value in values {
+                *value = transform(value.take(), component, mode, version)?;
+            }
+        }
+        for key in ["propertyNames", "unevaluatedProperties"] {
+            if let Some(value) = schema.get_mut(key) {
+                *value = transform(value.take(), component, mode, version)?;
             }
         }
     }
 
-    collapse_nullable_any_of(&mut schema);
-    wrap_reference_with_siblings(&mut schema);
-    if mode == SchemaMode::Strict
-        && schema.get("nullable") == Some(&Value::Bool(true))
-        && !schema.contains_key("type")
-    {
-        return Err(unsupported(
-            component,
-            "nullable references or composed schemas",
-        ));
+    if version == OasVersion::V3_0 {
+        collapse_nullable_any_of(&mut schema);
+        wrap_reference_with_siblings(&mut schema);
+        if mode == SchemaMode::Strict
+            && schema.get("nullable") == Some(&Value::Bool(true))
+            && !schema.contains_key("type")
+        {
+            return Err(unsupported(
+                component,
+                "nullable references or composed schemas",
+            ));
+        }
     }
     Ok(Value::Object(schema))
 }
 
-fn preserve_lossy_integer_bound(
-    schema: &mut Map<String, Value>,
-    keyword: &str,
-    component: &str,
-    mode: SchemaMode,
-) -> Result<(), Error> {
+/// Bounds beyond the signed 64-bit range are carried in `x-specta-*`
+/// extensions in both dialects. Mainstream generator toolchains parse bounds
+/// into signed 64-bit integers, and a bound that silently wraps -
+/// openapi-generator renders a `u64::MAX` maximum as `maximum: -1` - is worse
+/// than one carried out of band. The bound such values state is vacuous as a
+/// constraint, so nothing enforceable is lost.
+fn preserve_wide_integer_bound(schema: &mut Map<String, Value>, keyword: &str) {
     let Some(Value::Number(bound)) = schema.get(keyword) else {
-        return Ok(());
+        return;
     };
-    // `openapiv3` stores integer bounds as `i64`, so signed bounds remain
-    // exact. Larger unsigned bounds fall back to its floating-point schema
-    // representation and must not be silently rounded.
     if bound.as_i64().is_some() || bound.as_u64().is_none() {
-        return Ok(());
+        return;
     }
-    if mode == SchemaMode::Strict {
-        return Err(unsupported(component, "exact 64-bit integer bounds"));
-    }
-
     if let Some(bound) = schema.remove(keyword) {
         schema.insert(format!("x-specta-{keyword}"), bound);
     }
-    Ok(())
 }
 
 fn move_unsupported_keyword(
@@ -380,4 +409,55 @@ fn is_nullable_only(value: &Value) -> bool {
                     )
                 }))
     })
+}
+
+/// Collapses a `oneOf` whose members are all single-value string enums - the
+/// shape a plain string enum renders as - into the compact
+/// `{ "type": "string", "enum": [...] }` form generators handle best.
+/// Per-variant descriptions have no home in the compact form, so when any
+/// member carries one they are retained in `x-specta-enum-descriptions`,
+/// keyed by value.
+fn compact_string_enum(schema: &mut Map<String, Value>) {
+    let Some(Value::Array(members)) = schema.get("oneOf") else {
+        return;
+    };
+    let mut values = Vec::with_capacity(members.len());
+    let mut descriptions = Map::new();
+    for member in members {
+        let Value::Object(member) = member else {
+            return;
+        };
+        // Exactly a single string value - members are inspected before their
+        // own transform runs, so both the JSON Schema `const` form and the
+        // already-lowered single-value `enum` form appear here - with nothing
+        // but an optional description beside it.
+        let value = match (member.get("const"), member.get("enum")) {
+            (Some(Value::String(value)), None) => value,
+            (None, Some(Value::Array(constants))) => match constants.as_slice() {
+                [Value::String(value)] => value,
+                _ => return,
+            },
+            _ => return,
+        };
+        if member
+            .keys()
+            .any(|key| !matches!(key.as_str(), "const" | "enum" | "description"))
+        {
+            return;
+        }
+        if let Some(Value::String(description)) = member.get("description") {
+            // Doc comments arrive with their leading space.
+            descriptions.insert(value.clone(), Value::String(description.trim().to_string()));
+        }
+        values.push(Value::String(value.clone()));
+    }
+    schema.remove("oneOf");
+    schema.insert("type".to_string(), Value::String("string".into()));
+    schema.insert("enum".to_string(), Value::Array(values));
+    if !descriptions.is_empty() {
+        schema.insert(
+            "x-specta-enum-descriptions".to_string(),
+            Value::Object(descriptions),
+        );
+    }
 }

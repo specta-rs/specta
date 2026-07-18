@@ -1,8 +1,10 @@
-//! [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.3) schema exporter for
+//! [OpenAPI](https://spec.openapis.org/oas/) schema exporter for
 //! [Specta](specta).
 //!
 //! The exporter turns a [`specta::Types`] collection into a valid OpenAPI
-//! document whose reusable schemas live in `components.schemas`.
+//! document whose reusable schemas live in `components.schemas`. Documents
+//! target OpenAPI 3.1 by default; select [`OasVersion::V3_0`] to emit for
+//! OpenAPI 3.0 consumers.
 //!
 //! # Usage
 //!
@@ -33,16 +35,38 @@
 //! assert!(document.contains("User"));
 //! ```
 //!
+//! # Phase-aware operations
+//!
+//! Operations resolve their types per side: request bodies and parameters
+//! describe what the server deserializes, responses what it serializes.
+//! Under [`specta_serde::Format`] the phases are unified and nothing changes;
+//! export with [`specta_serde::PhasesFormat`] and a type whose serialize and
+//! deserialize shapes diverge - `#[serde(skip_serializing_if)]`, one-sided
+//! renames - references its own projection on each side, so both directions
+//! of the contract are stated exactly. Annotation-driven generators carry one
+//! schema per type and cannot make this distinction.
+//!
+//! # Generator compatibility
+//!
+//! Some lowerings exist for the toolchains that consume the document rather
+//! than for the specification: numeric schemas carry `format` hints, plain
+//! string enums compact to the `type: string, enum: [...]` form, and integer
+//! bounds beyond the signed 64-bit range are carried in `x-specta-*`
+//! extensions, since mainstream generators parse bounds into signed 64-bit
+//! integers and silently wrap anything wider.
+//!
 //! # OpenAPI 3.0 compatibility
 //!
-//! OpenAPI 3.0 uses an older, restricted JSON Schema dialect. The default
-//! [`SchemaMode::Strict`] returns an error for structural schema features which
-//! the specification cannot express. Opt into [`SchemaMode::Compatible`] to emit a useful
-//! approximation and retain the original constraints in `x-specta-*`
-//! extensions. This affects nullable references — an `Option<T>` over a named
-//! type, which OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with
-//! exact 64-bit integer bounds, null-only types, heterogeneous tuples,
-//! constrained map keys, and closed flattened intersections.
+//! OpenAPI 3.1's schema dialect is full JSON Schema, so every Specta shape is
+//! expressible in it. OpenAPI 3.0 uses an older, restricted dialect: under
+//! [`OasVersion::V3_0`] the default [`SchemaMode::Strict`] returns an error
+//! for structural schema features which that specification cannot express,
+//! and [`SchemaMode::Compatible`] emits a useful approximation instead,
+//! retaining the original constraints in `x-specta-*` extensions. This
+//! affects nullable references — an `Option<T>` over a named type, which
+//! OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with null-only
+//! types, heterogeneous tuples, constrained map keys, and closed flattened
+//! intersections.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -58,6 +82,5 @@ mod resolve;
 mod transform;
 
 pub use error::Error;
-pub use openapi::{OpenApi, OutputFormat, SchemaMode};
-pub use openapiv3::{Components, OpenAPI, ReferenceOr, Schema};
-pub use operation::{Method, Operation};
+pub use openapi::{OasVersion, OpenApi, OutputFormat, SchemaMode};
+pub use operation::{Method, Operation, Param};
