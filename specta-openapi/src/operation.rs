@@ -347,16 +347,21 @@ impl Operation {
         self
     }
 
-    /// Every type this operation references, with Rust's name for it.
-    pub(crate) fn referenced_types(&self) -> impl Iterator<Item = (&DataType, &'static str)> {
+    /// Every request-side type this operation references - the request body
+    /// and the parameters, the shapes the server deserializes.
+    pub(crate) fn request_types(&self) -> impl Iterator<Item = (&DataType, &'static str)> {
         self.request_body
             .iter()
-            .chain(
-                self.responses
-                    .iter()
-                    .filter_map(|response| response.body.as_ref()),
-            )
             .chain(self.parameters.iter().map(|parameter| &parameter.ty))
+            .map(|body| (&body.dt, body.type_name))
+    }
+
+    /// Every response-side type this operation references - the shapes the
+    /// server serializes.
+    pub(crate) fn response_types(&self) -> impl Iterator<Item = (&DataType, &'static str)> {
+        self.responses
+            .iter()
+            .filter_map(|response| response.body.as_ref())
             .map(|body| (&body.dt, body.type_name))
     }
 

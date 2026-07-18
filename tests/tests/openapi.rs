@@ -1376,3 +1376,117 @@ fn openapi_emits_string_formats_for_well_known_types() {
         );
     }
 }
+
+/// Operations resolve per phase: request bodies and parameters describe what
+/// the server deserializes, responses what it serializes. Under the unified
+/// format both sides are one component; under `PhasesFormat` a type whose
+/// phases diverge splits, and each side references its own projection.
+#[test]
+fn operations_are_phase_aware_under_phases_format() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct Draft {
+        id: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+    }
+
+    let operation = || {
+        Operation::post("/drafts")
+            .request_body::<Draft>()
+            .response::<Draft>(201, "Created")
+    };
+
+    let unified = OpenApi::default()
+        .operation(operation())
+        .export_document(&Types::default().register::<Draft>(), specta_serde::Format)
+        .expect("unified export");
+    let op = &unified["paths"]["/drafts"]["post"];
+    assert_eq!(
+        op["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Draft"
+    );
+    assert_eq!(
+        op["responses"]["201"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Draft"
+    );
+
+    let phased = OpenApi::default()
+        .operation(operation())
+        .export_document(
+            &Types::default().register::<Draft>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phased export");
+    let op = &phased["paths"]["/drafts"]["post"];
+    assert_eq!(
+        op["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Draft_Deserialize"
+    );
+    assert_eq!(
+        op["responses"]["201"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Draft_Serialize"
+    );
+
+    // The projections say different, individually true things about `note`:
+    // serialization omits it when `None` and never writes null; a client may
+    // send it absent, null, or a string.
+    let serialize = &phased["components"]["schemas"]["Draft_Serialize"];
+    let deserialize = &phased["components"]["schemas"]["Draft_Deserialize"];
+    assert_eq!(serialize["required"], serde_json::json!(["id"]));
+    assert_eq!(deserialize["required"], serde_json::json!(["id"]));
+    assert_eq!(serialize["properties"]["note"]["type"], "string");
+    assert!(
+        deserialize["properties"]["note"].get("anyOf").is_some()
+            || deserialize["properties"]["note"]["type"].is_array(),
+        "the deserialize projection should admit null: {}",
+        deserialize["properties"]["note"]
+    );
+}
+
+/// A plain `Option` field - no serde attributes at all - also splits per
+/// phase: serde always writes the key on the way out and accepts its absence
+/// on the way in, so the serialize projection lists it required-and-nullable
+/// while the deserialize projection drops it from `required`. Both statements
+/// are exactly true for their direction; a single-schema generator must pick
+/// one and be half-wrong.
+#[test]
+fn plain_option_fields_split_per_phase() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct Plain {
+        plain: Option<String>,
+        id: u32,
+    }
+
+    let phased = OpenApi::default()
+        .operation(
+            Operation::post("/p")
+                .request_body::<Plain>()
+                .response::<Plain>(201, "Created"),
+        )
+        .export_document(
+            &Types::default().register::<Plain>(),
+            specta_serde::PhasesFormat,
+        )
+        .expect("phased export");
+
+    let op = &phased["paths"]["/p"]["post"];
+    assert_eq!(
+        op["requestBody"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Plain_Deserialize"
+    );
+    assert_eq!(
+        op["responses"]["201"]["content"]["application/json"]["schema"]["$ref"],
+        "#/components/schemas/Plain_Serialize"
+    );
+    let schemas = &phased["components"]["schemas"];
+    assert_eq!(
+        schemas["Plain_Serialize"]["required"],
+        serde_json::json!(["plain", "id"])
+    );
+    assert_eq!(
+        schemas["Plain_Deserialize"]["required"],
+        serde_json::json!(["id"])
+    );
+}

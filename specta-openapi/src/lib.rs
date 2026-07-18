@@ -35,6 +35,17 @@
 //! assert!(document.contains("User"));
 //! ```
 //!
+//! # Phase-aware operations
+//!
+//! Operations resolve their types per side: request bodies and parameters
+//! describe what the server deserializes, responses what it serializes.
+//! Under [`specta_serde::Format`] the phases are unified and nothing changes;
+//! export with [`specta_serde::PhasesFormat`] and a type whose serialize and
+//! deserialize shapes diverge - `#[serde(skip_serializing_if)]`, one-sided
+//! renames - references its own projection on each side, so both directions
+//! of the contract are stated exactly. Annotation-driven generators carry one
+//! schema per type and cannot make this distinction.
+//!
 //! # Generator compatibility
 //!
 //! Some lowerings exist for the toolchains that consume the document rather

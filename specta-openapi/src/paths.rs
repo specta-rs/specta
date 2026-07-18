@@ -63,7 +63,7 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<Value, Error> {
             let content_type = response.content_type.as_deref().unwrap_or(JSON);
             object.insert(
                 "content".to_string(),
-                json!({ content_type: { "schema": schema_of(body, resolved)? } }),
+                json!({ content_type: { "schema": response_schema_of(body, resolved)? } }),
             );
         }
         responses.insert(response.status.to_string(), Value::Object(object));
@@ -96,7 +96,7 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<Value, Error> {
     }
     if let Some(body) = &operation.request_body {
         let mut media = Map::new();
-        media.insert("schema".to_string(), schema_of(body, resolved)?);
+        media.insert("schema".to_string(), request_schema_of(body, resolved)?);
         if let Some(example) = &operation.request_body_example {
             let example = example
                 .clone()
@@ -159,15 +159,28 @@ fn parameter(parameter: &crate::operation::Parameter, resolved: &Resolved) -> Re
     if let Some(example) = &parameter.example {
         object.insert("example".to_string(), example.clone());
     }
-    object.insert("schema".to_string(), schema_of(&parameter.ty, resolved)?);
+    object.insert(
+        "schema".to_string(),
+        request_schema_of(&parameter.ty, resolved)?,
+    );
     Ok(Value::Object(object))
 }
 
-/// What the exporter emitted for a declared type: a `$ref` when it has a
-/// component, its schema in place when it does not.
-fn schema_of(body: &Body, resolved: &Resolved) -> Result<Value, Error> {
+/// What the exporter emitted for a request-side type - a body or parameter,
+/// resolved through the deserialize phase: a `$ref` when it has a component,
+/// its schema in place when it does not.
+fn request_schema_of(body: &Body, resolved: &Resolved) -> Result<Value, Error> {
     resolved
-        .get(&body.dt)
+        .request(&body.dt)
+        .cloned()
+        .ok_or(Error::UnresolvedOperationTypes)
+}
+
+/// What the exporter emitted for a response-side type, resolved through the
+/// serialize phase.
+fn response_schema_of(body: &Body, resolved: &Resolved) -> Result<Value, Error> {
+    resolved
+        .response(&body.dt)
         .cloned()
         .ok_or(Error::UnresolvedOperationTypes)
 }

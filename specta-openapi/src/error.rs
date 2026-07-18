@@ -8,6 +8,10 @@ pub enum Error {
     #[error(transparent)]
     JsonSchema(#[from] specta_jsonschema::Error),
 
+    /// The format rejected the type collection.
+    #[error("format error: {0}")]
+    Format(#[from] specta::FormatError),
+
     /// A Specta shape cannot be represented exactly by OpenAPI 3.0.
     #[error(
         "OpenAPI 3.0 cannot represent {feature} exactly in component {component:?}. \
