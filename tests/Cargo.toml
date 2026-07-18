@@ -49,3 +49,6 @@ thiserror = "2.0.18"
 error-stack = { version = "0.8", default-features = false }
 bson = { version = "3", default-features = false, features = ["compat-3-0-0"] }
 uhlc = { version = "0.9", default-features = false }
+
+[dev-dependencies]
+jsonschema = { version = "0.48.1", default-features = false, features = ["resolve-file"] }

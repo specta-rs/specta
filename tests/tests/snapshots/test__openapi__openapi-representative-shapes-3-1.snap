@@ -81,9 +81,9 @@ expression: "serde_json::to_string_pretty(&document).expect(\"snapshot value sho
           "id": {
             "description": " Stable identifier.",
             "format": "int64",
-            "maximum": 18446744073709551615,
             "minimum": 0,
-            "type": "integer"
+            "type": "integer",
+            "x-specta-maximum": 18446744073709551615
           },
           "labels": {
             "additionalProperties": {
@@ -150,9 +150,9 @@ expression: "serde_json::to_string_pretty(&document).expect(\"snapshot value sho
           "id": {
             "description": " Stable identifier.",
             "format": "int64",
-            "maximum": 18446744073709551615,
             "minimum": 0,
-            "type": "integer"
+            "type": "integer",
+            "x-specta-maximum": 18446744073709551615
           },
           "labels": {
             "additionalProperties": {

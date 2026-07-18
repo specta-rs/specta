@@ -552,24 +552,29 @@ fn openapi_3_1_preserves_json_schema_shapes() {
     );
 }
 
-/// Schema bounds are plain JSON numbers, so 64-bit integer bounds are stated
-/// exactly in either schema mode — the spec has no integer-width limit.
+/// Signed 64-bit bounds are stated exactly; bounds beyond that range are
+/// carried in extensions in every dialect and mode, because mainstream
+/// generators parse bounds into signed 64-bit integers and silently wrap
+/// anything wider.
 #[test]
-fn openapi_emits_exact_wide_integer_bounds() {
+fn openapi_carries_wide_integer_bounds_in_extensions() {
     let types = Types::default().register::<WideIntegers>();
-    for mode in [SchemaMode::Strict, SchemaMode::Compatible] {
-        let document = OpenApi::default()
-            .schema_mode(mode)
-            .export_document(&types, specta_serde::Format)
-            .expect("64-bit integer bounds are exactly representable");
-        let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
+    for version in [OasVersion::V3_0, OasVersion::V3_1] {
+        for mode in [SchemaMode::Strict, SchemaMode::Compatible] {
+            let document = OpenApi::default()
+                .oas_version(version)
+                .schema_mode(mode)
+                .export_document(&types, specta_serde::Format)
+                .expect("wide integer bounds should always export");
+            let properties = &document["components"]["schemas"]["WideIntegers"]["properties"];
 
-        assert_eq!(properties["signed"]["maximum"], i64::MAX);
-        assert_eq!(properties["signed"]["minimum"], i64::MIN);
-        assert!(properties["signed"].get("x-specta-maximum").is_none());
-        assert_eq!(properties["unsigned"]["maximum"], u64::MAX);
-        assert!(properties["unsigned"].get("x-specta-maximum").is_none());
-        assert_eq!(properties["unsigned"]["minimum"], 0.0);
+            assert_eq!(properties["signed"]["maximum"], i64::MAX);
+            assert_eq!(properties["signed"]["minimum"], i64::MIN);
+            assert!(properties["signed"].get("x-specta-maximum").is_none());
+            assert!(properties["unsigned"].get("maximum").is_none());
+            assert_eq!(properties["unsigned"]["x-specta-maximum"], u64::MAX);
+            assert_eq!(properties["unsigned"]["minimum"], 0.0);
+        }
     }
 }
 
@@ -1154,4 +1159,97 @@ fn content_types_security_and_document_metadata() {
         operation["security"],
         serde_json::json!([{ "api_key": [] }, {}])
     );
+}
+
+/// Every emitted document validates against the official OAS meta-schema for
+/// its declared version, vendored from spec.openapis.org (the 3.0 line's
+/// 2024-10-18 iteration and the 3.1 line's 2025-11-23 iteration; per the
+/// spec, the latest iteration within a minor line covers all its patches).
+#[test]
+fn openapi_documents_validate_against_the_official_meta_schemas() {
+    let meta_31: serde_json::Value =
+        serde_json::from_str(include_str!("../schemas/openapi-3.1-2025-11-23.json"))
+            .expect("vendored 3.1 meta-schema parses");
+    let meta_30: serde_json::Value =
+        serde_json::from_str(include_str!("../schemas/openapi-3.0-2024-10-18.json"))
+            .expect("vendored 3.0 meta-schema parses");
+    let validator_31 = jsonschema::validator_for(&meta_31).expect("3.1 meta-schema compiles");
+    let validator_30 = jsonschema::validator_for(&meta_30).expect("3.0 meta-schema compiles");
+
+    let full_surface = |version: OasVersion| {
+        OpenApi::default()
+            .oas_version(version)
+            .title("Meta-schema conformance")
+            .version("1.0.0")
+            .description("Exercises the exporter's whole document surface.")
+            .contact("Specta", "https://specta.dev")
+            .license_spdx("MIT", "MIT")
+            .server_described("https://api.example.com", "Production")
+            .tag("recipes", "Recipe endpoints")
+            .bearer_security_scheme("api_key", "sk_...")
+            .operation(
+                Operation::get("/recipes/{slug}")
+                    .operation_id("getRecipe")
+                    .tag("recipes")
+                    .summary("Fetch one recipe")
+                    .path_param::<String>("slug")
+                    .parameter(
+                        specta_openapi::Param::query::<u32>("limit")
+                            .description("Max results")
+                            .example(serde_json::json!(10)),
+                    )
+                    .header_param::<String>("x-request-id")
+                    .response::<Recipe>(200, "The recipe")
+                    .response_as::<ApiError>(404, "No such recipe", "application/problem+json")
+                    .security([("api_key", Vec::new())])
+                    .security_optional(),
+            )
+            .operation(
+                Operation::post("/recipes")
+                    .operation_id("createRecipe")
+                    .tag("recipes")
+                    .request_body::<NewRecipe>()
+                    .response::<Recipe>(201, "Created")
+                    .empty_response(204, "Nothing to do"),
+            )
+            .export_document(&recipe_types(), specta_serde::Format)
+            .expect("full-surface document exports")
+    };
+
+    let (types, _) = crate::types();
+    let corpus_31 = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .expect("3.1 corpus exports");
+    let corpus_30 = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
+        .schema_mode(SchemaMode::Compatible)
+        .export_document(&types, specta_serde::Format)
+        .expect("3.0 corpus exports");
+
+    let cases = [
+        (
+            "3.1 full-surface",
+            full_surface(OasVersion::V3_1),
+            &validator_31,
+        ),
+        (
+            "3.0 full-surface",
+            full_surface(OasVersion::V3_0),
+            &validator_30,
+        ),
+        ("3.1 corpus", corpus_31, &validator_31),
+        ("3.0 corpus", corpus_30, &validator_30),
+    ];
+    for (label, document, validator) in cases {
+        let errors: Vec<String> = validator
+            .iter_errors(&document)
+            .map(|error| format!("  {} at {}", error, error.instance_path()))
+            .take(8)
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "{label} document violates its meta-schema:\n{}",
+            errors.join("\n")
+        );
+    }
 }

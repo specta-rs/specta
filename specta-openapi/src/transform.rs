@@ -182,6 +182,9 @@ fn transform_object(
 
     compact_string_enum(&mut schema);
 
+    preserve_wide_integer_bound(&mut schema, "minimum");
+    preserve_wide_integer_bound(&mut schema, "maximum");
+
     if version == OasVersion::V3_0 && schema.get("type").and_then(Value::as_str) == Some("null") {
         if mode == SchemaMode::Strict {
             return Err(unsupported(component, "null-only types"));
@@ -288,6 +291,24 @@ fn transform_object(
         }
     }
     Ok(Value::Object(schema))
+}
+
+/// Bounds beyond the signed 64-bit range are carried in `x-specta-*`
+/// extensions in both dialects. Mainstream generator toolchains parse bounds
+/// into signed 64-bit integers, and a bound that silently wraps -
+/// openapi-generator renders a `u64::MAX` maximum as `maximum: -1` - is worse
+/// than one carried out of band. The bound such values state is vacuous as a
+/// constraint, so nothing enforceable is lost.
+fn preserve_wide_integer_bound(schema: &mut Map<String, Value>, keyword: &str) {
+    let Some(Value::Number(bound)) = schema.get(keyword) else {
+        return;
+    };
+    if bound.as_i64().is_some() || bound.as_u64().is_none() {
+        return;
+    }
+    if let Some(bound) = schema.remove(keyword) {
+        schema.insert(format!("x-specta-{keyword}"), bound);
+    }
 }
 
 fn move_unsupported_keyword(

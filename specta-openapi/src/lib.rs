@@ -35,6 +35,15 @@
 //! assert!(document.contains("User"));
 //! ```
 //!
+//! # Generator compatibility
+//!
+//! Some lowerings exist for the toolchains that consume the document rather
+//! than for the specification: numeric schemas carry `format` hints, plain
+//! string enums compact to the `type: string, enum: [...]` form, and integer
+//! bounds beyond the signed 64-bit range are carried in `x-specta-*`
+//! extensions, since mainstream generators parse bounds into signed 64-bit
+//! integers and silently wrap anything wider.
+//!
 //! # OpenAPI 3.0 compatibility
 //!
 //! OpenAPI 3.1's schema dialect is full JSON Schema, so every Specta shape is

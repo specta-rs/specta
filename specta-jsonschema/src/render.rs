@@ -694,7 +694,13 @@ impl<'a> Renderer<'a> {
                     let field_path = format!("{path}.{name}");
                     let mut schema = self.render_datatype(ty, generics, &field_path, depth + 1)?;
                     self.apply_metadata(&mut schema, None, &field.docs, field.deprecated.as_ref());
-                    properties.insert(name.to_string(), schema);
+                    // A repeated field name overwrites its property, so its
+                    // `required` entry must not repeat either: `required`
+                    // demands unique items in every JSON Schema dialect.
+                    if properties.insert(name.to_string(), schema).is_some() {
+                        required
+                            .retain(|existing: &Value| existing.as_str() != Some(name.as_ref()));
+                    }
                     if !field.optional {
                         required.push(string(name.as_ref()));
                     }

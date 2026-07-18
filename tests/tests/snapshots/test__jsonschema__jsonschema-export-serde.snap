@@ -4675,7 +4675,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "&'static [i32]",
         "&'static [i32; 3]",
         "[i32; 3]",
-        "Vec<MyEnum>",
         "&'static [MyEnum]",
         "&'static [MyEnum; 6]",
         "[MyEnum; 2]",
@@ -4889,7 +4888,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "NamedConstGenericContainer",
         "InlineConstGenericContainer",
         "InlineRecursiveConstGenericContainer",
-        "TestCollectionRegister",
         "TestCollectionRegister"
       ],
       "title": "Primitives",

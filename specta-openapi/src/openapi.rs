@@ -182,7 +182,9 @@ impl OpenApi {
         self
     }
 
-    /// Configure the API license with its SPDX identifier.
+    /// Configure the API license with its SPDX identifier. The `identifier`
+    /// field is OpenAPI 3.1's; under [`OasVersion::V3_0`] the name alone is
+    /// emitted.
     pub fn license_spdx(mut self, name: impl Into<String>, identifier: impl Into<String>) -> Self {
         self.license = Some(License {
             name: name.into(),
@@ -327,11 +329,13 @@ impl OpenApi {
         if let Some(license) = &self.license {
             info.insert(
                 "license".to_string(),
-                match &license.identifier {
-                    Some(identifier) => {
+                match (&license.identifier, self.oas_version) {
+                    (Some(identifier), OasVersion::V3_1) => {
                         json!({ "name": license.name, "identifier": identifier })
                     }
-                    None => json!({ "name": license.name }),
+                    // `identifier` is an OpenAPI 3.1 field; 3.0's license
+                    // object carries the name alone.
+                    _ => json!({ "name": license.name }),
                 },
             );
         }
