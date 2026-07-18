@@ -75,6 +75,12 @@ struct Contact {
     url: String,
 }
 
+#[derive(Debug, Clone)]
+struct License {
+    name: String,
+    identifier: Option<String>,
+}
+
 /// OpenAPI schema exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -89,6 +95,7 @@ pub struct OpenApi {
     servers: Vec<Server>,
     tags: Vec<Tag>,
     contact: Option<Contact>,
+    license: Option<License>,
     security_schemes: BTreeMap<String, Value>,
 }
 
@@ -105,6 +112,7 @@ impl Default for OpenApi {
             servers: Vec::new(),
             tags: Vec::new(),
             contact: None,
+            license: None,
             security_schemes: BTreeMap::new(),
         }
     }
@@ -161,6 +169,24 @@ impl OpenApi {
         self.contact = Some(Contact {
             name: name.into(),
             url: url.into(),
+        });
+        self
+    }
+
+    /// Configure the API license in the generated document's `info` object.
+    pub fn license(mut self, name: impl Into<String>) -> Self {
+        self.license = Some(License {
+            name: name.into(),
+            identifier: None,
+        });
+        self
+    }
+
+    /// Configure the API license with its SPDX identifier.
+    pub fn license_spdx(mut self, name: impl Into<String>, identifier: impl Into<String>) -> Self {
+        self.license = Some(License {
+            name: name.into(),
+            identifier: Some(identifier.into()),
         });
         self
     }
@@ -296,6 +322,17 @@ impl OpenApi {
             info.insert(
                 "contact".to_string(),
                 json!({ "name": contact.name, "url": contact.url }),
+            );
+        }
+        if let Some(license) = &self.license {
+            info.insert(
+                "license".to_string(),
+                match &license.identifier {
+                    Some(identifier) => {
+                        json!({ "name": license.name, "identifier": identifier })
+                    }
+                    None => json!({ "name": license.name }),
+                },
             );
         }
 

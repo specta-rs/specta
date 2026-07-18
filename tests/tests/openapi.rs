@@ -1118,6 +1118,7 @@ fn content_types_security_and_document_metadata() {
         .version("1.0.0")
         .server_described("https://api.orr.sh", "Production")
         .contact("Orrery", "https://orreryhq.com")
+        .license_spdx("Apache-2.0", "Apache-2.0")
         .tag("weather", "Weather intelligence")
         .bearer_security_scheme("api_key", "opaque")
         .operation(
@@ -1139,6 +1140,7 @@ fn content_types_security_and_document_metadata() {
     assert_eq!(json["servers"][0]["url"], "https://api.orr.sh");
     assert_eq!(json["servers"][0]["description"], "Production");
     assert_eq!(json["info"]["contact"]["name"], "Orrery");
+    assert_eq!(json["info"]["license"]["identifier"], "Apache-2.0");
     assert_eq!(json["tags"][0]["description"], "Weather intelligence");
     assert_eq!(
         json["components"]["securitySchemes"]["api_key"]["scheme"],
