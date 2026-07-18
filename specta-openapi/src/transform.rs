@@ -3,12 +3,13 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Value, json};
 use specta::{Format, Types};
 
-use crate::{Error, SchemaMode};
+use crate::{Error, OasVersion, SchemaMode};
 
 pub(crate) fn components(
     types: &Types,
     format: impl Format,
     mode: SchemaMode,
+    version: OasVersion,
 ) -> Result<BTreeMap<String, Value>, Error> {
     let mut schema = specta_jsonschema::JsonSchema::default()
         // OpenAPI generators map numeric formats to language types.
@@ -41,7 +42,10 @@ pub(crate) fn components(
             .cloned()
             .unwrap_or_else(|| component_name(&name));
         rewrite_component_refs(&mut schema, &references);
-        let schema = component_schema(transform(schema, &component_name, mode)?);
+        let mut schema = transform(schema, &component_name, mode, version)?;
+        if version == OasVersion::V3_0 {
+            schema = component_schema(schema);
+        }
         components.insert(component_name, schema);
     }
     Ok(components)
@@ -115,17 +119,23 @@ fn component_schema(value: Value) -> Value {
     Value::Object(schema)
 }
 
-fn transform(value: Value, component: &str, mode: SchemaMode) -> Result<Value, Error> {
+fn transform(
+    value: Value,
+    component: &str,
+    mode: SchemaMode,
+    version: OasVersion,
+) -> Result<Value, Error> {
     Ok(match value {
-        Value::Bool(true) => json!({}),
-        Value::Bool(false) => json!({ "not": {} }),
+        // JSON Schema's boolean schemas are valid 3.1; 3.0 requires objects.
+        Value::Bool(true) if version == OasVersion::V3_0 => json!({}),
+        Value::Bool(false) if version == OasVersion::V3_0 => json!({ "not": {} }),
         Value::Array(values) => Value::Array(
             values
                 .into_iter()
-                .map(|value| transform(value, component, mode))
+                .map(|value| transform(value, component, mode, version))
                 .collect::<Result<_, _>>()?,
         ),
-        Value::Object(schema) => transform_object(schema, component, mode)?,
+        Value::Object(schema) => transform_object(schema, component, mode, version)?,
         value => value,
     })
 }
@@ -134,25 +144,28 @@ fn transform_object(
     mut schema: Map<String, Value>,
     component: &str,
     mode: SchemaMode,
+    version: OasVersion,
 ) -> Result<Value, Error> {
     schema.remove("$schema");
     schema.remove("$comment");
-    move_unsupported_keyword(
-        &mut schema,
-        "propertyNames",
-        "x-specta-property-names",
-        "constrained map keys",
-        component,
-        mode,
-    )?;
-    move_unsupported_keyword(
-        &mut schema,
-        "unevaluatedProperties",
-        "x-specta-unevaluated-properties",
-        "closed flattened intersections",
-        component,
-        mode,
-    )?;
+    if version == OasVersion::V3_0 {
+        move_unsupported_keyword(
+            &mut schema,
+            "propertyNames",
+            "x-specta-property-names",
+            "constrained map keys",
+            component,
+            mode,
+        )?;
+        move_unsupported_keyword(
+            &mut schema,
+            "unevaluatedProperties",
+            "x-specta-unevaluated-properties",
+            "closed flattened intersections",
+            component,
+            mode,
+        )?;
+    }
     schema.remove("additionalItems");
 
     if let Some(Value::String(reference)) = schema.get_mut("$ref") {
@@ -161,13 +174,15 @@ fn transform_object(
             .replacen("#/definitions/", "#/components/schemas/", 1);
     }
 
-    if let Some(constant) = schema.remove("const") {
+    if version == OasVersion::V3_0
+        && let Some(constant) = schema.remove("const")
+    {
         schema.insert("enum".to_string(), Value::Array(vec![constant]));
     }
 
     compact_string_enum(&mut schema);
 
-    if schema.get("type").and_then(Value::as_str) == Some("null") {
+    if version == OasVersion::V3_0 && schema.get("type").and_then(Value::as_str) == Some("null") {
         if mode == SchemaMode::Strict {
             return Err(unsupported(component, "null-only types"));
         }
@@ -178,77 +193,99 @@ fn transform_object(
         schema.insert("x-specta-type".to_string(), Value::String("null".into()));
     }
 
-    // Collapse nullable unions before recursively transforming their branches.
-    // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
-    // it can be represented by OpenAPI 3.0's `nullable` keyword.
-    while collapse_nullable_any_of(&mut schema) {}
+    if version == OasVersion::V3_0 {
+        // Collapse nullable unions before recursively transforming their branches.
+        // Otherwise strict mode rejects the raw `{ "type": "null" }` branch before
+        // it can be represented by OpenAPI 3.0's `nullable` keyword.
+        while collapse_nullable_any_of(&mut schema) {}
 
-    let prefix_items = schema.remove("prefixItems").or_else(|| {
-        schema
-            .get("items")
-            .is_some_and(Value::is_array)
-            .then(|| schema.remove("items"))
-            .flatten()
-    });
-    if let Some(Value::Array(items)) = prefix_items {
-        let heterogeneous = items
-            .first()
-            .is_some_and(|first| items.iter().skip(1).any(|item| item != first));
-        if heterogeneous && mode == SchemaMode::Strict {
-            return Err(unsupported(component, "heterogeneous positional tuples"));
+        let prefix_items = schema.remove("prefixItems").or_else(|| {
+            schema
+                .get("items")
+                .is_some_and(Value::is_array)
+                .then(|| schema.remove("items"))
+                .flatten()
+        });
+        if let Some(Value::Array(items)) = prefix_items {
+            let heterogeneous = items
+                .first()
+                .is_some_and(|first| items.iter().skip(1).any(|item| item != first));
+            if heterogeneous && mode == SchemaMode::Strict {
+                return Err(unsupported(component, "heterogeneous positional tuples"));
+            }
+            let mut items = items
+                .into_iter()
+                .map(|value| transform(value, component, mode, version))
+                .collect::<Result<Vec<_>, _>>()?;
+            if heterogeneous {
+                schema.insert(
+                    "x-specta-prefix-items".to_string(),
+                    Value::Array(items.clone()),
+                );
+            }
+            let item = match items.len() {
+                0 => json!({}),
+                1 => items.pop().unwrap_or_else(|| json!({})),
+                _ if heterogeneous => json!({ "oneOf": items }),
+                _ => items.pop().unwrap_or_else(|| json!({})),
+            };
+            schema.insert("items".to_string(), item);
         }
-        let mut items = items
-            .into_iter()
-            .map(|value| transform(value, component, mode))
-            .collect::<Result<Vec<_>, _>>()?;
-        if heterogeneous {
-            schema.insert(
-                "x-specta-prefix-items".to_string(),
-                Value::Array(items.clone()),
-            );
-        }
-        let item = match items.len() {
-            0 => json!({}),
-            1 => items.pop().unwrap_or_else(|| json!({})),
-            _ if heterogeneous => json!({ "oneOf": items }),
-            _ => items.pop().unwrap_or_else(|| json!({})),
-        };
-        schema.insert("items".to_string(), item);
+    } else if schema.get("items").is_some_and(Value::is_array)
+        && !schema.contains_key("prefixItems")
+        && let Some(items) = schema.remove("items")
+    {
+        // 2020-12 spells positional items `prefixItems`.
+        schema.insert("prefixItems".to_string(), items);
     }
 
     for key in ["items", "not"] {
         if let Some(value) = schema.get_mut(key) {
-            *value = transform(value.take(), component, mode)?;
+            *value = transform(value.take(), component, mode, version)?;
         }
     }
     if let Some(value @ Value::Object(_)) = schema.get_mut("additionalProperties") {
-        *value = transform(value.take(), component, mode)?;
+        *value = transform(value.take(), component, mode, version)?;
     }
     for key in ["properties"] {
         if let Some(Value::Object(values)) = schema.get_mut(key) {
             for value in values.values_mut() {
-                *value = transform(value.take(), component, mode)?;
+                *value = transform(value.take(), component, mode, version)?;
             }
         }
     }
     for key in ["oneOf", "allOf", "anyOf"] {
         if let Some(Value::Array(values)) = schema.get_mut(key) {
             for value in values {
-                *value = transform(value.take(), component, mode)?;
+                *value = transform(value.take(), component, mode, version)?;
+            }
+        }
+    }
+    if version == OasVersion::V3_1 {
+        if let Some(Value::Array(values)) = schema.get_mut("prefixItems") {
+            for value in values {
+                *value = transform(value.take(), component, mode, version)?;
+            }
+        }
+        for key in ["propertyNames", "unevaluatedProperties"] {
+            if let Some(value) = schema.get_mut(key) {
+                *value = transform(value.take(), component, mode, version)?;
             }
         }
     }
 
-    collapse_nullable_any_of(&mut schema);
-    wrap_reference_with_siblings(&mut schema);
-    if mode == SchemaMode::Strict
-        && schema.get("nullable") == Some(&Value::Bool(true))
-        && !schema.contains_key("type")
-    {
-        return Err(unsupported(
-            component,
-            "nullable references or composed schemas",
-        ));
+    if version == OasVersion::V3_0 {
+        collapse_nullable_any_of(&mut schema);
+        wrap_reference_with_siblings(&mut schema);
+        if mode == SchemaMode::Strict
+            && schema.get("nullable") == Some(&Value::Bool(true))
+            && !schema.contains_key("type")
+        {
+            return Err(unsupported(
+                component,
+                "nullable references or composed schemas",
+            ));
+        }
     }
     Ok(Value::Object(schema))
 }

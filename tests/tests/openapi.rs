@@ -5,7 +5,7 @@ use specta::{
     Type, Types,
     datatype::{DataType, Field, NamedDataType, Primitive, Struct},
 };
-use specta_openapi::{OpenApi, Operation, OutputFormat, SchemaMode};
+use specta_openapi::{OasVersion, OpenApi, Operation, OutputFormat, SchemaMode};
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -146,16 +146,17 @@ enum OverlappingUntagged {
 #[test]
 fn openapi_exports_full_type_corpus() {
     let (types, _) = crate::types();
+
+    // OpenAPI 3.1's dialect is full JSON Schema, so the whole corpus exports
+    // under the default strict mode with nothing approximated.
     let output = OpenApi::default()
         .title("Specta corpus")
         .version("1.0.0")
-        .schema_mode(SchemaMode::Compatible)
         .export(&types, specta_serde::Format)
-        .expect("the shared type corpus should be representable in OpenAPI");
-
+        .expect("the shared type corpus should be representable in OpenAPI 3.1");
     let document: serde_json::Value =
         serde_json::from_str(&output).expect("output should be a valid OpenAPI document");
-    assert_eq!(document["openapi"], "3.0.3");
+    assert_eq!(document["openapi"], "3.1.0");
     assert!(
         document["components"]["schemas"]
             .as_object()
@@ -163,6 +164,19 @@ fn openapi_exports_full_type_corpus() {
             .len()
             > 20
     );
+
+    // OpenAPI 3.0's restricted dialect still carries the corpus in
+    // compatible mode.
+    let output = OpenApi::default()
+        .title("Specta corpus")
+        .version("1.0.0")
+        .oas_version(OasVersion::V3_0)
+        .schema_mode(SchemaMode::Compatible)
+        .export(&types, specta_serde::Format)
+        .expect("the shared type corpus should be representable in OpenAPI 3.0");
+    let document: serde_json::Value =
+        serde_json::from_str(&output).expect("output should be a valid OpenAPI document");
+    assert_eq!(document["openapi"], "3.0.3");
 }
 
 #[test]
@@ -193,6 +207,7 @@ fn openapi_preserves_shapes_metadata_and_generics() {
         .register::<ReferencedField>()
         .register::<OverlappingUntagged>();
     let document = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Compatible)
         .export_document(&types, specta_serde::Format)
         .expect("representative shapes should export");
@@ -249,6 +264,24 @@ fn openapi_preserves_shapes_metadata_and_generics() {
         "openapi-representative-shapes",
         serde_json::to_string_pretty(&value).expect("snapshot value should serialize")
     );
+
+    // The same shapes under the default 3.1 dialect, where JSON Schema
+    // keywords survive verbatim and strict mode has nothing to reject.
+    let document = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .expect("representative shapes should export as OpenAPI 3.1");
+    assert_eq!(document["openapi"], "3.1.0");
+    let schemas = &document["components"]["schemas"];
+    assert!(
+        schemas["ApiModel_String"]["properties"]["optionalValue"]
+            .get("nullable")
+            .is_none(),
+        "3.1 has no `nullable` keyword"
+    );
+    insta::assert_snapshot!(
+        "openapi-representative-shapes-3-1",
+        serde_json::to_string_pretty(&document).expect("snapshot value should serialize")
+    );
 }
 
 #[test]
@@ -271,6 +304,7 @@ fn openapi_materializes_directly_registered_generic_root() {
 #[test]
 fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     let optional = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export_document(
             &Types::default().register::<StrictOptionalPrimitive>(),
             specta_serde::Format,
@@ -294,6 +328,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     );
 
     let homogeneous = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export_document(
             &Types::default().register::<StrictHomogeneousTuple>(),
             specta_serde::Format,
@@ -305,12 +340,14 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert_eq!(homogeneous["maxItems"], 2);
 
     OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export(
             &Types::default().register::<StringMap>(),
             specta_serde::Format,
         )
         .expect("ordinary string-key maps are exactly representable");
     OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export(
             &Types::default().register::<NamedStringMap>(),
             specta_serde::Format,
@@ -318,6 +355,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
         .expect("transparent string-newtype map keys are exactly representable");
 
     let error = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Strict)
         .export(
             &Types::default().register::<StrictTuple>(),
@@ -331,6 +369,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     );
 
     let compatible = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Compatible)
         .export_document(
             &Types::default().register::<StrictTuple>(),
@@ -345,6 +384,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     );
 
     let map_error = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Strict)
         .export(
             &Types::default().register::<StrictMap>(),
@@ -354,6 +394,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert!(map_error.to_string().contains("constrained map keys"));
 
     let enum_map = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Compatible)
         .export_document(
             &Types::default().register::<EnumMap>(),
@@ -366,6 +407,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     );
 
     let null_error = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export(
             &Types::default().register::<StrictUnit>(),
             specta_serde::Format,
@@ -374,6 +416,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert!(null_error.to_string().contains("null-only types"));
 
     let compatible_unit = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Compatible)
         .export_document(
             &Types::default().register::<StrictUnit>(),
@@ -388,6 +431,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     assert_eq!(compatible_unit["x-specta-type"], "null");
 
     let flattened = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export_document(
             &Types::default().register::<StrictFlattened>(),
             specta_serde::Format,
@@ -401,6 +445,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
     // `Option<T>` over a named type is the most common shape strict mode rejects: OpenAPI 3.0
     // cannot mark a `$ref` nullable.
     let reference_error = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .export_document(
             &Types::default().register::<StrictOptionalReference>(),
             specta_serde::Format,
@@ -412,6 +457,7 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             .contains("nullable references or composed schemas")
     );
     let compatible_reference = OpenApi::default()
+        .oas_version(OasVersion::V3_0)
         .schema_mode(SchemaMode::Compatible)
         .export_document(
             &Types::default().register::<StrictOptionalReference>(),
@@ -425,13 +471,85 @@ fn openapi_strict_mode_rejects_lossy_openapi_3_shapes() {
             .is_some()
     );
 
-    // Strict is the default, so every rejection names the way out.
+    // Strict is the default, so every rejection names both ways out: the
+    // compatible approximation and the dialect that expresses the shape.
     for error in [&error, &map_error, &null_error, &reference_error] {
         assert!(
             error.to_string().contains("SchemaMode::Compatible"),
             "strict-mode error should point at the escape hatch: {error}"
         );
+        assert!(
+            error.to_string().contains("OasVersion::V3_1"),
+            "strict-mode error should point at the 3.1 dialect: {error}"
+        );
     }
+}
+
+/// Under the default OpenAPI 3.1 dialect the JSON Schema keywords survive
+/// verbatim, so every shape strict mode rejects for 3.0 exports untouched.
+#[test]
+fn openapi_3_1_preserves_json_schema_shapes() {
+    let unit = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictUnit>(),
+            specta_serde::Format,
+        )
+        .expect("a null-only type is a legal 3.1 schema");
+    let unit = &unit["components"]["schemas"]["StrictUnit"];
+    assert_eq!(unit["type"], "null");
+    assert!(unit.get("nullable").is_none());
+    assert!(unit.get("x-specta-type").is_none());
+
+    let reference = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictOptionalReference>(),
+            specta_serde::Format,
+        )
+        .expect("a nullable reference is a legal 3.1 schema");
+    let value =
+        &reference["components"]["schemas"]["StrictOptionalReference"]["properties"]["value"];
+    let members = value["anyOf"]
+        .as_array()
+        .expect("Option<Named> should stay a union");
+    assert!(
+        members
+            .iter()
+            .any(|member| member["type"] == "null" || member.get("type").is_none()),
+        "the null branch should survive: {value}"
+    );
+    assert!(value.get("nullable").is_none());
+    assert!(value.get("x-specta-nullable").is_none());
+
+    let tuple = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictTuple>(),
+            specta_serde::Format,
+        )
+        .expect("a heterogeneous tuple is a legal 3.1 schema");
+    let tuple = &tuple["components"]["schemas"]["StrictTuple"];
+    assert_eq!(tuple["prefixItems"].as_array().map(Vec::len), Some(2));
+    assert!(tuple.get("x-specta-prefix-items").is_none());
+
+    let map = OpenApi::default()
+        .export_document(
+            &Types::default().register::<StrictMap>(),
+            specta_serde::Format,
+        )
+        .expect("constrained map keys are a legal 3.1 schema");
+    let map = &map["components"]["schemas"]["StrictMap"];
+    assert!(map.get("propertyNames").is_some());
+    assert!(map.get("x-specta-property-names").is_none());
+
+    let enum_map = OpenApi::default()
+        .export_document(
+            &Types::default().register::<EnumMap>(),
+            specta_serde::Format,
+        )
+        .expect("enum-keyed maps are a legal 3.1 schema");
+    assert_eq!(
+        enum_map["components"]["schemas"]["EnumMap"]["propertyNames"]["$ref"],
+        "#/components/schemas/EnumKey"
+    );
 }
 
 /// Schema bounds are plain JSON numbers, so 64-bit integer bounds are stated
@@ -508,7 +626,7 @@ fn openapi_supports_yaml_export_to_and_document_merging() {
         .expect("YAML export should succeed");
     let parsed: serde_json::Value =
         serde_yaml::from_str(&yaml).expect("YAML should be a valid OpenAPI document");
-    assert_eq!(parsed["openapi"], "3.0.3");
+    assert_eq!(parsed["openapi"], "3.1.0");
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target")

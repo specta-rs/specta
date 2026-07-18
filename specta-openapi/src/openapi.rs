@@ -5,7 +5,38 @@ use specta::{Format, Types};
 
 use crate::{Error, operation::Operation, resolve::resolve};
 
+/// OpenAPI Specification version of the emitted document.
+///
+/// OpenAPI 3.1's schema dialect is full JSON Schema, so every Specta shape is
+/// expressible in it and [`SchemaMode`] has no effect. OpenAPI 3.0 uses an
+/// older, restricted dialect whose unrepresentable shapes [`SchemaMode`]
+/// governs. Patch digits carry no meaning of their own — tooling is told to
+/// ignore them — so each variant emits the version string its consumers have
+/// seen most.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OasVersion {
+    /// OpenAPI 3.0, emitted as `3.0.3`, for consumers that predate 3.1.
+    V3_0,
+    /// OpenAPI 3.1, emitted as `3.1.0`.
+    #[default]
+    V3_1,
+}
+
+impl OasVersion {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            OasVersion::V3_0 => "3.0.3",
+            OasVersion::V3_1 => "3.1.0",
+        }
+    }
+}
+
 /// How shapes unsupported by OpenAPI 3.0's schema dialect are handled.
+///
+/// Applies to [`OasVersion::V3_0`] alone: OpenAPI 3.1's dialect is full JSON
+/// Schema, where every Specta shape is expressible, so under it both modes
+/// emit the same document.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SchemaMode {
     /// Return an error for unsupported structural OpenAPI 3.0 schema features.
@@ -44,7 +75,7 @@ struct Contact {
     url: String,
 }
 
-/// OpenAPI 3.0 schema exporter.
+/// OpenAPI schema exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct OpenApi {
@@ -52,6 +83,7 @@ pub struct OpenApi {
     version: Cow<'static, str>,
     description: Option<Cow<'static, str>>,
     output_format: OutputFormat,
+    oas_version: OasVersion,
     schema_mode: SchemaMode,
     operations: Vec<Operation>,
     servers: Vec<Server>,
@@ -67,6 +99,7 @@ impl Default for OpenApi {
             version: Cow::Borrowed("0.0.0"),
             description: None,
             output_format: OutputFormat::Json,
+            oas_version: OasVersion::default(),
             schema_mode: SchemaMode::Strict,
             operations: Vec::new(),
             servers: Vec::new(),
@@ -174,6 +207,13 @@ impl OpenApi {
         self
     }
 
+    /// Configure the OpenAPI Specification version of the emitted document.
+    /// Documents target OpenAPI 3.1 unless told otherwise; see [`OasVersion`].
+    pub fn oas_version(mut self, oas_version: OasVersion) -> Self {
+        self.oas_version = oas_version;
+        self
+    }
+
     /// Configure whether OpenAPI 3.0-incompatible shapes are approximated or
     /// rejected. See [`SchemaMode`].
     pub fn schema_mode(mut self, schema_mode: SchemaMode) -> Self {
@@ -219,7 +259,13 @@ impl OpenApi {
 
     /// Export the supplied types as a complete OpenAPI document, as JSON.
     pub fn export_document(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
-        let (schemas, resolved) = resolve(types, &self.operations, format, self.schema_mode)?;
+        let (schemas, resolved) = resolve(
+            types,
+            &self.operations,
+            format,
+            self.schema_mode,
+            self.oas_version,
+        )?;
         let paths = if self.operations.is_empty() {
             Value::Object(Map::new())
         } else {
@@ -254,7 +300,7 @@ impl OpenApi {
         }
 
         let mut document = Map::new();
-        document.insert("openapi".to_string(), json!("3.0.3"));
+        document.insert("openapi".to_string(), json!(self.oas_version.as_str()));
         document.insert("info".to_string(), Value::Object(info));
         if !self.servers.is_empty() {
             document.insert(
@@ -295,7 +341,7 @@ impl OpenApi {
         types: &Types,
         format: impl Format,
     ) -> Result<BTreeMap<String, Value>, Error> {
-        crate::transform::components(types, format, self.schema_mode)
+        crate::transform::components(types, format, self.schema_mode, self.oas_version)
     }
 
     /// Add exported schemas to an existing document without replacing any

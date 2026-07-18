@@ -12,7 +12,8 @@ pub enum Error {
     #[error(
         "OpenAPI 3.0 cannot represent {feature} exactly in component {component:?}. \
          Export with SchemaMode::Compatible to emit the closest schema and keep the exact \
-         constraints in x-specta-* extensions."
+         constraints in x-specta-* extensions, or target OasVersion::V3_1, whose schema \
+         dialect expresses this natively."
     )]
     UnsupportedSchemaFeature {
         /// Component containing the unsupported shape.

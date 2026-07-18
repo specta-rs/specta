@@ -19,7 +19,7 @@ use specta::{
     datatype::{DataType, Field, NamedDataType, NamedReference, Reference, Struct},
 };
 
-use crate::{Error, SchemaMode, operation::Operation, transform::components};
+use crate::{Error, OasVersion, SchemaMode, operation::Operation, transform::components};
 
 /// Name of the probe definition. Carries a prefix no derived type will produce, so it cannot collide
 /// with a real definition and change how the real ones are named.
@@ -38,6 +38,7 @@ pub(crate) fn resolve(
     operations: &[Operation],
     format: impl Format,
     mode: SchemaMode,
+    version: OasVersion,
 ) -> Result<(BTreeMap<String, Value>, Resolved), Error> {
     let mut referenced: Vec<DataType> = Vec::new();
     for operation in operations {
@@ -59,7 +60,7 @@ pub(crate) fn resolve(
     }
 
     if referenced.is_empty() {
-        return Ok((components(types, format, mode)?, HashMap::new()));
+        return Ok((components(types, format, mode, version)?, HashMap::new()));
     }
 
     let mut probe_types = types.clone();
@@ -72,7 +73,7 @@ pub(crate) fn resolve(
         ndt.ty = Some(body.clone());
     });
 
-    let mut components = components(&probe_types, format, mode)?;
+    let mut components = components(&probe_types, format, mode, version)?;
     let Some(probe) = components.remove(PROBE) else {
         return Err(Error::UnresolvedOperationTypes);
     };

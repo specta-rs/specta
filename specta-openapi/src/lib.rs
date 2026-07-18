@@ -1,8 +1,10 @@
-//! [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.3) schema exporter for
+//! [OpenAPI](https://spec.openapis.org/oas/) schema exporter for
 //! [Specta](specta).
 //!
 //! The exporter turns a [`specta::Types`] collection into a valid OpenAPI
-//! document whose reusable schemas live in `components.schemas`.
+//! document whose reusable schemas live in `components.schemas`. Documents
+//! target OpenAPI 3.1 by default; select [`OasVersion::V3_0`] to emit for
+//! OpenAPI 3.0 consumers.
 //!
 //! # Usage
 //!
@@ -35,14 +37,16 @@
 //!
 //! # OpenAPI 3.0 compatibility
 //!
-//! OpenAPI 3.0 uses an older, restricted JSON Schema dialect. The default
-//! [`SchemaMode::Strict`] returns an error for structural schema features which
-//! the specification cannot express. Opt into [`SchemaMode::Compatible`] to emit a useful
-//! approximation and retain the original constraints in `x-specta-*`
-//! extensions. This affects nullable references — an `Option<T>` over a named
-//! type, which OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with
-//! null-only types, heterogeneous tuples, constrained map keys, and closed
-//! flattened intersections.
+//! OpenAPI 3.1's schema dialect is full JSON Schema, so every Specta shape is
+//! expressible in it. OpenAPI 3.0 uses an older, restricted dialect: under
+//! [`OasVersion::V3_0`] the default [`SchemaMode::Strict`] returns an error
+//! for structural schema features which that specification cannot express,
+//! and [`SchemaMode::Compatible`] emits a useful approximation instead,
+//! retaining the original constraints in `x-specta-*` extensions. This
+//! affects nullable references — an `Option<T>` over a named type, which
+//! OpenAPI 3.0 cannot mark `nullable` beside a `$ref` — along with null-only
+//! types, heterogeneous tuples, constrained map keys, and closed flattened
+//! intersections.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -58,5 +62,5 @@ mod resolve;
 mod transform;
 
 pub use error::Error;
-pub use openapi::{OpenApi, OutputFormat, SchemaMode};
+pub use openapi::{OasVersion, OpenApi, OutputFormat, SchemaMode};
 pub use operation::{Method, Operation, Param};
