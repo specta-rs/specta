@@ -1173,7 +1173,73 @@ fn openapi_documents_validate_against_the_official_meta_schemas() {
     let meta_30: serde_json::Value =
         serde_json::from_str(include_str!("../schemas/openapi-3.0-2024-10-18.json"))
             .expect("vendored 3.0 meta-schema parses");
-    let validator_31 = jsonschema::validator_for(&meta_31).expect("3.1 meta-schema compiles");
+    // The base 3.1 meta-schema deliberately skips Schema Object validation;
+    // schema-base pins the OAS dialect so schemas are deep-validated too. Its
+    // reference chain (the base meta and the dialect meta) is vendored beside
+    // it and registered under the canonical URIs.
+    let mut meta_31_schema_base: serde_json::Value = serde_json::from_str(include_str!(
+        "../schemas/openapi-3.1-schema-base-2025-11-23.json"
+    ))
+    .expect("vendored 3.1 schema-base meta parses");
+    // The validator loses schema-base's lexical base URI when resolving its
+    // two same-document pointers from inside the dynamic scope. Both point at
+    // `$defs/dialect`, a one-line const, so inline it: identical semantics,
+    // vendored bytes untouched.
+    let dialect_const = meta_31_schema_base["$defs"]["dialect"].clone();
+    fn inline_dialect_pointer(value: &mut serde_json::Value, replacement: &serde_json::Value) {
+        match value {
+            serde_json::Value::Object(object) => {
+                if object.get("$ref").and_then(serde_json::Value::as_str) == Some("#/$defs/dialect")
+                {
+                    *value = replacement.clone();
+                    return;
+                }
+                for child in object.values_mut() {
+                    inline_dialect_pointer(child, replacement);
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    inline_dialect_pointer(item, replacement);
+                }
+            }
+            _ => {}
+        }
+    }
+    inline_dialect_pointer(&mut meta_31_schema_base, &dialect_const);
+    let meta_31_dialect: serde_json::Value = serde_json::from_str(include_str!(
+        "../schemas/openapi-3.1-dialect-2024-11-10.json"
+    ))
+    .expect("vendored 3.1 dialect meta parses");
+    let meta_31_vocabulary: serde_json::Value =
+        serde_json::from_str(include_str!("../schemas/openapi-3.1-meta-2024-11-10.json"))
+            .expect("vendored 3.1 vocabulary meta parses");
+    struct VendoredMetas {
+        base: serde_json::Value,
+        dialect: serde_json::Value,
+        vocabulary: serde_json::Value,
+    }
+    impl jsonschema::Retrieve for VendoredMetas {
+        fn retrieve(
+            &self,
+            uri: &jsonschema::Uri<String>,
+        ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+            match uri.as_str() {
+                "https://spec.openapis.org/oas/3.1/schema/2025-11-23" => Ok(self.base.clone()),
+                "https://spec.openapis.org/oas/3.1/dialect/2024-11-10" => Ok(self.dialect.clone()),
+                "https://spec.openapis.org/oas/3.1/meta/2024-11-10" => Ok(self.vocabulary.clone()),
+                other => Err(format!("no vendored meta-schema for {other}").into()),
+            }
+        }
+    }
+    let validator_31 = jsonschema::options()
+        .with_retriever(VendoredMetas {
+            base: meta_31.clone(),
+            dialect: meta_31_dialect,
+            vocabulary: meta_31_vocabulary,
+        })
+        .build(&meta_31_schema_base)
+        .expect("3.1 schema-base meta compiles");
     let validator_30 = jsonschema::validator_for(&meta_30).expect("3.0 meta-schema compiles");
 
     let full_surface = |version: OasVersion| {
@@ -1226,6 +1292,21 @@ fn openapi_documents_validate_against_the_official_meta_schemas() {
         .export_document(&types, specta_serde::Format)
         .expect("3.0 corpus exports");
 
+    // Prove the deep net bites where the base meta is blind by design: a
+    // corrupt Schema Object passes the base 3.1 meta (which skips Schema
+    // Object validation) and must fail schema-base.
+    let base_only = jsonschema::validator_for(&meta_31).expect("3.1 base meta compiles");
+    let mut corrupted = full_surface(OasVersion::V3_1);
+    corrupted["components"]["schemas"]["Recipe"]["type"] = serde_json::json!(123);
+    assert!(
+        base_only.iter_errors(&corrupted).next().is_none(),
+        "the base meta skips Schema Objects by design; if this fires, drop the schema-base layer"
+    );
+    assert!(
+        validator_31.iter_errors(&corrupted).next().is_some(),
+        "schema-base must reject a corrupt Schema Object"
+    );
+
     let cases = [
         (
             "3.1 full-surface",
@@ -1264,6 +1345,10 @@ fn openapi_emits_string_formats_for_well_known_types() {
     struct Meeting {
         starts_at: chrono::DateTime<chrono::Utc>,
         day: chrono::NaiveDate,
+        stamped: jiff::Timestamp,
+        civil_day: jiff::civil::Date,
+        id: uuid::Uuid,
+        link: url::Url,
         agenda: String,
         #[specta(type = String)]
         overridden: chrono::DateTime<chrono::Utc>,
@@ -1280,6 +1365,10 @@ fn openapi_emits_string_formats_for_well_known_types() {
         let properties = &document["components"]["schemas"]["Meeting"]["properties"];
         assert_eq!(properties["starts_at"]["format"], "date-time");
         assert_eq!(properties["day"]["format"], "date");
+        assert_eq!(properties["stamped"]["format"], "date-time");
+        assert_eq!(properties["civil_day"]["format"], "date");
+        assert_eq!(properties["id"]["format"], "uuid");
+        assert_eq!(properties["link"]["format"], "uri");
         assert!(properties["agenda"].get("format").is_none());
         assert!(
             properties["overridden"].get("format").is_none(),

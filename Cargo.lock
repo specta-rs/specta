@@ -2287,6 +2287,7 @@ dependencies = [
  "glam 0.33.2",
  "heapless",
  "insta",
+ "jiff",
  "jsonschema 0.48.1",
  "ordered-float",
  "semver",
@@ -2315,6 +2316,8 @@ dependencies = [
  "trybuild",
  "uhlc",
  "ulid",
+ "url",
+ "uuid",
  "wasm-bindgen",
 ]
 

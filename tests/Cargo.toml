@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson", "uhlc"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson", "uhlc", "uuid", "url", "jiff"] }
 specta-go = { path = "../specta-go" }
 specta-jsonschema = { path = "../specta-jsonschema" }
 specta-java = { path = "../specta-java" }
@@ -34,6 +34,9 @@ serde_yaml = "0.9.34"
 toml = "1.1.2"
 insta = "1.48.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+uuid = { version = "1", default-features = false }
+url = { version = "2", default-features = false }
+jiff = { version = "0.2", default-features = false }
 either = { version = "1.16", default-features = false }
 ulid = { version = "2.0", default-features = false, features = [] }
 glam = { version = "0.33", default-features = false, features = ["std", "all-types"] }
