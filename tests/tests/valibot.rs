@@ -1100,7 +1100,16 @@ fn valibot_map_key_validation_ignores_skipped_variants() {
 
 #[test]
 fn valibot_reserved_type_name_errors() {
-    for name in ["class", "unknown", "never", "bigint", "object", "undefined"] {
+    // https://github.com/specta-rs/specta/issues/303
+    for name in [
+        "class",
+        "await",
+        "unknown",
+        "never",
+        "bigint",
+        "object",
+        "undefined",
+    ] {
         let mut types = Types::default();
         NamedDataType::new(name, &mut types, |_, ndt| {
             ndt.ty = Some(DataType::Primitive(Primitive::i8));

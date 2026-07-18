@@ -38,6 +38,7 @@ pub(crate) const RESERVED_TYPE_NAMES: &[&str] = &[
     "while",
     "with",
     "as",
+    "await",
     "implements",
     "interface",
     "let",
