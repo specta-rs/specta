@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt,
     ops::Deref,
@@ -218,13 +219,13 @@ impl Valibot {
 
         let mut out = render_file_header(&exporter);
 
-        let mut has_manually_exported_user_types = false;
+        let manually_exported_user_types = RefCell::new(HashSet::new());
         let mut runtime = Ok(Cow::default());
         if let Some(framework_runtime) = &exporter.framework_runtime {
             runtime = (framework_runtime.0)(FrameworkExporter {
                 exporter: &exporter,
                 format: Some(&format),
-                has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                manually_exported_user_types: &manually_exported_user_types,
                 files_root_types: "",
                 types,
             });
@@ -237,9 +238,14 @@ impl Valibot {
             out.push('\n');
         }
 
-        if !has_manually_exported_user_types {
-            render_types(&mut out, &exporter, types, "")?;
-        }
+        render_types(
+            &mut out,
+            &exporter,
+            types,
+            "",
+            &manually_exported_user_types.into_inner(),
+            true,
+        )?;
 
         Ok(out)
     }
@@ -259,13 +265,13 @@ impl Valibot {
         if exporter.layout != Layout::Files {
             let mut result = render_file_header(&exporter);
 
-            let mut has_manually_exported_user_types = false;
+            let manually_exported_user_types = RefCell::new(HashSet::new());
             let mut runtime = Ok(Cow::default());
             if let Some(framework_runtime) = &exporter.framework_runtime {
                 runtime = (framework_runtime.0)(FrameworkExporter {
                     exporter: &exporter,
                     format: Some(&format),
-                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    manually_exported_user_types: &manually_exported_user_types,
                     files_root_types: "",
                     types,
                 });
@@ -278,9 +284,14 @@ impl Valibot {
                 result.push('\n');
             }
 
-            if !has_manually_exported_user_types {
-                render_types(&mut result, &exporter, types, "")?;
-            }
+            render_types(
+                &mut result,
+                &exporter,
+                types,
+                "",
+                &manually_exported_user_types.into_inner(),
+                true,
+            )?;
 
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
@@ -293,6 +304,7 @@ impl Valibot {
             exporter: &Valibot,
             types: &Types,
             module: &mut Module,
+            manually_exported_root_types: &HashSet<(String, String)>,
             s: &mut String,
             path: &Path,
             files: &mut HashMap<PathBuf, String>,
@@ -304,6 +316,15 @@ impl Valibot {
                     .then(a.location.cmp(&b.location))
             });
 
+            let module_types = module
+                .types
+                .iter()
+                .copied()
+                .filter(|ndt| {
+                    !module.module_path.is_empty()
+                        || !manually_exported_root_types.contains(&manual_export_identity(ndt))
+                })
+                .collect::<Vec<_>>();
             let (rendered_types_result, referenced_types) =
                 references::with_module_path(module.module_path.as_ref(), || {
                     references::collect_references(|| {
@@ -312,7 +333,7 @@ impl Valibot {
                             &mut rendered,
                             exporter,
                             types,
-                            module.types.iter().copied(),
+                            module_types.into_iter(),
                             "",
                         )?;
                         Ok::<_, Error>((rendered, exports))
@@ -360,7 +381,15 @@ impl Valibot {
                 };
                 let mut path = path.join(file_name);
                 let mut out = render_file_header(exporter);
-                let has_types = export(exporter, types, module, &mut out, &path, files)?;
+                let has_types = export(
+                    exporter,
+                    types,
+                    module,
+                    manually_exported_root_types,
+                    &mut out,
+                    &path,
+                    files,
+                )?;
                 if has_types {
                     path.set_extension("ts");
                     files.insert(path, out);
@@ -374,18 +403,20 @@ impl Valibot {
         let mut runtime_path = path.join("index");
         runtime_path.set_extension("ts");
 
+        let mut module_graph = build_module_graph(types.into_unsorted_iter());
         let mut root_types = String::new();
         export(
             &exporter,
             types,
-            &mut build_module_graph(types),
+            &mut module_graph,
+            &HashSet::new(),
             &mut root_types,
             path,
             &mut files,
         )?;
 
         {
-            let mut has_manually_exported_user_types = false;
+            let manually_exported_user_types = RefCell::new(HashSet::new());
             let mut runtime: Cow<'static, str> = Cow::default();
             let mut runtime_references = HashSet::new();
             if let Some(framework_runtime) = &exporter.framework_runtime {
@@ -394,7 +425,7 @@ impl Valibot {
                         (framework_runtime.0)(FrameworkExporter {
                             exporter: &exporter,
                             format: Some(&format),
-                            has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                            manually_exported_user_types: &manually_exported_user_types,
                             files_root_types: &root_types,
                             types,
                         })
@@ -405,8 +436,24 @@ impl Valibot {
             }
             let runtime = render_runtime(&exporter, runtime);
 
-            let should_export_user_types =
-                !has_manually_exported_user_types && !root_types.is_empty();
+            let manually_exported_user_types = manually_exported_user_types.into_inner();
+            if manually_exported_user_types
+                .iter()
+                .any(|(module_path, _)| module_path.is_empty())
+            {
+                root_types.clear();
+                export(
+                    &exporter,
+                    types,
+                    &mut module_graph,
+                    &manually_exported_user_types,
+                    &mut root_types,
+                    path,
+                    &mut files,
+                )?;
+            }
+
+            let should_export_user_types = !root_types.is_empty();
 
             if !runtime.is_empty() || should_export_user_types {
                 files.insert(runtime_path, {
@@ -695,7 +742,7 @@ impl AsMut<Valibot> for Valibot {
 pub struct FrameworkExporter<'a> {
     exporter: &'a Valibot,
     format: Option<&'a dyn Format>,
-    has_manually_exported_user_types: &'a mut bool,
+    manually_exported_user_types: &'a RefCell<HashSet<(String, String)>>,
     files_root_types: &'a str,
     /// Collected types currently being exported.
     pub types: &'a Types,
@@ -725,8 +772,17 @@ impl FrameworkExporter<'_> {
     /// Render the types within [`Types`](specta::Types).
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
-        *self.has_manually_exported_user_types = true;
+        render_types(
+            &mut s,
+            self.exporter,
+            self.types,
+            self.files_root_types,
+            &HashSet::new(),
+            true,
+        )?;
+        self.manually_exported_user_types
+            .borrow_mut()
+            .extend(self.types.into_unsorted_iter().map(manual_export_identity));
         Ok(Cow::Owned(s))
     }
 
@@ -751,11 +807,125 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
+        let ndts = ndts.collect::<Vec<_>>();
         let mapped = ndts
+            .iter()
             .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
             .collect::<Result<Vec<_>, _>>()?;
-        primitives::export(self, self.types, mapped.iter(), indent)
+        let rendered = if self.layout == Layout::Namespaces {
+            render_manual_namespace_types(
+                self,
+                self.types,
+                &mapped,
+                indent,
+                &self.manually_exported_user_types.borrow(),
+            )?
+        } else {
+            primitives::export(self, self.types, mapped.iter(), indent)?
+        };
+        self.manually_exported_user_types.borrow_mut().extend(
+            ndts.into_iter()
+                .filter(|ndt| ndt.ty.is_some())
+                .map(manual_export_identity),
+        );
+        Ok(rendered)
     }
+}
+
+fn manual_export_identity(ndt: &NamedDataType) -> (String, String) {
+    (ndt.module_path.to_string(), ndt.name.to_string())
+}
+
+fn render_manual_namespace_types(
+    exporter: &Valibot,
+    types: &Types,
+    ndts: &[NamedDataType],
+    indent: &str,
+    already_exported: &HashSet<(String, String)>,
+) -> Result<String, Error> {
+    let mut modules = BTreeMap::<&str, Vec<&NamedDataType>>::new();
+    for ndt in ndts.iter().filter(|ndt| ndt.ty.is_some()) {
+        modules
+            .entry(ndt.module_path.as_ref())
+            .or_default()
+            .push(ndt);
+    }
+
+    let mut out = String::new();
+    let mut emitted_top_modules = already_exported
+        .iter()
+        .filter_map(|(module_path, _)| module_path.split("::").next())
+        .filter(|module| !module.is_empty())
+        .map(str::to_string)
+        .collect::<HashSet<_>>();
+    for (module_path, ndts) in modules {
+        out.push_str(indent);
+        out.push_str("namespace $s$ {\n");
+
+        let segments = module_path
+            .split("::")
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>();
+        for (depth, segment) in segments.iter().enumerate() {
+            out.push_str(indent);
+            out.push_str(&"\t".repeat(depth + 1));
+            out.push_str("export namespace ");
+            out.push_str(&namespace_segment(segment));
+            out.push_str(" {\n");
+        }
+
+        let content_indent = format!("{indent}{}", "\t".repeat(segments.len() + 1));
+        out.push_str(&primitives::export(
+            exporter,
+            types,
+            ndts.iter().copied(),
+            &content_indent,
+        )?);
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
+
+        for depth in (0..segments.len()).rev() {
+            out.push_str(indent);
+            out.push_str(&"\t".repeat(depth + 1));
+            out.push_str("}\n");
+        }
+        out.push_str(indent);
+        out.push_str("}\n");
+
+        if module_path.is_empty() {
+            for ndt in ndts {
+                if already_exported.contains(&manual_export_identity(ndt)) {
+                    continue;
+                }
+                out.push_str(indent);
+                out.push_str("export import ");
+                out.push_str(&ndt.name);
+                out.push_str(" = $s$.");
+                out.push_str(&ndt.name);
+                out.push_str(";\n");
+                out.push_str(indent);
+                out.push_str("export import ");
+                out.push_str(&ndt.name);
+                out.push_str("Schema = $s$.");
+                out.push_str(&ndt.name);
+                out.push_str("Schema;\n");
+            }
+        } else {
+            let top_module = module_path.split("::").next().unwrap_or_default();
+            if emitted_top_modules.insert(top_module.to_string()) {
+                let top_module = namespace_segment(top_module);
+                out.push_str(indent);
+                out.push_str("export import ");
+                out.push_str(&top_module);
+                out.push_str(" = $s$.");
+                out.push_str(&top_module);
+                out.push_str(";\n");
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 struct Module<'a> {
@@ -764,8 +934,8 @@ struct Module<'a> {
     module_path: Cow<'static, str>,
 }
 
-fn build_module_graph(types: &Types) -> Module<'_> {
-    types.into_unsorted_iter().fold(
+fn build_module_graph<'a>(types: impl Iterator<Item = &'a NamedDataType>) -> Module<'a> {
+    types.fold(
         Module {
             types: Default::default(),
             children: Default::default(),
@@ -838,6 +1008,8 @@ fn render_types(
     exporter: &Valibot,
     types: &Types,
     files_user_types: &str,
+    manually_exported_user_types: &HashSet<(String, String)>,
+    render_namespace_reexports: bool,
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
@@ -865,6 +1037,35 @@ fn render_types(
                         return Err(Error::duplicate_export_name(name));
                     }
                     validate_namespace_scopes(child)?;
+                }
+                Ok(())
+            }
+
+            fn validate_namespace_reexports(module: &Module<'_>) -> Result<(), Error> {
+                let mut exports = HashSet::new();
+                for name in module
+                    .children
+                    .iter()
+                    .filter_map(|(name, module)| has_renderable_content(module).then_some(*name))
+                    .chain(
+                        module
+                            .types
+                            .iter()
+                            .filter(|ndt| ndt.ty.is_some())
+                            .map(|ndt| ndt.name.as_ref()),
+                    )
+                    .map(namespace_segment)
+                    .chain(
+                        module
+                            .types
+                            .iter()
+                            .filter(|ndt| ndt.ty.is_some())
+                            .map(|ndt| Cow::Owned(format!("{}Schema", ndt.name))),
+                    )
+                {
+                    if !exports.insert(name.to_string()) {
+                        return Err(Error::duplicate_export_name(name.into_owned()));
+                    }
                 }
                 Ok(())
             }
@@ -914,19 +1115,37 @@ fn render_types(
                 Ok(())
             }
 
-            let mut module = build_module_graph(types);
-            validate_namespace_scopes(&module)?;
+            let complete_module = build_module_graph(types.into_unsorted_iter());
+            validate_namespace_scopes(&complete_module)?;
+            validate_namespace_reexports(&complete_module)?;
+
+            let mut module = build_module_graph(types.into_unsorted_iter().filter(|ndt| {
+                !manually_exported_user_types.contains(&manual_export_identity(ndt))
+            }));
             let mut reexports = String::new();
             let mut reexport_names = HashSet::new();
-            for name in module
+            let manually_exported_top_modules = manually_exported_user_types
+                .iter()
+                .filter_map(|(module_path, _)| module_path.split("::").next())
+                .filter(|module| !module.is_empty())
+                .collect::<HashSet<_>>();
+            for name in complete_module
                 .children
                 .iter()
-                .filter_map(|(name, module)| has_renderable_content(module).then_some(*name))
+                .filter_map(|(name, module)| {
+                    (has_renderable_content(module)
+                        && !manually_exported_top_modules.contains(name))
+                    .then_some(*name)
+                })
                 .chain(
-                    module
+                    complete_module
                         .types
                         .iter()
-                        .filter(|ndt| ndt.ty.is_some())
+                        .filter(|ndt| {
+                            ndt.ty.is_some()
+                                && !manually_exported_user_types
+                                    .contains(&manual_export_identity(ndt))
+                        })
                         .map(|ndt| ndt.name.as_ref()),
                 )
             {
@@ -940,7 +1159,10 @@ fn render_types(
                 reexports.push_str(&name);
                 reexports.push_str(";\n");
             }
-            for ndt in module.types.iter().filter(|ndt| ndt.ty.is_some()) {
+            for ndt in complete_module.types.iter().filter(|ndt| {
+                ndt.ty.is_some()
+                    && !manually_exported_user_types.contains(&manual_export_identity(ndt))
+            }) {
                 let schema_name = format!("{}Schema", ndt.name);
                 if !reexport_names.insert(schema_name.clone()) {
                     return Err(Error::duplicate_export_name(schema_name));
@@ -953,10 +1175,17 @@ fn render_types(
             }
 
             export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
-            s.push_str(&reexports);
+            if render_namespace_reexports {
+                s.push_str(&reexports);
+            }
         }
         Layout::FlatFile | Layout::ModulePrefixedName => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+            validate_flat_type_names(exporter, types.into_sorted_iter())?;
+            let remaining_types = types
+                .into_sorted_iter()
+                .filter(|ndt| !manually_exported_user_types.contains(&manual_export_identity(ndt)))
+                .collect::<Vec<_>>();
+            render_flat_types(s, exporter, types, remaining_types.into_iter(), "")?;
         }
         Layout::Files => {
             if !files_user_types.is_empty() {
@@ -965,6 +1194,20 @@ fn render_types(
         }
     }
 
+    Ok(())
+}
+
+fn validate_flat_type_names<'a>(
+    exporter: &Valibot,
+    ndts: impl Iterator<Item = &'a NamedDataType>,
+) -> Result<(), Error> {
+    let mut exports = HashMap::new();
+    for ndt in ndts.filter(|ndt| ndt.ty.is_some()) {
+        let export_name = primitives::exported_type_name(exporter, ndt);
+        if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
+            return Err(Error::duplicate_type_name(export_name, ndt.location, other));
+        }
+    }
     Ok(())
 }
 

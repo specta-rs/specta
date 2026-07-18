@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter, path::Path};
+use std::{borrow::Cow, collections::HashMap, iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
@@ -351,6 +351,41 @@ fn main() {
     Valibot::default()
         .layout(Layout::Namespaces)
         .export_to(out.join("namespaces.ts"), &types, specta_serde::Format)
+        .unwrap();
+    let mut manual_namespace_types = Types::default();
+    let manual_namespace_type = NamedDataType::new(
+        "ManualNamespaceType",
+        &mut manual_namespace_types,
+        |_, ndt| {
+            ndt.module_path = "".into();
+            ndt.ty = Some(Primitive::str.into());
+        },
+    );
+    NamedDataType::new(
+        "AutomaticNamespaceType",
+        &mut manual_namespace_types,
+        |_, ndt| {
+            ndt.module_path = "".into();
+            ndt.ty = Some(DataType::Reference(manual_namespace_type.reference(vec![])));
+        },
+    );
+    Valibot::default()
+        .layout(Layout::Namespaces)
+        .framework_runtime(|exporter| {
+            let manual = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "ManualNamespaceType");
+            Ok(Cow::Owned(format!(
+                "{}\nexport const AdaptedManualNamespaceTypeSchema = ManualNamespaceTypeSchema;",
+                exporter.export(manual, "")?
+            )))
+        })
+        .export_to(
+            out.join("namespaces-manual.ts"),
+            &manual_namespace_types,
+            specta_serde::Format,
+        )
         .unwrap();
     let mut module_prefixed_types = Types::default();
     let module_prefixed_root =

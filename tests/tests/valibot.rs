@@ -1443,7 +1443,9 @@ fn valibot_header_raw_runtime_and_manual_rendering() {
 
 #[test]
 fn valibot_framework_export_formats_generic_named_datatypes() {
-    let types = Types::default().register::<ValibotGenericDefaults>();
+    let types = Types::default()
+        .register::<ValibotGenericDefaults>()
+        .register::<Another>();
     let rendered = Valibot::default()
         .framework_runtime(|exporter| {
             let generic_defaults = exporter
@@ -1457,6 +1459,125 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
 
     assert!(rendered.contains("export type ValibotGenericDefaults<T = string, U = T>"));
     assert!(rendered.contains("first: T"));
+    assert_eq!(
+        rendered
+            .matches("export type ValibotGenericDefaults<T = string, U = T>")
+            .count(),
+        1,
+        "{rendered}"
+    );
+    assert_eq!(
+        rendered.matches("export type Another").count(),
+        1,
+        "{rendered}"
+    );
+    assert_eq!(
+        rendered.matches("export const AnotherSchema").count(),
+        1,
+        "{rendered}"
+    );
+
+    let rendered = Valibot::default()
+        .framework_runtime(|exporter| {
+            Ok(Cow::Owned(
+                exporter.export(std::iter::empty::<&NamedDataType>(), "")?,
+            ))
+        })
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert_eq!(
+        rendered
+            .matches("export type ValibotGenericDefaults<T = string, U = T>")
+            .count(),
+        1,
+        "{rendered}"
+    );
+    assert_eq!(
+        rendered.matches("export type Another").count(),
+        1,
+        "{rendered}"
+    );
+
+    let mut colliding = Types::default();
+    NamedDataType::new("foo_Bar", &mut colliding, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Bar", &mut colliding, |_, ndt| {
+        ndt.module_path = "foo".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    let err = Valibot::default()
+        .layout(Layout::ModulePrefixedName)
+        .framework_runtime(|mut exporter| {
+            let root = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "foo_Bar");
+            Ok(Cow::Owned(exporter.export(root, "")?))
+        })
+        .export(&colliding, specta_serde::Format)
+        .unwrap_err();
+    assert!(err.to_string().contains("Detected multiple types"));
+
+    let mut references = Types::default();
+    let manual = NamedDataType::new("Manual", &mut references, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Automatic", &mut references, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(DataType::Reference(manual.reference(vec![])));
+    });
+    let rendered = Valibot::default()
+        .layout(Layout::Namespaces)
+        .framework_runtime(|exporter| {
+            let manual = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "Manual");
+            Ok(Cow::Owned(exporter.export(manual, "")?))
+        })
+        .export(&references, specta_serde::Format)
+        .unwrap();
+    assert_eq!(rendered.matches("export type Manual = string").count(), 1);
+    assert!(rendered.contains("v.lazy(() => $s$.ManualSchema)"));
+    assert!(rendered.contains("export import Manual = $s$.Manual;"));
+
+    let rendered = Valibot::default()
+        .layout(Layout::Namespaces)
+        .framework_runtime(|mut exporter| exporter.render_types())
+        .export(&references, specta_serde::Format)
+        .unwrap();
+    assert_eq!(
+        rendered
+            .matches("export import Manual = $s$.Manual;")
+            .count(),
+        1,
+        "{rendered}"
+    );
+    assert_eq!(
+        rendered
+            .matches("export import ManualSchema = $s$.ManualSchema;")
+            .count(),
+        1,
+        "{rendered}"
+    );
+
+    let mut non_exportable = Types::default();
+    NamedDataType::new("NonExportable", &mut non_exportable, |_, ndt| {
+        ndt.module_path = "".into();
+    });
+    let rendered = Valibot::default()
+        .layout(Layout::Namespaces)
+        .framework_runtime(|exporter| {
+            Ok(Cow::Owned(
+                exporter.export(exporter.types.into_unsorted_iter(), "")?,
+            ))
+        })
+        .export(&non_exportable, specta_serde::Format)
+        .unwrap();
+    assert!(!rendered.contains("namespace $s$"), "{rendered}");
 }
 
 #[test]

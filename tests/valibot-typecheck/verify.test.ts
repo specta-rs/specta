@@ -24,6 +24,7 @@ import {
   LowLevelRecordSchema,
   LowLevelReferenceSchema,
 } from "./generated/low-level";
+import { AdaptedManualNamespaceTypeSchema } from "./generated/namespaces-manual";
 
 const transformingNumber = v.pipe(v.string(), v.transform(Number));
 const TransformingGenericSchema = GenericSchema(transformingNumber);
@@ -233,4 +234,8 @@ test("low-level schemas compose with the public runtime helpers", () => {
   expect(v.safeParse(LowLevelInlineSchema, { ["\ud800"]: "value" }).success).toBe(false);
   expect(v.safeParse(LowLevelReferenceSchema, {}).success).toBe(true);
   expect(v.safeParse(LowLevelReferenceSchema, []).success).toBe(false);
+});
+
+test("manual namespace exports are initialized before framework adapters", () => {
+  expect(v.parse(AdaptedManualNamespaceTypeSchema, "value")).toBe("value");
 });
