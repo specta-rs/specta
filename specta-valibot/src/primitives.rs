@@ -129,8 +129,12 @@ fn export_single_internal(
                 indent,
             )
         };
+        let alias_module_path = (exporter.layout == Layout::Files)
+            .then(crate::references::current_module_path)
+            .flatten()
+            .unwrap_or_else(|| ndt.module_path.to_string());
         let mut type_alias = if exporter.layout == Layout::Files {
-            specta_typescript::with_module_path(&ndt.module_path, render_type_alias)
+            specta_typescript::with_module_path(&alias_module_path, render_type_alias)
         } else {
             render_type_alias()
         }
@@ -138,13 +142,13 @@ fn export_single_internal(
             Error::framework("failed to render the inferred TypeScript type", source)
         })?;
         if exporter.layout == Layout::Files {
-            let current_alias = if ndt.module_path.is_empty() {
+            let current_alias = if alias_module_path.is_empty() {
                 "$root".to_string()
             } else {
-                ndt.module_path.split("::").collect::<Vec<_>>().join("$")
+                alias_module_path.split("::").collect::<Vec<_>>().join("$")
             };
             type_alias = replace_typescript_code(&type_alias, &format!("{current_alias}."), "");
-            let sanitized_current_alias = crate::valibot::module_alias(&ndt.module_path);
+            let sanitized_current_alias = crate::valibot::module_alias(&alias_module_path);
             if current_alias != sanitized_current_alias {
                 type_alias = replace_typescript_code(
                     &type_alias,
@@ -155,7 +159,7 @@ fn export_single_internal(
             for module_path in types
                 .into_unsorted_iter()
                 .map(|ndt| ndt.module_path.as_ref())
-                .filter(|path| !path.is_empty() && *path != ndt.module_path.as_ref())
+                .filter(|path| !path.is_empty() && *path != alias_module_path)
                 .collect::<std::collections::BTreeSet<_>>()
             {
                 let raw = module_path.split("::").collect::<Vec<_>>().join("$");

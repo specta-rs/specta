@@ -412,4 +412,45 @@ fn main() {
         .with_raw("export const runtime = true;")
         .export_to(out.join("files"), &types, specta_serde::Format)
         .unwrap();
+
+    let mut manual_file_types = Types::default();
+    let sibling = NamedDataType::new("Sibling", &mut manual_file_types, |_, ndt| {
+        ndt.module_path = "nested".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("ManualNested", &mut manual_file_types, |_, ndt| {
+        ndt.module_path = "nested".into();
+        ndt.ty = Some(DataType::Reference(sibling.reference(vec![])));
+    });
+    Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            let manual = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "ManualNested");
+            Ok(Cow::Owned(exporter.export(manual, "")?))
+        })
+        .export_to(
+            out.join("manual-files"),
+            &manual_file_types,
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    let mut separate_declaration_spaces = Types::default();
+    for name in ["Foo", "FooSchema"] {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+            ndt.module_path = "source".into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+    Valibot::default()
+        .layout(Layout::Files)
+        .export_to(
+            out.join("separate-declaration-spaces"),
+            &separate_declaration_spaces,
+            specta_serde::Format,
+        )
+        .unwrap();
 }

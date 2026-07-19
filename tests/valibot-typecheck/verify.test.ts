@@ -24,6 +24,7 @@ import {
   LowLevelRecordSchema,
   LowLevelReferenceSchema,
 } from "./generated/low-level";
+import { ManualNestedSchema } from "./generated/manual-files";
 import { AdaptedManualNamespaceTypeSchema } from "./generated/namespaces-manual";
 
 const transformingNumber = v.pipe(v.string(), v.transform(Number));
@@ -238,4 +239,8 @@ test("low-level schemas compose with the public runtime helpers", () => {
 
 test("manual namespace exports are initialized before framework adapters", () => {
   expect(v.parse(AdaptedManualNamespaceTypeSchema, "value")).toBe("value");
+});
+
+test("manual file exports resolve aliases from the runtime module", () => {
+  expect(v.parse(ManualNestedSchema, "value")).toBe("value");
 });

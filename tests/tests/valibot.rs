@@ -739,6 +739,116 @@ fn valibot_layout_files_qualifies_root_types_from_modules() {
 }
 
 #[test]
+fn valibot_layout_files_rejects_import_alias_binding_collisions() {
+    // https://github.com/specta-rs/specta/issues/303
+    let temp = temp_dir();
+    let path = temp.path().join("valibot-import-alias-collision");
+    let mut types = Types::default();
+    let other = NamedDataType::new("Other", &mut types, |_, ndt| {
+        ndt.module_path = "target".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("target", &mut types, |_, ndt| {
+        ndt.module_path = "source".into();
+        ndt.ty = Some(DataType::Reference(other.reference(vec![])));
+    });
+
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"target\""),
+        "{err}"
+    );
+
+    let mut types = Types::default();
+    let other = NamedDataType::new("Other", &mut types, |_, ndt| {
+        ndt.module_path = "target".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("Root", &mut types, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(DataType::Reference(other.reference(vec![])));
+    });
+    NamedDataType::new("target", &mut types, |_, ndt| {
+        ndt.module_path = "source".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            let target = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "target");
+            Ok(Cow::Owned(exporter.export(target, "")?))
+        })
+        .export_to(
+            temp.path().join("valibot-root-import-alias-collision"),
+            &types,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"target\""),
+        "{err}"
+    );
+
+    Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|mut exporter| exporter.render_types())
+        .export_to(
+            temp.path().join("valibot-render-root-types"),
+            &types,
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    let mut helper_collision = Types::default();
+    let helper = NamedDataType::new("Helper", &mut helper_collision, |_, ndt| {
+        ndt.module_path = "$spectaObject".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("UsesHelper", &mut helper_collision, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(DataType::Reference(helper.reference(vec![])));
+    });
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .export_to(
+            temp.path().join("valibot-helper-binding-collision"),
+            &helper_collision,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"$spectaObject\""),
+        "{err}"
+    );
+
+    let mut separate_declaration_spaces = Types::default();
+    for name in ["Foo", "FooSchema"] {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+            ndt.module_path = "source".into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+    Valibot::default()
+        .layout(Layout::Files)
+        .export_to(
+            temp.path().join("valibot-separate-declaration-spaces"),
+            &separate_declaration_spaces,
+            specta_serde::Format,
+        )
+        .unwrap();
+}
+
+#[test]
 fn valibot_layout_files_preserves_a_top_level_index_module() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-index-module");

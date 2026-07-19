@@ -35,6 +35,7 @@ enum ErrorKind {
         second: String,
     },
     DuplicateExportName(String),
+    DuplicateFileBinding(String),
     Io(io::Error),
     ReadDir {
         path: PathBuf,
@@ -130,6 +131,12 @@ impl Error {
     pub(crate) fn duplicate_export_name(name: String) -> Self {
         Self {
             kind: ErrorKind::DuplicateExportName(name),
+        }
+    }
+
+    pub(crate) fn duplicate_file_binding(name: String) -> Self {
+        Self {
+            kind: ErrorKind::DuplicateFileBinding(name),
         }
     }
 
@@ -237,6 +244,9 @@ impl fmt::Display for Error {
                 f,
                 "Detected multiple namespace exports with the name {name:?}"
             ),
+            ErrorKind::DuplicateFileBinding(name) => {
+                write!(f, "Detected multiple file bindings with the name {name:?}")
+            }
             ErrorKind::Io(err) => write!(f, "IO error: {err}"),
             ErrorKind::ReadDir { path, source } => {
                 write!(f, "Failed to read directory '{}': {source}", path.display())
