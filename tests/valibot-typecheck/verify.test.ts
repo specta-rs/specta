@@ -1,11 +1,13 @@
 import { expect, test } from "bun:test";
 import * as v from "valibot";
 import {
+  AllSkippedTupleVariantSchema,
   ContextualExternalWrapperSchema,
   DangerousReferencedFlattenSchema,
   DefaultTupleSchema,
   EmptyObjectSchema,
   ExternalEnumSchema,
+  FlattenSiblingEnumsSchema,
   GenericMapSchema,
   GenericSchema,
   GenericMapHolderSchema,
@@ -111,6 +113,25 @@ test("generated schemas validate representative wire values", () => {
   expect(v.safeParse(EmptyObjectSchema, new Date()).success).toBe(false);
   expect(v.safeParse(OptionalObjectSchema, []).success).toBe(false);
   expect(v.safeParse(ReferencedFlattenSchema, { id: "id", First: { value: 1 } }).success).toBe(true);
+  for (const value of [
+    { A: null, B: null },
+    { A: null, D: null },
+    { C: null, B: null },
+    { C: null, D: null },
+  ]) {
+    expect(v.safeParse(FlattenSiblingEnumsSchema, value).success).toBe(true);
+  }
+  expect(
+    v.safeParse(FlattenSiblingEnumsSchema, { A: null, C: null, B: null }).success,
+  ).toBe(false);
+  expect(
+    v.safeParse(FlattenSiblingEnumsSchema, { A: null, B: null, D: null }).success,
+  ).toBe(false);
+  expect(
+    v.safeParse(FlattenSiblingEnumsSchema, { A: null, B: null, extra: null }).success,
+  ).toBe(false);
+  expect(v.safeParse(AllSkippedTupleVariantSchema, { A: [] }).success).toBe(true);
+  expect(v.safeParse(AllSkippedTupleVariantSchema, "A").success).toBe(false);
   const dangerousFlatten = JSON.parse(
     '{"__proto__":"proto","constructor":"constructor","prototype":"prototype","First":{"value":1}}',
   );

@@ -1569,6 +1569,26 @@ fn valibot_tuple_variant_default_phases() {
     );
 }
 
+#[test]
+fn valibot_external_all_skipped_tuple_variant_keeps_empty_payload() {
+    // https://github.com/specta-rs/specta/issues/303
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    enum AllSkipped {
+        A(#[serde(skip)] u8, #[serde(skip)] u8),
+        B(String),
+    }
+
+    let rendered = Valibot::default()
+        .export(
+            &Types::default().register::<AllSkipped>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(rendered.contains("A: v.strictTuple([])"), "{rendered}");
+}
+
 /// Top-level documentation containing a terminator: */ still remains valid.
 #[deprecated(note = "Use the replacement instead")]
 #[derive(Type, Serialize, Deserialize)]

@@ -1034,26 +1034,23 @@ fn datatype(
                 s.push_str("v.unknown()");
                 return Ok(());
             }
-            let allowed_object_keys = intersection
-                .iter()
-                .filter(|ty| match ty {
-                    DataType::Enum(_) => false,
-                    DataType::Reference(Reference::Named(named))
-                        if !matches!(&named.inner, NamedReferenceType::Recursive(_)) =>
-                    {
-                        !matches!(named_reference_ty(types, named), Ok(DataType::Enum(_)))
-                    }
-                    _ => true,
-                })
-                .filter_map(|ty| object_field_keys(ty, types, generics, &mut HashSet::new()))
-                .flatten()
-                .collect::<HashSet<_>>();
-            let allowed_object_keys = allowed_object_keys
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>();
             let mut parts = Vec::with_capacity(intersection.len());
-            for ty in intersection {
+            for (index, ty) in intersection.iter().enumerate() {
+                let mut allowed_object_keys = intersection
+                    .iter()
+                    .enumerate()
+                    .filter(|(other_index, _)| *other_index != index)
+                    .filter_map(|(_, ty)| {
+                        object_field_keys(ty, types, generics, &mut HashSet::new())
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>();
+                allowed_object_keys.sort_unstable();
+                allowed_object_keys.dedup();
+                let allowed_object_keys = allowed_object_keys
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
                 let mut part = String::new();
                 if let DataType::Enum(enm) = ty {
                     enum_dt(
@@ -1874,7 +1871,10 @@ fn enum_variant_dt(
                     }
                     has_field = true;
                     let key = sanitise_key(field_name);
-                    write!(schema, "\n\t{key}: v.optional(v.unknown()),")?;
+                    write!(
+                        schema,
+                        "\n\t{key}: v.optional(v.custom<never>(() => true)),"
+                    )?;
                 }
             }
 
@@ -1893,13 +1893,8 @@ fn enum_variant_dt(
                 .collect::<Vec<_>>();
 
             Ok(match fields.as_slice() {
-                [] => {
-                    if unnamed.fields.is_empty() {
-                        Some("v.strictTuple([])".to_string())
-                    } else {
-                        None
-                    }
-                }
+                [] if unnamed.fields.len() == 1 => None,
+                [] => Some("v.strictTuple([])".to_string()),
                 [(field, ty)] if unnamed.fields.len() == 1 => {
                     let mut out = String::new();
                     datatype_with_inline_attr(

@@ -196,6 +196,32 @@ struct DangerousReferencedFlatten {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+enum FlattenLeft {
+    A(()),
+    C(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum FlattenRight {
+    B(()),
+    D(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenSiblingEnums {
+    #[serde(flatten)]
+    left: FlattenLeft,
+    #[serde(flatten)]
+    right: FlattenRight,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum AllSkippedTupleVariant {
+    A(#[serde(skip)] u8, #[serde(skip)] u8),
+    B(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
 #[serde(untagged)]
 enum UntaggedMatchingField {
     Variant {
@@ -268,6 +294,8 @@ fn main() {
                 .register::<MapOnlyExternalWrapper>()
                 .register::<ReferencedFlatten>()
                 .register::<DangerousReferencedFlatten>()
+                .register::<FlattenSiblingEnums>()
+                .register::<AllSkippedTupleVariant>()
                 .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),
         );
