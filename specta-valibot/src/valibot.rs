@@ -369,7 +369,7 @@ impl Valibot {
                 })
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
-            validate_module_import_aliases(&import_paths, local_type_names.into_iter())?;
+            validate_file_bindings(&import_paths, local_type_names.into_iter())?;
 
             if !import_paths.is_empty() {
                 s.push('\n');
@@ -529,7 +529,7 @@ impl Valibot {
                                         .contains(&manual_export_identity(ndt)))
                         })
                         .map(|ndt| ndt.name.as_ref());
-                    validate_module_import_aliases(&all_import_paths, local_type_names)?;
+                    validate_file_bindings(&all_import_paths, local_type_names)?;
 
                     if !import_paths.is_empty() {
                         out.push('\n');
@@ -814,6 +814,15 @@ impl Deref for FrameworkExporter<'_> {
 impl FrameworkExporter<'_> {
     /// Render the types within [`Types`](specta::Types).
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
+        if self.layout == Layout::Files {
+            validate_manual_file_type_names(
+                &self.manually_exported_user_types.borrow(),
+                self.types
+                    .into_unsorted_iter()
+                    .filter(|ndt| ndt.module_path.is_empty()),
+            )?;
+        }
+
         let mut s = String::new();
         render_types(
             &mut s,
@@ -826,7 +835,9 @@ impl FrameworkExporter<'_> {
         self.manually_exported_user_types.borrow_mut().extend(
             self.types
                 .into_unsorted_iter()
-                .filter(|ndt| self.layout != Layout::Files || ndt.module_path.is_empty())
+                .filter(|ndt| {
+                    ndt.ty.is_some() && (self.layout != Layout::Files || ndt.module_path.is_empty())
+                })
                 .map(manual_export_identity),
         );
         Ok(Cow::Owned(s))
@@ -854,6 +865,13 @@ impl FrameworkExporter<'_> {
         indent: &'a str,
     ) -> Result<String, Error> {
         let ndts = ndts.collect::<Vec<_>>();
+        if self.layout == Layout::Files {
+            validate_manual_file_type_names(
+                &self.manually_exported_user_types.borrow(),
+                ndts.iter().copied(),
+            )?;
+        }
+
         let mapped = ndts
             .iter()
             .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
@@ -880,6 +898,25 @@ impl FrameworkExporter<'_> {
 
 fn manual_export_identity(ndt: &NamedDataType) -> (String, String) {
     (ndt.module_path.to_string(), ndt.name.to_string())
+}
+
+fn validate_manual_file_type_names<'a>(
+    already_exported: &HashSet<(String, String)>,
+    ndts: impl Iterator<Item = &'a NamedDataType>,
+) -> Result<(), Error> {
+    let mut identities = already_exported.clone();
+    let mut names = already_exported
+        .iter()
+        .map(|(_, name)| name.clone())
+        .collect::<HashSet<_>>();
+
+    for ndt in ndts.filter(|ndt| ndt.ty.is_some()) {
+        if !identities.insert(manual_export_identity(ndt)) || !names.insert(ndt.name.to_string()) {
+            return Err(Error::duplicate_file_binding(ndt.name.to_string()));
+        }
+    }
+
+    Ok(())
 }
 
 fn render_manual_namespace_types(
@@ -1435,15 +1472,23 @@ fn module_import_statement(from_module_path: &str, to_module_path: &str) -> Stri
     )
 }
 
-fn validate_module_import_aliases<'a>(
+fn validate_file_bindings<'a>(
     import_paths: &BTreeSet<String>,
     local_type_names: impl Iterator<Item = &'a str>,
 ) -> Result<(), Error> {
     let mut file_bindings = GENERATED_FILE_BINDINGS
         .iter()
         .map(|name| name.to_string())
-        .chain(local_type_names.flat_map(|name| [name.to_string(), format!("{name}Schema")]))
         .collect::<HashSet<_>>();
+    let mut local_type_bindings = HashSet::new();
+    for name in local_type_names {
+        if !local_type_bindings.insert(name) {
+            return Err(Error::duplicate_file_binding(name.to_string()));
+        }
+
+        file_bindings.insert(name.to_string());
+        file_bindings.insert(format!("{name}Schema"));
+    }
 
     for module_path in import_paths {
         let alias = module_alias(module_path);

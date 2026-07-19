@@ -849,6 +849,147 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
 }
 
 #[test]
+fn valibot_layout_files_rejects_manual_type_name_collisions() {
+    // https://github.com/specta-rs/specta/issues/303
+    let temp = temp_dir();
+
+    let mut manual_collision = Types::default();
+    for module_path in ["first", "second"] {
+        NamedDataType::new("Foo", &mut manual_collision, |_, ndt| {
+            ndt.module_path = module_path.into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            let foo = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "Foo");
+            Ok(Cow::Owned(exporter.export(foo, "")?))
+        })
+        .export_to(
+            temp.path().join("valibot-manual-name-collision"),
+            &manual_collision,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"Foo\""),
+        "{err}"
+    );
+
+    let mut root_collision = Types::default();
+    for module_path in ["", "nested"] {
+        NamedDataType::new("Foo", &mut root_collision, |_, ndt| {
+            ndt.module_path = module_path.into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            let nested_foo = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "Foo" && !ndt.module_path.is_empty());
+            Ok(Cow::Owned(exporter.export(nested_foo, "")?))
+        })
+        .export_to(
+            temp.path().join("valibot-root-manual-name-collision"),
+            &root_collision,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"Foo\""),
+        "{err}"
+    );
+
+    let mut repeated_export = Types::default();
+    NamedDataType::new("Foo", &mut repeated_export, |_, ndt| {
+        ndt.module_path = "nested".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            let foo = exporter
+                .types
+                .into_unsorted_iter()
+                .find(|ndt| ndt.name == "Foo")
+                .unwrap();
+            let first = exporter.export(std::iter::once(foo), "")?;
+            let second = exporter.export(std::iter::once(foo), "")?;
+            Ok(Cow::Owned(format!("{first}{second}")))
+        })
+        .export_to(
+            temp.path().join("valibot-repeated-manual-export"),
+            &repeated_export,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"Foo\""),
+        "{err}"
+    );
+
+    let mut repeated_render = Types::default();
+    NamedDataType::new("Foo", &mut repeated_render, |_, ndt| {
+        ndt.module_path = "".into();
+        ndt.ty = Some(Primitive::str.into());
+    });
+    let err = Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|mut exporter| {
+            let rendered = exporter.render_types()?;
+            let foo = exporter
+                .types
+                .into_unsorted_iter()
+                .filter(|ndt| ndt.name == "Foo");
+            let repeated = exporter.export(foo, "")?;
+            Ok(Cow::Owned(format!("{rendered}{repeated}")))
+        })
+        .export_to(
+            temp.path().join("valibot-repeated-manual-render"),
+            &repeated_render,
+            specta_serde::Format,
+        )
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("multiple file bindings with the name \"Foo\""),
+        "{err}"
+    );
+
+    let mut separate_declaration_spaces = Types::default();
+    for (name, module_path) in [("Foo", "first"), ("FooSchema", "second")] {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+            ndt.module_path = module_path.into();
+            ndt.ty = Some(Primitive::str.into());
+        });
+    }
+    Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|exporter| {
+            Ok(Cow::Owned(
+                exporter.export(exporter.types.into_unsorted_iter(), "")?,
+            ))
+        })
+        .export_to(
+            temp.path()
+                .join("valibot-manual-separate-declaration-spaces"),
+            &separate_declaration_spaces,
+            specta_serde::Format,
+        )
+        .unwrap();
+}
+
+#[test]
 fn valibot_layout_files_preserves_a_top_level_index_module() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-index-module");
