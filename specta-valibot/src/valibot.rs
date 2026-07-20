@@ -879,12 +879,13 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
-        let ndts = ndts.collect::<Vec<_>>();
+        let mut ndts = ndts.collect::<Vec<_>>();
+        let already_exported = self.manually_exported_user_types.borrow().clone();
         if self.layout == Layout::Files {
-            validate_manual_file_type_names(
-                &self.manually_exported_user_types.borrow(),
-                ndts.iter().copied(),
-            )?;
+            validate_manual_file_type_names(&already_exported, ndts.iter().copied())?;
+        } else {
+            let mut seen = already_exported.clone();
+            ndts.retain(|ndt| ndt.ty.is_none() || seen.insert(manual_export_identity(ndt)));
         }
 
         let mapped = ndts
@@ -892,13 +893,7 @@ impl FrameworkExporter<'_> {
             .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
             .collect::<Result<Vec<_>, _>>()?;
         let rendered = if self.layout == Layout::Namespaces {
-            render_manual_namespace_types(
-                self,
-                self.types,
-                &mapped,
-                indent,
-                &self.manually_exported_user_types.borrow(),
-            )?
+            render_manual_namespace_types(self, self.types, &mapped, indent, &already_exported)?
         } else {
             primitives::export(self, self.types, mapped.iter(), indent)?
         };

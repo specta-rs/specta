@@ -1887,29 +1887,39 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
         .register::<ValibotGenericDefaults>()
         .register::<Another>();
 
-    for layout in [Layout::FlatFile, Layout::Namespaces] {
+    for layout in [
+        Layout::FlatFile,
+        Layout::ModulePrefixedName,
+        Layout::Namespaces,
+    ] {
         let rendered = Valibot::default()
             .layout(layout)
-            .framework_runtime(|mut exporter| {
-                let manual = exporter
+            .framework_runtime(move |mut exporter| {
+                let manual_type = exporter
                     .types
                     .into_unsorted_iter()
-                    .filter(|ndt| ndt.name == "ValibotGenericDefaults");
-                let manual = exporter.export(manual, "")?;
+                    .find(|ndt| ndt.name == "ValibotGenericDefaults")
+                    .unwrap();
+                let manual = exporter.export(std::iter::once(manual_type), "")?;
+                let repeated = exporter.export(std::iter::once(manual_type), "")?;
+                assert!(repeated.is_empty(), "{layout:?}: {repeated}");
                 let remaining = exporter.render_types()?;
                 Ok(Cow::Owned(format!("{manual}\n{remaining}")))
             })
             .export(&types, specta_serde::Format)
             .unwrap();
 
+        let prefix = (layout == Layout::ModulePrefixedName)
+            .then_some("test_valibot_")
+            .unwrap_or_default();
         for declaration in [
-            "export type ValibotGenericDefaults",
-            "export function ValibotGenericDefaultsSchema():",
-            "export type Another",
-            "export const AnotherSchema",
+            format!("export type {prefix}ValibotGenericDefaults"),
+            format!("export function {prefix}ValibotGenericDefaultsSchema():"),
+            format!("export type {prefix}Another"),
+            format!("export const {prefix}AnotherSchema"),
         ] {
             assert_eq!(
-                rendered.matches(declaration).count(),
+                rendered.matches(&declaration).count(),
                 1,
                 "{layout:?}: {rendered}"
             );
