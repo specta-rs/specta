@@ -118,7 +118,7 @@ small_ctor = { version = "0.1.2", optional = true }
 serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9", optional = true, default-features = false, features = [] }
 toml = { version = "1.1", optional = true, default-features = false, features = ["serde"] }
-ulid = { version = "2", optional = true, default-features = false, features = [] }
+ulid = { version = "3", optional = true, default-features = false, features = [] }
 uuid = { version = "1", optional = true, default-features = false, features = [
 ] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
