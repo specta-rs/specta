@@ -216,6 +216,98 @@ struct FlattenSiblingEnums {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+struct FlattenedStringMap {
+    id: u32,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedFiniteMap {
+    #[serde(rename = "wire_id")]
+    id: u32,
+    #[serde(flatten)]
+    extra: HashMap<FiniteKey, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct OptionalFlattenedMap {
+    id: u32,
+    #[serde(flatten)]
+    extra: Option<HashMap<String, String>>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct GenericFlatten<T> {
+    id: u32,
+    #[serde(flatten)]
+    extra: T,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct GenericFlattenHolder {
+    value: GenericFlatten<HashMap<String, String>>,
+}
+
+mod flattened_maps {
+    use super::*;
+
+    #[derive(Type, Serialize, Deserialize)]
+    pub struct StringMap(pub HashMap<String, String>);
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct CrossModuleFlattenedMap {
+    id: u32,
+    #[serde(flatten)]
+    extra: flattened_maps::StringMap,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct NestedMapInner {
+    name: String,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct NestedFlattenedMap {
+    id: u32,
+    #[serde(flatten)]
+    inner: NestedMapInner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct OverlappingNestedMapInner {
+    id: u32,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct OverlappingNestedFlattenedMap {
+    id: u32,
+    #[serde(flatten)]
+    inner: OverlappingNestedMapInner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+enum FlattenedMapEnum {
+    A {
+        #[serde(flatten)]
+        extra: HashMap<String, String>,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedMapEnumHolder {
+    id: u32,
+    #[serde(flatten)]
+    value: FlattenedMapEnum,
+}
+
+#[derive(Type, Serialize, Deserialize)]
 enum AllSkippedTupleVariant {
     A(#[serde(skip)] u8, #[serde(skip)] u8),
     B(String),
@@ -295,6 +387,14 @@ fn main() {
                 .register::<ReferencedFlatten>()
                 .register::<DangerousReferencedFlatten>()
                 .register::<FlattenSiblingEnums>()
+                .register::<FlattenedStringMap>()
+                .register::<FlattenedFiniteMap>()
+                .register::<OptionalFlattenedMap>()
+                .register::<GenericFlattenHolder>()
+                .register::<CrossModuleFlattenedMap>()
+                .register::<NestedFlattenedMap>()
+                .register::<OverlappingNestedFlattenedMap>()
+                .register::<FlattenedMapEnumHolder>()
                 .register::<AllSkippedTupleVariant>()
                 .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),

@@ -3,18 +3,26 @@ import * as v from "valibot";
 import {
   AllSkippedTupleVariantSchema,
   ContextualExternalWrapperSchema,
+  CrossModuleFlattenedMapSchema,
   DangerousReferencedFlattenSchema,
   DefaultTupleSchema,
   EmptyObjectSchema,
   ExternalEnumSchema,
   FlattenSiblingEnumsSchema,
+  FlattenedMapEnumHolderSchema,
+  FlattenedFiniteMapSchema,
+  FlattenedStringMapSchema,
   GenericMapSchema,
   GenericSchema,
   GenericMapHolderSchema,
+  GenericFlattenHolderSchema,
   MapOnlyExternalWrapperSchema,
   NarrowFloatsSchema,
+  NestedFlattenedMapSchema,
   OptionalFlattenSchema,
+  OptionalFlattenedMapSchema,
   OptionalObjectSchema,
+  OverlappingNestedFlattenedMapSchema,
   ProtoFieldSchema,
   RecursiveSchema,
   ReferencedFlattenSchema,
@@ -129,6 +137,47 @@ test("generated schemas validate representative wire values", () => {
   ).toBe(false);
   expect(
     v.safeParse(FlattenSiblingEnumsSchema, { A: null, B: null, extra: null }).success,
+  ).toBe(false);
+  const flattenedStringMap = v.parse(FlattenedStringMapSchema, { id: 1, extra: "ok" });
+  expect(flattenedStringMap.id).toBe(1);
+  expect((flattenedStringMap as unknown as Record<string, unknown>).extra).toBe("ok");
+  expect(v.safeParse(FlattenedStringMapSchema, { id: 1 }).success).toBe(true);
+  expect(v.safeParse(FlattenedStringMapSchema, { id: "1", extra: "ok" }).success).toBe(false);
+  expect(v.safeParse(FlattenedStringMapSchema, { id: 1, extra: 2 }).success).toBe(false);
+  const flattenedFiniteMap = v.parse(FlattenedFiniteMapSchema, { wire_id: 1, First: "ok" });
+  expect(flattenedFiniteMap.wire_id).toBe(1);
+  expect((flattenedFiniteMap as unknown as Record<string, unknown>).First).toBe("ok");
+  expect(v.safeParse(FlattenedFiniteMapSchema, { wire_id: 1, Third: "no" }).success).toBe(false);
+  expect(v.safeParse(FlattenedFiniteMapSchema, { wire_id: "1", First: "ok" }).success).toBe(false);
+  expect(v.safeParse(OptionalFlattenedMapSchema, { id: 1 }).success).toBe(true);
+  expect(v.safeParse(OptionalFlattenedMapSchema, { id: 1, extra: "ok" }).success).toBe(true);
+  // Serde may treat an invalid optional flattened map as absent and ignore its unknown entries.
+  expect(v.safeParse(OptionalFlattenedMapSchema, { id: 1, extra: 2 }).success).toBe(true);
+  expect(
+    v.safeParse(GenericFlattenHolderSchema, { value: { id: 1, extra: "ok" } }).success,
+  ).toBe(true);
+  expect(
+    v.safeParse(GenericFlattenHolderSchema, { value: { id: 1, extra: 2 } }).success,
+  ).toBe(false);
+  expect(v.safeParse(CrossModuleFlattenedMapSchema, { id: 1, extra: "ok" }).success).toBe(true);
+  expect(v.safeParse(CrossModuleFlattenedMapSchema, { id: 1, extra: 2 }).success).toBe(false);
+  expect(
+    v.safeParse(NestedFlattenedMapSchema, { id: 1, name: "name", extra: "ok" }).success,
+  ).toBe(true);
+  expect(
+    v.safeParse(NestedFlattenedMapSchema, { id: 1, name: "name", extra: 2 }).success,
+  ).toBe(false);
+  expect(
+    v.safeParse(OverlappingNestedFlattenedMapSchema, { id: 1, extra: "ok" }).success,
+  ).toBe(true);
+  expect(
+    v.safeParse(OverlappingNestedFlattenedMapSchema, { id: 1, extra: 2 }).success,
+  ).toBe(false);
+  expect(
+    v.safeParse(FlattenedMapEnumHolderSchema, { id: 1, kind: "A", extra: "ok" }).success,
+  ).toBe(true);
+  expect(
+    v.safeParse(FlattenedMapEnumHolderSchema, { id: 1, kind: "A", extra: 2 }).success,
   ).toBe(false);
   expect(v.safeParse(AllSkippedTupleVariantSchema, { A: [] }).success).toBe(true);
   expect(v.safeParse(AllSkippedTupleVariantSchema, "A").success).toBe(false);

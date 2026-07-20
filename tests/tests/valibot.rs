@@ -1589,6 +1589,26 @@ fn valibot_external_all_skipped_tuple_variant_keeps_empty_payload() {
     assert!(rendered.contains("A: v.strictTuple([])"), "{rendered}");
 }
 
+#[test]
+fn valibot_flattened_map_excludes_known_sibling_fields() {
+    // https://github.com/specta-rs/specta/issues/303
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    struct FlattenedMap {
+        id: u32,
+        #[serde(flatten)]
+        extra: HashMap<String, String>,
+    }
+
+    let types = Types::default().register::<FlattenedMap>();
+    let rendered = Valibot::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    assert!(rendered.contains("$spectaRecord("), "{rendered}");
+    assert!(rendered.contains(r#", ["id"])"#), "{rendered}");
+}
+
 /// Top-level documentation containing a terminator: */ still remains valid.
 #[deprecated(note = "Use the replacement instead")]
 #[derive(Type, Serialize, Deserialize)]

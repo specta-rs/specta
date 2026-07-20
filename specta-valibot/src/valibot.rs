@@ -28,6 +28,7 @@ const GENERATED_FILE_BINDINGS: &[&str] = &[
     "$spectaDeepDecode",
     "$spectaObject",
     "$spectaRecord",
+    "$spectaFlattened",
     "$spectaIntersect",
 ];
 
@@ -99,6 +100,19 @@ function $spectaRecord<
 		v.InferInput<v.RecordSchema<TKey, TValue, undefined>>,
 		v.InferOutput<v.RecordSchema<TKey, TValue, undefined>>
 	>;
+}
+function $spectaFlattened<const TSchema extends v.GenericSchema>(
+	schema: TSchema,
+	excludedKeys: readonly string[],
+): v.GenericSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>> {
+	const objectSchema = schema as v.GenericSchema<Record<string, unknown>>;
+	return v.pipe(
+		v.custom<Record<string, unknown>>($spectaIsRecord),
+		v.transform((input) =>
+			Object.fromEntries(Object.entries(input).filter(([key]) => !excludedKeys.includes(key))),
+		),
+		objectSchema,
+	) as unknown as v.GenericSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>>;
 }
 function $spectaIntersect<const TOptions extends v.IntersectOptions>(options: TOptions) {
 	const encodedOptions = options.map((option) =>
