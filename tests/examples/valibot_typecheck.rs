@@ -216,6 +216,22 @@ struct FlattenSiblingEnums {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+enum WrappedFlattenEnum {
+    A(()),
+    B(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedEnumNewtype<T>(T);
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedEnumNewtypeHolder {
+    id: u32,
+    #[serde(flatten)]
+    value: FlattenedEnumNewtype<WrappedFlattenEnum>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
 struct FlattenedStringMap {
     id: u32,
     #[serde(flatten)]
@@ -387,6 +403,7 @@ fn main() {
                 .register::<ReferencedFlatten>()
                 .register::<DangerousReferencedFlatten>()
                 .register::<FlattenSiblingEnums>()
+                .register::<FlattenedEnumNewtypeHolder>()
                 .register::<FlattenedStringMap>()
                 .register::<FlattenedFiniteMap>()
                 .register::<OptionalFlattenedMap>()

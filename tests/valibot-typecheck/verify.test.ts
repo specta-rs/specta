@@ -9,6 +9,7 @@ import {
   EmptyObjectSchema,
   ExternalEnumSchema,
   FlattenSiblingEnumsSchema,
+  FlattenedEnumNewtypeHolderSchema,
   FlattenedMapEnumHolderSchema,
   FlattenedFiniteMapSchema,
   FlattenedStringMapSchema,
@@ -138,6 +139,12 @@ test("generated schemas validate representative wire values", () => {
   expect(
     v.safeParse(FlattenSiblingEnumsSchema, { A: null, B: null, extra: null }).success,
   ).toBe(false);
+  expect(v.safeParse(FlattenedEnumNewtypeHolderSchema, { id: 1, A: null }).success).toBe(true);
+  expect(v.safeParse(FlattenedEnumNewtypeHolderSchema, { id: 1, B: null }).success).toBe(true);
+  expect(
+    v.safeParse(FlattenedEnumNewtypeHolderSchema, { id: 1, A: null, B: null }).success,
+  ).toBe(false);
+  expect(v.safeParse(FlattenedEnumNewtypeHolderSchema, { id: 1, extra: null }).success).toBe(false);
   const flattenedStringMap = v.parse(FlattenedStringMapSchema, { id: 1, extra: "ok" });
   expect(flattenedStringMap.id).toBe(1);
   expect((flattenedStringMap as unknown as Record<string, unknown>).extra).toBe("ok");

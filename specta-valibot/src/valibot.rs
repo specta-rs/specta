@@ -837,13 +837,14 @@ impl FrameworkExporter<'_> {
             )?;
         }
 
+        let manually_exported_user_types = self.manually_exported_user_types.borrow().clone();
         let mut s = String::new();
         render_types(
             &mut s,
             self.exporter,
             self.types,
             self.files_root_types,
-            &HashSet::new(),
+            &manually_exported_user_types,
             true,
         )?;
         self.manually_exported_user_types.borrow_mut().extend(

@@ -1203,8 +1203,7 @@ fn flattened_datatype(
         )?,
         DataType::Reference(Reference::Named(reference))
             if !matches!(reference.inner, NamedReferenceType::Recursive(_))
-                && (flattened_input_needs_filtering(dt, types, generics, &mut HashSet::new())
-                    || matches!(named_reference_ty(types, reference), Ok(DataType::Enum(_)))) =>
+                && flattened_input_requires_context(dt, types, generics, &mut HashSet::new()) =>
         {
             // Keep the normal reference-rendering side effects so file exporters import the
             // referenced TypeScript type even though its schema must be rendered contextually.
@@ -1880,7 +1879,7 @@ fn object_field_keys(
     }
 }
 
-fn flattened_input_needs_filtering(
+fn flattened_input_requires_context(
     dt: &DataType,
     types: &Types,
     generics: &[(GenericReference, DataType)],
@@ -1889,7 +1888,7 @@ fn flattened_input_needs_filtering(
     match dt {
         DataType::Map(_) => true,
         DataType::Nullable(inner) => {
-            flattened_input_needs_filtering(inner, types, generics, visiting)
+            flattened_input_requires_context(inner, types, generics, visiting)
         }
         DataType::Struct(strct) => {
             let Fields::Unnamed(fields) = &strct.fields else {
@@ -1897,31 +1896,15 @@ fn flattened_input_needs_filtering(
             };
             match fields.fields.as_slice() {
                 [field] => field.ty.as_ref().is_some_and(|ty| {
-                    flattened_input_needs_filtering(ty, types, generics, visiting)
+                    flattened_input_requires_context(ty, types, generics, visiting)
                 }),
                 _ => false,
             }
         }
-        DataType::Enum(enm) => enm
-            .variants
-            .iter()
-            .filter(|(_, variant)| !variant.skip)
-            .any(|(_, variant)| match &variant.fields {
-                Fields::Unit => false,
-                Fields::Unnamed(fields) => fields.fields.iter().any(|field| {
-                    field.ty.as_ref().is_some_and(|ty| {
-                        flattened_input_needs_filtering(ty, types, generics, visiting)
-                    })
-                }),
-                Fields::Named(fields) => fields.fields.iter().any(|(_, field)| {
-                    field.ty.as_ref().is_some_and(|ty| {
-                        flattened_input_needs_filtering(ty, types, generics, visiting)
-                    })
-                }),
-            }),
+        DataType::Enum(_) => true,
         DataType::Intersection(parts) => parts
             .iter()
-            .any(|part| flattened_input_needs_filtering(part, types, generics, visiting)),
+            .any(|part| flattened_input_requires_context(part, types, generics, visiting)),
         DataType::Reference(Reference::Named(reference)) => {
             if matches!(reference.inner, NamedReferenceType::Recursive(_))
                 || !visiting.insert(reference.clone())
@@ -1931,7 +1914,7 @@ fn flattened_input_needs_filtering(
             let result = (|| {
                 let ty = named_reference_ty(types, reference).ok()?;
                 let reference_generics = resolved_reference_generics(reference, generics).ok()?;
-                Some(flattened_input_needs_filtering(
+                Some(flattened_input_requires_context(
                     ty,
                     types,
                     &reference_generics,
@@ -1949,7 +1932,7 @@ fn flattened_input_needs_filtering(
                 if matches!(ty, DataType::Generic(candidate) if candidate == generic) {
                     true
                 } else {
-                    flattened_input_needs_filtering(ty, types, generics, visiting)
+                    flattened_input_requires_context(ty, types, generics, visiting)
                 }
             })
             .unwrap_or(true),

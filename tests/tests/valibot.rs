@@ -1881,6 +1881,43 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
 }
 
 #[test]
+fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
+    // https://github.com/specta-rs/specta/pull/558
+    let types = Types::default()
+        .register::<ValibotGenericDefaults>()
+        .register::<Another>();
+
+    for layout in [Layout::FlatFile, Layout::Namespaces] {
+        let rendered = Valibot::default()
+            .layout(layout)
+            .framework_runtime(|mut exporter| {
+                let manual = exporter
+                    .types
+                    .into_unsorted_iter()
+                    .filter(|ndt| ndt.name == "ValibotGenericDefaults");
+                let manual = exporter.export(manual, "")?;
+                let remaining = exporter.render_types()?;
+                Ok(Cow::Owned(format!("{manual}\n{remaining}")))
+            })
+            .export(&types, specta_serde::Format)
+            .unwrap();
+
+        for declaration in [
+            "export type ValibotGenericDefaults",
+            "export function ValibotGenericDefaultsSchema():",
+            "export type Another",
+            "export const AnotherSchema",
+        ] {
+            assert_eq!(
+                rendered.matches(declaration).count(),
+                1,
+                "{layout:?}: {rendered}"
+            );
+        }
+    }
+}
+
+#[test]
 fn valibot_type_alias_cleanup_preserves_jsdoc_markdown_breaks() {
     #[doc = "First line  \nSecond line"]
     #[derive(Type)]
