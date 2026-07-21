@@ -9,7 +9,7 @@ use std::{
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Deprecated, Field, Fields, Generic, NamedDataType, NamedReference,
+        Attributes, DataType, Deprecated, Field, Fields, Generic, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference,
     },
 };
@@ -40,6 +40,40 @@ pub enum Layout {
 impl fmt::Display for Layout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+/// A no-op [`Format`] that exports the type graph exactly as it was declared.
+///
+/// Rust is both Specta's source language and a target language, so — unlike a
+/// serialization target — it can reproduce the source types verbatim, serde
+/// container attributes and all. Pass this to [`Rust::export`] to generate a
+/// faithful copy of the source graph.
+///
+/// A serialization [`Format`] such as `specta_serde::Format` instead *lowers*
+/// the serde representation into the graph's shape and clears the container
+/// attributes, which a Rust target can no longer reproduce. That is the right
+/// input when inspecting the shape a format produces, but not when generating a
+/// type that is meant to round-trip like the original.
+///
+/// ```rust
+/// # use specta::{Type, Types};
+/// # use specta_rust::{Identity, Rust};
+/// # #[derive(Type)]
+/// # struct User { name: String }
+/// let types = Types::default().register::<User>();
+/// let source = Rust::default().export(&types, Identity).unwrap();
+/// assert!(source.contains("pub struct User"));
+/// ```
+pub struct Identity;
+
+impl Format for Identity {
+    fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
+    }
+
+    fn map_type(&self, _: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, specta::FormatError> {
+        Ok(Cow::Owned(dt.clone()))
     }
 }
 
@@ -291,10 +325,19 @@ fn render_named(
     match &ty {
         DataType::Struct(strct) => {
             render_derives(out, exporter, depth);
+            render_serde_container(out, exporter, &strct.attributes, false, &ndt_path, depth)?;
             render_struct(out, exporter, None, types, &name, ndt, &strct.fields, depth)?;
         }
         DataType::Enum(enm) => {
             render_derives(out, exporter, depth);
+            render_serde_container(
+                out,
+                exporter,
+                &enm.attributes,
+                lowering_changed_the_wire(enm),
+                &ndt_path,
+                depth,
+            )?;
             render_enum(out, exporter, None, types, &name, ndt, enm, depth)?;
         }
         ty => {
@@ -375,9 +418,7 @@ fn render_enum(
         match &variant.fields {
             Fields::Unit => line(out, depth + 1, &format!("{variant_name},")),
             Fields::Unnamed(fields)
-                if enm
-                    .attributes
-                    .contains_key("specta_serde:enum_repr_rewritten")
+                if enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
                     && is_singleton_unit_enum_field(fields) =>
             {
                 line(out, depth + 1, &format!("{variant_name},"));
@@ -417,6 +458,25 @@ fn render_enum(
     }
     line(out, depth, "}");
     Ok(())
+}
+
+/// Whether `specta-serde`'s lowering moved this enum away from the wire shape
+/// serde's own derive would produce for it.
+///
+/// An enum whose variants all carry no payload is unaffected: external tagging
+/// renders each one as a bare string either way, which is why the lowered
+/// singleton-literal form is collapsed straight back to a unit variant when
+/// rendering. Anything carrying a payload is a different shape once lowered.
+fn lowering_changed_the_wire(enm: &specta::datatype::Enum) -> bool {
+    enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+        && !enm
+            .variants
+            .iter()
+            .all(|(_, variant)| match &variant.fields {
+                Fields::Unit => true,
+                Fields::Unnamed(fields) => is_singleton_unit_enum_field(fields),
+                Fields::Named(_) => false,
+            })
 }
 
 fn is_singleton_unit_enum_field(fields: &specta::datatype::UnnamedFields) -> bool {
@@ -878,6 +938,123 @@ fn render_derives(out: &mut String, exporter: &Rust, depth: usize) {
             depth,
             &format!("#[derive({})]", exporter.derives.join(", ")),
         );
+    }
+}
+
+/// Container attribute keys recorded by Specta's derive macro, and the marker
+/// `specta-serde` leaves behind once it has lowered an enum's representation.
+///
+/// The exporter reads these keys directly to stay decoupled from how
+/// `specta-serde` models them internally.
+const SERDE_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
+const SERDE_RENAME_DESERIALIZE: &str = "serde:container:rename_deserialize";
+const SERDE_RENAME_ALL_SERIALIZE: &str = "serde:container:rename_all_serialize";
+const SERDE_RENAME_ALL_DESERIALIZE: &str = "serde:container:rename_all_deserialize";
+const SERDE_TAG: &str = "serde:container:tag";
+const SERDE_CONTENT: &str = "serde:container:content";
+const SERDE_UNTAGGED: &str = "serde:container:untagged";
+const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
+
+/// Whether the configured derives make the generated types speak serde's wire
+/// format, and therefore whether container attributes have to be reproduced.
+fn has_serde_derive(exporter: &Rust) -> bool {
+    exporter.derives.iter().any(|derive| {
+        matches!(
+            derive.rsplit("::").next().map(str::trim),
+            Some("Serialize" | "Deserialize")
+        )
+    })
+}
+
+/// Emit the `#[serde(...)]` container attribute for a generated declaration.
+///
+/// Rust is the one target language that expresses serde's container
+/// representations directly, so a generated type only round-trips to the same
+/// wire shape as its source when these are carried across. Without them a
+/// `#[serde(untagged)]` enum silently becomes an externally tagged one.
+///
+/// A graph already lowered by [`specta_serde::Format`] has the representation
+/// baked into its *shape* and its container attributes cleared, so re-deriving
+/// serde over it would tag the wire a second time. That case is reported
+/// instead of generating a type with the wrong wire format.
+fn render_serde_container(
+    out: &mut String,
+    exporter: &Rust,
+    attributes: &Attributes,
+    lowering_changed_the_wire: bool,
+    path: &str,
+    depth: usize,
+) -> Result<(), Error> {
+    if !has_serde_derive(exporter) {
+        return Ok(());
+    }
+    if lowering_changed_the_wire {
+        return Err(Error::UnsupportedSerdeLowering { path: path.into() });
+    }
+
+    let mut args = Vec::new();
+    push_serde_rename(
+        &mut args,
+        attributes,
+        "rename",
+        SERDE_RENAME_SERIALIZE,
+        SERDE_RENAME_DESERIALIZE,
+    );
+    push_serde_rename(
+        &mut args,
+        attributes,
+        "rename_all",
+        SERDE_RENAME_ALL_SERIALIZE,
+        SERDE_RENAME_ALL_DESERIALIZE,
+    );
+    if attributes
+        .get_named_as::<bool>(SERDE_UNTAGGED)
+        .copied()
+        .unwrap_or(false)
+    {
+        args.push("untagged".to_string());
+    }
+    if let Some(tag) = attributes.get_named_as::<String>(SERDE_TAG) {
+        args.push(format!("tag = {}", string_literal(tag)));
+    }
+    if let Some(content) = attributes.get_named_as::<String>(SERDE_CONTENT) {
+        args.push(format!("content = {}", string_literal(content)));
+    }
+
+    if !args.is_empty() {
+        line(out, depth, &format!("#[serde({})]", args.join(", ")));
+    }
+    Ok(())
+}
+
+/// Render a container rename, collapsing the serialize/deserialize pair back
+/// into serde's shorthand when both sides agree.
+fn push_serde_rename(
+    args: &mut Vec<String>,
+    attributes: &Attributes,
+    name: &str,
+    serialize_key: &str,
+    deserialize_key: &str,
+) {
+    let serialize = attributes.get_named_as::<String>(serialize_key);
+    let deserialize = attributes.get_named_as::<String>(deserialize_key);
+    match (serialize, deserialize) {
+        (Some(serialize), Some(deserialize)) if serialize == deserialize => {
+            args.push(format!("{name} = {}", string_literal(serialize)));
+        }
+        (Some(serialize), Some(deserialize)) => args.push(format!(
+            "{name}(serialize = {}, deserialize = {})",
+            string_literal(serialize),
+            string_literal(deserialize)
+        )),
+        (Some(serialize), None) => {
+            args.push(format!("{name}(serialize = {})", string_literal(serialize)))
+        }
+        (None, Some(deserialize)) => args.push(format!(
+            "{name}(deserialize = {})",
+            string_literal(deserialize)
+        )),
+        (None, None) => {}
     }
 }
 
