@@ -2354,6 +2354,7 @@ dependencies = [
  "specta-swift",
  "specta-typescript",
  "specta-util",
+ "specta-valibot",
  "specta-zod",
  "tempfile",
  "thiserror",
@@ -2382,6 +2383,17 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+]
+
+[[package]]
+name = "specta-valibot"
+version = "0.0.4"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+ "specta-util",
 ]
 
 [[package]]

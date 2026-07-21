@@ -31,6 +31,7 @@
 | **Kotlin**      | 🚧 **Partial** | [`specta-kotlin`](https://crates.io/crates/specta-kotlin)         | Data/sealed classes, generics, optional Kotlinx   |
 | **JSON Schema** | 🚧 **Partial** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
 | **Zod**         | 🚧 **Partial** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod 4 schemas, inferred types, generics, layouts  |
+| **Valibot**     | 🚧 **Partial** | [`specta-valibot`](https://crates.io/crates/specta-valibot)       | Valibot schemas, inferred types, generics, layouts |
 | **Python**      | 🚧 **Partial** | [`specta-python`](./specta-python)                                | Python 3.13 TypedDicts and type hints             |
 | **C#**          | 🚧 **Partial** | `specta-csharp`                                                   | Records, enums, generics, namespaces, file layouts |
 | **Java**        | 🚧 **Partial** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
@@ -45,7 +46,7 @@
 The Specta ecosystem is actively developed with varying levels of completeness:
 
 - **Production Ready (2)**: TypeScript and Swift exporters are fully functional with comprehensive test coverage
-- **Partially Implemented (9)**: Rust, OpenAPI, Go, C#, Java, Kotlin, JSON Schema, Zod, and Python have broad type support but are still stabilizing
+- **Partially Implemented (10)**: Rust, OpenAPI, Go, C#, Java, Kotlin, JSON Schema, Zod, Valibot, and Python have broad type support but are still stabilizing
 - **Planned (0)**: All currently listed exporters have an initial implementation
 
 For the most up-to-date status of each exporter, check the individual crate documentation and issue trackers.
@@ -77,6 +78,7 @@ cargo add specta-python      # Python 3.13 type hints (partial)
 cargo add specta_kotlin       # Kotlin (partial)
 cargo add specta_jsonschema   # JSON Schema (partial)
 cargo add specta_zod          # Zod schemas (partial)
+cargo add specta-valibot      # Valibot schemas (partial)
 cargo add specta-csharp       # C# (partial)
 ```
 
