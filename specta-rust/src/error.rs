@@ -48,6 +48,12 @@ pub enum Error {
         /// Path within the exported type graph.
         path: String,
     },
+    /// Serde derives were configured over a type graph whose serde
+    /// representation has already been lowered into its shape.
+    UnsupportedSerdeLowering {
+        /// Path within the exported type graph.
+        path: String,
+    },
     /// A primitive requires an unstable Rust language feature.
     UnsupportedPrimitive {
         /// Path within the exported type graph.
@@ -126,6 +132,15 @@ impl fmt::Display for Error {
                 write!(
                     f,
                     "structural intersection at {path} has no Rust equivalent"
+                )
+            }
+            Self::UnsupportedSerdeLowering { path } => {
+                write!(
+                    f,
+                    "serde derives at {path} cannot reproduce the source wire shape: \
+                     its serde representation was already lowered into the type graph. \
+                     Export with `Identity` instead of a serialization format so the \
+                     container attributes survive"
                 )
             }
             Self::UnsupportedPrimitive { path, primitive } => {

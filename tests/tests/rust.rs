@@ -17,19 +17,7 @@ use specta::{
         Variant,
     },
 };
-use specta_rust::{Layout, Rust};
-
-struct Identity;
-
-impl Format for Identity {
-    fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        Ok(Cow::Owned(types.clone()))
-    }
-
-    fn map_type(&self, _: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, specta::FormatError> {
-        Ok(Cow::Owned(ty.clone()))
-    }
-}
+use specta_rust::{Identity, Layout, Rust};
 
 /// A documented account.
 #[derive(Type, Serialize, Deserialize)]
@@ -909,4 +897,153 @@ fn compile_file(path: &std::path::Path, output_dir: &std::path::Path) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn serde_container_reprs_are_emitted_for_serde_derives() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum Untagged {
+        Text(String),
+        Count(u32),
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "kind", rename_all = "camelCase")]
+    enum Internal {
+        AlphaOne { value: String },
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c")]
+    enum Adjacent {
+        Alpha(String),
+    }
+
+    let types = Types::default()
+        .register::<Untagged>()
+        .register::<Internal>()
+        .register::<Adjacent>();
+    let output = Rust::default()
+        .derive("serde::Serialize")
+        .derive("serde::Deserialize")
+        .export(&types, Identity)
+        .unwrap();
+
+    insta::assert_snapshot!("rust-export-serde-container-reprs", output);
+}
+
+/// The wire shape is the point: a generated type that drops `untagged` is not
+/// a different spelling of the same contract, it is a different contract.
+#[test]
+fn dropping_the_container_repr_changes_the_wire_shape() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum Source {
+        Text(String),
+    }
+
+    // Transcribed from the generated source asserted below.
+    #[derive(Serialize)]
+    #[serde(untagged)]
+    enum Generated {
+        Text(String),
+    }
+
+    // The same declaration with the container attribute dropped, which is what
+    // the exporter produced before it emitted container reprs.
+    #[derive(Serialize)]
+    enum WithoutRepr {
+        Text(String),
+    }
+
+    let types = Types::default().register::<Source>();
+    let output = Rust::default()
+        .derive("serde::Serialize")
+        .export(&types, Identity)
+        .unwrap();
+    assert!(
+        output.contains("#[serde(untagged)]"),
+        "container repr missing from generated source:\n{output}"
+    );
+
+    let source = serde_json::to_string(&Source::Text("hi".into())).unwrap();
+    assert_eq!(source, "\"hi\"");
+    assert_eq!(
+        serde_json::to_string(&Generated::Text("hi".into())).unwrap(),
+        source,
+        "generated type must speak the source's wire format"
+    );
+    assert_eq!(
+        serde_json::to_string(&WithoutRepr::Text("hi".into())).unwrap(),
+        "{\"Text\":\"hi\"}",
+        "without the container repr serde externally tags the payload"
+    );
+}
+
+#[test]
+fn serde_derives_over_a_lowered_graph_report_an_error() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum Untagged {
+        Text(String),
+    }
+
+    let types = Types::default().register::<Untagged>();
+    let error = Rust::default()
+        .derive("serde::Serialize")
+        .export(&types, specta_serde::Format)
+        .unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            specta_rust::Error::UnsupportedSerdeLowering { path } if path.ends_with("Untagged")
+        ),
+        "unexpected lowered-graph error: {error}"
+    );
+}
+
+#[test]
+fn container_reprs_are_left_alone_without_serde_derives() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum Untagged {
+        Text(String),
+    }
+
+    let types = Types::default().register::<Untagged>();
+    let output = Rust::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(
+        !output.contains("serde"),
+        "serde attributes leaked into a non-serde export:\n{output}"
+    );
+    compile_source("serde-container-no-derives", &output);
+}
+
+#[test]
+fn unit_only_enums_survive_the_lowered_graph() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(rename_all = "lowercase")]
+    enum Visibility {
+        Public,
+        Private,
+    }
+
+    // Every variant is payload-free, so external tagging renders each one as a
+    // bare string either way and the lowering is wire-preserving.
+    let types = Types::default().register::<Visibility>();
+    let output = Rust::default()
+        .derive("serde::Serialize")
+        .export(&types, specta_serde::Format)
+        .expect("a payload-free enum should still export over a lowered graph");
+    assert!(output.contains("pub enum Visibility"), "{output}");
 }
