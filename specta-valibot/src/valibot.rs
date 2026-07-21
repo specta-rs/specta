@@ -253,7 +253,6 @@ impl Valibot {
                 exporter: &exporter,
                 format: Some(&format),
                 manually_exported_user_types: &manually_exported_user_types,
-                files_root_types: "",
                 types,
             });
         }
@@ -269,7 +268,6 @@ impl Valibot {
             &mut out,
             &exporter,
             types,
-            "",
             &manually_exported_user_types.into_inner(),
             true,
         )?;
@@ -299,7 +297,6 @@ impl Valibot {
                     exporter: &exporter,
                     format: Some(&format),
                     manually_exported_user_types: &manually_exported_user_types,
-                    files_root_types: "",
                     types,
                 });
             }
@@ -315,7 +312,6 @@ impl Valibot {
                 &mut result,
                 &exporter,
                 types,
-                "",
                 &manually_exported_user_types.into_inner(),
                 true,
             )?;
@@ -459,7 +455,6 @@ impl Valibot {
                             exporter: &exporter,
                             format: Some(&format),
                             manually_exported_user_types: &manually_exported_user_types,
-                            files_root_types: &root_types,
                             types,
                         })
                     })
@@ -800,7 +795,6 @@ pub struct FrameworkExporter<'a> {
     exporter: &'a Valibot,
     format: Option<&'a dyn Format>,
     manually_exported_user_types: &'a RefCell<HashSet<(String, String)>>,
-    files_root_types: &'a str,
     /// Collected types currently being exported.
     pub types: &'a Types,
 }
@@ -828,22 +822,12 @@ impl Deref for FrameworkExporter<'_> {
 impl FrameworkExporter<'_> {
     /// Render the types within [`Types`](specta::Types).
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
-        if self.layout == Layout::Files {
-            validate_manual_file_type_names(
-                &self.manually_exported_user_types.borrow(),
-                self.types
-                    .into_unsorted_iter()
-                    .filter(|ndt| ndt.module_path.is_empty()),
-            )?;
-        }
-
         let manually_exported_user_types = self.manually_exported_user_types.borrow().clone();
         let mut s = String::new();
         render_types(
             &mut s,
             self.exporter,
             self.types,
-            self.files_root_types,
             &manually_exported_user_types,
             true,
         )?;
@@ -1100,7 +1084,6 @@ fn render_types(
     s: &mut String,
     exporter: &Valibot,
     types: &Types,
-    files_user_types: &str,
     manually_exported_user_types: &HashSet<(String, String)>,
     render_namespace_reexports: bool,
 ) -> Result<(), Error> {
@@ -1281,9 +1264,14 @@ fn render_types(
             render_flat_types(s, exporter, types, remaining_types.into_iter(), "")?;
         }
         Layout::Files => {
-            if !files_user_types.is_empty() {
-                s.push_str(files_user_types);
-            }
+            let remaining_types = types
+                .into_sorted_iter()
+                .filter(|ndt| {
+                    ndt.module_path.is_empty()
+                        && !manually_exported_user_types.contains(&manual_export_identity(ndt))
+                })
+                .collect::<Vec<_>>();
+            render_flat_types(s, exporter, types, remaining_types.into_iter(), "")?;
         }
     }
 

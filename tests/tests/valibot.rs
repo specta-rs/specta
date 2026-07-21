@@ -1925,6 +1925,63 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
             );
         }
     }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct FilesManualRoot {
+        child: testing::Testing,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct FilesRemainingRoot {
+        child: testing::Testing,
+    }
+
+    let mut types = Types::default()
+        .register::<FilesManualRoot>()
+        .register::<FilesRemainingRoot>();
+    types.iter_mut(|ndt| {
+        if matches!(ndt.name.as_ref(), "FilesManualRoot" | "FilesRemainingRoot") {
+            ndt.module_path = "".into();
+        }
+    });
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    Valibot::default()
+        .layout(Layout::Files)
+        .framework_runtime(|mut exporter| {
+            let manual_type = exporter
+                .types
+                .into_unsorted_iter()
+                .find(|ndt| ndt.name == "FilesManualRoot")
+                .unwrap();
+            let manual = exporter.export(std::iter::once(manual_type), "")?;
+            let remaining = exporter.render_types()?;
+            assert!(exporter.render_types()?.is_empty());
+            Ok(Cow::Owned(format!("{manual}\n{remaining}")))
+        })
+        .export_to(temp.path(), &types, specta_serde::Format)
+        .unwrap();
+
+    let rendered = std::fs::read_to_string(temp.path().join("index.ts")).unwrap();
+    for declaration in [
+        "export type FilesManualRoot",
+        "export const FilesManualRootSchema",
+        "export type FilesRemainingRoot",
+        "export const FilesRemainingRootSchema",
+    ] {
+        assert_eq!(rendered.matches(declaration).count(), 1, "{rendered}");
+    }
+    assert_eq!(
+        rendered
+            .matches("import * as test$valibot$testing from \"./test/valibot/testing\";")
+            .count(),
+        1,
+        "{rendered}"
+    );
 }
 
 #[test]
