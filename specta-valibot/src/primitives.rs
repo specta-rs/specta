@@ -1039,6 +1039,7 @@ fn datatype(
             generics,
             type_render_stack,
             &[],
+            false,
         )?,
     }
 
@@ -1055,6 +1056,7 @@ fn intersection_dt(
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
     inherited_excluded_keys: &[&str],
+    inherited_open_sibling: bool,
 ) -> Result<(), Error> {
     if intersection.is_empty() {
         s.push_str("v.unknown()");
@@ -1063,6 +1065,14 @@ fn intersection_dt(
 
     let mut parts = Vec::with_capacity(intersection.len());
     for (index, ty) in intersection.iter().enumerate() {
+        let open_sibling = inherited_open_sibling
+            || intersection
+                .iter()
+                .enumerate()
+                .filter(|(other_index, _)| *other_index != index)
+                .any(|(_, ty)| {
+                    flattened_input_validates_unknown_keys(ty, types, generics, &mut HashSet::new())
+                });
         let mut excluded_keys = inherited_excluded_keys
             .iter()
             .map(|key| (*key).to_string())
@@ -1091,6 +1101,7 @@ fn intersection_dt(
             generics,
             type_render_stack,
             &excluded_keys,
+            open_sibling,
         )?;
         parts.push(part);
     }
@@ -1108,6 +1119,7 @@ fn flattened_datatype(
     generics: &[(GenericReference, DataType)],
     type_render_stack: &mut TypeRenderStack,
     excluded_keys: &[&str],
+    open_sibling: bool,
 ) -> Result<(), Error> {
     match dt {
         DataType::Map(_) => {
@@ -1144,6 +1156,7 @@ fn flattened_datatype(
                 generics,
                 type_render_stack,
                 excluded_keys,
+                open_sibling,
             )?;
             write!(s, "v.nullable({schema})")?;
         }
@@ -1166,6 +1179,7 @@ fn flattened_datatype(
                     generics,
                     type_render_stack,
                     excluded_keys,
+                    open_sibling,
                 )?;
             } else {
                 datatype(
@@ -1189,18 +1203,38 @@ fn flattened_datatype(
             generics,
             type_render_stack,
             excluded_keys,
+            open_sibling,
         )?,
-        DataType::Enum(enm) => enum_dt(
-            s,
-            exporter,
-            types,
-            enm,
-            location,
-            generics,
-            type_render_stack,
-            excluded_keys,
-            excluded_keys,
-        )?,
+        DataType::Enum(enm) => {
+            let mut schema = String::new();
+            enum_dt(
+                &mut schema,
+                exporter,
+                types,
+                enm,
+                location,
+                generics,
+                type_render_stack,
+                excluded_keys,
+                excluded_keys,
+            )?;
+            if open_sibling {
+                if let Some(keys) = object_field_keys(dt, types, generics, &mut HashSet::new()) {
+                    let mut keys = keys.into_iter().collect::<Vec<_>>();
+                    keys.sort_unstable();
+                    let keys = keys
+                        .iter()
+                        .map(|key| format!("\"{}\"", escape_string(key)))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    write!(s, "$spectaPick({schema}, [{keys}])")?;
+                } else {
+                    s.push_str(&schema);
+                }
+            } else {
+                s.push_str(&schema);
+            }
+        }
         DataType::Reference(Reference::Named(reference))
             if !matches!(reference.inner, NamedReferenceType::Recursive(_))
                 && flattened_input_requires_context(dt, types, generics, &mut HashSet::new()) =>
@@ -1229,6 +1263,7 @@ fn flattened_datatype(
                 generics,
                 type_render_stack,
                 excluded_keys,
+                open_sibling,
             )?;
         }
         DataType::Generic(generic) => {
@@ -1248,8 +1283,12 @@ fn flattened_datatype(
                     generics,
                     type_render_stack,
                     excluded_keys,
+                    open_sibling,
                 )?;
             } else {
+                if open_sibling {
+                    return Err(Error::unrepresentable_flattened_generic(location.join(".")));
+                }
                 let mut schema = String::new();
                 datatype(
                     &mut schema,
@@ -1940,6 +1979,75 @@ fn flattened_input_requires_context(
     }
 }
 
+fn flattened_input_validates_unknown_keys(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    visiting: &mut HashSet<NamedReference>,
+) -> bool {
+    match dt {
+        DataType::Map(_) => true,
+        DataType::Nullable(inner) => {
+            flattened_input_validates_unknown_keys(inner, types, generics, visiting)
+        }
+        DataType::Struct(strct) => {
+            let Fields::Unnamed(fields) = &strct.fields else {
+                return false;
+            };
+            match fields.fields.as_slice() {
+                [field] => field.ty.as_ref().is_some_and(|ty| {
+                    flattened_input_validates_unknown_keys(ty, types, generics, visiting)
+                }),
+                _ => false,
+            }
+        }
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .any(|(_, variant)| match &variant.fields {
+                Fields::Unnamed(fields) if fields.fields.len() == 1 => {
+                    fields.fields[0].ty.as_ref().is_some_and(|ty| {
+                        flattened_input_validates_unknown_keys(ty, types, generics, visiting)
+                    })
+                }
+                _ => false,
+            }),
+        DataType::Intersection(parts) => parts
+            .iter()
+            .any(|part| flattened_input_validates_unknown_keys(part, types, generics, visiting)),
+        DataType::Reference(Reference::Named(reference)) => {
+            if matches!(reference.inner, NamedReferenceType::Recursive(_))
+                || !visiting.insert(reference.clone())
+            {
+                return false;
+            }
+            let result = (|| {
+                let ty = named_reference_ty(types, reference).ok()?;
+                let reference_generics = resolved_reference_generics(reference, generics).ok()?;
+                Some(flattened_input_validates_unknown_keys(
+                    ty,
+                    types,
+                    &reference_generics,
+                    visiting,
+                ))
+            })()
+            .unwrap_or(false);
+            visiting.remove(reference);
+            result
+        }
+        DataType::Generic(generic) => generics
+            .iter()
+            .find(|(candidate, _)| candidate == generic)
+            .map(|(_, ty)| {
+                matches!(ty, DataType::Generic(candidate) if candidate == generic)
+                    || flattened_input_validates_unknown_keys(ty, types, generics, visiting)
+            })
+            .unwrap_or(true),
+        _ => false,
+    }
+}
+
 fn object_field_keys_for_fields(
     fields: &Fields,
     types: &Types,
@@ -2154,6 +2262,7 @@ fn enum_variant_dt(
                         generics,
                         type_render_stack,
                         flattened_excluded_keys,
+                        false,
                     )?;
                     Some(out)
                 }

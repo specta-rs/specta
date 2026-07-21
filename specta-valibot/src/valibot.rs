@@ -29,6 +29,7 @@ const GENERATED_FILE_BINDINGS: &[&str] = &[
     "$spectaObject",
     "$spectaRecord",
     "$spectaFlattened",
+    "$spectaPick",
     "$spectaIntersect",
 ];
 
@@ -110,6 +111,19 @@ function $spectaFlattened<const TSchema extends v.GenericSchema>(
 		v.custom<Record<string, unknown>>($spectaIsRecord),
 		v.transform((input) =>
 			Object.fromEntries(Object.entries(input).filter(([key]) => !excludedKeys.includes(key))),
+		),
+		objectSchema,
+	) as unknown as v.GenericSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>>;
+}
+function $spectaPick<const TSchema extends v.GenericSchema>(
+	schema: TSchema,
+	retainedKeys: readonly string[],
+): v.GenericSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>> {
+	const objectSchema = schema as v.GenericSchema<Record<string, unknown>>;
+	return v.pipe(
+		v.custom<Record<string, unknown>>($spectaIsRecord),
+		v.transform((input) =>
+			Object.fromEntries(Object.entries(input).filter(([key]) => retainedKeys.includes(key))),
 		),
 		objectSchema,
 	) as unknown as v.GenericSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>>;

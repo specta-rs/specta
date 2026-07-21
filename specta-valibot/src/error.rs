@@ -57,6 +57,9 @@ enum ErrorKind {
     DanglingNamedReference {
         reference: String,
     },
+    UnrepresentableFlattenedGeneric {
+        path: String,
+    },
     Framework {
         message: Cow<'static, str>,
         source: FrameworkSource,
@@ -176,6 +179,12 @@ impl Error {
         }
     }
 
+    pub(crate) fn unrepresentable_flattened_generic(path: String) -> Self {
+        Self {
+            kind: ErrorKind::UnrepresentableFlattenedGeneric { path },
+        }
+    }
+
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
         Self {
             kind: ErrorKind::UnableToExport(layout),
@@ -276,6 +285,10 @@ impl fmt::Display for Error {
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
+            ),
+            ErrorKind::UnrepresentableFlattenedGeneric { path } => write!(
+                f,
+                "Unable to export flattened generic at {path:?} beside a map-like sibling because an arbitrary Valibot schema does not expose its owned object keys."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

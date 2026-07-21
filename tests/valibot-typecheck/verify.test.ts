@@ -10,6 +10,9 @@ import {
   ExternalEnumSchema,
   FlattenSiblingEnumsSchema,
   FlattenedEnumNewtypeHolderSchema,
+  FlattenedExternalGenericSchema,
+  FlattenedExternalMapSchema,
+  FlattenedExternalOpenEnumSchema,
   FlattenedMapEnumHolderSchema,
   FlattenedFiniteMapSchema,
   FlattenedStringMapSchema,
@@ -151,6 +154,61 @@ test("generated schemas validate representative wire values", () => {
   expect(v.safeParse(FlattenedStringMapSchema, { id: 1 }).success).toBe(true);
   expect(v.safeParse(FlattenedStringMapSchema, { id: "1", extra: "ok" }).success).toBe(false);
   expect(v.safeParse(FlattenedStringMapSchema, { id: 1, extra: 2 }).success).toBe(false);
+  const flattenedExternalMap = v.parse(FlattenedExternalMapSchema, {
+    id: 1,
+    wire_a: null,
+    extra: "ok",
+  });
+  expect(flattenedExternalMap.id).toBe(1);
+  expect((flattenedExternalMap as unknown as Record<string, unknown>).wire_a).toBeNull();
+  expect((flattenedExternalMap as unknown as Record<string, unknown>).extra).toBe("ok");
+  expect(v.safeParse(FlattenedExternalMapSchema, { id: 1, B: null, other: "ok" }).success).toBe(
+    true,
+  );
+  expect(v.safeParse(FlattenedExternalMapSchema, { id: 1, wire_a: null, extra: 2 }).success).toBe(
+    false,
+  );
+  expect(v.safeParse(FlattenedExternalMapSchema, { id: 1, wire_a: null, B: null }).success).toBe(
+    false,
+  );
+  expect(v.safeParse(FlattenedExternalMapSchema, { id: 1, extra: "ok" }).success).toBe(false);
+  expect(
+    v.safeParse(FlattenedExternalMapSchema, { id: 1, wire_a: "wrong", extra: "ok" }).success,
+  ).toBe(false);
+  const flattenedExternalOpenEnum = v.parse(FlattenedExternalOpenEnumSchema, {
+    wire_a: null,
+    kind: "WithMap",
+    extra: "ok",
+  });
+  expect((flattenedExternalOpenEnum as unknown as Record<string, unknown>).wire_a).toBeNull();
+  expect(flattenedExternalOpenEnum.kind).toBe("WithMap");
+  expect((flattenedExternalOpenEnum as unknown as Record<string, unknown>).extra).toBe("ok");
+  expect(
+    v.safeParse(FlattenedExternalOpenEnumSchema, {
+      wire_a: null,
+      kind: "WithMap",
+      extra: 2,
+    }).success,
+  ).toBe(false);
+  expect(
+    v.safeParse(FlattenedExternalOpenEnumSchema, {
+      wire_a: null,
+      B: null,
+      kind: "WithMap",
+    }).success,
+  ).toBe(false);
+  const flattenedExternalGeneric = v.parse(
+    FlattenedExternalGenericSchema(v.record(v.string(), v.string())),
+    { wire_a: null, extra: "ok" },
+  );
+  expect((flattenedExternalGeneric as unknown as Record<string, unknown>).wire_a).toBeNull();
+  expect((flattenedExternalGeneric as unknown as Record<string, unknown>).extra).toBe("ok");
+  expect(
+    v.safeParse(FlattenedExternalGenericSchema(v.record(v.string(), v.string())), {
+      wire_a: null,
+      extra: 2,
+    }).success,
+  ).toBe(false);
   const flattenedFiniteMap = v.parse(FlattenedFiniteMapSchema, { wire_id: 1, First: "ok" });
   expect(flattenedFiniteMap.wire_id).toBe(1);
   expect((flattenedFiniteMap as unknown as Record<string, unknown>).First).toBe("ok");

@@ -239,6 +239,46 @@ struct FlattenedStringMap {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+enum FlattenedExternalMapPayload {
+    #[serde(rename = "wire_a")]
+    A(()),
+    B(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+enum FlattenedOpenEnum {
+    WithMap(flattened_maps::StringMap),
+    Empty,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedExternalOpenEnum {
+    #[serde(flatten)]
+    payload: FlattenedExternalMapPayload,
+    #[serde(flatten)]
+    extra: FlattenedOpenEnum,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedExternalGeneric<T> {
+    #[serde(flatten)]
+    payload: FlattenedExternalMapPayload,
+    #[serde(flatten)]
+    extra: T,
+}
+
+// https://github.com/specta-rs/specta/pull/558
+#[derive(Type, Serialize, Deserialize)]
+struct FlattenedExternalMap {
+    id: u32,
+    #[serde(flatten)]
+    payload: FlattenedExternalMapPayload,
+    #[serde(flatten)]
+    extra: flattened_maps::StringMap,
+}
+
+#[derive(Type, Serialize, Deserialize)]
 struct FlattenedFiniteMap {
     #[serde(rename = "wire_id")]
     id: u32,
@@ -405,6 +445,9 @@ fn main() {
                 .register::<FlattenSiblingEnums>()
                 .register::<FlattenedEnumNewtypeHolder>()
                 .register::<FlattenedStringMap>()
+                .register::<FlattenedExternalMap>()
+                .register::<FlattenedExternalOpenEnum>()
+                .register::<FlattenedExternalGeneric<flattened_maps::StringMap>>()
                 .register::<FlattenedFiniteMap>()
                 .register::<OptionalFlattenedMap>()
                 .register::<GenericFlattenHolder>()

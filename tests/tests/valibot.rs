@@ -41,6 +41,22 @@ struct GenericMap<K = bool> {
     values: HashMap<K, String>,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum GenericFlattenedExternalPayload {
+    A(()),
+    B(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct GenericFlattenedBesideMap<T> {
+    #[serde(flatten)]
+    payload: T,
+    #[serde(flatten)]
+    extra: HashMap<String, String>,
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct ChainedDefaultMap<T = bool, U = T> {
@@ -373,6 +389,16 @@ fn valibot_generic_maps_receive_serialized_key_schemas() {
         out.contains("$key$U: v.GenericSchema<string, string> = $key$T"),
         "{out}"
     );
+}
+
+#[test]
+fn valibot_rejects_unrepresentable_flattened_generic_beside_map() {
+    // https://github.com/specta-rs/specta/pull/558
+    let err = export_for::<GenericFlattenedBesideMap<GenericFlattenedExternalPayload>>()
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("flattened generic"), "{err}");
+    assert!(err.contains("map-like sibling"), "{err}");
 }
 
 #[test]
