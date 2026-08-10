@@ -28,7 +28,17 @@
 //! # Scope and caveats
 //!
 //! * Arrays type as a **tuple** of their elements (`[1, "x"]` → `[number, string]`),
-//!   which stays honest for heterogeneous arrays.
+//!   which stays honest for heterogeneous arrays and matches how Specta treats a
+//!   Rust `[T; N]` (a bracket literal *is* a fixed-size array). For a plain array
+//!   type (`number[]`), interpolate a `Vec` — it keeps its `List` type:
+//!
+//!   ```
+//!   # use specta_util::ty;
+//!   let tags: Vec<String> = vec!["serde".into(), "specta".into()];
+//!   let _fixed = ty!({ "pair": [1, "x"] }); // pair: [number, string]
+//!   let _list = ty!({ "tags": tags });      // tags: string[]
+//!   ```
+//!
 //! * `null` maps to `()` (serializes as `null`, types as the unit/null type).
 //! * A large literal expands to deeply nested items; bump `#![recursion_limit]` if
 //!   you hit it.
