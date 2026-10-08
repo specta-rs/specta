@@ -10,6 +10,10 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod selection;
 
+#[cfg(feature = "unstable_ty_macro")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable_ty_macro")))]
+pub mod ty;
+
 mod array;
 mod remapper;
 
