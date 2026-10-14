@@ -141,13 +141,13 @@ bson = { version = "3", optional = true, default-features = false, features = ["
 bytes = { version = "1", optional = true, default-features = false, features = [] }
 uhlc = { version = "0.9", optional = true, default-features = false, features = [] }
 bytesize = { version = "2", optional = true, default-features = false, features = [] }
-glam = { version = "0.33", optional = true, default-features = false, features = ["std", "all-types"] }
+glam = { version = "0.34", optional = true, default-features = false, features = ["std", "all-types"] }
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 url = { version = "2", optional = true, default-features = false }
 either = { version = "1", optional = true, default-features = false }
 error-stack = { version = "0.8", optional = true, default-features = false }
-bevy_ecs = { version = "0.19", optional = true, default-features = false, features = ["std"] }
-bevy_input = { version = "0.19", optional = true, default-features = false, features = [
+bevy_ecs = { version = "0.20", optional = true, default-features = false, features = ["std"] }
+bevy_input = { version = "0.20", optional = true, default-features = false, features = [
   "std",
   "bevy_reflect",
   "keyboard",
