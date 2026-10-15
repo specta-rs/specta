@@ -631,13 +631,18 @@ impl Configuration {
                 Fields::Unnamed(fields) => {
                     let mut ty = s.clone();
                     let mut changed = false;
+                    let is_newtype = fields.fields.len() == 1;
                     let parts = fields
                         .fields
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, field)| {
                             let field_ty = field.ty.as_ref()?;
-                            let field_ident = format!("{js_ident}[{idx}]");
+                            let field_ident = if is_newtype {
+                                js_ident.to_owned()
+                            } else {
+                                format!("{js_ident}[{idx}]")
+                            };
                             let (next_ty, runtime) = self.apply_inner(
                                 transform_for_rule,
                                 remap_bigint,
@@ -663,7 +668,11 @@ impl Configuration {
                     } else {
                         Some((
                             changed.then_some(DataType::Struct(ty)),
-                            array_transform(js_ident, fields.fields.len(), parts),
+                            if is_newtype {
+                                parts.into_iter().next()?.1
+                            } else {
+                                array_transform(js_ident, fields.fields.len(), parts)
+                            },
                         ))
                     }
                 }
@@ -1132,5 +1141,54 @@ fn js_object_key(name: &str) -> Cow<'_, str> {
         Cow::Borrowed(name)
     } else {
         Cow::Owned(format!("\"{}\"", escape_typescript_string_literal(name)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Website(String);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Newtype(Option<Website>);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Tuple(Option<Website>, Website);
+
+    fn semantic_config() -> Configuration {
+        Configuration::empty().define::<Website>(
+            |_| crate::define("URL").into(),
+            Some(Transform::new(|value| format!("{value}.toString()"))),
+            Some(Transform::new(|value| format!("new URL({value})"))),
+        )
+    }
+
+    #[test]
+    fn semantic_newtype_transforms_use_scalar_shape() {
+        let semantic = semantic_config();
+        let mut types = Types::default();
+        let newtype = Newtype::definition(&mut types);
+
+        let (_, serialize) = semantic
+            .apply_serialize(&types, &newtype, "value")
+            .expect("newtype should apply its nested semantic transform");
+        assert_eq!(serialize, "value==null?value:value.toString()");
+
+        let (_, deserialize) = semantic
+            .apply_deserialize(&types, &newtype, "value")
+            .expect("newtype should apply its nested semantic transform");
+        assert_eq!(deserialize, "value==null?value:new URL(value)");
+
+        let tuple = Tuple::definition(&mut types);
+        let (_, tuple_runtime) = semantic
+            .apply_serialize(&types, &tuple, "value")
+            .expect("tuple should apply its nested semantic transform");
+        assert!(tuple_runtime.starts_with("([value[0]==null?value[0]:"));
+        assert!(tuple_runtime.ends_with("value[1].toString()])"));
     }
 }
