@@ -40,7 +40,7 @@ url = { version = "2", default-features = false }
 jiff = { version = "0.2", default-features = false }
 either = { version = "1.16", default-features = false }
 ulid = { version = "3.0", default-features = false, features = [] }
-glam = { version = "0.33", default-features = false, features = ["std", "all-types"] }
+glam = { version = "0.34", default-features = false, features = ["std", "all-types"] }
 ordered-float = { version = ">=3, <6", default-features = false }
 heapless = { version = ">=0.7, <0.10", default-features = false }
 semver = { version = "1", default-features = false }
