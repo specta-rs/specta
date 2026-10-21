@@ -116,6 +116,295 @@ fn normalized_payload<'a>(variant_name: &str, payload: &'a DataType) -> &'a Data
     current
 }
 
+/// Marker `specta-serde` leaves on the single-variant unit enums it synthesises
+/// for serde tags (and on the enums it has rewritten).
+const ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
+
+/// Field attribute recorded by the derive macro for `#[serde(flatten)]`.
+const FLATTENED_FIELD: &str = "serde:field:flatten";
+
+/// A serde tag that `specta-serde` baked into a rewritten enum variant.
+struct VariantTag<'a> {
+    /// The wire key carrying the discriminant (serde's `tag`).
+    key: &'a str,
+    /// The string the discriminant must carry (the variant's serialized name).
+    value: &'a str,
+}
+
+/// The fixed string a rewritten tag field carries, when the datatype is the
+/// single-variant unit enum `specta-serde` synthesises for a serde tag.
+///
+/// The `enum_repr_rewritten` marker is required so a user-authored
+/// single-variant unit enum (e.g. an inlined field type) is never mistaken for
+/// a tag.
+fn tag_literal_value(dt: &DataType) -> Option<&str> {
+    let DataType::Enum(enm) = dt else {
+        return None;
+    };
+
+    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN) {
+        return None;
+    }
+
+    let [(value, variant)] = enm.variants.as_slice() else {
+        return None;
+    };
+
+    matches!(variant.fields, Fields::Unit).then_some(value.as_ref())
+}
+
+/// Recover the serde tag from an internally or adjacently tagged variant.
+///
+/// `specta-serde` lowers both representations into a named field whose type is
+/// a single-variant unit enum (a string literal). An externally tagged variant
+/// keys its payload by the variant's own name instead, so a string-literal field
+/// can only be a tag.
+fn variant_tag<'a>(variant: &'a Variant) -> Option<VariantTag<'a>> {
+    let Fields::Named(fields) = &variant.fields else {
+        return None;
+    };
+
+    let mut tags = fields.fields.iter().filter_map(|(name, field)| {
+        Some(VariantTag {
+            key: name.as_ref(),
+            value: tag_literal_value(field.ty.as_ref()?)?,
+        })
+    });
+
+    let tag = tags.next()?;
+    tags.next().is_none().then_some(tag)
+}
+
+/// A tagged variant's payload once its tag field is removed.
+struct TaggedPayload<'a> {
+    /// The payload fields, in declaration order.
+    fields: Vec<(&'a str, &'a Field)>,
+    /// The wire key the payload nests under when it is an adjacent variant's
+    /// inline struct content.
+    content_key: Option<&'a str>,
+}
+
+/// Split a tagged variant into its payload fields, dropping the tag.
+fn tagged_payload<'a>(variant: &'a Variant, tag_key: &str) -> TaggedPayload<'a> {
+    let Fields::Named(fields) = &variant.fields else {
+        return TaggedPayload {
+            fields: Vec::new(),
+            content_key: None,
+        };
+    };
+
+    let payload: Vec<(&str, &Field)> = fields
+        .fields
+        .iter()
+        .filter(|(name, _)| name.as_ref() != tag_key)
+        .map(|(name, field)| (name.as_ref(), field))
+        .collect();
+
+    // An adjacently tagged struct variant carries its payload as one inline
+    // struct under the `content` key. The exporter has no name for that struct,
+    // so hoist its fields into the wrapper and re-nest them on the wire.
+    if let [(key, field)] = payload.as_slice()
+        && let Some(DataType::Struct(strct)) = field.ty.as_ref()
+        && let Fields::Named(named) = &strct.fields
+    {
+        return TaggedPayload {
+            fields: named
+                .fields
+                .iter()
+                .map(|(name, field)| (name.as_ref(), field))
+                .collect(),
+            content_key: Some(key),
+        };
+    }
+
+    TaggedPayload {
+        fields: payload,
+        content_key: None,
+    }
+}
+
+/// The Swift name of the struct generated to wrap a variant's named payload.
+fn variant_wrapper_name(enum_name: &str, variant_name: &str) -> String {
+    format!("{}{}Data", enum_name, to_pascal_case(variant_name))
+}
+
+/// The named fields a variant's generated wrapper struct holds.
+///
+/// Returns `None` when the variant is not represented by a wrapper struct (its
+/// case carries the payload type directly, or it is a unit case).
+fn wrapper_fields<'a>(
+    variant_name: &str,
+    variant: &'a Variant,
+) -> Option<Vec<(&'a str, &'a Field)>> {
+    if let Some(tag) = variant_tag(variant) {
+        let payload = tagged_payload(variant, tag.key);
+        return (payload.content_key.is_some() || !payload.fields.is_empty())
+            .then_some(payload.fields);
+    }
+
+    let Fields::Named(fields) = &variant.fields else {
+        return None;
+    };
+
+    if fields.fields.is_empty() {
+        return None;
+    }
+
+    let wrapper = match serde_variant_payload(variant_name, variant) {
+        Some(payload) => {
+            let DataType::Struct(strct) = normalized_payload(variant_name, payload) else {
+                return None;
+            };
+            let Fields::Named(named) = &strct.fields else {
+                return None;
+            };
+            named
+                .fields
+                .iter()
+                .map(|(name, field)| (name.as_ref(), field))
+                .collect::<Vec<_>>()
+        }
+        None => fields
+            .fields
+            .iter()
+            .map(|(name, field)| (name.as_ref(), field))
+            .collect(),
+    };
+
+    (!wrapper.is_empty()).then_some(wrapper)
+}
+
+/// Whether a variant serializes as a bare string under external tagging, which
+/// serde does for unit variants.
+fn is_external_unit_variant(variant_name: &str, variant: &Variant) -> bool {
+    match &variant.fields {
+        Fields::Unit => true,
+        Fields::Unnamed(fields) => {
+            fields.fields.len() == 1
+                && fields.fields[0]
+                    .ty
+                    .as_ref()
+                    .is_some_and(|ty| is_unit_payload(variant_name, ty))
+        }
+        Fields::Named(_) => false,
+    }
+}
+
+/// Whether a payload field may be absent from the wire.
+///
+/// `specta-serde` only sets `Field::optional` for `#[serde(default)]`; a plain
+/// `Option<T>` is a `Nullable` datatype, and serde deserializes a missing key
+/// for one to `None`.
+fn field_is_optional(field: &Field) -> bool {
+    field.optional || matches!(field.ty.as_ref(), Some(DataType::Nullable(_)))
+}
+
+/// The `?` a generated property needs when a field tolerates absence but its
+/// datatype is not already nullable (a `Nullable` renders as `T?` on its own,
+/// so adding the marker would produce `T??`).
+fn optional_suffix(field: &Field, ty: &DataType) -> &'static str {
+    if field.optional && !matches!(ty, DataType::Nullable(_)) {
+        "?"
+    } else {
+        ""
+    }
+}
+
+/// The Swift type to decode a field as, unwrapping a `Nullable` so
+/// `decodeIfPresent` produces the same optional the generated property expects.
+fn field_decode_type(field: &Field) -> Option<&DataType> {
+    match field.ty.as_ref()? {
+        DataType::Nullable(inner) => Some(inner),
+        ty => Some(ty),
+    }
+}
+
+/// Whether a payload renders to nothing (`Void`, or an empty string), which no
+/// `Codable` can carry.
+fn payload_renders_empty(ty: &DataType) -> bool {
+    match ty {
+        DataType::Tuple(tuple) => tuple.elements.is_empty(),
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unit => true,
+            Fields::Unnamed(fields) => fields.fields.iter().all(|field| field.ty.is_none()),
+            Fields::Named(fields) => fields.fields.iter().all(|(_, field)| field.ty.is_none()),
+        },
+        _ => false,
+    }
+}
+
+/// Whether a payload datatype renders as something Swift's `Codable` cannot
+/// carry: a Swift tuple, an unnamed struct (a tuple payload with an optional
+/// element), or an empty payload.
+fn unsupported_payload(ty: &DataType) -> bool {
+    match ty {
+        DataType::Tuple(_) => true,
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unit => true,
+            Fields::Unnamed(_) => true,
+            Fields::Named(fields) => fields.fields.iter().all(|(_, field)| field.ty.is_none()),
+        },
+        _ => false,
+    }
+}
+
+/// Whether a generated wrapper field's datatype is one Swift's `Codable` cannot
+/// carry.
+fn unsupported_payload_field(field: &Field) -> bool {
+    field.ty.as_ref().is_some_and(unsupported_payload)
+}
+
+/// The element types of a payload serde writes as a JSON array (a tuple
+/// variant).
+///
+/// `specta-serde` lowers a tuple variant to a `Tuple`, or to a preserved-arity
+/// unnamed struct once an element is optional; only the former is supported.
+fn tuple_payload_elements<'a>(
+    variant_name: &str,
+    variant: &'a Variant,
+) -> Option<Vec<&'a DataType>> {
+    let payload = match &variant.fields {
+        Fields::Unnamed(fields) if fields.fields.len() > 1 => {
+            return Some(
+                fields
+                    .fields
+                    .iter()
+                    .filter_map(|field| field.ty.as_ref())
+                    .collect(),
+            );
+        }
+        Fields::Named(_) => {
+            normalized_payload(variant_name, serde_variant_payload(variant_name, variant)?)
+        }
+        Fields::Unit | Fields::Unnamed(_) => return None,
+    };
+
+    match payload {
+        DataType::Tuple(tuple) if !tuple.elements.is_empty() => {
+            Some(tuple.elements.iter().collect())
+        }
+        _ => None,
+    }
+}
+
+/// Render a Rust string as a Swift string literal.
+fn swift_string_literal(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for c in value.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 fn is_unit_payload(variant_name: &str, dt: &DataType) -> bool {
     let dt = normalized_payload(variant_name, dt);
 
@@ -147,6 +436,17 @@ fn enum_payload_to_swift_type(
     generic_scope: &[Generic],
 ) -> Result<String, Error> {
     let payload = normalized_payload(variant_name, payload);
+
+    // An empty payload renders as `Void`/nothing, and a preserved-arity unnamed
+    // struct renders as a struct body; neither is a Swift type a `Codable` can
+    // carry.
+    if payload_renders_empty(payload)
+        || matches!(payload, DataType::Struct(strct) if matches!(&strct.fields, Fields::Unnamed(_)))
+    {
+        return Err(Error::UnsupportedType(format!(
+            "variant `{variant_name}` has a payload that Swift's `Codable` cannot encode"
+        )));
+    }
 
     Ok(match payload {
         DataType::Tuple(tuple) if tuple.elements.len() > 1 => tuple
@@ -182,18 +482,6 @@ fn should_emit_variant_wrapper(variant_name: &str, variant: &Variant) -> bool {
                 Fields::Named(named) if !named.fields.is_empty()
             )
     )
-}
-
-fn wrapper_variant_fields<'a>(variant_name: &str, variant: &'a Variant) -> Option<&'a Fields> {
-    if let Some(payload) = serde_variant_payload(variant_name, variant) {
-        let DataType::Struct(strct) = normalized_payload(variant_name, payload) else {
-            return None;
-        };
-
-        return Some(&strct.fields);
-    }
-
-    Some(&variant.fields)
 }
 
 fn is_unit_like_variant(variant_name: &str, variant: &Variant) -> bool {
@@ -321,8 +609,12 @@ pub fn export_type(
                 )
             };
 
-            // Check if this is a string enum
-            let is_string_enum_val = resolved_string_enum(e).is_some();
+            // Internal and adjacent tagging put the discriminant in a field, so
+            // a synthesised `Codable` would read the wrong shape entirely.
+            let has_tagged_variants = e
+                .variants
+                .iter()
+                .any(|(_, variant)| variant_tag(variant).is_some());
 
             // Check if this enum has struct-like variants (needs custom Codable)
             let has_struct_variants = e
@@ -336,7 +628,13 @@ pub fn export_type(
                         .is_some_and(|_| !is_unit_like_variant(variant_name, variant))
                 });
 
-            let needs_custom_codable = has_struct_variants || has_serde_payload_variants;
+            // A tagged enum's variants are string literals only because the tag
+            // is one; a `String` raw type would advertise raw values that do not
+            // match the wire tag.
+            let is_string_enum_val = !has_tagged_variants && resolved_string_enum(e).is_some();
+
+            let needs_custom_codable =
+                has_struct_variants || has_serde_payload_variants || has_tagged_variants;
 
             // Determine protocols based on whether we'll generate custom Codable
             let protocols = if is_string_enum_val {
@@ -426,7 +724,10 @@ pub fn datatype_to_swift(
         DataType::Reference(r) => reference_to_swift(swift, format, types, r, &generic_scope),
         DataType::Generic(g) => generic_to_swift(g, &generic_scope),
         DataType::Intersection(_) => Err(Error::UnsupportedType(
-            "Intersection types are not supported by Swift exporter".to_string(),
+            "Intersection types are not supported by the Swift exporter; this usually comes from \
+             an internally tagged variant whose payload is merged into the tag, which Swift's \
+             `Codable` cannot express"
+                .to_string(),
         )),
     }
 }
@@ -771,7 +1072,7 @@ fn struct_to_swift(
                     // A `#[serde(default)]` trailing tuple element may be
                     // absent on deserialize; Swift's closest representation
                     // is an Optional property.
-                    let optional_marker = if field.optional { "?" } else { "" };
+                    let optional_marker = optional_suffix(field, ty);
                     result.push_str(&format!(
                         "    public let field{}: {}{}\n",
                         i, field_type, optional_marker
@@ -785,13 +1086,13 @@ fn struct_to_swift(
             let mut field_mappings = Vec::new();
 
             for (original_field_name, field) in &fields.fields {
-                let field_type = if let Some(ty) = field.ty.as_ref() {
-                    datatype_to_swift(swift, format, types, ty, generic_scope.clone())?
-                } else {
+                let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
+                let field_type =
+                    datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
 
-                let optional_marker = if field.optional { "?" } else { "" };
+                let optional_marker = optional_suffix(field, ty);
                 let swift_field_name = swift.naming.convert_field(original_field_name.as_ref());
 
                 result.push_str(&format!(
@@ -888,7 +1189,19 @@ fn enum_to_swift(
                 }
             }
             specta::datatype::Fields::Named(fields) => {
-                if fields.fields.is_empty() {
+                if let Some(tag) = variant_tag(variant) {
+                    // Internally and adjacently tagged variants carry their
+                    // discriminant in a field; a payload-less variant is a plain
+                    // case and the rest wrap their payload in a struct.
+                    let payload = tagged_payload(variant, tag.key);
+                    if payload.fields.is_empty() && payload.content_key.is_none() {
+                        result.push_str(&format!("    case {}\n", variant_name));
+                    } else {
+                        let struct_name =
+                            variant_wrapper_name(enum_name.unwrap_or(""), original_variant_name);
+                        result.push_str(&format!("    case {}({})\n", variant_name, struct_name));
+                    }
+                } else if fields.fields.is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
                 } else if !should_emit_variant_wrapper(original_variant_name, variant) {
                     let payload = serde_variant_payload(original_variant_name, variant)
@@ -910,12 +1223,8 @@ fn enum_to_swift(
                 } else {
                     // Generate struct for named fields
                     // Use the original variant name for PascalCase struct name
-                    let pascal_variant_name = to_pascal_case(original_variant_name);
-                    let struct_name = if let Some(enum_name) = enum_name {
-                        format!("{}{}Data", enum_name, pascal_variant_name)
-                    } else {
-                        format!("{}Data", pascal_variant_name)
-                    };
+                    let struct_name =
+                        variant_wrapper_name(enum_name.unwrap_or(""), original_variant_name);
 
                     // Generate enum case that references the struct
                     result.push_str(&format!("    case {}({})\n", variant_name, struct_name));
@@ -943,49 +1252,61 @@ fn generate_enum_structs(
             continue;
         }
 
-        if let Some(Fields::Named(fields)) = wrapper_variant_fields(original_variant_name, variant)
-            && !fields.fields.is_empty()
-            && should_emit_variant_wrapper(original_variant_name, variant)
-        {
-            let pascal_variant_name = to_pascal_case(original_variant_name.as_ref());
-            let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
+        let Some(wrapper) = wrapper_fields(original_variant_name, variant) else {
+            continue;
+        };
 
-            // Generate struct definition with custom CodingKeys for field name mapping
-            result.push_str(&format!("\npublic struct {}: Codable {{\n", struct_name));
+        let struct_name = variant_wrapper_name(enum_name, original_variant_name);
 
-            // Generate struct fields
-            let mut field_mappings = Vec::new();
-            for (original_field_name, field) in &fields.fields {
-                if let Some(ty) = field.ty.as_ref() {
-                    let field_type =
-                        datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
-                    let optional_marker = if field.optional { "?" } else { "" };
-                    let swift_field_name = swift.naming.convert_field(original_field_name.as_ref());
-                    result.push_str(&format!(
-                        "    public let {}: {}{}\n",
-                        swift_field_name, field_type, optional_marker
-                    ));
-                    field_mappings.push((swift_field_name, original_field_name.to_string()));
+        // Generate struct definition with custom CodingKeys for field name mapping
+        result.push_str(&format!("\npublic struct {}: Codable {{\n", struct_name));
+
+        // Generate struct fields
+        let mut field_mappings = Vec::new();
+        for (original_field_name, field) in &wrapper {
+            if let Some(ty) = field.ty.as_ref() {
+                if field.attributes.contains_key(FLATTENED_FIELD) {
+                    return Err(Error::UnsupportedType(format!(
+                        "variant `{original_variant_name}` flattens field `{original_field_name}` \
+                         into the variant, which the Swift exporter cannot express"
+                    )));
                 }
-            }
 
-            // Generate custom CodingKeys if field names were converted
-            let needs_custom_coding_keys = field_mappings
-                .iter()
-                .any(|(swift_name, rust_name)| swift_name != rust_name);
-            if needs_custom_coding_keys {
-                result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
-                for (swift_name, rust_name) in &field_mappings {
-                    result.push_str(&format!(
-                        "        case {} = \"{}\"\n",
-                        swift_name, rust_name
-                    ));
+                if unsupported_payload_field(field) {
+                    return Err(Error::UnsupportedType(format!(
+                        "variant `{original_variant_name}` has a field `{original_field_name}` that \
+                         Swift's `Codable` cannot encode (a tuple or empty payload)"
+                    )));
                 }
-                result.push_str("    }\n");
-            }
 
-            result.push_str("}\n");
+                let field_type =
+                    datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
+                let optional_marker = optional_suffix(field, ty);
+                let swift_field_name = swift.naming.convert_field(original_field_name);
+                result.push_str(&format!(
+                    "    public let {}: {}{}\n",
+                    swift_field_name, field_type, optional_marker
+                ));
+                field_mappings.push((swift_field_name, original_field_name.to_string()));
+            }
         }
+
+        // Generate custom CodingKeys if field names were converted
+        let needs_custom_coding_keys = field_mappings
+            .iter()
+            .any(|(swift_name, rust_name)| swift_name != rust_name);
+        if needs_custom_coding_keys {
+            result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
+            for (swift_name, rust_name) in &field_mappings {
+                result.push_str(&format!(
+                    "        case {} = \"{}\"\n",
+                    swift_name, rust_name
+                ));
+            }
+            result.push_str("    }\n");
+        }
+
+        result.push_str("}\n");
     }
 
     Ok(result)
@@ -1111,8 +1432,257 @@ fn generic_to_swift(
         .ok_or_else(|| Error::GenericConstraint(format!("Unresolved generic reference: {g:?}")))
 }
 
-/// Generate custom Codable implementation for enums with struct-like variants
+/// Generate a custom `Codable` implementation that matches the serde wire
+/// format `specta-serde` baked into the enum's shape.
 fn generate_enum_codable_impl(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    e: &specta::datatype::Enum,
+    generic_scope: Vec<Generic>,
+    enum_name: &str,
+) -> Result<String, Error> {
+    // Internal and adjacent tagging name the variant in a tag field; external
+    // tagging uses the variant name as the sole object key instead.
+    let tags = e
+        .variants
+        .iter()
+        .filter(|(_, variant)| !variant.skip)
+        .map(|(_, variant)| variant_tag(variant).map(|tag| tag.key))
+        .collect::<Vec<_>>();
+    let first = tags.first().copied().flatten();
+
+    let tag_key = match first {
+        Some(key) if tags.iter().all(|tag| *tag == Some(key)) => key,
+        // Some variants are tagged and others are not (variant-level
+        // `#[serde(untagged)]`, or a `#[serde(other)]` tag widened to a plain
+        // string). Neither shape maps onto a single Swift `Codable`.
+        Some(_) => {
+            return Err(Error::UnsupportedType(format!(
+                "enum `{enum_name}` mixes tagged and untagged serde variants, which the Swift \
+                 exporter cannot express as one `Codable`"
+            )));
+        }
+        None if tags.iter().any(Option::is_some) => {
+            return Err(Error::UnsupportedType(format!(
+                "enum `{enum_name}` has a serde tag that the Swift exporter cannot recover"
+            )));
+        }
+        None => {
+            return generate_external_enum_codable(
+                swift,
+                format,
+                types,
+                e,
+                generic_scope,
+                enum_name,
+            );
+        }
+    };
+
+    generate_tagged_enum_codable(swift, format, types, e, generic_scope, enum_name, tag_key)
+}
+
+/// Generate the `Codable` conformance for an internally or adjacently tagged
+/// enum, whose variants all share a discriminant field.
+fn generate_tagged_enum_codable(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    e: &specta::datatype::Enum,
+    generic_scope: Vec<Generic>,
+    enum_name: &str,
+    tag_key: &str,
+) -> Result<String, Error> {
+    let mut result = String::new();
+
+    result.push_str(&format!(
+        "\n// MARK: - {} Codable Implementation\n",
+        enum_name
+    ));
+    result.push_str(&format!("extension {}: Codable {{\n", enum_name));
+
+    // Wire keys are looked up by their serde name, so a dynamic key type avoids
+    // synthesising a `CodingKeys` case per field (and the collisions between
+    // variants that would come with it).
+    result.push_str("    private struct CodingKeys: CodingKey {\n");
+    result.push_str("        let stringValue: String\n");
+    result.push_str("        var intValue: Int? { nil }\n");
+    result.push_str("        init(_ stringValue: String) { self.stringValue = stringValue }\n");
+    result.push_str("        init?(stringValue: String) { self.stringValue = stringValue }\n");
+    result.push_str("        init?(intValue: Int) { nil }\n");
+    result.push_str("    }\n\n");
+
+    // Generate init(from decoder:)
+    result.push_str("    public init(from decoder: Decoder) throws {\n");
+    result.push_str("        let container = try decoder.container(keyedBy: CodingKeys.self)\n");
+    result.push_str(&format!(
+        "        let tag = try container.decode(String.self, forKey: CodingKeys({}))\n",
+        swift_string_literal(tag_key)
+    ));
+    result.push_str("        switch tag {\n");
+
+    for (original_variant_name, variant) in &e.variants {
+        if variant.skip {
+            continue;
+        }
+
+        let Some(tag) = variant_tag(variant) else {
+            continue;
+        };
+        let case_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
+        let payload = tagged_payload(variant, tag.key);
+
+        result.push_str(&format!(
+            "        case {}:\n",
+            swift_string_literal(tag.value)
+        ));
+
+        if let Some(content_key) = payload.content_key {
+            let struct_name = variant_wrapper_name(enum_name, original_variant_name);
+            result.push_str(&format!(
+                "            let data = try container.decode({}.self, forKey: CodingKeys({}))\n",
+                struct_name,
+                swift_string_literal(content_key)
+            ));
+            result.push_str(&format!("            self = .{}(data)\n", case_name));
+            continue;
+        }
+
+        if payload.fields.is_empty() {
+            result.push_str(&format!("            self = .{}\n", case_name));
+            continue;
+        }
+
+        let struct_name = variant_wrapper_name(enum_name, original_variant_name);
+        let mut arguments = Vec::new();
+        for (field_name, field) in &payload.fields {
+            let Some(ty) = field_decode_type(field) else {
+                continue;
+            };
+            if unsupported_payload_field(field) {
+                return Err(Error::UnsupportedType(format!(
+                    "variant `{original_variant_name}` has a field `{field_name}` that Swift's \
+                     `Codable` cannot encode (a tuple or empty payload)"
+                )));
+            }
+
+            let field_type = datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
+            let swift_field_name = swift.naming.convert_field(field_name);
+            // Appending to a backticked identifier (`` `default`Value ``) does
+            // not parse, so build the binding from the raw name.
+            let binding = format!("{}Value", swift_field_name.trim_matches('`'));
+            let decode = if field_is_optional(field) {
+                format!(
+                    "try container.decodeIfPresent({}.self, forKey: CodingKeys({}))",
+                    field_type,
+                    swift_string_literal(field_name)
+                )
+            } else {
+                format!(
+                    "try container.decode({}.self, forKey: CodingKeys({}))",
+                    field_type,
+                    swift_string_literal(field_name)
+                )
+            };
+            result.push_str(&format!("            let {} = {}\n", binding, decode));
+            // Argument labels are not identifier positions, so an escaped
+            // keyword there is unnecessary (and warns).
+            arguments.push(format!(
+                "{}: {}",
+                swift_field_name.trim_matches('`'),
+                binding
+            ));
+        }
+        result.push_str(&format!(
+            "            self = .{}({}({}))\n",
+            case_name,
+            struct_name,
+            arguments.join(", ")
+        ));
+    }
+
+    result.push_str("        default:\n");
+    result.push_str("            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Unknown variant \\(tag)\"))\n");
+    result.push_str("        }\n");
+    result.push_str("    }\n\n");
+
+    // Generate encode(to encoder:)
+    result.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    result.push_str("        var container = encoder.container(keyedBy: CodingKeys.self)\n");
+    result.push_str("        switch self {\n");
+
+    for (original_variant_name, variant) in &e.variants {
+        if variant.skip {
+            continue;
+        }
+
+        let Some(tag) = variant_tag(variant) else {
+            continue;
+        };
+        let case_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
+        let payload = tagged_payload(variant, tag.key);
+        let has_payload = payload.content_key.is_some() || !payload.fields.is_empty();
+        // A payload of only skipped fields still has an associated value, but
+        // nothing to encode from it.
+        let uses_data = payload.content_key.is_some()
+            || payload.fields.iter().any(|(_, field)| field.ty.is_some());
+        let binding = match (has_payload, uses_data) {
+            (false, _) => "",
+            (true, true) => "(let data)",
+            (true, false) => "(_)",
+        };
+
+        result.push_str(&format!("        case .{}{}:\n", case_name, binding));
+        result.push_str(&format!(
+            "            try container.encode({}, forKey: CodingKeys({}))\n",
+            swift_string_literal(tag.value),
+            swift_string_literal(tag_key)
+        ));
+
+        if let Some(content_key) = payload.content_key {
+            result.push_str(&format!(
+                "            try container.encode(data, forKey: CodingKeys({}))\n",
+                swift_string_literal(content_key)
+            ));
+            continue;
+        }
+
+        for (field_name, field) in &payload.fields {
+            if field.ty.is_none() {
+                continue;
+            }
+            let swift_field_name = swift.naming.convert_field(field_name);
+            // serde omits an absent optional/defaulted field rather than
+            // writing `null` (which its non-`Option` types reject), so encode
+            // only what is present.
+            let encode = if field_is_optional(field) {
+                "encodeIfPresent"
+            } else {
+                "encode"
+            };
+            result.push_str(&format!(
+                "            try container.{}(data.{}, forKey: CodingKeys({}))\n",
+                encode,
+                swift_field_name,
+                swift_string_literal(field_name)
+            ));
+        }
+    }
+
+    result.push_str("        }\n");
+    result.push_str("    }\n");
+    result.push_str("}\n");
+
+    Ok(result)
+}
+
+/// Generate custom Codable implementation for externally tagged enums.
+fn generate_external_enum_codable(
     swift: &Swift,
     format: Option<&dyn Format>,
     types: &Types,
@@ -1144,8 +1714,36 @@ fn generate_enum_codable_impl(
     }
     result.push_str("    }\n\n");
 
+    // Externally tagged unit variants serialize as a bare string, while every
+    // other variant is a single-key object, so try the string form first.
+    let unit_variants: Vec<&str> = e
+        .variants
+        .iter()
+        .filter(|(name, variant)| !variant.skip && is_external_unit_variant(name, variant))
+        .map(|(name, _)| name.as_ref())
+        .collect();
+
     // Generate init(from decoder:)
     result.push_str("    public init(from decoder: Decoder) throws {\n");
+    if !unit_variants.is_empty() {
+        result.push_str(
+            "        if let value = try? decoder.singleValueContainer().decode(String.self) {\n",
+        );
+        result.push_str("            switch value {\n");
+        for name in &unit_variants {
+            let swift_case_name = swift.naming.convert_enum_case(name);
+            result.push_str(&format!(
+                "            case {}:\n",
+                swift_string_literal(name)
+            ));
+            result.push_str(&format!("                self = .{}\n", swift_case_name));
+            result.push_str("                return\n");
+        }
+        result.push_str("            default:\n");
+        result.push_str("                break\n");
+        result.push_str("            }\n");
+        result.push_str("        }\n\n");
+    }
     result.push_str("        let container = try decoder.container(keyedBy: CodingKeys.self)\n");
     result.push_str("        \n");
     result.push_str("        if container.allKeys.count != 1 {\n");
@@ -1164,6 +1762,32 @@ fn generate_enum_codable_impl(
         let swift_case_name = swift
             .naming
             .convert_enum_case(original_variant_name.as_ref());
+
+        // serde writes an externally tagged tuple variant as a JSON array under
+        // the variant key, so decode it from an unkeyed container.
+        if let Some(elements) = tuple_payload_elements(original_variant_name, variant) {
+            result.push_str(&format!("        case .{}:\n", swift_case_name));
+            result.push_str(&format!(
+                "            var nested = try container.nestedUnkeyedContainer(forKey: .{})\n",
+                swift_case_name
+            ));
+            let mut bindings = Vec::new();
+            for (index, ty) in elements.iter().enumerate() {
+                let element_ty =
+                    datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
+                let binding = format!("value{index}");
+                result.push_str(&format!(
+                    "            let {binding} = try nested.decode({element_ty}.self)\n"
+                ));
+                bindings.push(binding);
+            }
+            result.push_str(&format!(
+                "            self = .{}({})\n",
+                swift_case_name,
+                bindings.join(", ")
+            ));
+            continue;
+        }
 
         match &variant.fields {
             specta::datatype::Fields::Unit => {
@@ -1253,8 +1877,6 @@ fn generate_enum_codable_impl(
 
     // Generate encode(to encoder:)
     result.push_str("    public func encode(to encoder: Encoder) throws {\n");
-    result.push_str("        var container = encoder.container(keyedBy: CodingKeys.self)\n");
-    result.push_str("        \n");
     result.push_str("        switch self {\n");
 
     for (original_variant_name, variant) in &e.variants {
@@ -1266,12 +1888,40 @@ fn generate_enum_codable_impl(
             .naming
             .convert_enum_case(original_variant_name.as_ref());
 
+        // A tuple variant is written as a JSON array under the variant key.
+        if let Some(elements) = tuple_payload_elements(original_variant_name, variant) {
+            let bindings = (0..elements.len())
+                .map(|index| format!("value{index}"))
+                .collect::<Vec<_>>();
+            result.push_str(&format!(
+                "        case .{}({}):\n",
+                swift_case_name,
+                bindings
+                    .iter()
+                    .map(|binding| format!("let {binding}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            result.push_str(
+                "            var container = encoder.container(keyedBy: CodingKeys.self)\n",
+            );
+            result.push_str(&format!(
+                "            var nested = container.nestedUnkeyedContainer(forKey: .{})\n",
+                swift_case_name
+            ));
+            for binding in &bindings {
+                result.push_str(&format!("            try nested.encode({binding})\n"));
+            }
+            continue;
+        }
+
         match &variant.fields {
             specta::datatype::Fields::Unit => {
                 result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str("            var container = encoder.singleValueContainer()\n");
                 result.push_str(&format!(
-                    "            try container.encodeNil(forKey: .{})\n",
-                    swift_case_name
+                    "            try container.encode({})\n",
+                    swift_string_literal(original_variant_name)
                 ));
             }
             specta::datatype::Fields::Unnamed(fields) => {
@@ -1282,13 +1932,17 @@ fn generate_enum_codable_impl(
                         .is_some_and(|ty| is_unit_payload(original_variant_name, ty))
                 {
                     result.push_str(&format!("        case .{}:\n", swift_case_name));
+                    result.push_str("            var container = encoder.singleValueContainer()\n");
                     result.push_str(&format!(
-                        "            try container.encodeNil(forKey: .{})\n",
-                        swift_case_name
+                        "            try container.encode({})\n",
+                        swift_string_literal(original_variant_name)
                     ));
                     continue;
                 } else if fields.fields.len() == 1 {
                     result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                    result.push_str(
+                        "            var container = encoder.container(keyedBy: CodingKeys.self)\n",
+                    );
                     result.push_str(&format!(
                         "            try container.encode(data, forKey: .{})\n",
                         swift_case_name
@@ -1309,6 +1963,9 @@ fn generate_enum_codable_impl(
             specta::datatype::Fields::Named(_) => {
                 if should_emit_variant_wrapper(original_variant_name, variant) {
                     result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                    result.push_str(
+                        "            var container = encoder.container(keyedBy: CodingKeys.self)\n",
+                    );
                     result.push_str(&format!(
                         "            try container.encode(data, forKey: .{})\n",
                         swift_case_name
@@ -1319,12 +1976,18 @@ fn generate_enum_codable_impl(
 
                     if is_unit_payload(original_variant_name, payload) {
                         result.push_str(&format!("        case .{}:\n", swift_case_name));
+                        result.push_str(
+                            "            var container = encoder.singleValueContainer()\n",
+                        );
                         result.push_str(&format!(
-                            "            try container.encodeNil(forKey: .{})\n",
-                            swift_case_name
+                            "            try container.encode({})\n",
+                            swift_string_literal(original_variant_name)
                         ));
                     } else {
                         result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                        result.push_str(
+                            "            var container = encoder.container(keyedBy: CodingKeys.self)\n",
+                        );
                         result.push_str(&format!(
                             "            try container.encode(data, forKey: .{})\n",
                             swift_case_name
