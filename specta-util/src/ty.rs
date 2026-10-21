@@ -37,9 +37,10 @@
 //!   empty list rather than
 //!   [`null`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#null-and-undefined).
 //!
-//! Elements are compared as an exporter would render them, so a transparent alias
-//! counts as the type it aliases: `ty!(["a", owned_string])` is `string[]` even
-//! though `&str` and `String` are different Rust types.
+//! Elements are compared by their Specta type, with a transparent `inline` alias
+//! unwrapped to the datatype it stands for: `ty!(["a", owned_string])` is `string[]`
+//! even though `&str` and `String` are different Rust types. A named type is compared
+//! by identity, so two different types stay a tuple even when they render alike.
 //!
 //! ```
 //! # use specta_util::ty;
@@ -326,6 +327,9 @@ macro_rules! ty {
     // ---- array: accumulate each element's tokens up to a top-level comma ----
     (@arr) => { $crate::ty::__macro::Nil };
     (@arr $($rest:tt)+) => { $crate::ty!(@arr_val [] $($rest)+) };
+    (@arr_val [] , $($rest:tt)*) => {
+        compile_error!("ty!: empty array element before a `,`")
+    };
     (@arr_val [$($val:tt)*] , $($rest:tt)*) => {
         $crate::ty!(@seq $crate::ty!($($val)*), $crate::ty!(@arr $($rest)*))
     };
@@ -362,6 +366,7 @@ macro_rules! ty {
     }};
 
     // ---- public leaves ----
+    () => { compile_error!("ty! needs a value: a literal, an expression, an object or an array") };
     (null) => { () };
     ({}) => { $crate::ty::__macro::Object($crate::ty::__macro::Nil) };
     // Only a string literal followed by `:` can start an entry, so a brace group that
@@ -372,10 +377,12 @@ macro_rules! ty {
     ([]) => { $crate::ty::__macro::Array($crate::ty::__macro::Nil) };
     ([ $($arr:tt)+ ]) => { $crate::ty::__macro::Array($crate::ty!(@arr $($arr)+)) };
     // A single value never has a top-level comma, so finding one means the input was
-    // meant to be two entries (or two array elements).
-    ($first:expr , $($rest:tt)+) => {
+    // meant to be two entries (or two array elements). Matching a single `tt` rather
+    // than an `expr` keeps this arm from trying to parse a partial expression, which
+    // would add a second, confusing error alongside this one.
+    ($first:tt , $($rest:tt)+) => {
         compile_error!(
-            "ty! takes a single value; `,` only separates entries inside a `{{ }}` or `[ ]` literal"
+            "ty! takes a single value; `,` only separates entries inside a `{ }` or `[ ]` literal"
         )
     };
     // a scalar literal or an interpolated expression (bare `a.b` / `f()` included)
