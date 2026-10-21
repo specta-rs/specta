@@ -13,7 +13,6 @@ categories = ["web-programming", "asynchronous"]
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true
