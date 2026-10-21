@@ -60,8 +60,8 @@
 //! * A brace group is only read as an object literal when its first entry looks like
 //!   `"key": value`; any other brace group is passed through as an expression, so a
 //!   **bare block used as a value works**: `ty!({ "x": { 1 + 1 } })` is the block
-//!   `{ 1 + 1 }`, and `ty!({ "x": {}})` is still an empty object. A missing `:` is
-//!   therefore never reported as a malformed entry.
+//!   `{ 1 + 1 }`, and `ty!({ "x": {}})` is still an empty object. A missing `:` on that
+//!   first entry is not reported as a malformed one.
 //! * A value ends at a top-level `,`, so an expression containing one has to be bound
 //!   to a variable or wrapped in a call first. This affects a turbofish with several
 //!   parameters and a closure with several parameters — write `ty!({ "map": map })`
@@ -108,6 +108,10 @@ pub mod __macro {
         Type, Types,
         datatype::{DataType, Field, Struct, Tuple},
     };
+    // `Vec` and `Result` appear in the generated `impl` signatures, so they have to be
+    // reached through here as well — otherwise a caller's own `Vec`, or a one-parameter
+    // `Result` alias such as `type Result<T> = std::io::Result<T>`, would be captured.
+    pub use std::{result::Result, vec::Vec};
 
     pub use super::{Array, Nil, ObjPart, Object, SeqPart};
 }
@@ -310,7 +314,9 @@ macro_rules! ty {
         let head = $head;
         let tail = $tail;
         {
-            use $crate::ty::__macro::{Field, ObjPart, Serialize, SerializeMap, Type, Types};
+            use $crate::ty::__macro::{
+                Field, ObjPart, Result, Serialize, SerializeMap, Type, Types, Vec,
+            };
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
             struct Node<H, T> {
                 head: H,
@@ -360,7 +366,9 @@ macro_rules! ty {
         let head = $head;
         let tail = $tail;
         {
-            use $crate::ty::__macro::{DataType, SeqPart, Serialize, SerializeSeq, Type, Types};
+            use $crate::ty::__macro::{
+                DataType, Result, SeqPart, Serialize, SerializeSeq, Type, Types, Vec,
+            };
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
             struct SeqNode<H, T> {
                 head: H,
@@ -393,10 +401,21 @@ macro_rules! ty {
     ([]) => { $crate::ty::__macro::Array($crate::ty::__macro::Nil) };
     ([ $($arr:tt)+ ]) => { $crate::ty::__macro::Array($crate::ty!(@arr $($arr)+)) };
     // A single value never has a top-level comma, so finding one means the input was
-    // meant to be two entries (or two array elements). Matching a single `tt` rather
-    // than an `expr` keeps this arm from trying to parse a partial expression, which
-    // would add a second, confusing error alongside this one.
+    // meant to be two entries (or two array elements). A single `tt` is matched first so
+    // that the common case does not have to parse a possibly-partial expression.
     ($first:tt , $($rest:tt)+) => {
+        compile_error!(
+            "ty! takes a single value; `,` only separates entries inside a `{ }` or `[ ]` literal"
+        )
+    };
+    // A first value of more than one token, such as `-1, x` or `f(), x`.
+    ($first:expr , $($rest:tt)+) => {
+        compile_error!(
+            "ty! takes a single value; `,` only separates entries inside a `{ }` or `[ ]` literal"
+        )
+    };
+    // A trailing comma after a single value.
+    ($first:tt ,) => {
         compile_error!(
             "ty! takes a single value; `,` only separates entries inside a `{ }` or `[ ]` literal"
         )
@@ -661,6 +680,19 @@ mod tests {
         assert_eq!(json_of(&v), r#"{"user":{"id":1,"name":"ada"}}"#);
         let d = format!("{:#?}", def_of(&v));
         assert!(d.contains("User"), "interpolated User type was lost: {d}");
+    }
+
+    /// `Vec` and `Result` appear in the generated `impl` signatures, so a caller's own
+    /// `Vec` or a one-parameter `Result` alias must not be captured by the expansion.
+    /// The single-parameter alias is a common crate-level pattern.
+    #[test]
+    #[allow(dead_code)] // the shadowing items exist only to be shadowed
+    fn caller_vec_and_result_aliases_do_not_break_the_expansion() {
+        struct Vec;
+        type Result<T> = std::result::Result<T, ()>;
+
+        let v = crate::ty!({ "a": 1, "b": [1, 2] });
+        assert_eq!(json_of(&v), r#"{"a":1,"b":[1,2]}"#);
     }
 
     /// The generated value is a normal value.
