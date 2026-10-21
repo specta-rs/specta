@@ -33,8 +33,13 @@
 //! * Elements all the same type → a list (`[1, 2, 3]` → `number[]`).
 //! * Mixed element types → a tuple, the honest fixed-shape description
 //!   (`[1, "x"]` → `[number, string]`).
-//! * Empty → `never[]`, because an empty array is an empty list rather than
+//! * Empty → a list of the bottom type (`never[]`), because an empty array is an
+//!   empty list rather than
 //!   [`null`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#null-and-undefined).
+//!
+//! Elements are compared as an exporter would render them, so a transparent alias
+//! counts as the type it aliases: `ty!(["a", owned_string])` is `string[]` even
+//! though `&str` and `String` are different Rust types.
 //!
 //! ```
 //! # use specta_util::ty;
@@ -42,19 +47,30 @@
 //! let _list = ty!({ "tags": tags });       // tags: string[]
 //! let _literal = ty!({ "pair": [1, 2] });  // pair: number[]
 //! let _mixed = ty!({ "pair": [1, "x"] });  // pair: [number, string]
+//! let _empty = ty!({ "pair": [] });        // pair: never[]
 //! ```
 //!
 //! # Scope and caveats
 //!
 //! * `null` maps to `()` — it serializes as `null` and types as the unit type.
-//! * Object keys must be string literals; a key cannot be an interpolated expression.
+//! * Object keys must be string literals, must be unique, and cannot be interpolated
+//!   expressions. A repeated key is emitted as a repeated field, which most exporters
+//!   reject rather than resolve, so a duplicate is a mistake in the target language.
 //! * A brace group is only read as an object literal when its first entry looks like
 //!   `"key": value`; any other brace group is passed through as an expression, so a
 //!   **bare block used as a value works**: `ty!({ "x": { 1 + 1 } })` is the block
-//!   `{ 1 + 1 }`, and `ty!({ "x": {}})` is still an empty object.
-//! * A large literal expands to deeply nested items; bump `#![recursion_limit]` if you
-//!   hit the compiler's limit. At the default of 128 roughly 25 fields or array
-//!   elements fit in one literal.
+//!   `{ 1 + 1 }`, and `ty!({ "x": {}})` is still an empty object. A missing `:` is
+//!   read as a block, not as a malformed object.
+//! * A value ends at a top-level `,`, so an expression containing one has to be bound
+//!   to a variable or wrapped in a call first. This affects a turbofish with several
+//!   parameters and a closure with several parameters — write `ty!({ "map": map })`
+//!   rather than `ty!({ "map": HashMap::<K, V>::new() })`.
+//! * An empty array is a list of Specta's bottom type. The exporters with a bottom
+//!   type render it (TypeScript's `never[]`, Zod's `z.never()`, Python's `Never`,
+//!   JSON Schema's `false`); a target without one may reject or widen it.
+//! * A large literal expands to deeply nested items, so it is bounded by
+//!   `#![recursion_limit]`: at the default of 128 a literal fits at most 31 entries
+//!   (fields or array elements) before the compiler asks you to raise the limit.
 //!
 //! # Getting a [`specta::Type`] out
 //!
@@ -96,7 +112,7 @@ use serde::{
 };
 use specta::{
     Type, Types,
-    datatype::{DataType, Enum, Field, List, Struct, Tuple},
+    datatype::{DataType, Enum, Field, List, NamedReferenceType, Reference, Struct, Tuple},
 };
 
 /// The empty tail of an object or array field list.
@@ -179,12 +195,22 @@ impl<P: SeqPart> Type for Array<P> {
 
         // An empty literal is an empty *list*. The unit type it would otherwise become
         // serialises as `null` and exports as `null`, which does not describe an array.
-        let Some(first) = elements.first() else {
+        if elements.is_empty() {
             return DataType::List(List::new(never()));
+        }
+
+        // A list has one element type, so the elements are compared as an exporter would
+        // render them rather than by Rust type identity.
+        let homogeneous = {
+            let first = resolved(&elements[0]);
+            elements
+                .iter()
+                .skip(1)
+                .all(|element| resolved(element) == first)
         };
 
-        if elements.iter().skip(1).all(|element| element == first) {
-            DataType::List(List::new(first.clone()))
+        if homogeneous {
+            DataType::List(List::new(elements.remove(0)))
         } else {
             DataType::Tuple(Tuple::new(elements))
         }
@@ -202,10 +228,33 @@ impl<P: SeqPart> Serialize for Array<P> {
 /// The element type of an empty array literal.
 ///
 /// Specta has no dedicated bottom type, so an [`Enum`] with no variants stands in. It
-/// is the representation exporters already render as "never" (TypeScript's `never`),
-/// which is what an array that may not hold anything is.
+/// is the representation exporters already render as "never" (TypeScript's `never`,
+/// Zod's `z.never()`, Python's `Never`, JSON Schema's `false`), which is what an array
+/// that may not hold anything is.
 fn never() -> DataType {
     DataType::Enum(Enum::default())
+}
+
+/// The [`DataType`] an exporter would render for `dt`.
+///
+/// A named reference carrying an inline datatype — a transparent alias such as
+/// [`String`], `smol_str::SmolStr` or `semver::Version`, all of which render as a
+/// string — is unwrapped to the datatype it stands for. Comparing the resolved shape
+/// keeps the list/tuple decision about the elements' *type* rather than about which
+/// Rust type was written, so `ty!(["a", owned_string])` is still `string[]`.
+fn resolved(dt: &DataType) -> &DataType {
+    let mut current = dt;
+    // Bounded: alias chains are short, and a self-referential one must not spin forever.
+    for _ in 0..16 {
+        let DataType::Reference(Reference::Named(named)) = current else {
+            break;
+        };
+        let NamedReferenceType::Inline { dt, .. } = &named.inner else {
+            break;
+        };
+        current = dt;
+    }
+    current
 }
 
 /// Build a value that implements [`specta::Type`] from a `json!`-style literal.
@@ -222,11 +271,26 @@ macro_rules! ty {
     // ---- object: peel `key :`, then accumulate value tokens up to a top-level comma ----
     (@obj) => { $crate::ty::__macro::Nil };
     (@obj $key:literal : $($rest:tt)*) => { $crate::ty!(@obj_val $key [] $($rest)*) };
+    // Anything else is not an entry. The common cause is a value that was split on a
+    // top-level comma, which leaves its second half here.
+    (@obj $($unexpected:tt)+) => {
+        compile_error!(
+            "ty!: expected an object entry (`\"key\": value`) here. A value containing a \
+             top-level comma — such as `HashMap::<K, V>::new()` or a multi-parameter closure \
+             — is split at the comma; bind it to a variable or wrap it in a call first."
+        )
+    };
+    (@obj_val $key:literal [] , $($rest:tt)*) => {
+        compile_error!("ty!: missing a value for the preceding object key (`\"key\": value`)")
+    };
     (@obj_val $key:literal [$($val:tt)*] , $($rest:tt)*) => {
         $crate::ty!(@node $key, $crate::ty!($($val)*), $crate::ty!(@obj $($rest)*))
     };
     (@obj_val $key:literal [$($val:tt)*] $next:tt $($rest:tt)*) => {
         $crate::ty!(@obj_val $key [$($val)* $next] $($rest)*)
+    };
+    (@obj_val $key:literal []) => {
+        compile_error!("ty!: missing a value for the preceding object key (`\"key\": value`)")
     };
     (@obj_val $key:literal [$($val:tt)*]) => {
         $crate::ty!(@node $key, $crate::ty!($($val)*), $crate::ty::__macro::Nil)
@@ -307,6 +371,13 @@ macro_rules! ty {
     };
     ([]) => { $crate::ty::__macro::Array($crate::ty::__macro::Nil) };
     ([ $($arr:tt)+ ]) => { $crate::ty::__macro::Array($crate::ty!(@arr $($arr)+)) };
+    // A single value never has a top-level comma, so finding one means the input was
+    // meant to be two entries (or two array elements).
+    ($first:expr , $($rest:tt)+) => {
+        compile_error!(
+            "ty! takes a single value; `,` only separates entries inside a `{{ }}` or `[ ]` literal"
+        )
+    };
     // a scalar literal or an interpolated expression (bare `a.b` / `f()` included)
     ($($other:tt)+) => { $($other)+ };
 }
@@ -401,6 +472,17 @@ mod tests {
             list_element(&def_of(&nested)),
             Some(DataType::List(_))
         ));
+
+        // A transparent alias counts as the type it aliases, so a literal and a `String`
+        // are one element type even though the Rust types differ.
+        let owned: String = "a".into();
+        let aliased = crate::ty!(["lit", owned.clone()]);
+        assert_eq!(
+            list_element(&def_of(&aliased)),
+            Some(&DataType::Primitive(Primitive::str)),
+        );
+        // But genuinely different element types stay a tuple.
+        assert!(tuple_elements(&def_of(&crate::ty!([1, "x"]))).is_some());
     }
 
     #[test]
