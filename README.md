@@ -218,3 +218,55 @@ This library was originally created to power the type exporting functionality of
 but after building it we realized that it could be useful for other projects as well so we decided to move it into a dedicated library.
 
 A huge thanks to [Brendonovich](https://github.com/brendonovich) for doing a heap of early development on this library.
+
+## Releasing
+
+Publishing to [crates.io](https://crates.io/crates/specta) uses
+[crates.io trusted publishing](https://crates.io/docs/trusted-publishing): the
+`release` workflow exchanges its GitHub OIDC identity for a short-lived crates.io
+token, so **no long-lived `CARGO_REGISTRY_TOKEN` is stored** in this repository or
+in Actions secrets.
+
+**One-time setup** — a crate owner adds a trusted publisher in the crates.io UI
+(the crate's **Settings → Trusted Publishing**) for every crate in the workspace.
+These values must match `.github/workflows/release.yml` exactly, or the token
+exchange is refused:
+
+| Field | Value |
+| --- | --- |
+| Owner | `specta-rs` |
+| Repository | `specta` |
+| Workflow filename | `release.yml` |
+| Environment | `release` |
+
+The workflow publishes the whole workspace, so each of the following crates needs
+its own trusted publisher: `specta`, `specta-macros`, `specta-serde`,
+`specta-util`, `specta-typescript`, `specta-swift`, `specta-openapi`,
+`specta-jsonschema`, `specta-kotlin`, `specta-csharp`, `specta-go`,
+`specta-python`, `specta-java`, `specta-zod`, `specta-valibot`, `specta-rust` and
+`specta-rescript`.
+
+A trusted publisher can only be configured once a crate exists on crates.io, and
+the initial publish requires an API token. `specta-valibot`, `specta-rust` and
+`specta-rescript` have never been released, so publish each of them once from your
+machine before adding its trusted publisher.
+
+Adding required reviewers to the `release` GitHub environment is recommended: it
+turns publishing into an approved action rather than something any tag push does.
+
+**Cutting a release:**
+
+1. Bump the `version` of every workspace crate (the tag names the `specta` crate
+   version) and merge to `main`. The exporters pin `specta` to an exact version,
+   so each one has to be republished whenever `specta` changes, and Cargo refuses
+   to publish a version that already exists on crates.io.
+2. Tag the merge commit and push the tag:
+
+   ```bash
+   git tag v2.0.0-rc.27
+   git push origin v2.0.0-rc.27
+   ```
+
+The `release` workflow then verifies the release (the tag matches the `specta`
+crate version, and the workspace builds and tests), publishes every crate to
+crates.io, and creates the GitHub release.
