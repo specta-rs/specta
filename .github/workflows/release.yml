@@ -1,0 +1,96 @@
+name: release
+
+# crates.io *trusted publishing*: crates.io mints a short-lived token from this
+# workflow's OIDC identity, so no long-lived `CARGO_REGISTRY_TOKEN` is stored in
+# this repository or in Actions secrets. See `README.md` → "Releasing" for the
+# one-time crates.io configuration.
+#
+# These four values must match the trusted publisher configured on crates.io for
+# *every* crate in the workspace, or the token exchange is refused:
+#   owner        specta-rs
+#   repository   specta
+#   workflow     release.yml
+#   environment  release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Mirrors the system dependencies installed by `ci.yml`.
+      - name: Setup
+        run: sudo apt-get update && sudo apt-get install libgtk-3-dev webkit2gtk-4.1 libayatana-appindicator3-dev
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      # `tests/tests/java.rs` shells out to `javac` to validate the generated Java.
+      - name: Install Java 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      # The release tag names the `specta` crate version; the whole workspace is
+      # bumped in lockstep so a single tag releases every crate.
+      - name: The tag must match the `specta` crate version
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "specta") | .version')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the Cargo.toml version v$version"
+            exit 1
+          fi
+
+      - run: cargo build --all-features
+      - run: cargo test --all-features
+      - run: cargo build --all --no-default-features
+
+  publish:
+    name: Publish to crates.io
+    needs: verify
+    runs-on: ubuntu-latest
+    # Must match the `environment` of the trusted publisher configured on
+    # crates.io. Require reviewers on that environment to gate publishing.
+    environment: release
+    permissions:
+      id-token: write # exchange the GitHub OIDC token for a crates.io token
+      contents: write # create the GitHub release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Authenticate with crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1
+
+      # `--workspace` publishes every crate in dependency order. `--locked`
+      # requires `Cargo.lock` to be committed and up to date, so a release can
+      # never drift from the versions CI tested.
+      - name: cargo publish
+        run: cargo publish --workspace --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Create the GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}

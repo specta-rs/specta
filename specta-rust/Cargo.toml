@@ -1,7 +1,7 @@
 [package]
 name = "specta-rust"
 description = "Export your Rust types to Rust"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -19,9 +19,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.26", path = "../specta" }
+specta = { version = "=2.0.0-rc.27", path = "../specta" }
 unicode-ident = "1"
 
 [dev-dependencies]
-specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive"] }
-specta-serde = { version = "=0.0.13", path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.27", path = "../specta", features = ["derive"] }
+specta-serde = { version = "=0.0.14", path = "../specta-serde" }
