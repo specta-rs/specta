@@ -55,23 +55,28 @@
 //!
 //! * `null` maps to `()` — it serializes as `null` and types as the unit type.
 //! * Object keys must be string literals, must be unique, and cannot be interpolated
-//!   expressions. A repeated key is emitted as a repeated field, which most exporters
-//!   reject rather than resolve, so a duplicate is a mistake in the target language.
+//!   expressions. A repeated key is emitted as a repeated field, which the generated
+//!   target language rejects as a duplicate, so it is a mistake.
 //! * A brace group is only read as an object literal when its first entry looks like
 //!   `"key": value`; any other brace group is passed through as an expression, so a
 //!   **bare block used as a value works**: `ty!({ "x": { 1 + 1 } })` is the block
 //!   `{ 1 + 1 }`, and `ty!({ "x": {}})` is still an empty object. A missing `:` is
-//!   read as a block, not as a malformed object.
+//!   therefore never reported as a malformed entry.
 //! * A value ends at a top-level `,`, so an expression containing one has to be bound
 //!   to a variable or wrapped in a call first. This affects a turbofish with several
 //!   parameters and a closure with several parameters — write `ty!({ "map": map })`
 //!   rather than `ty!({ "map": HashMap::<K, V>::new() })`.
-//! * An empty array is a list of Specta's bottom type. The exporters with a bottom
-//!   type render it (TypeScript's `never[]`, Zod's `z.never()`, Python's `Never`,
-//!   JSON Schema's `false`); a target without one may reject or widen it.
+//! * `[value; N]` array-repeat syntax is not supported: the length is a value and a
+//!   `ty!` type is decided statically. Bind the array and interpolate it — a Rust
+//!   `[T; N]` keeps its fixed length that way.
+//! * An empty array is a list of Specta's bottom type. Exporters with a bottom type
+//!   render it (TypeScript's `never[]`, Zod's `z.never()`, Python's `Never`, JSON
+//!   Schema's `false`); a target without one may reject it or represent it
+//!   differently.
 //! * A large literal expands to deeply nested items, so it is bounded by
-//!   `#![recursion_limit]`: at the default of 128 a literal fits at most 31 entries
-//!   (fields or array elements) before the compiler asks you to raise the limit.
+//!   `#![recursion_limit]`. At the default of 128 a literal of single-token values
+//!   fits at most 31 entries (fields or array elements); longer values reach the
+//!   limit sooner.
 //!
 //! # Getting a [`specta::Type`] out
 //!
@@ -240,12 +245,14 @@ fn never() -> DataType {
 ///
 /// A named reference carrying an inline datatype — a transparent alias such as
 /// [`String`], `smol_str::SmolStr` or `semver::Version`, all of which render as a
-/// string — is unwrapped to the datatype it stands for. Comparing the resolved shape
-/// keeps the list/tuple decision about the elements' *type* rather than about which
-/// Rust type was written, so `ty!(["a", owned_string])` is still `string[]`.
+/// string — is unwrapped to the datatype it stands for. Unwrapping means two spellings
+/// of the same type do not by themselves make a literal a tuple, so
+/// `ty!(["a", owned_string])` is still `string[]`.
 fn resolved(dt: &DataType) -> &DataType {
     let mut current = dt;
     // Bounded: alias chains are short, and a self-referential one must not spin forever.
+    // Only the top level is unwrapped — an alias nested inside another type (an element
+    // of an element) is left alone, and is compared as written.
     for _ in 0..16 {
         let DataType::Reference(Reference::Named(named)) = current else {
             break;
@@ -332,6 +339,15 @@ macro_rules! ty {
     };
     (@arr_val [$($val:tt)*] , $($rest:tt)*) => {
         $crate::ty!(@seq $crate::ty!($($val)*), $crate::ty!(@arr $($rest)*))
+    };
+    // Rust's array-repeat syntax. The length is a value and a `ty!` type is decided
+    // statically, so this cannot be described — say that instead of letting the split
+    // surface as "macro expansion ignores ..".
+    (@arr_val [$($val:tt)*] ; $($rest:tt)*) => {
+        compile_error!(
+            "ty!: `[value; N]` array-repeat syntax is not supported; bind the array to a \
+             variable and interpolate that instead — a Rust `[T; N]` keeps its fixed length"
+        )
     };
     (@arr_val [$($val:tt)*] $next:tt $($rest:tt)*) => {
         $crate::ty!(@arr_val [$($val)* $next] $($rest)*)
