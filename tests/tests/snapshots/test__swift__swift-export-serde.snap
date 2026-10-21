@@ -22,6 +22,16 @@ extension MixedEnum: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "unit":
+                self = .unit
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -41,12 +51,12 @@ extension MixedEnum: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .unit:
-            try container.encodeNil(forKey: .unit)
+            var container = encoder.singleValueContainer()
+            try container.encode("unit")
         case .withData(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .withData)
         }
     }

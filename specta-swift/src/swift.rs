@@ -216,20 +216,24 @@ impl NamingConvention {
 
     /// Convert a string to the appropriate naming convention for fields.
     pub fn convert_field(&self, name: &str) -> String {
-        match self {
+        let converted = match self {
             Self::PascalCase => self.to_camel_case(name), // Fields should be camelCase even with PascalCase
             Self::CamelCase => self.to_camel_case(name),
             Self::SnakeCase => self.to_snake_case(name),
-        }
+        };
+
+        escape_swift_keyword(&converted)
     }
 
     /// Convert a string to the appropriate naming convention for enum cases.
     pub fn convert_enum_case(&self, name: &str) -> String {
-        match self {
+        let converted = match self {
             Self::PascalCase => self.to_camel_case(name), // Enum cases should be camelCase
             Self::CamelCase => self.to_camel_case(name),
             Self::SnakeCase => self.to_snake_case(name),
-        }
+        };
+
+        escape_swift_keyword(&converted)
     }
 
     #[allow(clippy::wrong_self_convention)]
@@ -313,6 +317,78 @@ impl NamingConvention {
         }
 
         result
+    }
+}
+
+/// Swift reserved words that cannot be used as identifiers without backticks.
+const SWIFT_KEYWORDS: &[&str] = &[
+    "Any",
+    "Self",
+    "_",
+    "actor",
+    "as",
+    "associatedtype",
+    "async",
+    "await",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "continue",
+    "default",
+    "defer",
+    "deinit",
+    "do",
+    "else",
+    "enum",
+    "extension",
+    "fallthrough",
+    "false",
+    "fileprivate",
+    "for",
+    "func",
+    "guard",
+    "if",
+    "import",
+    "in",
+    "init",
+    "inout",
+    "internal",
+    "is",
+    "let",
+    "nil",
+    "open",
+    "operator",
+    "precedencegroup",
+    "private",
+    "protocol",
+    "public",
+    "repeat",
+    "rethrows",
+    "return",
+    "self",
+    "static",
+    "struct",
+    "subscript",
+    "super",
+    "switch",
+    "throw",
+    "throws",
+    "true",
+    "try",
+    "typealias",
+    "var",
+    "where",
+    "while",
+];
+
+/// Wrap a generated identifier in backticks when it collides with a Swift
+/// keyword, which would otherwise be a syntax error.
+fn escape_swift_keyword(name: &str) -> String {
+    if SWIFT_KEYWORDS.contains(&name) {
+        format!("`{name}`")
+    } else {
+        name.to_string()
     }
 }
 
