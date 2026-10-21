@@ -2199,7 +2199,7 @@ checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
 
 [[package]]
 name = "specta"
-version = "2.0.0-rc.26"
+version = "2.0.0-rc.27"
 dependencies = [
  "arrayvec",
  "bevy_ecs",
@@ -2244,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "specta-csharp"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "rustix",
  "serde",
@@ -2254,7 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "specta-go"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "specta",
  "specta-serde",
@@ -2263,7 +2263,7 @@ dependencies = [
 
 [[package]]
 name = "specta-java"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "specta",
  "specta-serde",
@@ -2271,7 +2271,7 @@ dependencies = [
 
 [[package]]
 name = "specta-jsonschema"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "insta",
  "jsonschema 0.46.10",
@@ -2285,7 +2285,7 @@ dependencies = [
 
 [[package]]
 name = "specta-kotlin"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "specta",
  "specta-serde",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "specta-macros"
-version = "2.0.0-rc.26"
+version = "2.0.0-rc.27"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2303,7 +2303,7 @@ dependencies = [
 
 [[package]]
 name = "specta-openapi"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -2316,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "specta-python"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "serde",
  "specta",
@@ -2327,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "specta-rescript"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "serde",
  "specta",
@@ -2337,7 +2337,7 @@ dependencies = [
 
 [[package]]
 name = "specta-rust"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "specta",
  "specta-serde",
@@ -2346,7 +2346,7 @@ dependencies = [
 
 [[package]]
 name = "specta-serde"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "serde",
  "specta",
@@ -2355,7 +2355,7 @@ dependencies = [
 
 [[package]]
 name = "specta-swift"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "chrono",
  "insta",
@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "specta-typescript"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "serde",
  "specta",
@@ -2426,7 +2426,7 @@ dependencies = [
 
 [[package]]
 name = "specta-util"
-version = "0.0.13"
+version = "0.0.14"
 dependencies = [
  "serde",
  "serde_json",
@@ -2435,7 +2435,7 @@ dependencies = [
 
 [[package]]
 name = "specta-valibot"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde",
  "specta",
@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "specta-zod"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "serde",
  "specta",

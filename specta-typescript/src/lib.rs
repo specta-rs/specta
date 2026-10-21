@@ -5,9 +5,9 @@
 //! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.26 --features derive,collect
-//! cargo add specta-serde@0.0.13
-//! cargo add specta-typescript@0.0.13
+//! cargo add specta@2.0.0-rc.27 --features derive,collect
+//! cargo add specta-serde@0.0.14
+//! cargo add specta-typescript@0.0.14
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:

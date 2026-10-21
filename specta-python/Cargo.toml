@@ -1,7 +1,7 @@
 [package]
 name = "specta-python"
 description = "Export your Rust types to Python"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -23,12 +23,12 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-specta = { version = "=2.0.0-rc.26", path = "../specta" }
+specta = { version = "=2.0.0-rc.27", path = "../specta" }
 serde = { version = "1", default-features = false, optional = true }
 unicode-ident = "1"
 unicode-normalization = "0.1"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-specta = { version = "=2.0.0-rc.26", path = "../specta", features = ["derive", "collect"] }
+specta = { version = "=2.0.0-rc.27", path = "../specta", features = ["derive", "collect"] }
 specta-serde = { path = "../specta-serde" }

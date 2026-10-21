@@ -17,9 +17,9 @@ Export your Rust types to [ReScript](https://rescript-lang.org), built on top of
 
 ```toml
 [dependencies]
-specta = { version = "2.0.0-rc.26", features = ["derive"] }
-specta-rescript = "0.0.1"
-specta-serde = "0.0.13"
+specta = { version = "2.0.0-rc.27", features = ["derive"] }
+specta-rescript = "0.0.2"
+specta-serde = "0.0.14"
 ```
 
 Define your types:
