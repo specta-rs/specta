@@ -631,13 +631,18 @@ impl Configuration {
                 Fields::Unnamed(fields) => {
                     let mut ty = s.clone();
                     let mut changed = false;
+                    let is_newtype = fields.fields.len() == 1;
                     let parts = fields
                         .fields
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, field)| {
                             let field_ty = field.ty.as_ref()?;
-                            let field_ident = format!("{js_ident}[{idx}]");
+                            let field_ident = if is_newtype {
+                                js_ident.to_owned()
+                            } else {
+                                format!("{js_ident}[{idx}]")
+                            };
                             let (next_ty, runtime) = self.apply_inner(
                                 transform_for_rule,
                                 remap_bigint,
@@ -663,7 +668,11 @@ impl Configuration {
                     } else {
                         Some((
                             changed.then_some(DataType::Struct(ty)),
-                            array_transform(js_ident, fields.fields.len(), parts),
+                            if is_newtype {
+                                parts.into_iter().next()?.1
+                            } else {
+                                array_transform(js_ident, fields.fields.len(), parts)
+                            },
                         ))
                     }
                 }

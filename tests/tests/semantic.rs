@@ -4,9 +4,32 @@ use specta_typescript::{
     semantic::{Configuration, Transform},
 };
 
-#[derive(Type)]
+#[derive(Type, serde::Serialize, serde::Deserialize)]
 #[specta(collect = false)]
 struct Website(String);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Newtype(Option<Website>);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct SemanticTuple(Option<Website>, Website);
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentWebsite {
+    value: Option<Website>,
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct TupleWithSkippedFirst(#[serde(skip)] String, Option<Website>);
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct TupleWithSkippedLast(Option<Website>, #[serde(skip)] String);
 
 #[derive(Type)]
 #[specta(collect = false)]
@@ -76,6 +99,93 @@ fn identity_semantic_config() -> Configuration {
         Some(Transform::identity()),
         Some(Transform::identity()),
     )
+}
+
+// Regression coverage for https://github.com/specta-rs/specta/issues/578.
+#[test]
+fn semantic_newtype_transforms_use_scalar_shape() {
+    let semantic = semantic_config();
+    let mut types = Types::default();
+    let newtype = Newtype::definition(&mut types);
+
+    let (_, serialize) = semantic
+        .apply_serialize(&types, &newtype, "value")
+        .expect("newtype should apply its nested semantic transform");
+    assert_eq!(serialize, "value==null?value:value.toString()");
+
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &newtype, "value")
+        .expect("newtype should apply its nested semantic transform");
+    assert_eq!(deserialize, "value==null?value:new URL(value)");
+
+    let tuple = SemanticTuple::definition(&mut types);
+    let (_, serialize) = semantic
+        .apply_serialize(&types, &tuple, "value")
+        .expect("tuple should apply its nested semantic transform");
+    assert_eq!(
+        serialize,
+        "([value[0]==null?value[0]:value[0].toString(),value[1].toString()])"
+    );
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &tuple, "value")
+        .expect("tuple should apply its nested semantic transform");
+    assert_eq!(
+        deserialize,
+        "([value[0]==null?value[0]:new URL(value[0]),new URL(value[1])])"
+    );
+}
+
+// Named transparent structs share the newtype representation from #578.
+#[test]
+fn semantic_transparent_struct_transforms_use_scalar_shape() {
+    let semantic = semantic_config();
+    let mut types = Types::default();
+    let dt = TransparentWebsite::definition(&mut types);
+    let types = specta::Format::map_types(&specta_serde::Format, &types).unwrap();
+
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &dt, "value")
+        .expect("transparent struct should apply its nested semantic transform");
+    assert_eq!(deserialize, "value==null?value:new URL(value)");
+    let (_, serialize) = semantic
+        .apply_serialize(&types, &dt, "value")
+        .expect("transparent struct should apply its nested semantic transform");
+    assert_eq!(serialize, "value==null?value:value.toString()");
+
+    let types = semantic.apply_types(&types);
+    let rendered = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(rendered.contains("export type TransparentWebsite = URL | null;"));
+}
+
+#[test]
+fn semantic_skipped_tuple_fields_preserve_array_shape() {
+    let semantic = semantic_config();
+    let mut types = Types::default();
+    let tuples = [
+        TupleWithSkippedFirst::definition(&mut types),
+        TupleWithSkippedLast::definition(&mut types),
+    ];
+    let types = specta::Format::map_types(&specta_serde::Format, &types).unwrap();
+
+    for dt in tuples {
+        let (_, serialize) = semantic
+            .apply_serialize(&types, &dt, "value")
+            .expect("single live tuple field should retain its array transform");
+        assert_eq!(serialize, "([value[0]==null?value[0]:value[0].toString()])");
+        let (_, deserialize) = semantic
+            .apply_deserialize(&types, &dt, "value")
+            .expect("single live tuple field should retain its array transform");
+        assert_eq!(deserialize, "([value[0]==null?value[0]:new URL(value[0])])");
+    }
+
+    let types = semantic.apply_types(&types);
+    let rendered = Typescript::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+    assert!(rendered.contains("export type TupleWithSkippedFirst = [URL | null];"));
+    assert!(rendered.contains("export type TupleWithSkippedLast = [URL | null];"));
 }
 
 fn transformed_snapshot(types: &Types, transform: Option<(Option<DataType>, String)>) -> String {
