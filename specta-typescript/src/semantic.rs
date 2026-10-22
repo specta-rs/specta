@@ -1331,8 +1331,19 @@ fn js_property_access(base: &str, name: &str) -> String {
     }
 }
 
+/// Render a wire key as an object-literal property key for a transform body.
+///
+/// `__proto__` must be a *computed* key. In an object literal, `__proto__:`
+/// triggers the legacy prototype setter instead of defining an own property, so
+/// `{...value, __proto__: new URL(value.__proto__)}` would silently keep the
+/// wire value. Quoting the key does not help (`"__proto__":` is the same
+/// special case); only `["__proto__"]:` defines an own property.
+///
+/// Regression coverage for https://github.com/specta-rs/specta/issues/611.
 fn js_object_key(name: &str) -> Cow<'_, str> {
-    if is_identifier(name) {
+    if name == "__proto__" {
+        Cow::Owned(format!("[{}]", js_string_literal(name)))
+    } else if is_identifier(name) {
         Cow::Borrowed(name)
     } else {
         Cow::Owned(format!("\"{}\"", escape_typescript_string_literal(name)))

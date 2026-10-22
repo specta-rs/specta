@@ -210,6 +210,26 @@ enum PrototypeEnum {
     Constructor(Website),
 }
 
+// `__proto__` is special-cased by the language: writing it as an object-literal
+// key sets the prototype rather than defining an own property. Regression
+// coverage for https://github.com/specta-rs/specta/issues/611.
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum ProtoVariantEnum {
+    #[serde(rename = "__proto__")]
+    Proto(Website),
+    #[serde(rename = "other-value")]
+    Other(String),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct ProtoFieldPayload {
+    #[serde(rename = "__proto__")]
+    proto: Website,
+    site: Website,
+}
+
 #[derive(Type, serde::Serialize, serde::Deserialize)]
 #[specta(collect = false)]
 enum InlineRecursiveEnum {
@@ -1002,6 +1022,77 @@ fn semantic_external_enum_guards_ignore_prototype_members() {
         &serialize,
         "{ constructor: new URL(\"https://example.com/ctor\") }",
         "out.constructor === \"https://example.com/ctor\"",
+    );
+}
+
+// Regression coverage for https://github.com/specta-rs/specta/issues/611.
+//
+// An externally tagged variant renamed `__proto__` used to be rewritten into
+// `{...value, __proto__: ...}`, which triggers the language's prototype setter
+// instead of defining an own property, so the field kept its wire value.
+#[test]
+fn semantic_external_enum_variant_named_proto_is_rewritten() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<ProtoVariantEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("prototype-named variant deserialization should be supported")
+        .expect("prototype-named variant deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"__proto__\")?({...value,[\"__proto__\"]:new URL(value.__proto__)}):value"
+    );
+
+    // `JSON.parse` defines `__proto__` as an own property (as the wire layer
+    // does), so the guard selects the branch and the body must rewrite it.
+    assert_runtime_js(
+        &deserialize,
+        "JSON.parse('{\"__proto__\":\"https://example.com/\"}')",
+        "out[\"__proto__\"] instanceof URL && Object.prototype.hasOwnProperty.call(out,\"__proto__\") && out[\"__proto__\"].href === \"https://example.com/\"",
+    );
+    // The other variant is untouched.
+    assert_runtime_js(
+        &deserialize,
+        "{ \"other-value\": \"plain\" }",
+        "out[\"other-value\"] === \"plain\" && Object.getPrototypeOf(out) === Object.prototype",
+    );
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("prototype-named variant serialization should be supported")
+        .expect("prototype-named variant serialization should require a transform");
+    assert_eq!(
+        serialize,
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"__proto__\")?({...value,[\"__proto__\"]:value.__proto__.toString()}):value"
+    );
+    assert_runtime_js(
+        &serialize,
+        "Object.defineProperty({}, \"__proto__\", { value: new URL(\"https://example.com/\"), enumerable: true, configurable: true, writable: true })",
+        "out[\"__proto__\"] === \"https://example.com/\" && Object.prototype.hasOwnProperty.call(out,\"__proto__\")",
+    );
+}
+
+// The same rule applies to a `__proto__` field inside a named payload, and a
+// normal identifier key must keep using the plain form.
+#[test]
+fn semantic_struct_proto_field_is_rewritten_and_safe_keys_are_unchanged() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<ProtoFieldPayload>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("prototype-named field deserialization should be supported")
+        .expect("prototype-named field deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "({...value,[\"__proto__\"]:new URL(value.__proto__),site:new URL(value.site)})"
+    );
+
+    assert_runtime_js(
+        &deserialize,
+        "JSON.parse('{\"__proto__\":\"https://example.com/p\",\"site\":\"https://example.com/s\"}')",
+        "out[\"__proto__\"] instanceof URL && Object.prototype.hasOwnProperty.call(out,\"__proto__\") && out.site instanceof URL",
     );
 }
 
