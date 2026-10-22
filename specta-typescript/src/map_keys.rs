@@ -2,10 +2,136 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
+    datatype::{
+        DataType, Fields, Generic, GenericReference, NamedReferenceType, Primitive, Reference,
+    },
 };
 
 use crate::Error;
+
+/// The key-safe wire shape a validated map key normalises to.
+///
+/// JSON object property names are always strings, and TypeScript mapped-type
+/// keys must satisfy the built-in `PropertyKey` (`string | number | symbol`).
+/// A key that is not already a valid `PropertyKey` therefore cannot reuse the
+/// value rendering (`number | null`, `bigint`, a bare type parameter) and must
+/// render through one of these shapes instead. See [`map_key_shape`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum MapKeyShape {
+    /// The key expression already satisfies `PropertyKey`; render it as-is.
+    Property,
+    /// Wide integers and this crate's lossless `BigInt` remap. serde_json
+    /// stringifies integer map keys, so these render as lexical string keys.
+    String,
+    /// Floats and this crate's lossless `Number` remap. `NaN`/`Infinity` are
+    /// not representable as JSON keys, so the key-safe form drops the `null`
+    /// branch and renders plain `number`.
+    Number,
+    /// A type parameter used (possibly through wrappers) as the key. It is not
+    /// constrained to `PropertyKey` at its declaration, so the mapped type
+    /// must intersect it locally.
+    TypeParameter,
+}
+
+/// Classifies a validated map key into the shape it should render as.
+///
+/// This resolves through inline references, named newtype wrappers and generic
+/// arguments so that a wide integer or lossless remap hidden behind a wrapper
+/// still renders key-safely, while a concrete wrapper over an already-valid
+/// key (`MaybeValidKey<string>`) keeps rendering as its own name.
+///
+/// Only call this after [`validate_map_key`], which rejects genuinely invalid
+/// key shapes (structs, tuples, collections, ...). The returned
+/// [`MapKeyShape::Property`] means "render the key expression unchanged".
+pub(crate) fn map_key_shape(
+    key_ty: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+) -> MapKeyShape {
+    map_key_shape_inner(key_ty, types, generics, &mut HashSet::new())
+}
+
+fn map_key_shape_inner(
+    key_ty: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    visiting: &mut HashSet<Reference>,
+) -> MapKeyShape {
+    match key_ty {
+        DataType::Primitive(primitive) => match primitive {
+            Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => {
+                MapKeyShape::Number
+            }
+            Primitive::usize
+            | Primitive::isize
+            | Primitive::i64
+            | Primitive::u64
+            | Primitive::i128
+            | Primitive::u128 => MapKeyShape::String,
+            _ => MapKeyShape::Property,
+        },
+        DataType::Reference(Reference::Opaque(r)) => {
+            if r.downcast_ref::<crate::opaque::BigInt>().is_some() {
+                MapKeyShape::String
+            } else if r.downcast_ref::<crate::opaque::Number>().is_some() {
+                MapKeyShape::Number
+            } else {
+                MapKeyShape::Property
+            }
+        }
+        DataType::Reference(Reference::Named(r)) => {
+            let reference_key = Reference::Named(r.clone());
+            if !visiting.insert(reference_key.clone()) {
+                return MapKeyShape::Property;
+            }
+
+            let shape = match &r.inner {
+                NamedReferenceType::Inline { dt, .. } => {
+                    map_key_shape_inner(dt, types, generics, visiting)
+                }
+                NamedReferenceType::Reference {
+                    generics: arguments,
+                    ..
+                } => types
+                    .get(r)
+                    .and_then(|ndt| ndt.ty.clone())
+                    .map(|mut body| {
+                        substitute_generics(&mut body, arguments);
+                        map_key_shape_inner(&body, types, generics, visiting)
+                    })
+                    .unwrap_or(MapKeyShape::Property),
+                NamedReferenceType::Recursive(_) => MapKeyShape::Property,
+            };
+
+            visiting.remove(&reference_key);
+            shape
+        }
+        DataType::Struct(strct) => {
+            // A named struct is only a valid key when it serialises as a
+            // newtype, in which case the key is its single live field.
+            let Fields::Unnamed(unnamed) = &strct.fields else {
+                return MapKeyShape::Property;
+            };
+
+            let mut live = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+            match (live.next(), live.next()) {
+                (Some(inner), None) => map_key_shape_inner(inner, types, generics, visiting),
+                _ => MapKeyShape::Property,
+            }
+        }
+        DataType::Generic(generic) => {
+            // A scoped substitution (e.g. a named reference's generic
+            // argument) can bind the parameter to a concrete key shape.
+            match generics.iter().find(|(reference, _)| reference == generic) {
+                Some((_, substituted)) if !matches!(substituted, DataType::Generic(inner) if inner == generic) => {
+                    map_key_shape_inner(substituted, types, generics, visiting)
+                }
+                _ => MapKeyShape::TypeParameter,
+            }
+        }
+        _ => MapKeyShape::Property,
+    }
+}
 
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
@@ -178,9 +304,18 @@ fn validate_map_key_inner(
             // a serializable JSON map key, and rejecting it forces them to
             // duplicate the bigint-style rewrite already done by libraries
             // like taurpc (which converts `i64` -> `define("number")` to
-            // satisfy the BigInt-forbidden filter). Other opaque flavors --
-            // Tauri channels, branded types -- still fail loudly.
-            if r.downcast_ref::<crate::opaque::Define>().is_some() {
+            // satisfy the BigInt-forbidden filter).
+            //
+            // `BigInt`/`Number` are this crate's own lossless remaps. At a key
+            // position they render as a lexical `string`/`number` key (see
+            // `primitives::map_key_datatype`), so a key whose *named*
+            // definition was remapped (`struct Id(u64)` -> `bigint`) stays
+            // valid. Other opaque flavors -- Tauri channels, branded types --
+            // still fail loudly.
+            if r.downcast_ref::<crate::opaque::Define>().is_some()
+                || r.downcast_ref::<crate::opaque::BigInt>().is_some()
+                || r.downcast_ref::<crate::opaque::Number>().is_some()
+            {
                 Ok(())
             } else {
                 Err(Error::invalid_map_key(
