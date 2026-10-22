@@ -2032,6 +2032,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-metadata-no-direct-deps"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-typescript",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2353,7 +2362,6 @@ version = "0.0.14"
 dependencies = [
  "serde",
  "specta",
- "specta-macros",
 ]
 
 [[package]]

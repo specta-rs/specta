@@ -122,8 +122,8 @@ mod validate;
 
 use inflection::RenameRule;
 use parser::{
-    CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED, CONTAINER_TRY_FROM_RESOLVED,
-    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+    CONTAINER_DENY_UNKNOWN_FIELDS, CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED,
+    CONTAINER_TRY_FROM_RESOLVED, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
 };
 use phased::PhasedTy;
 use repr::EnumRepr;
@@ -2901,6 +2901,13 @@ fn rewrite_enum_repr_for_phase(
     }
 
     let container_attrs = SerdeContainerAttrs::from_attributes(&e.attributes)?;
+    // `deny_unknown_fields` describes the enum's own objects rather than its
+    // tagging representation, so it must survive the rewrite below. Exporters
+    // need it to close named-field variant payloads, which Serde also rejects
+    // unknown keys in.
+    let deny_unknown_fields = container_attrs
+        .as_ref()
+        .is_some_and(|attrs| attrs.deny_unknown_fields);
     let variants = std::mem::take(&mut e.variants);
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
@@ -2946,9 +2953,13 @@ fn rewrite_enum_repr_for_phase(
             let widen_tag = matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Deserialize)
                 && variant_attrs.as_ref().is_some_and(|attrs| attrs.other);
             let mut transformed_variant = match &repr {
-                EnumRepr::External => {
-                    transform_external_variant(serialized_name.clone(), &variant, widen_tag, mode)?
-                }
+                EnumRepr::External => transform_external_variant(
+                    serialized_name.clone(),
+                    &variant,
+                    widen_tag,
+                    deny_unknown_fields,
+                    mode,
+                )?,
                 EnumRepr::Internal { tag } => transform_internal_variant(
                     serialized_name.clone(),
                     tag.as_ref(),
@@ -2970,6 +2981,7 @@ fn rewrite_enum_repr_for_phase(
                         content.as_ref(),
                         &variant,
                         widen_tag,
+                        deny_unknown_fields,
                         mode,
                     )?
                 }
@@ -3001,6 +3013,9 @@ fn rewrite_enum_repr_for_phase(
     e.variants = transformed;
     e.attributes = Default::default();
     e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    if deny_unknown_fields {
+        e.attributes.insert(CONTAINER_DENY_UNKNOWN_FIELDS, true);
+    }
 
     Ok(())
 }
@@ -3396,10 +3411,28 @@ fn select_conversion_target(
     }
 }
 
+/// Stamp `#[serde(deny_unknown_fields)]` onto the anonymous named-field payload
+/// struct that an externally or adjacently tagged variant wraps.
+///
+/// Serde applies a container's `deny_unknown_fields` to each variant's payload,
+/// so exporters must close the nested object. The tag wrapper itself is strict
+/// regardless of this, since it holds exactly the tag key(s). Only the generated
+/// named payload struct is stamped: a tuple/newtype payload renders as a JSON
+/// array, and a named reference is a shared definition whose own strictness must
+/// not change.
+fn close_named_payload(field: &mut Field) {
+    if let Some(DataType::Struct(strct)) = &mut field.ty
+        && matches!(&strct.fields, Fields::Named(_))
+    {
+        strct.attributes.insert(CONTAINER_DENY_UNKNOWN_FIELDS, true);
+    }
+}
+
 fn transform_external_variant(
     serialized_name: String,
     variant: &Variant,
     widen_tag: bool,
+    deny_unknown_fields: bool,
     mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     // Only a genuine newtype variant (declared arity 1) collapses to a unit
@@ -3431,8 +3464,11 @@ fn transform_external_variant(
             })],
         ),
         _ => {
-            let payload = variant_payload_field(variant)
+            let mut payload = variant_payload_field(variant)
                 .ok_or_else(|| Error::invalid_external_tagged_variant(serialized_name.clone()))?;
+            if deny_unknown_fields {
+                close_named_payload(&mut payload);
+            }
 
             clone_variant_with_named_fields(variant, vec![(Cow::Owned(serialized_name), payload)])
         }
@@ -3445,6 +3481,7 @@ fn transform_adjacent_variant(
     content: &str,
     variant: &Variant,
     widen_tag: bool,
+    deny_unknown_fields: bool,
     mode: PhaseRewrite,
 ) -> Result<Variant, Error> {
     let mut fields: Vec<(Cow<'static, str>, Field)> = vec![(
@@ -3470,6 +3507,9 @@ fn transform_adjacent_variant(
     } else if !variant_collapses_to_unit(variant) {
         let mut payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
+        if deny_unknown_fields {
+            close_named_payload(&mut payload);
+        }
         // serde's adjacent deserializer routes a missing `content` key
         // through `missing_field`, which yields `None` for a *newtype*
         // `Option` payload even without any skip attrs -- `{"t":"V"}`

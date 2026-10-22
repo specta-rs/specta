@@ -1,0 +1,11 @@
+[package]
+name = "serde-metadata-no-direct-deps"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Deliberately no `specta-serde` dependency. See `src/main.rs` for why.
+[dependencies]
+specta = { path = "../../specta", features = ["derive"] }
+specta-typescript = { path = "../../specta-typescript" }
+serde = { version = "1", features = ["derive"] }

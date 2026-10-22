@@ -16,9 +16,24 @@ use crate::{Error, SchemaVersion};
 
 const INLINE_RECURSION_LIMIT: usize = 128;
 const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
+/// Authored `#[serde(deny_unknown_fields)]`. Distinct from
+/// [`SERDE_STRICT_OBJECT_MARKER`], which specta-serde puts on the wrapper it
+/// generates for an externally tagged variant.
+const SERDE_CONTAINER_DENY_UNKNOWN_FIELDS: &str = "serde:container:deny_unknown_fields";
+/// Marks a synthetic object wrapper whose wire format accepts exactly one key.
+/// specta-serde sets it on the wrapper it generates for an externally tagged
+/// variant. This is not authored metadata — it describes the tagging
+/// representation itself — so such a wrapper is closed regardless of the schema
+/// policy. Adjacently tagged variants deliberately do not carry it: Serde does
+/// accept extra keys alongside `tag`/`content`.
+const SERDE_STRICT_OBJECT_MARKER: &str = "specta:strict_object";
 const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
 const SERDE_ENUM_OTHER_VARIANT: &str = "specta_serde:variant_other";
+/// Marks a struct that specta-serde inlined as a flattened payload. Serde
+/// ignores an inner struct's `deny_unknown_fields` when it is flattened, so a
+/// marked part must not close the merged object.
+const SERDE_FLATTENED_PAYLOAD: &str = "specta_serde:flattened_payload";
 
 type Generics = BTreeMap<Cow<'static, str>, DataType>;
 
@@ -229,13 +244,15 @@ impl<'a> Renderer<'a> {
             .map(|ty| self.render_datatype_for_intersection(ty, generics, path, depth + 1))
             .collect::<Result<Vec<_>, _>>()?;
 
-        if let Some(schema) = merge_object_intersection(&parts, self.allow_additional_properties) {
+        let deny =
+            !self.allow_additional_properties || self.intersection_denies_unknown_fields(types);
+        if let Some(schema) = merge_object_intersection(&parts, deny) {
             return Ok(schema);
         }
 
         let mut schema = Map::new();
         schema.insert("allOf".to_string(), Value::Array(parts));
-        if !self.allow_additional_properties {
+        if deny {
             if self.schema_version.supports_unevaluated_properties() {
                 schema.insert("unevaluatedProperties".to_string(), Value::Bool(false));
             } else {
@@ -268,6 +285,27 @@ impl<'a> Renderer<'a> {
         }
 
         Ok(Value::Object(schema))
+    }
+
+    /// Whether an intersection of object parts must reject undeclared
+    /// properties because of an authored `#[serde(deny_unknown_fields)]`.
+    ///
+    /// Flattening lowers the outer container's attributes onto the base struct
+    /// part, so a literal struct carrying the marker closes the merged object.
+    /// Serde ignores a flattened inner struct's own `deny_unknown_fields`, and
+    /// such parts reach here either as named references or, when their payload
+    /// was inlined, with the `flattened_payload` marker — neither closes.
+    fn intersection_denies_unknown_fields(&self, types: &[DataType]) -> bool {
+        types.iter().any(|ty| match ty {
+            DataType::Struct(strct) => {
+                !strct.attributes.contains_key(SERDE_FLATTENED_PAYLOAD)
+                    && strct
+                        .attributes
+                        .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS)
+            }
+            DataType::Intersection(types) => self.intersection_denies_unknown_fields(types),
+            _ => false,
+        })
     }
 
     fn render_datatype_for_intersection(
@@ -691,6 +729,17 @@ impl<'a> Renderer<'a> {
         })
     }
 
+    /// Whether a named object must reject undeclared properties.
+    ///
+    /// The default policy (exact serialization shapes) closes every object.
+    /// Deserialization-compatible mode (`allow_additional_properties`) leaves
+    /// objects open to match Serde's default of ignoring unknown fields, but an
+    /// authored `#[serde(deny_unknown_fields)]` still closes the object because
+    /// Serde itself rejects the extra keys.
+    fn deny_unknown_fields(&self, container_denies: bool) -> bool {
+        container_denies || !self.allow_additional_properties
+    }
+
     fn render_struct(
         &mut self,
         strct: &Struct,
@@ -698,7 +747,12 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
-        self.render_fields(&strct.fields, generics, path, depth, true)
+        let deny = self.deny_unknown_fields(
+            strct
+                .attributes
+                .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS),
+        );
+        self.render_fields(&strct.fields, generics, path, depth, deny)
     }
 
     fn render_fields(
@@ -744,7 +798,7 @@ impl<'a> Renderer<'a> {
                 if !required.is_empty() {
                     schema.insert("required".to_string(), Value::Array(required));
                 }
-                if deny_unknown_fields && !self.allow_additional_properties {
+                if deny_unknown_fields {
                     schema.insert("additionalProperties".to_string(), Value::Bool(false));
                 }
                 Ok(Value::Object(schema))
@@ -848,6 +902,12 @@ impl<'a> Renderer<'a> {
     ) -> Result<Value, Error> {
         let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
         let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+        // Serde applies a container's `deny_unknown_fields` to each variant's
+        // named-field payload, so it is threaded through to `render_variant`.
+        let deny_unknown_fields = self.deny_unknown_fields(
+            enm.attributes
+                .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS),
+        );
         let mut variants = enm
             .variants
             .iter()
@@ -858,6 +918,7 @@ impl<'a> Renderer<'a> {
                     variant,
                     untagged,
                     rewritten,
+                    deny_unknown_fields,
                     generics,
                     path,
                     depth + 1,
@@ -905,12 +966,13 @@ impl<'a> Renderer<'a> {
         variant: &Variant,
         untagged: bool,
         rewritten: bool,
+        deny_unknown_fields: bool,
         generics: &Generics,
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
         let schema = if untagged || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) {
-            self.render_untagged_variant(variant, generics, path, depth)?
+            self.render_untagged_variant(variant, deny_unknown_fields, generics, path, depth)?
         } else {
             match &variant.fields {
                 Fields::Unit => object([("const", string(name))]),
@@ -938,12 +1000,19 @@ impl<'a> Renderer<'a> {
                     }
                 }
                 Fields::Named(fields) => {
+                    // A specta-serde rewritten external variant renders its
+                    // one-key tag wrapper here (not through
+                    // `external_variant_schema`), and Serde rejects a second key
+                    // in that wrapper even without `deny_unknown_fields`, so it
+                    // stays closed regardless of the schema policy.
+                    let strict_wrapper =
+                        rewritten && variant.attributes.contains_key(SERDE_STRICT_OBJECT_MARKER);
                     let payload = self.render_fields(
                         &Fields::Named(fields.clone()),
                         generics,
                         path,
                         depth + 1,
-                        true,
+                        deny_unknown_fields || strict_wrapper,
                     )?;
                     if rewritten {
                         payload
@@ -967,6 +1036,7 @@ impl<'a> Renderer<'a> {
     fn render_untagged_variant(
         &mut self,
         variant: &Variant,
+        deny_unknown_fields: bool,
         generics: &Generics,
         path: &str,
         depth: usize,
@@ -988,11 +1058,18 @@ impl<'a> Renderer<'a> {
                 generics,
                 path,
                 depth + 1,
-                true,
+                deny_unknown_fields,
             ),
         }
     }
 
+    /// Wrapper for an externally-tagged variant that has *not* been rewritten by
+    /// specta-serde (no Serde format applied). Serde's external tagging accepts
+    /// exactly one key, so this is strict regardless of the schema policy.
+    ///
+    /// A rewritten external variant never reaches here: it renders as a named
+    /// object through `render_fields`, where the same one-key rule is applied
+    /// via [`SERDE_STRICT_OBJECT_MARKER`].
     fn external_variant_schema(&self, name: &str, payload: Value) -> Value {
         let mut properties = Map::new();
         properties.insert(name.to_string(), payload);
@@ -1485,7 +1562,7 @@ fn metadata_description(docs: &str, deprecated: Option<&Deprecated>) -> String {
     description
 }
 
-fn merge_object_intersection(parts: &[Value], allow_additional_properties: bool) -> Option<Value> {
+fn merge_object_intersection(parts: &[Value], deny_unknown_fields: bool) -> Option<Value> {
     let mut properties = Map::new();
     let mut required = Vec::new();
 
@@ -1521,7 +1598,7 @@ fn merge_object_intersection(parts: &[Value], allow_additional_properties: bool)
     if !required.is_empty() {
         schema.insert("required".to_string(), Value::Array(required));
     }
-    if !allow_additional_properties {
+    if deny_unknown_fields {
         schema.insert("additionalProperties".to_string(), Value::Bool(false));
     }
     Some(Value::Object(schema))

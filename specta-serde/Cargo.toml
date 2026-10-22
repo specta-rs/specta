@@ -19,7 +19,6 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.27", path = "../specta" }
-specta-macros = { version = "=2.0.0-rc.27", path = "../specta-macros", features = ["serde"] }
 
 [dev-dependencies]
 specta = { version = "=2.0.0-rc.27", path = "../specta", features = ["derive"] }

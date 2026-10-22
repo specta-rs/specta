@@ -2,7 +2,8 @@
 //! specta doesn't act on. Attributes that take a `= value` or `(...)` list were previously not
 //! consumed by the fall-through branch of `parse_container_meta` / `parse_variant_meta` /
 //! `parse_field_meta`, so `syn`'s `parse_nested_meta` errored with `expected `,`` on anything
-//! after them. Path-only unknown attributes (e.g. `deny_unknown_fields`) already worked.
+//! after them. Path-only unknown attributes (attributes with no `= value` or `(...)` tail)
+//! already worked, because `syn` had nothing left to parse after them.
 //!
 //! These types only need to compile to prove the fix; a couple of them are also exported to
 //! TypeScript to prove the fix didn't swallow more than the unknown attribute (i.e. a following

@@ -16,6 +16,7 @@ const CONTAINER_CONTENT: &str = "serde:container:content";
 const CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 const CONTAINER_DEFAULT: &str = "serde:container:default";
 const CONTAINER_TRANSPARENT: &str = "serde:container:transparent";
+pub(crate) const CONTAINER_DENY_UNKNOWN_FIELDS: &str = "serde:container:deny_unknown_fields";
 const CONTAINER_FROM_TYPE_SRC: &str = "serde:container:from_type_src";
 pub(crate) const CONTAINER_FROM_RESOLVED: &str = "serde:container:from_resolved";
 const CONTAINER_TRY_FROM_TYPE_SRC: &str = "serde:container:try_from_type_src";
@@ -62,6 +63,7 @@ const CONTAINER_ATTR_KEYS: &[&str] = &[
     CONTAINER_UNTAGGED,
     CONTAINER_DEFAULT,
     CONTAINER_TRANSPARENT,
+    CONTAINER_DENY_UNKNOWN_FIELDS,
     CONTAINER_FROM_TYPE_SRC,
     CONTAINER_FROM_RESOLVED,
     CONTAINER_TRY_FROM_TYPE_SRC,
@@ -119,6 +121,7 @@ pub struct SerdeContainerAttrs {
     pub untagged: bool,
     pub default: bool,
     pub transparent: bool,
+    pub deny_unknown_fields: bool,
     pub from: Option<ConversionType>,
     pub try_from: Option<ConversionType>,
     pub into: Option<ConversionType>,
@@ -157,6 +160,7 @@ impl SerdeContainerAttrs {
                     untagged: has_attr(attributes, CONTAINER_UNTAGGED),
                     default: has_attr(attributes, CONTAINER_DEFAULT),
                     transparent: has_attr(attributes, CONTAINER_TRANSPARENT),
+                    deny_unknown_fields: has_attr(attributes, CONTAINER_DENY_UNKNOWN_FIELDS),
                     from: get_string(attributes, CONTAINER_FROM_TYPE_SRC)
                         .map(|type_src| ConversionType { type_src }),
                     try_from: get_string(attributes, CONTAINER_TRY_FROM_TYPE_SRC)
