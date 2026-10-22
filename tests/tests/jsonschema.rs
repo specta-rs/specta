@@ -337,3 +337,121 @@ fn jsonschema_flattened_deny_unknown_fields_matches_serde() {
     assert!(!strict_validator.is_valid(&payload));
     assert!(open_validator.is_valid(&payload));
 }
+
+/// A standalone schema for `base`'s deserialize-phase shape in `format`.
+///
+/// `PhasesFormat` only splits a type into `_Serialize`/`_Deserialize` variants
+/// when its two shapes differ; a symmetric type keeps its original name, so the
+/// split name is preferred but not required.
+fn deserialize_phase_schema(types: &Types, format: &dyn Format, base: &str) -> serde_json::Value {
+    let document = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_value(types, format)
+        .unwrap_or_else(|err| panic!("export of `{base}` failed: {err}"));
+    let defs = document["$defs"].clone();
+    let split = format!("{base}_Deserialize");
+    let key = if defs.get(&split).is_some() {
+        split
+    } else {
+        base.to_string()
+    };
+    serde_json::json!({ "$ref": format!("#/$defs/{key}"), "$defs": defs })
+}
+
+/// An externally or adjacently tagged variant's *named payload* object must be
+/// closed when the enum container carries `deny_unknown_fields` — Serde rejects
+/// unknown keys there too. The tag wrapper is strict either way; this covers the
+/// payload nested inside it.
+///
+/// Asserted against real `serde_json` accept/reject under the
+/// deserialization-compatible mode, in both format phases.
+#[test]
+fn jsonschema_deny_unknown_fields_closes_external_and_adjacent_payloads() {
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    enum ExternalDeny {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c", deny_unknown_fields)]
+    enum AdjacentDeny {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    enum ExternalOpen {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c")]
+    enum AdjacentOpen {
+        V { a: i32 },
+    }
+
+    let types = Types::default()
+        .register::<ExternalDeny>()
+        .register::<AdjacentDeny>()
+        .register::<ExternalOpen>()
+        .register::<AdjacentOpen>();
+
+    let external_extra = serde_json::json!({ "V": { "a": 1, "extra": true } });
+    let adjacent_extra = serde_json::json!({ "t": "V", "c": { "a": 1, "extra": true } });
+
+    // Ground truth straight from Serde: the deny-marked payloads reject the
+    // unknown key, the ordinary ones accept it.
+    assert!(serde_json::from_value::<ExternalDeny>(external_extra.clone()).is_err());
+    assert!(serde_json::from_value::<AdjacentDeny>(adjacent_extra.clone()).is_err());
+    assert!(serde_json::from_value::<ExternalOpen>(external_extra.clone()).is_ok());
+    assert!(serde_json::from_value::<AdjacentOpen>(adjacent_extra.clone()).is_ok());
+
+    for (phase, format) in [
+        ("unified", &specta_serde::Format as &dyn Format),
+        ("phases", &specta_serde::PhasesFormat as &dyn Format),
+    ] {
+        for (shape, name, json, closed) in [
+            ("external deny", "ExternalDeny", &external_extra, true),
+            ("adjacent deny", "AdjacentDeny", &adjacent_extra, true),
+            ("external open", "ExternalOpen", &external_extra, false),
+            ("adjacent open", "AdjacentOpen", &adjacent_extra, false),
+        ] {
+            let schema = deserialize_phase_schema(&types, format, name);
+            let validator = jsonschema::validator_for(&schema)
+                .unwrap_or_else(|err| panic!("{phase}: {shape} schema invalid: {err}"));
+            assert_eq!(
+                validator.is_valid(json),
+                !closed,
+                "{phase}: the {shape} schema must {} a payload with an unknown key",
+                if closed { "reject" } else { "accept" }
+            );
+        }
+    }
+
+    // Structural check so a regression is obvious without reading the validator
+    // result: the deny-marked payload object itself is closed.
+    let external = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "ExternalDeny")
+        .expect("external export");
+    let adjacent = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "AdjacentDeny")
+        .expect("adjacent export");
+    assert_eq!(
+        external["$defs"]["ExternalDeny"]["properties"]["V"]["additionalProperties"],
+        serde_json::json!(false),
+        "external payload must be closed: {}",
+        external["$defs"]["ExternalDeny"]
+    );
+    assert_eq!(
+        adjacent["$defs"]["AdjacentDeny"]["properties"]["c"]["additionalProperties"],
+        serde_json::json!(false),
+        "adjacent payload must be closed: {}",
+        adjacent["$defs"]["AdjacentDeny"]
+    );
+}
