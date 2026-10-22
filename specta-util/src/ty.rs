@@ -69,10 +69,12 @@
 //! * `[value; N]` array-repeat syntax is not supported: the length is a value and a
 //!   `ty!` type is decided statically. Bind the array and interpolate it — a Rust
 //!   `[T; N]` keeps its fixed length that way.
-//! * An empty array is a list of Specta's bottom type. Exporters with a bottom type
-//!   render it (TypeScript's `never[]`, Zod's `z.never()`, Python's `Never`, JSON
-//!   Schema's `false`); a target without one may reject it or represent it
-//!   differently.
+//! * An empty array is a list of Specta's bottom type: an enum with no variants, the
+//!   same datatype `std::convert::Infallible` produces. TypeScript, Zod, Valibot,
+//!   Python, Kotlin, Swift, Rust and JSON Schema each render it as their own bottom
+//!   type — `never[]`, `z.never()`, `v.never()`, `Never`, `kotlin.Never`, `Never`,
+//!   `std::convert::Infallible` and `false`. A target that has none, such as ReScript,
+//!   reports it as unsupported rather than silently widening it.
 //! * A large literal expands to deeply nested items, so it is bounded by
 //!   `#![recursion_limit]`. At the default of 128 a literal of single-token values
 //!   fits at most 31 entries (fields or array elements); longer values reach the
