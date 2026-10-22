@@ -61,6 +61,11 @@ impl JsonSchema {
     /// set `additionalProperties` to `false`. Enable this when the schema is
     /// primarily used for deserialization compatible with Serde's default of
     /// ignoring unknown fields.
+    ///
+    /// This is a default, not an override: an object marked with
+    /// `#[serde(deny_unknown_fields)]` stays closed either way, because Serde
+    /// itself rejects the extra keys. Synthetic externally-tagged variant
+    /// wrappers are also always closed, since they accept exactly one key.
     pub fn allow_additional_properties(mut self, allow: bool) -> Self {
         self.allow_additional_properties = allow;
         self

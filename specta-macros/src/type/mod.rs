@@ -17,7 +17,6 @@ pub(crate) mod attr;
 mod r#enum;
 mod field;
 mod generics;
-#[cfg(feature = "serde")]
 mod serde;
 mod r#struct;
 
@@ -28,6 +27,15 @@ pub(super) enum AttributeScope {
     Field,
 }
 
+/// Lower the Serde attributes of a container, variant or field into the inert `serde:*` runtime
+/// attributes.
+///
+/// This is deliberately unconditional. The parsed attributes are just strings and the derive
+/// never interprets them, so gating this behind a Cargo feature only made the recorded metadata
+/// depend on graph-wide feature unification: a consumer of `specta` + `derive` + an exporter that
+/// never depended on `specta-serde` silently lost every `rename`/`rename_all`/`untagged`
+/// attribute. Interpretation stays in `specta-serde`. See
+/// https://github.com/specta-rs/specta/issues/590.
 pub(super) fn build_runtime_attributes(
     crate_ref: &TokenStream,
     scope: AttributeScope,
@@ -35,7 +43,6 @@ pub(super) fn build_runtime_attributes(
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> syn::Result<Option<TokenStream>> {
-    #[cfg(feature = "serde")]
     let serde_insert = serde::lower_runtime_attributes(
         crate_ref,
         scope,
@@ -51,14 +58,6 @@ pub(super) fn build_runtime_attributes(
             .cloned()
             .collect::<Vec<_>>(),
     )?;
-    #[cfg(not(feature = "serde"))]
-    let serde_insert: Option<TokenStream> = {
-        let _ = crate_ref;
-        let _ = scope;
-        let _ = raw_attrs;
-        let _ = skip_attrs;
-        None
-    };
 
     if serde_insert.is_none() {
         return Ok(None);

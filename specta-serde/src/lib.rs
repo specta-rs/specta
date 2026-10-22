@@ -121,8 +121,8 @@ mod validate;
 
 use inflection::RenameRule;
 use parser::{
-    CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED, CONTAINER_TRY_FROM_RESOLVED,
-    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+    CONTAINER_DENY_UNKNOWN_FIELDS, CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED,
+    CONTAINER_TRY_FROM_RESOLVED, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
 };
 use phased::PhasedTy;
 use repr::EnumRepr;
@@ -2886,6 +2886,11 @@ fn rewrite_enum_repr_for_phase(
     }
 
     let repr = EnumRepr::from_attrs(&e.attributes)?;
+    // `deny_unknown_fields` describes the enum's own objects rather than its
+    // tagging representation, so it must survive the rewrite below. Exporters
+    // need it to close named-field variant payloads, which Serde also rejects
+    // unknown keys in.
+    let deny_unknown_fields = e.attributes.contains_key(CONTAINER_DENY_UNKNOWN_FIELDS);
     if matches!(repr, EnumRepr::Untagged) {
         rewrite_container_untagged_unit_variants(e)?;
         // Mark like every other branch so idempotency across passes comes
@@ -3001,6 +3006,9 @@ fn rewrite_enum_repr_for_phase(
     e.variants = transformed;
     e.attributes = Default::default();
     e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    if deny_unknown_fields {
+        e.attributes.insert(CONTAINER_DENY_UNKNOWN_FIELDS, true);
+    }
 
     Ok(())
 }

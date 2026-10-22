@@ -1,5 +1,5 @@
 use serde::Serialize;
-use specta::{Type, Types};
+use specta::{Format, Type, Types};
 use specta_jsonschema::JsonSchema;
 
 #[test]
@@ -133,4 +133,207 @@ fn jsonschema_string_formats_are_opt_in() {
         formatted["$defs"]["Stamped"]["properties"]["at"]["format"],
         "date-time"
     );
+}
+
+// Regression tests for the P1 defect in https://github.com/specta-rs/specta/issues/590.
+//
+// `#[serde(deny_unknown_fields)]` used to be discarded at derive time, so JSON
+// Schema had no way to honour per-type strictness and instead applied one global
+// policy to every object.
+
+/// An ordinary struct must stay permissive in the deserialization-compatible
+/// mode, while a `#[serde(deny_unknown_fields)]` struct must stay closed — and
+/// the two schemas must no longer be identical.
+#[test]
+fn jsonschema_deny_unknown_fields_closes_only_marked_objects() {
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct Permissive {
+        a: i32,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    struct Strict {
+        a: i32,
+    }
+
+    // Both in one graph, matching a real crate that mixes the two.
+    let types = Types::default()
+        .register::<Permissive>()
+        .register::<Strict>();
+
+    let permissive = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "Permissive")
+        .expect("permissive export");
+    let strict = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "Strict")
+        .expect("strict export");
+
+    let permissive_object = &permissive["$defs"]["Permissive"];
+    let strict_object = &strict["$defs"]["Strict"];
+
+    assert!(
+        permissive_object.get("additionalProperties").is_none(),
+        "an ordinary struct must stay permissive in deserialization-compatible mode: {permissive_object}"
+    );
+    assert_eq!(
+        strict_object["additionalProperties"],
+        serde_json::json!(false),
+        "a deny-marked struct must stay closed: {strict_object}"
+    );
+    assert_ne!(
+        permissive_object, strict_object,
+        "ordinary and deny-marked structs must no longer produce identical schemas"
+    );
+
+    let permissive_validator = jsonschema::validator_for(&permissive).expect("valid schema");
+    let strict_validator = jsonschema::validator_for(&strict).expect("valid schema");
+
+    // Serde accepts the extra key for `Permissive` and rejects it for `Strict`.
+    assert!(permissive_validator.is_valid(&serde_json::json!({ "a": 1, "extra": true })));
+    assert!(!strict_validator.is_valid(&serde_json::json!({ "a": 1, "extra": true })));
+    assert!(strict_validator.is_valid(&serde_json::json!({ "a": 1 })));
+}
+
+/// Serde applies a container's `deny_unknown_fields` to each named-field enum
+/// variant payload, and the recorded policy must survive both format phases.
+#[test]
+fn jsonschema_deny_unknown_fields_applies_to_enum_payloads_in_both_phases() {
+    // Internally tagged variants render as one object whose properties are the
+    // tag plus the payload fields, so the variant object *is* the payload.
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", deny_unknown_fields)]
+    enum StrictEnum {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t")]
+    enum OpenEnum {
+        V { a: i32 },
+    }
+
+    let types = Types::default()
+        .register::<StrictEnum>()
+        .register::<OpenEnum>();
+
+    let strict = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "StrictEnum")
+        .expect("strict enum export");
+    let open = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "OpenEnum")
+        .expect("open enum export");
+
+    assert_eq!(
+        strict["$defs"]["StrictEnum"]["additionalProperties"],
+        serde_json::json!(false),
+        "a deny-marked enum's variant payload must stay closed: {}",
+        strict["$defs"]["StrictEnum"]
+    );
+    assert!(
+        open["$defs"]["OpenEnum"]
+            .get("additionalProperties")
+            .is_none(),
+        "an ordinary enum's variant payload must stay permissive: {}",
+        open["$defs"]["OpenEnum"]
+    );
+
+    // Both phases must retain the recorded policy (the raw attribute is what
+    // `specta-jsonschema` reads), including the split phase types.
+    for mapped in [
+        specta_serde::Format
+            .map_types(&types)
+            .expect("unified phase"),
+        specta_serde::PhasesFormat
+            .map_types(&types)
+            .expect("split phases"),
+    ] {
+        assert!(
+            mapped.as_ref().into_sorted_iter().any(|ndt| {
+                matches!(
+                    ndt.ty.as_ref(),
+                    Some(specta::datatype::DataType::Enum(enm))
+                        if enm
+                            .attributes
+                            .contains_key("serde:container:deny_unknown_fields")
+                )
+            }),
+            "deny_unknown_fields must survive the format phase"
+        );
+    }
+}
+
+/// Serde honours the outer container's `deny_unknown_fields` across a
+/// `#[serde(flatten)]`, but ignores the flattened inner struct's own — so only
+/// the outer marker may close the merged intersection object.
+#[test]
+fn jsonschema_flattened_deny_unknown_fields_matches_serde() {
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct OpenInner {
+        b: i32,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    struct StrictInner {
+        b: i32,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    struct StrictOuter {
+        a: i32,
+        #[serde(flatten)]
+        inner: OpenInner,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct OpenOuter {
+        a: i32,
+        #[serde(flatten)]
+        inner: StrictInner,
+    }
+
+    let types = Types::default()
+        .register::<StrictOuter>()
+        .register::<OpenOuter>();
+
+    let strict = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "StrictOuter")
+        .expect("strict outer export");
+    let open = JsonSchema::default()
+        .allow_additional_properties(true)
+        .export_ref_value(&types, specta_serde::Format, "OpenOuter")
+        .expect("open outer export");
+
+    let strict_outer = &strict["$defs"]["StrictOuter"];
+    let open_outer = &open["$defs"]["OpenOuter"];
+    assert_eq!(
+        strict_outer["additionalProperties"],
+        serde_json::json!(false),
+        "the outer container's deny must close the flattened object: {strict_outer}"
+    );
+    assert!(
+        open_outer.get("additionalProperties").is_none(),
+        "a flattened inner struct's deny must not close the merged object: {open_outer}"
+    );
+
+    let strict_validator = jsonschema::validator_for(&strict).expect("valid schema");
+    let open_validator = jsonschema::validator_for(&open).expect("valid schema");
+    let payload = serde_json::json!({ "a": 1, "b": 2, "extra": true });
+    assert!(!strict_validator.is_valid(&payload));
+    assert!(open_validator.is_valid(&payload));
 }

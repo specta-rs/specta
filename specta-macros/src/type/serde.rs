@@ -69,6 +69,7 @@ struct ContainerAttrs {
     untagged: bool,
     default: bool,
     transparent: bool,
+    deny_unknown_fields: bool,
     from: Option<ConversionType>,
     try_from: Option<ConversionType>,
     into: Option<ConversionType>,
@@ -200,6 +201,8 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
         target.default = true;
     } else if meta.path.is_ident("transparent") {
         target.transparent = true;
+    } else if meta.path.is_ident("deny_unknown_fields") {
+        target.deny_unknown_fields = true;
     } else if meta.path.is_ident("from") {
         target.from = Some(parse_conversion_assignment(&meta)?);
     } else if meta.path.is_ident("try_from") {
@@ -302,9 +305,9 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
 /// attribute list can continue (e.g. `#[serde(expecting = "...", rename_all = "camelCase")]`).
 ///
 /// These attributes don't affect the exported type's wire shape, so specta intentionally ignores
-/// them — just like it already does for unrecognized path-only attributes (e.g.
-/// `deny_unknown_fields`). Without this, `syn`'s `parse_nested_meta` would error with `expected
-/// `,`` on the leftover `= value` or `(...)` tokens.
+/// them — just like it already does for unrecognized path-only attributes (e.g. `field_identifier`
+/// on a struct). Without this, `syn`'s `parse_nested_meta` would error with `expected `,`` on the
+/// leftover `= value` or `(...)` tokens.
 fn skip_unknown_meta(meta: &ParseNestedMeta<'_>) -> Result<()> {
     if meta.input.peek(syn::Token![=]) {
         meta.value()?.parse::<syn::Expr>()?;
@@ -427,6 +430,11 @@ fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> Toke
         &mut inserts,
         "serde:container:transparent",
         attrs.transparent,
+    );
+    push_bool(
+        &mut inserts,
+        "serde:container:deny_unknown_fields",
+        attrs.deny_unknown_fields,
     );
     push_opt_conversion(&mut inserts, crate_ref, "from", &attrs.from);
     push_opt_conversion(&mut inserts, crate_ref, "try_from", &attrs.try_from);
