@@ -38,15 +38,18 @@
 //! </details>
 //!
 
-use std::{borrow::Cow, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeSet, fmt, sync::Arc};
 
 use specta::{
     Type, Types,
-    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
+    datatype::{
+        DataType, Enum, Field, Fields, NamedDataType, NamedReferenceType, Primitive, Reference,
+        Variant,
+    },
 };
 
 use crate::{
-    define,
+    Error, define,
     primitives::{escape_typescript_string_literal, is_identifier},
 };
 
@@ -493,59 +496,153 @@ impl Configuration {
     /// inline inputs, a type-only result is retained with an identity runtime
     /// expression because there is no registered type for `apply_types` to rewrite.
     ///
+    /// This method is non-panicking. A construct that cannot be transformed is
+    /// skipped: it contributes no runtime change, and enclosing structs/lists
+    /// still transform their other parts. When the *root* cannot be transformed,
+    /// `None` is returned. Use [`Configuration::try_apply_serialize`] to find out
+    /// why a transform was skipped.
     pub fn apply_serialize(
         &self,
         types: &Types,
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        let result = self.apply_inner(
-            |rule| &rule.serialize,
+        self.apply(
             serialize_bigint,
+            |rule| &rule.serialize,
             types,
             dt,
             js_ident,
-            &mut Vec::new(),
-        );
-        prune_identity_root(types, dt, js_ident, result)
+        )
+    }
+
+    /// Fallible counterpart to [`Configuration::apply_serialize`].
+    ///
+    /// Returns an [`Error`] when a non-identity transform is required beneath a
+    /// construct whose wire shape cannot be discriminated without guessing (for
+    /// example overlapping `#[serde(untagged)]` variants, or a recursive enum
+    /// whose expansion would leave nested values untransformed). Emitting a
+    /// transform there would let the exported type and the runtime value
+    /// diverge, so the unsupported part is skipped and reported instead.
+    pub fn try_apply_serialize(
+        &self,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Result<Option<(Option<DataType>, String)>, Error> {
+        self.try_apply(
+            serialize_bigint,
+            |rule| &rule.serialize,
+            types,
+            dt,
+            js_ident,
+        )
     }
 
     /// Scan a [`DataType`] tree applying deserialize-facing rules.
     ///
     /// Use this for values received from Rust before exposing them to
     /// TypeScript callers.
+    ///
+    /// This method is non-panicking. See [`Configuration::apply_serialize`] for
+    /// the skipping semantics, and [`Configuration::try_apply_deserialize`] to
+    /// find out why a transform was skipped.
     pub fn apply_deserialize(
         &self,
         types: &Types,
         dt: &DataType,
         js_ident: &str,
     ) -> Option<(Option<DataType>, String)> {
-        let result = self.apply_inner(
-            |rule| &rule.deserialize,
+        self.apply(
             deserialize_bigint,
+            |rule| &rule.deserialize,
             types,
             dt,
             js_ident,
-            &mut Vec::new(),
-        );
-        prune_identity_root(types, dt, js_ident, result)
+        )
+    }
+
+    /// Fallible counterpart to [`Configuration::apply_deserialize`].
+    ///
+    /// See [`Configuration::try_apply_serialize`] for the rejection semantics.
+    pub fn try_apply_deserialize(
+        &self,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Result<Option<(Option<DataType>, String)>, Error> {
+        self.try_apply(
+            deserialize_bigint,
+            |rule| &rule.deserialize,
+            types,
+            dt,
+            js_ident,
+        )
+    }
+
+    /// Run a traversal and keep the diagnostic if a part could not be
+    /// transformed. The infallible API drops the diagnostic and keeps whatever
+    /// could be generated.
+    fn run(
+        &self,
+        remap_bigint: fn() -> DataType,
+        transform_for_rule: fn(&Rule) -> &Option<Transform>,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> (Option<(Option<DataType>, String)>, Option<Error>) {
+        let mut walk = Walk {
+            transform_for_rule,
+            remap_bigint,
+            types,
+            stack: Vec::new(),
+            error: None,
+            recursion_cut: false,
+            current: None,
+        };
+        let result = self.apply_inner(&mut walk, dt, js_ident);
+        (prune_identity_root(types, dt, js_ident, result), walk.error)
+    }
+
+    fn apply(
+        &self,
+        remap_bigint: fn() -> DataType,
+        transform_for_rule: fn(&Rule) -> &Option<Transform>,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Option<(Option<DataType>, String)> {
+        self.run(remap_bigint, transform_for_rule, types, dt, js_ident)
+            .0
+    }
+
+    fn try_apply(
+        &self,
+        remap_bigint: fn() -> DataType,
+        transform_for_rule: fn(&Rule) -> &Option<Transform>,
+        types: &Types,
+        dt: &DataType,
+        js_ident: &str,
+    ) -> Result<Option<(Option<DataType>, String)>, Error> {
+        let (result, error) = self.run(remap_bigint, transform_for_rule, types, dt, js_ident);
+        match error {
+            Some(error) => Err(error),
+            None => Ok(result),
+        }
     }
 
     fn apply_inner(
         &self,
-        transform_for_rule: fn(&Rule) -> &Option<Transform>,
-        remap_bigint: fn() -> DataType,
-        types: &Types,
+        walk: &mut Walk<'_>,
         dt: &DataType,
         js_ident: &str,
-        stack: &mut Vec<(Cow<'static, str>, Cow<'static, str>)>,
     ) -> Option<(Option<DataType>, String)> {
         let result = match dt {
             DataType::Reference(Reference::Named(r)) => {
-                if let Some(rule) = self.rule_for_reference(types, r) {
+                if let Some(rule) = self.rule_for_reference(walk.types, r) {
                     return Some((
-                        Some((rule.data_type.0)(Self::reference_source_dt(types, r))),
-                        transform_for_rule(rule).as_ref().map_or_else(
+                        Some((rule.data_type.0)(Self::reference_source_dt(walk.types, r))),
+                        (walk.transform_for_rule)(rule).as_ref().map_or_else(
                             || js_ident.to_owned(),
                             |transform| transform.apply(js_ident),
                         ),
@@ -553,131 +650,45 @@ impl Configuration {
                 }
 
                 match &r.inner {
-                    NamedReferenceType::Inline { dt, .. } => self.apply_inner(
-                        transform_for_rule,
-                        remap_bigint,
-                        types,
-                        dt,
-                        js_ident,
-                        stack,
-                    ),
-                    NamedReferenceType::Recursive(_) => None,
+                    NamedReferenceType::Inline { dt, .. } => self.apply_inner(walk, dt, js_ident),
+                    // An inline cycle was cut short during definition. Treat it
+                    // like the cycle-stack cutoff so an enclosing enum reports
+                    // it rather than emitting a silently partial transform.
+                    NamedReferenceType::Recursive(_) => {
+                        walk.recursion_cut = true;
+                        None
+                    }
                     NamedReferenceType::Reference { .. } => {
-                        let ndt = types.get(r)?;
+                        let ndt = walk.types.get(r)?;
 
                         let ty = ndt.ty.as_ref()?;
                         let key = (ndt.name.clone(), ndt.module_path.clone());
-                        if stack.contains(&key) {
+                        if walk.stack.contains(&key) {
+                            walk.recursion_cut = true;
                             return None;
                         }
-                        stack.push(key);
+                        walk.stack.push(key);
+                        let previous = walk.current.replace(ndt);
                         let result = self
-                            .apply_inner(
-                                transform_for_rule,
-                                remap_bigint,
-                                types,
-                                ty,
-                                js_ident,
-                                stack,
-                            )
+                            .apply_inner(walk, ty, js_ident)
                             .map(|(_, runtime)| (None, runtime));
-                        stack.pop();
+                        walk.current = previous;
+                        walk.stack.pop();
                         result
                     }
                 }
             }
-            DataType::Struct(s) => match &s.fields {
-                Fields::Named(fields) => {
-                    let mut ty = s.clone();
-                    let mut changed = false;
-                    let mut parts = Vec::new();
-
-                    for (name, field) in &fields.fields {
-                        let Some(field_ty) = &field.ty else { continue };
-                        let field_ident = js_property_access(js_ident, name);
-                        let Some((next_ty, runtime)) = self.apply_inner(
-                            transform_for_rule,
-                            remap_bigint,
-                            types,
-                            field_ty,
-                            &field_ident,
-                            stack,
-                        ) else {
-                            continue;
-                        };
-
-                        if let Some(next_ty) = next_ty
-                            && let Fields::Named(fields) = &mut ty.fields
-                            && let Some((_, field)) =
-                                fields.fields.iter_mut().find(|(n, _)| n == name)
-                        {
-                            field.ty = Some(next_ty);
-                            changed = true;
-                        }
-                        if runtime != field_ident {
-                            parts.push(format!("{}:{runtime}", js_object_key(name)));
-                        }
-                    }
-
-                    if parts.is_empty() {
-                        changed.then_some((Some(DataType::Struct(ty)), js_ident.to_owned()))
-                    } else {
-                        Some((
-                            changed.then_some(DataType::Struct(ty)),
-                            spread_transform(js_ident, parts),
-                        ))
-                    }
-                }
-                Fields::Unnamed(fields) => {
-                    let mut ty = s.clone();
-                    let mut changed = false;
-                    let is_newtype = fields.fields.len() == 1;
-                    let parts = fields
-                        .fields
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(idx, field)| {
-                            let field_ty = field.ty.as_ref()?;
-                            let field_ident = if is_newtype {
-                                js_ident.to_owned()
-                            } else {
-                                format!("{js_ident}[{idx}]")
-                            };
-                            let (next_ty, runtime) = self.apply_inner(
-                                transform_for_rule,
-                                remap_bigint,
-                                types,
-                                field_ty,
-                                &field_ident,
-                                stack,
-                            )?;
-
-                            if let Some(next_ty) = next_ty
-                                && let Fields::Unnamed(fields) = &mut ty.fields
-                            {
-                                fields.fields[idx].ty = Some(next_ty);
-                                changed = true;
-                            }
-
-                            (runtime != field_ident).then_some((idx, runtime))
-                        })
-                        .collect::<Vec<_>>();
-
-                    if parts.is_empty() {
-                        changed.then_some((Some(DataType::Struct(ty)), js_ident.to_owned()))
-                    } else {
-                        Some((
-                            changed.then_some(DataType::Struct(ty)),
-                            if is_newtype {
-                                parts.into_iter().next()?.1
-                            } else {
-                                array_transform(js_ident, fields.fields.len(), parts)
-                            },
-                        ))
-                    }
-                }
-                Fields::Unit => None,
-            },
+            DataType::Struct(s) => {
+                self.apply_fields(walk, &s.fields, js_ident)
+                    .map(|(fields, runtime)| {
+                        let ty = fields.map(|fields| {
+                            let mut next = s.clone();
+                            next.fields = fields;
+                            DataType::Struct(next)
+                        });
+                        (ty, runtime)
+                    })
+            }
             DataType::Tuple(tuple) => {
                 let mut ty = tuple.clone();
                 let mut changed = false;
@@ -687,14 +698,7 @@ impl Configuration {
                     .enumerate()
                     .filter_map(|(idx, element)| {
                         let ident = format!("{js_ident}[{idx}]");
-                        let (next_ty, runtime) = self.apply_inner(
-                            transform_for_rule,
-                            remap_bigint,
-                            types,
-                            element,
-                            &ident,
-                            stack,
-                        )?;
+                        let (next_ty, runtime) = self.apply_inner(walk, element, &ident)?;
                         if let Some(next_ty) = next_ty {
                             ty.elements[idx] = next_ty;
                             changed = true;
@@ -714,14 +718,7 @@ impl Configuration {
             }
             DataType::Map(map) => {
                 let item = "v";
-                let (next_ty, runtime) = self.apply_inner(
-                    transform_for_rule,
-                    remap_bigint,
-                    types,
-                    map.value_ty(),
-                    item,
-                    stack,
-                )?;
+                let (next_ty, runtime) = self.apply_inner(walk, map.value_ty(), item)?;
 
                 let mut ty = map.clone();
                 let mut changed = false;
@@ -743,14 +740,7 @@ impl Configuration {
             }
             DataType::List(list) => {
                 let item = "i";
-                let (next_ty, runtime) = self.apply_inner(
-                    transform_for_rule,
-                    remap_bigint,
-                    types,
-                    &list.ty,
-                    item,
-                    stack,
-                )?;
+                let (next_ty, runtime) = self.apply_inner(walk, &list.ty, item)?;
                 let mut ty = list.clone();
                 let mut changed = false;
                 if let Some(next_ty) = next_ty {
@@ -767,14 +757,7 @@ impl Configuration {
                 ))
             }
             DataType::Nullable(inner) => {
-                let (next_ty, runtime) = self.apply_inner(
-                    transform_for_rule,
-                    remap_bigint,
-                    types,
-                    inner,
-                    js_ident,
-                    stack,
-                )?;
+                let (next_ty, runtime) = self.apply_inner(walk, inner, js_ident)?;
                 Some((
                     next_ty.map(|dt| DataType::Nullable(Box::new(dt))),
                     if runtime == js_ident {
@@ -791,14 +774,7 @@ impl Configuration {
                     .iter()
                     .enumerate()
                     .filter_map(|(idx, item)| {
-                        let (next_ty, runtime) = self.apply_inner(
-                            transform_for_rule,
-                            remap_bigint,
-                            types,
-                            item,
-                            js_ident,
-                            stack,
-                        )?;
+                        let (next_ty, runtime) = self.apply_inner(walk, item, js_ident)?;
                         if let Some(next_ty) = next_ty {
                             ty[idx] = next_ty;
                             changed = true;
@@ -824,13 +800,234 @@ impl Configuration {
                     )),
                 }
             }
-            DataType::Enum(_)
-            | DataType::Primitive(_)
+            DataType::Enum(e) => self.apply_enum(walk, e, js_ident),
+            DataType::Primitive(_)
             | DataType::Generic(_)
             | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
-        self.apply_builtin_remaps(remap_bigint, dt, js_ident, result)
+        self.apply_builtin_remaps(walk.remap_bigint, dt, js_ident, result)
+    }
+
+    /// Apply the configured rules to one variant/struct [`Fields`] layout.
+    ///
+    /// Returns `None` when the layout needs neither a type nor a runtime
+    /// change, and otherwise the (possibly unchanged) fields plus the runtime
+    /// expression. This is shared by structs and enum variant payloads so the
+    /// two stay in agreement.
+    fn apply_fields(
+        &self,
+        walk: &mut Walk<'_>,
+        fields: &Fields,
+        js_ident: &str,
+    ) -> Option<(Option<Fields>, String)> {
+        match fields {
+            Fields::Unit => None,
+            Fields::Named(named) => {
+                let mut ty = named.clone();
+                let mut changed = false;
+                let mut parts = Vec::new();
+
+                for (name, field) in &named.fields {
+                    let Some(field_ty) = &field.ty else { continue };
+                    let field_ident = js_property_access(js_ident, name);
+                    let Some((next_ty, runtime)) = self.apply_inner(walk, field_ty, &field_ident)
+                    else {
+                        continue;
+                    };
+
+                    if let Some(next_ty) = next_ty
+                        && let Some((_, field)) = ty.fields.iter_mut().find(|(n, _)| n == name)
+                    {
+                        field.ty = Some(next_ty);
+                        changed = true;
+                    }
+                    if runtime != field_ident {
+                        parts.push(format!("{}:{runtime}", js_object_key(name)));
+                    }
+                }
+
+                if parts.is_empty() {
+                    changed.then_some((Some(Fields::Named(ty)), js_ident.to_owned()))
+                } else {
+                    Some((
+                        changed.then_some(Fields::Named(ty)),
+                        spread_transform(js_ident, parts),
+                    ))
+                }
+            }
+            Fields::Unnamed(unnamed) => {
+                let mut ty = unnamed.clone();
+                let mut changed = false;
+                let is_newtype = unnamed.fields.len() == 1;
+                let parts = unnamed
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, field)| {
+                        let field_ty = field.ty.as_ref()?;
+                        let field_ident = if is_newtype {
+                            js_ident.to_owned()
+                        } else {
+                            format!("{js_ident}[{idx}]")
+                        };
+                        let (next_ty, runtime) = self.apply_inner(walk, field_ty, &field_ident)?;
+
+                        if let Some(next_ty) = next_ty {
+                            ty.fields[idx].ty = Some(next_ty);
+                            changed = true;
+                        }
+
+                        (runtime != field_ident).then_some((idx, runtime))
+                    })
+                    .collect::<Vec<_>>();
+
+                if parts.is_empty() {
+                    changed.then_some((Some(Fields::Unnamed(ty)), js_ident.to_owned()))
+                } else {
+                    Some((
+                        changed.then_some(Fields::Unnamed(ty)),
+                        if is_newtype {
+                            parts.into_iter().next()?.1
+                        } else {
+                            array_transform(js_ident, unnamed.fields.len(), parts)
+                        },
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Generate a representation-aware runtime transform for an enum.
+    ///
+    /// The wire shape is the one produced by the format layer (for example
+    /// `specta_serde`): external variants are keyed by their serialized name,
+    /// internally/adjacently tagged variants carry a discriminator field, and
+    /// untagged variants carry no discriminant (and are told apart by their
+    /// payload shape). Each active variant's payload is transformed with the
+    /// same [`Fields`] traversal structs use, then the branches are dispatched
+    /// on the wire shape so the runtime value matches the remapped type.
+    ///
+    /// When a non-identity transform would be required beneath a shape that
+    /// cannot be discriminated without guessing (or beneath a recursive enum,
+    /// whose single-expression expansion would be partial), this records an
+    /// explicit [`Error`] and returns `None` rather than emitting an expression
+    /// that would let the exported type and the runtime value diverge.
+    fn apply_enum(
+        &self,
+        walk: &mut Walk<'_>,
+        e: &Enum,
+        js_ident: &str,
+    ) -> Option<(Option<DataType>, String)> {
+        let active = e
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .collect::<Vec<_>>();
+        if active.is_empty() {
+            return None;
+        }
+
+        let cut_before = walk.recursion_cut;
+
+        let mut branches = Vec::with_capacity(active.len());
+        let mut changed = false;
+        let mut needs_transform = false;
+        for (_, variant) in &active {
+            let (fields, runtime) = match self.apply_fields(walk, &variant.fields, js_ident) {
+                Some((fields, runtime)) => (fields, runtime),
+                None => (None, js_ident.to_owned()),
+            };
+            changed |= fields.is_some();
+            needs_transform |= runtime != js_ident;
+            branches.push((fields, runtime));
+        }
+
+        // A recursive expansion is cut short by the cycle stack, so the single
+        // expression we could emit would leave the nested values untransformed
+        // while the exported type claims otherwise. Report it instead.
+        if walk.recursion_cut && !cut_before {
+            self.record_unsupported(walk, RECURSIVE_ENUM_REASON);
+            return None;
+        }
+
+        let build = |branches: &mut Vec<(Option<Fields>, String)>| -> Option<DataType> {
+            if !changed {
+                return None;
+            }
+            let mut next = e.clone();
+            for ((_, variant), (fields, _)) in next
+                .variants
+                .iter_mut()
+                .filter(|(_, variant)| !variant.skip)
+                .zip(branches.iter_mut())
+            {
+                if let Some(fields) = fields.take() {
+                    variant.fields = fields;
+                }
+            }
+            Some(DataType::Enum(next))
+        };
+
+        if !needs_transform {
+            return build(&mut branches).map(|ty| (Some(ty), js_ident.to_owned()));
+        }
+
+        // A lone variant is never ambiguous: every value belongs to it.
+        if branches.len() == 1 {
+            let next_ty = build(&mut branches);
+            let (_, runtime) = branches.pop()?;
+            return Some((next_ty, runtime));
+        }
+
+        let needs = branches
+            .iter()
+            .map(|(_, runtime)| runtime != js_ident)
+            .collect::<Vec<_>>();
+        let Some(guards) = enum_branch_guards(walk.types, &active, &needs, js_ident) else {
+            self.record_unsupported(walk, UNSUPPORTED_ENUM_REASON);
+            return None;
+        };
+
+        let has_else = guards
+            .iter()
+            .any(|guard| matches!(guard, BranchGuard::Else));
+        let mut parts = Vec::new();
+        let mut fallback = None;
+        for ((_, runtime), guard) in branches.iter().zip(&guards) {
+            match guard {
+                BranchGuard::Match(condition) => {
+                    if has_else || runtime != js_ident {
+                        parts.push(format!("{condition}?{runtime}"));
+                    }
+                }
+                BranchGuard::Else => fallback = Some(runtime.clone()),
+            }
+        }
+
+        let default = fallback.unwrap_or_else(|| js_ident.to_owned());
+        let runtime = if parts.is_empty() {
+            default
+        } else {
+            format!("{}:{}", parts.join(":"), default)
+        };
+
+        let next_ty = build(&mut branches);
+        Some((next_ty, runtime))
+    }
+
+    /// Record the first unsupported construct, attaching the named type
+    /// currently being expanded so the diagnostic can name it.
+    fn record_unsupported(&self, walk: &mut Walk<'_>, reason: &'static str) {
+        if walk.error.is_some() {
+            return;
+        }
+
+        let mut error = Error::unsupported_semantic_transform(reason);
+        if let Some(ndt) = walk.current {
+            error = error.with_named_datatype(ndt);
+        }
+        walk.error = Some(error);
     }
 
     fn rule_for_reference<'a>(
@@ -1140,4 +1337,363 @@ fn js_object_key(name: &str) -> Cow<'_, str> {
     } else {
         Cow::Owned(format!("\"{}\"", escape_typescript_string_literal(name)))
     }
+}
+
+fn js_string_literal(value: &str) -> String {
+    format!("\"{}\"", escape_typescript_string_literal(value))
+}
+
+/// Mutable state shared across one `apply_serialize` / `apply_deserialize` call.
+struct Walk<'a> {
+    transform_for_rule: fn(&Rule) -> &Option<Transform>,
+    remap_bigint: fn() -> DataType,
+    types: &'a Types,
+    /// Named types currently being expanded, used to cut recursive cycles.
+    stack: Vec<(Cow<'static, str>, Cow<'static, str>)>,
+    /// The first unsupported construct encountered, if any.
+    error: Option<Error>,
+    /// Set when a recursive reference was cut short by [`Walk::stack`].
+    recursion_cut: bool,
+    /// The named type currently being expanded, used to name errors.
+    current: Option<&'a NamedDataType>,
+}
+
+const UNSUPPORTED_ENUM_REASON: &str = "the enum's wire shape cannot be discriminated without guessing (for example overlapping `#[serde(untagged)]` variants); use a tagged representation or apply the rule to a non-ambiguous position";
+const RECURSIVE_ENUM_REASON: &str = "the enum is recursive, so a single expression cannot transform nested values without the exported type claiming more than the runtime value provides";
+
+/// How a single enum branch is selected at runtime.
+enum BranchGuard {
+    /// A JavaScript expression that is truthy exactly for this variant.
+    Match(String),
+    /// The variant is the unguarded fallback: either a remapped untagged
+    /// variant whose runtime shape may differ from its wire shape, or (for
+    /// tagged enums) nothing.
+    Else,
+}
+
+/// Work out how to select each active variant from its wire value.
+///
+/// Prefers a shared discriminator field (internally/adjacently tagged enums),
+/// then the external representation's per-variant key or string literal, then
+/// structural discrimination of untagged variants. Returns `None` when no
+/// unambiguous discrimination exists.
+fn enum_branch_guards(
+    types: &Types,
+    active: &[&(Cow<'static, str>, Variant)],
+    needs: &[bool],
+    js_ident: &str,
+) -> Option<Vec<BranchGuard>> {
+    tag_branch_guards(active, js_ident)
+        .or_else(|| external_branch_guards(active, js_ident))
+        .or_else(|| untagged_branch_guards(types, active, needs, js_ident))
+}
+
+/// Guards for a tagged enum: a field present in every variant with distinct
+/// string-literal values (`#[serde(tag = ...)]`, optionally with `content`).
+fn tag_branch_guards(
+    active: &[&(Cow<'static, str>, Variant)],
+    js_ident: &str,
+) -> Option<Vec<BranchGuard>> {
+    let candidates = active
+        .iter()
+        .map(|(_, variant)| variant_tag_candidates(variant))
+        .collect::<Vec<_>>();
+    let (key, literals) = common_tag_key(&candidates)?;
+
+    Some(
+        literals
+            .iter()
+            .map(|literal| {
+                BranchGuard::Match(format!(
+                    "{js_ident}!=null&&{}==={}",
+                    js_property_access(js_ident, &key),
+                    js_string_literal(literal),
+                ))
+            })
+            .collect(),
+    )
+}
+
+/// Guards for the external representation: a non-unit variant is keyed by its
+/// serialized name, while a unit (or collapsed) variant is the bare string.
+/// The discriminators must be distinct so overlapping shapes are rejected
+/// rather than mis-dispatched.
+///
+/// The keyed guard uses an own-property check rather than `value.name !==
+/// undefined`: the latter is also true for members inherited from
+/// `Object.prototype` (a variant named `constructor`, `valueOf`, `toString`,
+/// … would otherwise be selected for any object). The `=== literal` guard for
+/// unit variants compares against a specific string, so it is unaffected.
+fn external_branch_guards(
+    active: &[&(Cow<'static, str>, Variant)],
+    js_ident: &str,
+) -> Option<Vec<BranchGuard>> {
+    let mut discriminators = BTreeSet::new();
+    let mut guards = Vec::with_capacity(active.len());
+
+    for (_, variant) in active {
+        let (discriminator, guard) = match &variant.fields {
+            Fields::Named(named) if named.fields.len() == 1 => {
+                let name = named.fields[0].0.to_string();
+                let guard = format!(
+                    "{js_ident}!=null&&Object.prototype.hasOwnProperty.call({js_ident},{})",
+                    js_string_literal(&name),
+                );
+                (name, guard)
+            }
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => {
+                let literal = string_literal_of(unnamed.fields[0].ty.as_ref()?)?;
+                let guard = format!("{js_ident}==={}", js_string_literal(&literal));
+                (literal, guard)
+            }
+            _ => return None,
+        };
+
+        if !discriminators.insert(discriminator) {
+            return None;
+        }
+        guards.push(BranchGuard::Match(guard));
+    }
+
+    Some(guards)
+}
+
+/// Guards for untagged enums, which have no discriminant and must be told
+/// apart by their payload shape.
+///
+/// Every variant must occupy a distinct wire shape (`null`, `boolean`,
+/// `number`, `string`, `Array.isArray`, object). At most one variant may have a
+/// non-identity runtime transform, because a remapped payload can change its
+/// runtime shape; that variant becomes the unguarded fallback. Overlapping
+/// shapes are rejected rather than guessed.
+fn untagged_branch_guards(
+    types: &Types,
+    active: &[&(Cow<'static, str>, Variant)],
+    needs: &[bool],
+    js_ident: &str,
+) -> Option<Vec<BranchGuard>> {
+    let mut shapes = Vec::with_capacity(active.len());
+    let mut fallback = None;
+
+    for (idx, (_, variant)) in active.iter().enumerate() {
+        let shape = untagged_payload_shape(types, variant)?;
+        if needs[idx] && fallback.replace(idx).is_some() {
+            return None;
+        }
+        shapes.push(shape);
+    }
+
+    let mut seen = BTreeSet::new();
+    for shape in &shapes {
+        if !seen.insert(*shape) {
+            return None;
+        }
+    }
+
+    Some(
+        shapes
+            .iter()
+            .enumerate()
+            .map(|(idx, shape)| {
+                if Some(idx) == fallback {
+                    BranchGuard::Else
+                } else {
+                    BranchGuard::Match(shape_guard(*shape, js_ident))
+                }
+            })
+            .collect(),
+    )
+}
+
+/// The wire shape of an untagged variant's payload.
+fn untagged_payload_shape(types: &Types, variant: &Variant) -> Option<UntaggedShape> {
+    match &variant.fields {
+        Fields::Unit => Some(UntaggedShape::Null),
+        Fields::Named(_) => Some(UntaggedShape::Object),
+        Fields::Unnamed(unnamed) => {
+            let mut live = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+            let first = live.next()?;
+            if live.next().is_some() {
+                return Some(UntaggedShape::Array);
+            }
+            wire_shape(types, first, WIRE_SHAPE_DEPTH)
+        }
+    }
+}
+
+/// The JavaScript value shape a wire datatype occupies, resolving newtype
+/// wrappers and named references to the underlying wire type. Returns `None`
+/// for shapes that cannot be classified (for example nullable payloads).
+fn wire_shape(types: &Types, ty: &DataType, depth: usize) -> Option<UntaggedShape> {
+    if depth == 0 {
+        return None;
+    }
+
+    match ty {
+        DataType::Primitive(primitive) => Some(primitive_shape(primitive)),
+        DataType::Tuple(tuple) if tuple.elements.is_empty() => Some(UntaggedShape::Null),
+        DataType::List(_) => Some(UntaggedShape::Array),
+        DataType::Map(_) => Some(UntaggedShape::Object),
+        DataType::Struct(s) => match &s.fields {
+            Fields::Named(_) => Some(UntaggedShape::Object),
+            Fields::Unit => Some(UntaggedShape::Null),
+            Fields::Unnamed(unnamed) => {
+                let mut live = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
+                let first = live.next()?;
+                if live.next().is_some() {
+                    Some(UntaggedShape::Array)
+                } else {
+                    wire_shape(types, first, depth - 1)
+                }
+            }
+        },
+        DataType::Reference(Reference::Named(r)) => {
+            let source = Configuration::reference_source_dt(types, r);
+            wire_shape(types, &source, depth - 1)
+        }
+        _ => None,
+    }
+}
+
+const WIRE_SHAPE_DEPTH: usize = 32;
+
+fn primitive_shape(primitive: &Primitive) -> UntaggedShape {
+    match primitive {
+        Primitive::bool => UntaggedShape::Boolean,
+        Primitive::str | Primitive::char => UntaggedShape::String,
+        Primitive::i8
+        | Primitive::i16
+        | Primitive::i32
+        | Primitive::i64
+        | Primitive::i128
+        | Primitive::isize
+        | Primitive::u8
+        | Primitive::u16
+        | Primitive::u32
+        | Primitive::u64
+        | Primitive::u128
+        | Primitive::usize
+        | Primitive::f16
+        | Primitive::f32
+        | Primitive::f64
+        | Primitive::f128 => UntaggedShape::Number,
+    }
+}
+
+/// A JavaScript value shape used to tell untagged variants apart.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum UntaggedShape {
+    Null,
+    Boolean,
+    Number,
+    String,
+    Array,
+    Object,
+}
+
+fn shape_guard(shape: UntaggedShape, js_ident: &str) -> String {
+    match shape {
+        UntaggedShape::Null => format!("{js_ident}===null"),
+        UntaggedShape::Boolean => format!("typeof {js_ident}===\"boolean\""),
+        UntaggedShape::Number => format!("typeof {js_ident}===\"number\""),
+        UntaggedShape::String => format!("typeof {js_ident}===\"string\""),
+        UntaggedShape::Array => format!("Array.isArray({js_ident})"),
+        UntaggedShape::Object => {
+            format!("{js_ident}!=null&&typeof {js_ident}===\"object\"&&!Array.isArray({js_ident})")
+        }
+    }
+}
+
+/// The literal value of a synthetic single-variant string enum, if `ty` is one.
+fn string_literal_of(ty: &DataType) -> Option<String> {
+    let DataType::Enum(e) = ty else {
+        return None;
+    };
+
+    let mut variants = e.variants.iter();
+    let (name, variant) = variants.next()?;
+    if variants.next().is_some() || !matches!(variant.fields, Fields::Unit) {
+        return None;
+    }
+
+    Some(name.to_string())
+}
+
+/// Every `(key, literal)` discriminator candidate directly on a variant's wire
+/// shape.
+fn variant_tag_candidates(variant: &Variant) -> Vec<(String, String)> {
+    let mut candidates = Vec::new();
+    match &variant.fields {
+        Fields::Named(named) => collect_tag_candidates(&named.fields, &mut candidates),
+        Fields::Unnamed(unnamed) => {
+            for field in &unnamed.fields {
+                if let Some(ty) = &field.ty {
+                    collect_datatype_tag_candidates(ty, &mut candidates);
+                }
+            }
+        }
+        Fields::Unit => {}
+    }
+    candidates
+}
+
+fn collect_tag_candidates(
+    fields: &[(Cow<'static, str>, Field)],
+    candidates: &mut Vec<(String, String)>,
+) {
+    for (name, field) in fields {
+        if field.optional {
+            continue;
+        }
+        let Some(ty) = &field.ty else { continue };
+        if let Some(literal) = string_literal_of(ty) {
+            candidates.push((name.to_string(), literal));
+        }
+    }
+}
+
+/// Descend the intersection/struct wrappers an internally tagged tuple variant
+/// is rewritten into so its tag field is visible.
+fn collect_datatype_tag_candidates(ty: &DataType, candidates: &mut Vec<(String, String)>) {
+    match ty {
+        DataType::Intersection(parts) => {
+            for part in parts {
+                collect_datatype_tag_candidates(part, candidates);
+            }
+        }
+        DataType::Struct(s) => {
+            if let Fields::Named(named) = &s.fields {
+                collect_tag_candidates(&named.fields, candidates);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The key shared by every variant with distinct literal values, if any, plus
+/// the literal for each variant in order.
+fn common_tag_key(candidates: &[Vec<(String, String)>]) -> Option<(String, Vec<String>)> {
+    let first = candidates.first()?;
+
+    'keys: for (key, _) in first {
+        let mut literals = Vec::with_capacity(candidates.len());
+        let mut seen = BTreeSet::new();
+        for variant in candidates {
+            let matching = variant
+                .iter()
+                .filter(|(candidate, _)| candidate == key)
+                .collect::<Vec<_>>();
+            let [(_, literal)] = matching.as_slice() else {
+                continue 'keys;
+            };
+            if !seen.insert(literal.clone()) {
+                continue 'keys;
+            }
+            literals.push(literal.clone());
+        }
+
+        return Some((key.clone(), literals));
+    }
+
+    None
 }
