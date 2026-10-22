@@ -140,6 +140,14 @@ const DEFAULTED_FIELD: &str = "serde:field:default";
 /// container's `Default` to every absent field, so each one is absent-tolerant.
 const DEFAULTED_CONTAINER: &str = "serde:container:default";
 
+/// Field attribute the `Type` derive records when the field was *declared* as
+/// `Option<T>`. It survives a `#[specta(type = ...)]` override, which changes
+/// the exported datatype (and its nullability) but not serde's behaviour: serde
+/// still treats the field as an `Option`, writing `null` and tolerating an
+/// absent key. It is deliberately not inferred from the exported datatype,
+/// which a nullable override can make `Nullable` for a non-`Option` field.
+const NULLABLE_FIELD: &str = "specta:nullable";
+
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
     /// The wire key carrying the discriminant (serde's `tag`).
@@ -1256,12 +1264,29 @@ struct KeyedField<'a> {
     /// Whether serde tolerates an absent key for this field on its own: it
     /// carries `#[serde(default)]`, or its struct does.
     defaulted: bool,
+    /// Whether the field was *declared* as `Option<T>` (the `specta:nullable`
+    /// marker), which survives a `#[specta(type = ...)]` override that hides
+    /// the optionality from the exported datatype.
+    rust_nullable: bool,
 }
 
 impl KeyedField<'_> {
-    /// Whether the field's datatype is already nullable (`Option<T>`).
+    /// Whether the exported datatype is already nullable (`Option<T>`).
     fn is_nullable(&self) -> bool {
         matches!(self.field.ty.as_ref(), Some(DataType::Nullable(_)))
+    }
+
+    /// Whether the field is an `Option` to serde, from either the exported
+    /// datatype or the declared Rust type behind a `#[specta(type = ...)]`
+    /// override.
+    fn nullable(&self) -> bool {
+        self.is_nullable() || self.rust_nullable
+    }
+
+    /// Whether the generated property is optional, which every codec branch
+    /// that reads a value into it depends on.
+    fn property_optional(&self) -> bool {
+        self.is_nullable() || self.field.optional || self.rust_nullable
     }
 
     /// Whether serde may omit the key when encoding.
@@ -1269,25 +1294,42 @@ impl KeyedField<'_> {
     /// `#[serde(skip_serializing_if = ...)]` omits the field when it is nil. A
     /// defaulted non-`Option` field is also omittable: Swift cannot know the
     /// Rust default, so a nil value is only representable by dropping the key.
-    /// A plain `Option<T>` and a defaulted `Option<T>` are *not* omittable --
-    /// serde writes both as `null`.
+    /// An `Option` (including one hidden behind a `#[specta(type = ...)]`
+    /// override) is *not* omittable -- serde writes it as `null`.
     fn may_be_absent(&self) -> bool {
         self.field.attributes.contains_key(SERIALIZE_OMISSION_FIELD)
-            || (self.field.optional && !self.is_nullable())
+            || (self.field.optional && !self.nullable())
     }
 
     /// Whether serde accepts an absent key when decoding, as opposed to
     /// requiring it.
     ///
-    /// serde tolerates absence only for an `Option<T>` (a missing key yields
-    /// `None`) or a `#[serde(default)]` field/struct. A bare
-    /// `#[serde(skip_serializing_if = ...)]` does *not*: it omits the key when
-    /// serializing but still errors on the absent key when deserializing.
-    /// `specta-serde` marks such a field `optional`, so this cannot key off
-    /// `Field::optional` alone. A field whose property is not optional must
-    /// still `decode` (a `decodeIfPresent` would not fit the property type).
+    /// serde tolerates absence only for a field whose *declared Rust type* is
+    /// `Option<T>` (a missing key yields `None`) or a `#[serde(default)]`
+    /// field/struct. A bare `#[serde(skip_serializing_if = ...)]` does *not*:
+    /// it omits the key when serializing but still errors on the absent key
+    /// when deserializing. Nor does a `#[specta(type = Option<...>)]` override
+    /// on a non-`Option` field: it only changes the exported datatype, not what
+    /// serde accepts. `specta-serde` marks a `skip_serializing_if` field
+    /// `optional`, so this cannot key off `Field::optional` alone. A field
+    /// whose property is not optional must still `decode` (a `decodeIfPresent`
+    /// would not fit the property type).
     fn may_be_absent_on_decode(&self) -> bool {
-        field_is_optional(self.field) && (self.is_nullable() || self.defaulted)
+        self.property_optional() && (self.rust_nullable || self.defaulted)
+    }
+}
+
+/// The `?` a keyed field's generated property needs.
+///
+/// A `Nullable` datatype renders as `T?` on its own. A `#[specta(type = ...)]`
+/// override can hide a declared `Option<T>` behind a non-nullable datatype, but
+/// serde still treats the field as an `Option` (writing `null` and tolerating
+/// an absent key), so the property must be optional to represent that.
+fn keyed_optional_suffix(field: &Field, ty: &DataType, rust_nullable: bool) -> &'static str {
+    if (field.optional || rust_nullable) && !matches!(ty, DataType::Nullable(_)) {
+        "?"
+    } else {
+        ""
     }
 }
 
@@ -1306,10 +1348,11 @@ fn keyed_fields<'a>(
         let Some(original) = field.ty.as_ref() else {
             continue;
         };
+        let rust_nullable = field.attributes.contains_key(NULLABLE_FIELD);
         let property_type = format!(
             "{}{}",
             datatype_to_swift(swift, format, types, original, generic_scope.to_vec())?,
-            optional_suffix(field, original)
+            keyed_optional_suffix(field, original, rust_nullable)
         );
         let decode_type = datatype_to_swift(
             swift,
@@ -1325,6 +1368,7 @@ fn keyed_fields<'a>(
             property_type,
             decode_type,
             defaulted: container_default || field.attributes.contains_key(DEFAULTED_FIELD),
+            rust_nullable,
         });
     }
     Ok(out)

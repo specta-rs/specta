@@ -878,6 +878,27 @@ struct SwiftNamedContainerDefault {
 #[specta(collect = false)]
 struct SwiftNamedEmpty {}
 
+/// A field-level `#[serde(default)]` on a non-`Option` field: serde tolerates
+/// an absent key (the branch is distinct from the container-level default).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedFieldDefault {
+    #[serde(default)]
+    x: u8,
+    y: u8,
+}
+
+/// A `#[specta(type = ...)]` override changes the exported datatype but not
+/// serde's behaviour: `#[specta(type = u8)] x: Option<u8>` is still an
+/// `Option<u8>` to serde, so it writes `null` and tolerates an absent key.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedOverrideNullable {
+    #[specta(type = u8)]
+    x: Option<u8>,
+    y: u8,
+}
+
 fn swift_wire_types() -> Types {
     Types::default()
         .register::<SwiftNewtype>()
@@ -1671,12 +1692,14 @@ fn swift_named_skip_if_and_default_decode_tolerance() {
     );
     assert!(serde_json::from_str::<SwiftNamedSkipVec>(r#"{"x":[],"y":1}"#).is_ok());
     assert!(serde_json::from_str::<SwiftNamedContainerDefault>(r#"{}"#).is_ok());
+    assert!(serde_json::from_str::<SwiftNamedFieldDefault>(r#"{"y":1}"#).is_ok());
     assert_eq!(serde_json::to_string(&SwiftNamedEmpty {}).unwrap(), r#"{}"#);
     assert!(serde_json::from_str::<SwiftNamedEmpty>(r#"{}"#).is_ok());
 
     let types = Types::default()
         .register::<SwiftNamedSkipVec>()
         .register::<SwiftNamedContainerDefault>()
+        .register::<SwiftNamedFieldDefault>()
         .register::<SwiftNamedEmpty>();
     let exported = Swift::default()
         .export(&types, specta_serde::Format)
@@ -1694,6 +1717,7 @@ fn swift_named_skip_if_and_default_decode_tolerance() {
         r#"let skipVecOmittedJSON = {}
 let skipVecPresentJSON = {}
 let containerDefaultEmptyJSON = {}
+let fieldDefaultMissingJSON = {}
 let emptyJSON = {}
 {}
 import Foundation
@@ -1739,6 +1763,9 @@ check(decode(skipVecPresentJSON, SwiftNamedSkipVec.self).x == [1], "skip-if pres
 check(decode(containerDefaultEmptyJSON, SwiftNamedContainerDefault.self).x == nil, "container default decodes empty")
 expect(encode(SwiftNamedContainerDefault(x: nil, y: nil)), containerDefaultEmptyJSON, "container default nil omits both")
 
+// A field-level `#[serde(default)]` on a non-`Option` field is tolerant too.
+check(decode(fieldDefaultMissingJSON, SwiftNamedFieldDefault.self).x == nil, "field default decodes missing")
+
 // An empty named struct writes and reads an empty object and is publicly
 // constructible.
 expect(encode(SwiftNamedEmpty()), emptyJSON, "empty encodes object")
@@ -1749,11 +1776,153 @@ print("SWIFT-OK")
         swift_literal(&swift_sorted_json(&SwiftNamedSkipVec { x: vec![], y: 1 })),
         swift_literal(&swift_sorted_json(&SwiftNamedSkipVec { x: vec![1], y: 1 })),
         swift_literal(r#"{}"#),
+        swift_literal(r#"{"y":1}"#),
         swift_literal(r#"{}"#),
         "",
     );
 
     run_swift(&exported, &harness);
+}
+
+/// `#[specta(type = ...)]` overrides the exported datatype without changing
+/// serde's behaviour. `#[specta(type = u8)] x: Option<u8>` is still an
+/// `Option<u8>` to serde: it writes `null` and tolerates an absent key, so the
+/// generated Swift must too -- in both the unified shape and the `*Deserialize`
+/// half of a phase split. Deriving decode tolerance from the exported datatype
+/// nullability alone regressed the `*Deserialize` half to a required key.
+#[test]
+fn swift_named_override_nullable_matches_serde() {
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedOverrideNullable { x: None, y: 1 }).unwrap(),
+        r#"{"x":null,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedOverrideNullable { x: Some(2), y: 1 }).unwrap(),
+        r#"{"x":2,"y":1}"#
+    );
+    assert!(
+        serde_json::from_str::<SwiftNamedOverrideNullable>(r#"{"y":1}"#).is_ok(),
+        "serde tolerates the absent key: the Rust type is `Option<u8>`"
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftNamedOverrideNullable>(r#"{"y":1}"#)
+            .unwrap()
+            .x,
+        None
+    );
+
+    let types = Types::default().register::<SwiftNamedOverrideNullable>();
+
+    // Unified: the override must not hide the Rust `Option`, so the property is
+    // optional and decoding tolerates an absent key.
+    let unified = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect("named structs should export");
+    assert!(
+        unified.contains("public let x: UInt8?"),
+        "the override must not hide the Rust `Option`:\n{unified}"
+    );
+    assert!(
+        unified.contains("self.x = try container.decodeIfPresent(UInt8.self, forKey: .x)"),
+        "the override must stay absent-tolerant on decode:\n{unified}"
+    );
+
+    // Phase-split: the `*Deserialize` half must tolerate the absent key too.
+    let phases = Swift::default()
+        .export(&types, specta_serde::PhasesFormat)
+        .expect("phase-split named structs should export");
+    assert!(
+        phases.contains("public struct SwiftNamedOverrideNullableDeserialize: Codable {"),
+        "{phases}"
+    );
+    assert!(
+        phases.contains("self.x = try container.decodeIfPresent(UInt8.self, forKey: .x)"),
+        "the deserialize half must stay absent-tolerant:\n{phases}"
+    );
+
+    let fixtures = format!(
+        "let overrideNullJSON = {}\nlet overrideSomeJSON = {}\nlet overrideMissingJSON = {}\n",
+        swift_literal(&swift_sorted_json(&SwiftNamedOverrideNullable {
+            x: None,
+            y: 1
+        })),
+        swift_literal(&swift_sorted_json(&SwiftNamedOverrideNullable {
+            x: Some(2),
+            y: 1,
+        })),
+        swift_literal(r#"{"y":1}"#),
+    );
+
+    let unified_harness = format!(
+        r#"{fixtures}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+// serde writes `null` for the nil `Option<u8>`, and an absent key still
+// decodes to nil.
+expect(encode(SwiftNamedOverrideNullable(x: nil, y: 1)), overrideNullJSON, "override nil encodes null")
+expect(encode(SwiftNamedOverrideNullable(x: 2, y: 1)), overrideSomeJSON, "override some encodes value")
+check(decode(overrideMissingJSON, SwiftNamedOverrideNullable.self).x == nil, "override decode missing")
+check(decode(overrideNullJSON, SwiftNamedOverrideNullable.self).x == nil, "override decode null")
+check(decode(overrideSomeJSON, SwiftNamedOverrideNullable.self).x == 2, "override decode some")
+
+print("SWIFT-OK")
+"#
+    );
+
+    let phases_harness = format!(
+        r#"{fixtures}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+// Both halves keep the `Option<u8>`: the serialize half writes `null`, and the
+// deserialize half tolerates the absent key.
+expect(encode(SwiftNamedOverrideNullableSerialize(x: nil, y: 1)), overrideNullJSON, "phase override nil encodes null")
+expect(encode(SwiftNamedOverrideNullableSerialize(x: 2, y: 1)), overrideSomeJSON, "phase override some encodes value")
+check(decode(overrideMissingJSON, SwiftNamedOverrideNullableDeserialize.self).x == nil, "phase override deserialize missing")
+check(decode(overrideNullJSON, SwiftNamedOverrideNullableDeserialize.self).x == nil, "phase override deserialize null")
+check(decode(overrideSomeJSON, SwiftNamedOverrideNullableDeserialize.self).x == 2, "phase override deserialize some")
+
+print("SWIFT-OK")
+"#
+    );
+
+    run_swift(&unified, &unified_harness);
+    run_swift(&phases, &phases_harness);
 }
 
 /// Shapes with no faithful Swift codec must fail the export rather than silently
