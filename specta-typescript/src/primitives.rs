@@ -1825,6 +1825,12 @@ fn optional_element_needs_parens(ty: &DataType) -> bool {
             NamedReferenceType::Inline { dt, .. } => optional_element_needs_parens(dt),
             _ => false,
         },
+        // `Branded` renders `<payload> & { readonly __brand: ... }` and `Define`
+        // renders arbitrary caller-supplied text; both need parentheses before
+        // the trailing `?`, matching [`intersection_operand_is_atomic`].
+        DataType::Reference(Reference::Opaque(r)) => {
+            r.downcast_ref::<Branded>().is_some() || r.downcast_ref::<opaque::Define>().is_some()
+        }
         // A lone live unnamed field renders as its bare inner type.
         DataType::Struct(strct) => match &strct.fields {
             Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => unnamed

@@ -121,7 +121,7 @@ fn flattened_inline_newtype_union_is_parenthesised() {
     );
 }
 
-branded!(#[derive(Serialize)] pub struct Brand(Option<String>) as "Brand");
+branded!(#[derive(Serialize, Deserialize, Default)] pub struct Brand(Option<String>) as "Brand");
 
 #[derive(Type)]
 #[specta(collect = false)]
@@ -202,6 +202,22 @@ struct OptionalFloatTuple(String, #[serde(default)] f32);
 fn optional_float_tuple_element_is_parenthesised() {
     let rendered = export::<OptionalFloatTuple>();
     let expected = "export type OptionalFloatTuple = [string, (number | null)?];";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
+/// A branded element renders as `<payload> & { readonly __brand: ... }`, which
+/// is an intersection and must be parenthesised before the trailing `?`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct OptionalBrandTuple(String, #[serde(default)] Brand);
+
+#[test]
+fn optional_branded_tuple_element_is_parenthesised() {
+    let rendered = export::<OptionalBrandTuple>();
+    let expected = "export type OptionalBrandTuple = [string, ((string | null) & { readonly __brand: \"Brand\" })?];";
     assert!(
         rendered.contains(expected),
         "expected:\n{expected}\n\ngot:\n{rendered}"
@@ -333,6 +349,7 @@ fn generated_typescript_passes_strict_typecheck() {
         .register::<FlattenedOuter>()
         .register::<NewtypeOuter>()
         .register::<OptionalFloatTuple>()
+        .register::<OptionalBrandTuple>()
         .register::<BrandHolder>()
         .register::<Alias>();
     let generated = Typescript::default()
@@ -359,6 +376,12 @@ const tupleNumber: OptionalFloatTuple = ["value", 1.5];
 // @ts-expect-error the second element must be a number or null.
 const tupleBad: OptionalFloatTuple = ["value", "bad"];
 
+// A trailing optional branded tuple element is an intersection and must parse.
+const brandTupleShort: OptionalBrandTuple = ["value"];
+const brandTupleOk: OptionalBrandTuple = ["value", "x" as string & { readonly __brand: "Brand" }];
+// @ts-expect-error the second element must be the branded type, not a bare string.
+const brandTupleBad: OptionalBrandTuple = ["value", "x"];
+
 // A branded value is its payload intersected with the brand marker.
 const branded: BrandHolder["value"] = "value" as string & { readonly __brand: "Brand" };
 // @ts-expect-error a bare string must not be assignable to a brand.
@@ -382,6 +405,9 @@ void tupleShort;
 void tupleNull;
 void tupleNumber;
 void tupleBad;
+void brandTupleShort;
+void brandTupleOk;
+void brandTupleBad;
 void branded;
 void unbranded;
 void nullBrand;

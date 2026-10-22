@@ -104,9 +104,12 @@ jobs:
 
   # `tests/tests/typescript_precedence.rs` shells out to a TypeScript compiler
   # to assert assignability of the generated types. It skips when no compiler
-  # is installed, so this job installs one and runs the module.
+  # is installed, so this job installs one and pins `SPECTA_TSC` to make a
+  # missing compiler a hard failure rather than a silent skip.
   typescript-precedence:
     runs-on: ubuntu-latest
+    env:
+      SPECTA_TSC: tsc
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust toolchain
