@@ -88,6 +88,25 @@ impl_ndt!(
     bytes::BytesMut as [u8] = inline;
 );
 
+#[cfg(feature = "bit-vec")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bit-vec")))]
+const _: () = {
+    // `bit_vec::BitVec` derives `Serialize` from its private layout, so the wire
+    // shape is `{ storage: [B], nbits: usize }`, not a sequence of booleans.
+    // The `BitBlock` bound is stricter than the derived `B: Serialize` bound, but
+    // every `BitBlock` is one of the primitive integer types Serde supports, so the
+    // two are equivalent in practice.
+    // https://github.com/specta-rs/specta/issues/597
+    impl<B: bit_vec::BitBlock + Type> Type for bit_vec::BitVec<B> {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("storage", Field::new(<[B]>::definition(types)))
+                .field("nbits", Field::new(usize::definition(types)))
+                .build()
+        }
+    }
+};
+
 #[cfg(feature = "serde_json")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_json")))]
 const _: () = {
@@ -191,7 +210,12 @@ const _: () = {
         serde_yaml::Mapping as PrimitiveMap<Value, Value> = passthrough;
         serde_yaml::Value as SerdeYamlValue = inline;
         serde_yaml::Number as SerdeYamlNumber = inline;
-        serde_yaml::value::TaggedValue as SerdeYamlTaggedValue = inline;
+        // Serde serializes a tagged value as a single-entry map whose key is the
+        // tag string, e.g. `{"!Thing": true}`. Specta cannot express the dynamic
+        // one-entry key, so a string-keyed map is the closest static shape.
+        // Native YAML still renders `!Thing true`.
+        // https://github.com/specta-rs/specta/issues/597
+        serde_yaml::value::TaggedValue as PrimitiveMap<String, Value> = inline;
     );
 
     struct SerdeYamlValue;
@@ -276,16 +300,6 @@ const _: () = {
             })
         }
     }
-
-    struct SerdeYamlTaggedValue;
-    impl Type for SerdeYamlTaggedValue {
-        fn definition(types: &mut Types) -> DataType {
-            Struct::named()
-                .field("tag", Field::new(str::definition(types)))
-                .field("value", Field::new(Value::definition(types)))
-                .build()
-        }
-    }
 };
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
@@ -300,9 +314,17 @@ const _: () = {
 
     struct TomlDatetime;
     impl Type for TomlDatetime {
+        /// Serde's `toml` integration emits a `$__toml_private_Datetime` struct
+        /// with a single `$__toml_private_datetime` string field. Native TOML
+        /// encodes datetimes natively instead; Specta's static type graph models
+        /// the serde data model, which matches the JSON rendering.
+        /// https://github.com/specta-rs/specta/issues/597
         fn definition(types: &mut Types) -> DataType {
             Struct::named()
-                .field("v", Field::new(str::definition(types)))
+                .field(
+                    "$__toml_private_datetime",
+                    Field::new(str::definition(types)),
+                )
                 .build()
         }
     }
