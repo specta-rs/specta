@@ -2527,6 +2527,11 @@ fn rewrite_field_for_phase(
             && matches!(mode, PhaseRewrite::Unified | PhaseRewrite::Serialize)
         {
             field.optional = true;
+            // Record the omission semantically: the raw parser attribute is
+            // stripped just below, but exporters still need to tell a
+            // `skip_serializing_if` omission apart from a `#[serde(default)]`
+            // element, which serde keeps writing.
+            field.attributes.insert(SERIALIZE_OMISSION_MARKER, true);
             if attrs.flatten {
                 field.attributes.insert(CONDITIONAL_OMISSION_MARKER, true);
             }
@@ -2874,6 +2879,13 @@ const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_paylo
 /// also set it, while defaults do not make flattened payloads optional.
 const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 
+/// Marks a field that `#[serde(skip_serializing_if = ...)]` may omit from a
+/// serialized sequence. The raw parser attribute is stripped during the phase
+/// rewrite (a phase-split field already carries the decision in
+/// `Field::optional`), so exporters read this semantic marker to tell the
+/// omission apart from a `#[serde(default)]`-optional field, which serde still
+/// writes.
+const SERIALIZE_OMISSION_MARKER: &str = "specta_serde:serialize_omission";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
 
 fn rewrite_enum_repr_for_phase(
