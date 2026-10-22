@@ -110,6 +110,7 @@ use specta::{
         DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
     },
+    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER, STRICT_OBJECT_MARKER},
 };
 
 mod error;
@@ -2845,11 +2846,6 @@ const HIDDEN_EXTERNAL_PAYLOAD_MARKER: &str = "specta_serde:hidden_external_paylo
 /// variant-level untagged branches with an equally broad string field.
 const ENUM_OTHER_VARIANT_MARKER: &str = "specta_serde:variant_other";
 
-/// Marks generated object wrappers whose wire format rejects unknown keys.
-/// Exporters can consume this semantic attribute without inferring tagging
-/// from a shape that user-authored untagged variants can also have.
-const STRICT_OBJECT_MARKER: &str = "specta:strict_object";
-
 /// Marks the synthetic present/absent union produced for optional flattened
 /// payloads so exporters can reject malformed values that use payload keys.
 const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
@@ -2867,14 +2863,7 @@ const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_paylo
 /// also set it, while defaults do not make flattened payloads optional.
 const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 
-/// Marks optional `never` fields synthesized solely to make alias spellings
-/// mutually exclusive. Genuine user-authored uninhabited fields must survive
-/// contextual flatten relaxation.
-const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
-/// Marks alias unions that an exporter may preserve symbolically instead of
-/// distributing their enclosing intersection into a Cartesian union.
-const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,

@@ -32,14 +32,11 @@ impl ContainerAttr {
         };
 
         if let Some(attr) = attrs.extract("specta", "crate") {
-            result.crate_name = result
-                .crate_name
-                .take()
-                .or(Some(attr.parse_path()?.to_token_stream()));
+            result.crate_name = Some(attr.parse_path()?.to_token_stream());
         }
 
         if let Some(attr) = attrs.extract("specta", "type") {
-            result.r#type = result.r#type.take().or(Some(attr.parse_type()?));
+            result.r#type = Some(attr.parse_type()?);
         }
 
         if let Some(attr) = attrs.extract("specta", "inline") {
@@ -47,14 +44,11 @@ impl ContainerAttr {
         }
 
         if let Some(attr) = attrs.extract("specta", "remote") {
-            result.remote = result
-                .remote
-                .take()
-                .or(Some(attr.parse_path()?.to_token_stream()));
+            result.remote = Some(attr.parse_path()?.to_token_stream());
         }
 
         if let Some(attr) = attrs.extract("specta", "collect") {
-            result.collect = result.collect.take().or(Some(attr.parse_bool_or_true()?));
+            result.collect = Some(attr.parse_bool_or_true()?);
         }
 
         for attr in attrs.extract_all("specta", "skip_attr") {
