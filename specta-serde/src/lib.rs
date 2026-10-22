@@ -110,6 +110,7 @@ use specta::{
         DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
     },
+    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER, STRICT_OBJECT_MARKER},
 };
 
 mod error;
@@ -1029,30 +1030,41 @@ fn rewrite_datatype_for_phase_inner(
                     conditional_omission_applies,
                 )?;
 
-                let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
-                    if named.fields.iter().any(|(_, field)| field_is_flattened(field)))
-                    && fields_have_flattened_aliases(
-                        &variant.fields,
+                // A named variant payload with `#[serde(flatten)]` merges the
+                // flattened field's keys into the payload object, exactly like
+                // a named struct. Lower it through the same struct pipeline
+                // (flatten plus field aliases) here, once, before the
+                // representation-specific transform wraps it. Doing it here -
+                // rather than inside `variant_payload_field` - keeps every
+                // representation (external, adjacent, untagged, and
+                // per-variant `#[serde(untagged)]`) on one shared routine and
+                // never depends on a later rewrite pass visiting the generated
+                // payload. A plain internally tagged variant is excluded
+                // because `transform_internal_variant` lowers flatten itself,
+                // in context with the container's tag key; a variant-level
+                // `#[serde(untagged)]` drops that tag, so it is lowered here.
+                let has_flattened = matches!(&variant.fields, Fields::Named(named)
+                    if named.fields.iter().any(|(_, field)| field_is_flattened(field)));
+                let internal_variant = matches!(&repr, EnumRepr::Internal { .. });
+                let variant_is_untagged = SerdeVariantAttrs::from_attributes(&variant.attributes)?
+                    .is_some_and(|attrs| attrs.untagged);
+
+                let lowered = if has_flattened && (!internal_variant || variant_is_untagged) {
+                    let mut strct = Struct::unit();
+                    std::mem::swap(&mut strct.fields, &mut variant.fields);
+                    lower_flattened_struct_inner(
+                        &mut strct,
                         mode,
                         original_types,
-                        &mut FlattenedAliasVisits::default(),
-                    );
-
-                let lowered = if has_flattened_aliases {
-                    if matches!(&repr, EnumRepr::Internal { .. }) {
-                        None
-                    } else {
-                        let mut strct = Struct::unit();
-                        std::mem::swap(&mut strct.fields, &mut variant.fields);
-                        lower_flattened_struct_inner(
-                            &mut strct,
-                            mode,
-                            original_types,
-                            generated,
-                            split_types,
-                            expanding_flattened,
-                        )?
-                    }
+                        generated,
+                        split_types,
+                        expanding_flattened,
+                    )?
+                } else if has_flattened {
+                    // A plain internally tagged variant: `transform_internal_variant`
+                    // lowers flatten (and its aliases) itself, in context with
+                    // the tag key, so lowering again here would double-apply it.
+                    None
                 } else {
                     lower_field_aliases_for_phase(&mut variant.fields, mode, true)?
                 };
@@ -2845,11 +2857,6 @@ const HIDDEN_EXTERNAL_PAYLOAD_MARKER: &str = "specta_serde:hidden_external_paylo
 /// variant-level untagged branches with an equally broad string field.
 const ENUM_OTHER_VARIANT_MARKER: &str = "specta_serde:variant_other";
 
-/// Marks generated object wrappers whose wire format rejects unknown keys.
-/// Exporters can consume this semantic attribute without inferring tagging
-/// from a shape that user-authored untagged variants can also have.
-const STRICT_OBJECT_MARKER: &str = "specta:strict_object";
-
 /// Marks the synthetic present/absent union produced for optional flattened
 /// payloads so exporters can reject malformed values that use payload keys.
 const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
@@ -2867,14 +2874,7 @@ const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_paylo
 /// also set it, while defaults do not make flattened payloads optional.
 const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 
-/// Marks optional `never` fields synthesized solely to make alias spellings
-/// mutually exclusive. Genuine user-authored uninhabited fields must survive
-/// contextual flatten relaxation.
-const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
-/// Marks alias unions that an exporter may preserve symbolically instead of
-/// distributing their enclosing intersection into a Cartesian union.
-const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,

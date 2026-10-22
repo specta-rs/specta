@@ -226,9 +226,7 @@ export type RecursiveMapValue = {
 
 export type RecursiveTransparent = RecursiveInline;
 
-export type RecursiveInEnum = { A: {
-	demo: RecursiveInEnum,
-} };
+export type RecursiveInEnum = { A: RecursiveInEnum };
 
 export type NonOptional = string | null;
 
@@ -485,15 +483,11 @@ export type MyEnumTagged = {
 	type: "Variant",
 } & First;
 
-export type MyEnumExternal = { Variant: {
-	inner: First,
-} };
+export type MyEnumExternal = { Variant: First };
 
-export type MyEnumAdjacent = { t: "Variant"; c: {
-	inner: First,
-} };
+export type MyEnumAdjacent = { t: "Variant"; c: First };
 
-export type MyEnumUntagged = { inner: First };
+export type MyEnumUntagged = First;
 
 export type EmptyStruct = Record<string, never>;
 
@@ -545,7 +539,7 @@ export type InternallyTaggedM = { type: "A" };
 
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
-export type Issue221UntaggedMixed = ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never };
+export type Issue221UntaggedMixed = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | { [key in string]: string };
 
 export type EmptyEnum = never;
 

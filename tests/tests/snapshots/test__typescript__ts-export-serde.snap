@@ -485,7 +485,7 @@ export type Issue221External = ({ A: {
 	b: string,
 } }) & { A?: never };
 
-export type Issue221UntaggedMixed = ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never };
+export type Issue221UntaggedMixed = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | { [key in string]: string };
 
 export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
@@ -530,19 +530,15 @@ export type MyEmptyInput = Record<string, never>;
 
 export type MyEnum = ({ A: string }) & { B?: never } | ({ B: number }) & { A?: never };
 
-export type MyEnumAdjacent = { t: "Variant"; c: {
-	inner: First,
-} };
+export type MyEnumAdjacent = { t: "Variant"; c: First };
 
-export type MyEnumExternal = { Variant: {
-	inner: First,
-} };
+export type MyEnumExternal = { Variant: First };
 
 export type MyEnumTagged = {
 	type: "Variant",
 } & First;
 
-export type MyEnumUntagged = { inner: First };
+export type MyEnumUntagged = First;
 
 export type NamedConstGeneric = {
 	data: number[],
@@ -859,9 +855,7 @@ export type Recursive = {
 	demo: Recursive,
 };
 
-export type RecursiveInEnum = { A: {
-	demo: RecursiveInEnum,
-} };
+export type RecursiveInEnum = { A: RecursiveInEnum };
 
 export type RecursiveInline = RecursiveInline;
 

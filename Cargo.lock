@@ -363,6 +363,9 @@ name = "bit-vec"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5727b15fa97d4f4fee0a3b7c3d550ed0269f54329207b86388de918604e31269"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitflags"
@@ -2372,6 +2375,7 @@ name = "specta-tests"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
+ "bit-vec 0.10.1",
  "bson",
  "chrono",
  "either",

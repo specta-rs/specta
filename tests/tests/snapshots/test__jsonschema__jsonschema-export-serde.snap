@@ -2666,19 +2666,15 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           "type": "object"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "values": {
+          "allOf": [
+            {
               "additionalProperties": {
                 "type": "string"
               },
               "type": "object"
             }
-          },
-          "required": [
-            "values"
           ],
-          "type": "object"
+          "unevaluatedProperties": false
         }
       ],
       "title": "Issue221UntaggedMixed"
@@ -2989,12 +2985,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "c": {
           "additionalProperties": false,
           "properties": {
-            "inner": {
-              "$ref": "#/$defs/First"
+            "a": {
+              "type": "string"
             }
           },
           "required": [
-            "inner"
+            "a"
           ],
           "type": "object"
         },
@@ -3015,12 +3011,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "Variant": {
           "additionalProperties": false,
           "properties": {
-            "inner": {
-              "$ref": "#/$defs/First"
+            "a": {
+              "type": "string"
             }
           },
           "required": [
-            "inner"
+            "a"
           ],
           "type": "object"
         }
@@ -3051,12 +3047,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
     "MyEnumUntagged": {
       "additionalProperties": false,
       "properties": {
-        "inner": {
-          "$ref": "#/$defs/First"
+        "a": {
+          "type": "string"
         }
       },
       "required": [
-        "inner"
+        "a"
       ],
       "title": "MyEnumUntagged",
       "type": "object"
@@ -4952,16 +4948,12 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
       "additionalProperties": false,
       "properties": {
         "A": {
-          "additionalProperties": false,
-          "properties": {
-            "demo": {
+          "allOf": [
+            {
               "$ref": "#/$defs/RecursiveInEnum"
             }
-          },
-          "required": [
-            "demo"
           ],
-          "type": "object"
+          "unevaluatedProperties": false
         }
       },
       "required": [

@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson", "uhlc", "uuid", "url", "jiff"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson", "uhlc", "uuid", "url", "jiff", "bit-vec"] }
 specta-go = { path = "../specta-go" }
 specta-jsonschema = { path = "../specta-jsonschema" }
 specta-java = { path = "../specta-java" }
@@ -53,6 +53,7 @@ thiserror = "2.0.18"
 error-stack = { version = "0.8", default-features = false }
 bson = { version = "3", default-features = false, features = ["compat-3-0-0"] }
 uhlc = { version = "0.9", default-features = false }
+bit-vec = { version = "0.10", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
 jsonschema = { version = "0.49.2", default-features = false, features = ["resolve-file"] }

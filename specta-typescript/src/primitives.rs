@@ -15,6 +15,7 @@ use specta::{
         NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
         Struct, Tuple, Variant,
     },
+    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER},
 };
 
 use crate::{
@@ -25,8 +26,6 @@ use crate::{
 const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
-const FIELD_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
-const FIELD_ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 fn path_string(location: &[Cow<'static, str>]) -> String {
     location.join(".")
@@ -1277,7 +1276,13 @@ fn render_map(
     map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
 
     let rendered_key = map_key_render_type(map.key_ty().clone());
-    let exhaustive = is_exhaustive_map_key(&rendered_key, types, generics);
+    let key_shape = map_keys::map_key_shape(&rendered_key, types, generics);
+    // A key normalised to a lexical string/number (or a locally constrained
+    // type parameter) is exhaustive in the same sense a `String` key is, so it
+    // must not be wrapped in `Partial<>`. Everything else keeps the existing
+    // enum/`Partial<>` behaviour.
+    let exhaustive = !matches!(key_shape, map_keys::MapKeyShape::Property)
+        || is_exhaustive_map_key(&rendered_key, types, generics);
 
     // Use `{ [key in K]: V }` instead of `Record<K, V>` to avoid circular reference issues.
     if !exhaustive {
@@ -1291,6 +1296,7 @@ fn render_map(
         format,
         types,
         &rendered_key,
+        key_shape,
         location.clone(),
         parent_name,
         prefix,
@@ -1631,7 +1637,66 @@ fn list_dt(
     Ok(())
 }
 
+/// Renders a map key as a TypeScript mapped-type key.
+///
+/// Object property names have stricter rules than values, so a key never
+/// reuses the value rendering directly. [`map_keys::map_key_shape`] classifies
+/// the key into a key-safe shape (see [`map_keys::MapKeyShape`]) and this
+/// function emits the matching expression.
 fn map_key_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    key_ty: &DataType,
+    shape: map_keys::MapKeyShape,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match shape {
+        // serde_json writes integer map keys as JSON strings, and a lossless
+        // `BigInt` key would otherwise render as the value-shaped `bigint`.
+        map_keys::MapKeyShape::String => s.push_str(STRING),
+        // `number | null` is not assignable to `PropertyKey`; a key is always
+        // a finite number (`NaN`/`Infinity` are not representable in JSON).
+        map_keys::MapKeyShape::Number => s.push_str("number"),
+        // A type parameter is not constrained to `PropertyKey` at its
+        // declaration, so constrain it locally to keep the mapped type valid.
+        map_keys::MapKeyShape::TypeParameter => {
+            map_key_expression(
+                s,
+                exporter,
+                format,
+                types,
+                key_ty,
+                location,
+                parent_name,
+                prefix,
+                generics,
+            )?;
+            s.push_str(" & PropertyKey");
+        }
+        map_keys::MapKeyShape::Property => map_key_expression(
+            s,
+            exporter,
+            format,
+            types,
+            key_ty,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        )?,
+    }
+
+    Ok(())
+}
+
+/// Renders a map key whose shape is already a valid `PropertyKey` (or a type
+/// parameter to be constrained by the caller).
+fn map_key_expression(
     s: &mut String,
     exporter: &Exporter,
     format: Option<&dyn Format>,
@@ -3135,7 +3200,7 @@ fn enum_dt(
 ) -> Result<(), Error> {
     let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
 
-    if e.attributes.get_named_as(FIELD_ALIAS_UNION_MARKER) == Some(&true) {
+    if e.attributes.get_named_as(DEFERRED_ALIAS_UNION_MARKER) == Some(&true) {
         return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);
     }
 
@@ -3241,7 +3306,7 @@ fn alias_field_union_dt(
         {
             named
                 .fields
-                .retain(|(_, field)| !field.attributes.contains_key(FIELD_ALIAS_EXCLUSION_MARKER));
+                .retain(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER));
             all_optional &= named.fields.iter().all(|(_, field)| field.optional);
         } else {
             all_optional = false;
