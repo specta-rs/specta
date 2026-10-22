@@ -86,11 +86,76 @@ const _: () = {
         std::sync::Mutex<T> where { T: Type + ?Sized } as T = passthrough;
         std::sync::RwLock<T> where { T: Type + ?Sized } as T = passthrough;
 
-        std::ffi::CString as str = inline;
-        std::ffi::CStr as str = inline;
-        std::ffi::OsString as str = inline;
-        std::ffi::OsStr as str = inline;
+        // Serde serializes C strings with `serialize_bytes`, so they are a byte
+        // list on the wire rather than a UTF-8 string.
+        // https://github.com/specta-rs/specta/issues/597
+        std::ffi::CString as [u8] = inline;
+        std::ffi::CStr as [u8] = inline;
+    );
 
+    // Serde's `OsStr`/`OsString` encoding is platform specific: on Unix the value
+    // is the externally tagged `Unix` newtype variant holding the raw bytes, and
+    // on Windows it is `Windows` holding UTF-16 code units. Neither is a UTF-8
+    // string, so each platform gets its own shape.
+    // https://github.com/specta-rs/specta/issues/597
+    #[cfg(unix)]
+    const _: () = {
+        impl Type for std::ffi::OsString {
+            fn definition(types: &mut Types) -> DataType {
+                DataType::Enum(Enum {
+                    variants: vec![(
+                        "Unix".into(),
+                        datatype::Variant::unnamed()
+                            .field(Field::new(<[u8]>::definition(types)))
+                            .build(),
+                    )],
+                    attributes: Default::default(),
+                })
+            }
+        }
+
+        impl Type for std::ffi::OsStr {
+            fn definition(types: &mut Types) -> DataType {
+                <std::ffi::OsString as Type>::definition(types)
+            }
+        }
+    };
+
+    #[cfg(windows)]
+    const _: () = {
+        impl Type for std::ffi::OsString {
+            fn definition(types: &mut Types) -> DataType {
+                DataType::Enum(Enum {
+                    variants: vec![(
+                        "Windows".into(),
+                        datatype::Variant::unnamed()
+                            .field(Field::new(<[u16]>::definition(types)))
+                            .build(),
+                    )],
+                    attributes: Default::default(),
+                })
+            }
+        }
+
+        impl Type for std::ffi::OsStr {
+            fn definition(types: &mut Types) -> DataType {
+                <std::ffi::OsString as Type>::definition(types)
+            }
+        }
+    };
+
+    // Serde has no `Serialize` for `OsStr`/`OsString` on this target, so there is
+    // no wire shape to mirror. Keep the historical `str` mapping so `#[derive(Type)]`
+    // on these types keeps compiling (it does not depend on Serde).
+    #[cfg(not(any(unix, windows)))]
+    const _: () = {
+        impl_ndt!(
+            std::ffi::OsString as str = inline;
+            std::ffi::OsStr as str = inline;
+        );
+    };
+
+    impl_ndt!(
         std::path::Path as str = inline;
         std::path::PathBuf as str = inline;
 

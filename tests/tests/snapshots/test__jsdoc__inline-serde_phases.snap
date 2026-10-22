@@ -248,9 +248,7 @@ RecursiveMapValue: {
 	demo: { [key in string]: RecursiveMapValue },
 }
 RecursiveTransparent: RecursiveInline
-RecursiveInEnum: { A: {
-	demo: RecursiveInEnum,
-} }
+RecursiveInEnum: { A: RecursiveInEnum }
 NonOptional: string | null
 OptionalOnNamedField: string | null
 OptionalOnTransparentNamedField: {
@@ -455,13 +453,9 @@ Tenth: string | null | {
 MyEnumTagged: {
 	type: "Variant",
 } & First
-MyEnumExternal: { Variant: {
-	inner: First,
-} }
-MyEnumAdjacent: { t: "Variant"; c: {
-	inner: First,
-} }
-MyEnumUntagged: { inner: First }
+MyEnumExternal: { Variant: First }
+MyEnumAdjacent: { t: "Variant"; c: First }
+MyEnumUntagged: First
 EmptyStruct: Record<string, never>
 EmptyStructWithTag: {
 	a: "EmptyStructWithTag",
@@ -499,7 +493,7 @@ InternallyTaggedL: {
 } & { type: "A" } | { type: "B" }
 InternallyTaggedM: { type: "A" }
 Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
-Issue221UntaggedMixed: ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }
+Issue221UntaggedMixed: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | { [key in string]: string }
 EmptyEnum: never
 EmptyEnumTagged: never
 EmptyEnumTaggedWContent: never

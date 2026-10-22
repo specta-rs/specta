@@ -74,6 +74,22 @@ jobs:
         working-directory: tests/zod-typecheck
         run: bun run test
 
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - name: Install TypeScript test dependencies
+        working-directory: tests/typescript-typecheck
+        run: bun install --frozen-lockfile
+      - name: Typecheck generated TypeScript bindings
+        working-directory: tests/typescript-typecheck
+        run: bun run test
+
   rescript:
     runs-on: ubuntu-latest
     steps:

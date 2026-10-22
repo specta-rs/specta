@@ -495,12 +495,8 @@ RecursiveTransparent: /**
 	*/
 
 RecursiveInEnum: /**
-	* @typedef {{ A: {
-	* 	demo: RecursiveInEnum,
-	* } }} RecursiveInEnum
-	* @property {{ A: {
-	* 	demo: RecursiveInEnum,
-	* } }} A
+	* @typedef {{ A: RecursiveInEnum }} RecursiveInEnum
+	* @property {{ A: RecursiveInEnum }} A
 	*/
 
 NonOptional: /**
@@ -992,26 +988,18 @@ MyEnumTagged: /**
 	*/
 
 MyEnumExternal: /**
-	* @typedef {{ Variant: {
-	* 	inner: First,
-	* } }} MyEnumExternal
-	* @property {{ Variant: {
-	* 	inner: First,
-	* } }} Variant
+	* @typedef {{ Variant: First }} MyEnumExternal
+	* @property {{ Variant: First }} Variant
 	*/
 
 MyEnumAdjacent: /**
-	* @typedef {{ t: "Variant"; c: {
-	* 	inner: First,
-	* } }} MyEnumAdjacent
-	* @property {{ t: "Variant"; c: {
-	* 	inner: First,
-	* } }} Variant
+	* @typedef {{ t: "Variant"; c: First }} MyEnumAdjacent
+	* @property {{ t: "Variant"; c: First }} Variant
 	*/
 
 MyEnumUntagged: /**
-	* @typedef {{ inner: First }} MyEnumUntagged
-	* @property {{ inner: First }} Variant
+	* @typedef {First} MyEnumUntagged
+	* @property {First} Variant
 	*/
 
 EmptyStruct: /**
@@ -1133,10 +1121,10 @@ Issue221UntaggedSafe: /**
 	*/
 
 Issue221UntaggedMixed: /**
-	* @typedef {({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }} Issue221UntaggedMixed
+	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | { [key in string]: string }} Issue221UntaggedMixed
 	* @property {{ a: string }} A
 	* @property {{ b: string }} B
-	* @property {{ values: { [key in string]: string } }} Unsafe
+	* @property {{ [key in string]: string }} Unsafe
 	*/
 
 EmptyEnum: /**
