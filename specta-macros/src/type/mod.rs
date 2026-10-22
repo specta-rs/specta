@@ -2,15 +2,16 @@ use attr::*;
 use r#enum::parse_enum;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
+use std::collections::HashSet;
 use r#struct::parse_struct;
 use syn::{Data, DeriveInput, GenericParam, parse};
 
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, build_type_where_clause, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, generics_with_ident_only_and_const_ty, type_with_inferred_lifetimes,
-    used_type_params,
+    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
+    generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
+    resolve_ty_expr, type_with_inferred_lifetimes, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -148,13 +149,45 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             quote!()
         };
 
+    let used_generic_types = used_type_params(
+        generics,
+        data,
+        container_attrs.r#type.as_ref(),
+        &container_attrs.skip_attrs,
+    )?;
+
+    let bounded = bounded_params(
+        generics,
+        container_attrs.bound.as_deref(),
+        &used_generic_types,
+    );
+
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         let container_ty = type_with_inferred_lifetimes(container_ty);
-        quote!(datatype::inline(types, |types| <#container_ty as #crate_ref::Type>::definition(types)))
+        let resolve = resolve_ty_expr(
+            &crate_ref,
+            &container_ty,
+            &used_generic_types,
+            &bounded,
+            true,
+        );
+        quote!(datatype::inline(types, |types| #resolve))
     } else {
         let dt_expr = match data {
-            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
-            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
+            Data::Struct(data) => parse_struct(
+                &crate_ref,
+                &container_attrs,
+                data,
+                &used_generic_types,
+                &bounded,
+            ),
+            Data::Enum(data) => parse_enum(
+                &crate_ref,
+                &container_attrs,
+                data,
+                &used_generic_types,
+                &bounded,
+            ),
             Data::Union(data) => Err(syn::Error::new_spanned(
                 data.union_token,
                 "specta: Union types are not supported by Specta yet!",
@@ -174,51 +207,34 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .params
         .iter()
         .any(|param| matches!(param, GenericParam::Const(_)));
-    let used_generic_types = used_type_params(
-        generics,
-        data,
-        container_attrs.r#type.as_ref(),
-        &container_attrs.skip_attrs,
-    )?;
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
         &used_generic_types,
     );
-    let build_ty_where_bound =
-        build_type_where_clause(&quote!(#crate_ref::Type), &used_generic_types);
-    let build_ty_bounds = generics_with_ident_only_and_const_ty(generics);
+    // `build` resolves field types with the *concrete* generic arguments (so any
+    // bounds a field's own type declaration requires are satisfied) and the
+    // declaration then rewrites those arguments back to `Generic` placeholders.
+    // It therefore needs the declared inline bounds on the parameter list plus
+    // the container's `where` clause, the `#[specta(bound = "...")]` override
+    // and the automatic `Type` predicates.
+    let build_ty_where_bound = build_where_clause(
+        &crate_ref,
+        generics,
+        container_attrs.bound.as_deref(),
+        &used_generic_types,
+    );
+    let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(&crate_ref, generics);
+    let placeholder_params = used_generic_types
+        .iter()
+        .filter(|ident| !bounded.contains(&ident.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let build_placeholders = placeholder_definitions(&crate_ref, &placeholder_params);
 
-    let build_ty_placeholder_args = generic_type_and_const_args(generics, |ty| {
-        format_ident!("PLACEHOLDER_{}", ty.ident).to_token_stream()
-    });
     let build_ty_passthrough_args =
         generic_type_and_const_args(generics, |ty| ty.ident.to_token_stream());
-
-    let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics
-        .params
-        .iter()
-        .filter_map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
-            GenericParam::Type(t) => {
-                let ident = &t.ident;
-                let ident_str = ident.to_string();
-                let placeholder_ident = format_ident!("PLACEHOLDER_{ident}");
-                Some((
-                    quote!(
-                        pub struct #placeholder_ident;
-                        impl #crate_ref::Type for #placeholder_ident {
-                            fn definition(_: &mut #crate_ref::Types) -> datatype::DataType {
-                                datatype::Generic::new(Cow::Borrowed(#ident_str)).into()
-                            }
-                        }
-                    ),
-                    quote!(type #ident = #placeholder_ident;),
-                ))
-            }
-        })
-        .unzip();
 
     let (generics_for_ndt, instantiation_generics) = generics
         .params
@@ -242,13 +258,22 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 let default = match (&t.default, skip_default) {
                     (_, true) | (None, false) => quote!(None),
                     (Some(default), false) => {
-                        quote!(Some(<#default as #crate_ref::Type>::definition(types)))
+                        // A default may reference another parameter (`U = T`), so
+                        // resolve it with the same placeholder rewriting.
+                        let resolve = resolve_ty_expr(
+                            &crate_ref,
+                            default,
+                            &used_generic_types,
+                            &bounded,
+                            false,
+                        );
+                        quote!(Some(#resolve))
                     }
                 };
                 let reference = used_generic_types.iter().any(|used| used == i).then(|| {
                     quote!((
                         #crate_ref::datatype::Generic::new(Cow::Borrowed(#i_str)),
-                        <#i as #crate_ref::Type>::definition(types),
+                        types.define::<#i>(),
                     ))
                 });
                 Ok(Some((
@@ -330,10 +355,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let ndt_ty = (!container_attrs.inline).then(|| {
         quote! {
-            #(#generic_placeholders)*
-            #(#shadow_generics)*
-
-            ndt.ty = Some(build #build_ty_placeholder_args (types));
+            ndt.ty = Some(build #build_ty_passthrough_args (types, true));
         }
     });
     let definition = quote! {
@@ -354,7 +376,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                     #ndt_ty
                 },
-                build #build_ty_passthrough_args
+                |types| build #build_ty_passthrough_args (types, false)
             )
         )
     };
@@ -374,7 +396,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                 static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
 
-                fn build #build_ty_bounds (types: &mut #crate_ref::Types) -> datatype::DataType #build_ty_where_bound {
+                #build_placeholders
+
+                fn build #build_ty_bounds (types: &mut #crate_ref::Types, declaration: bool) -> datatype::DataType #build_ty_where_bound {
                     #dt_expr
                 }
 
@@ -386,4 +410,81 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     }
     .into())
+}
+
+/// Declares a placeholder type for each of `params` that resolves to a
+/// `Generic` node. The canonical declaration build substitutes these for the
+/// corresponding parameters.
+fn placeholder_definitions(crate_ref: &TokenStream, params: &[syn::Ident]) -> TokenStream {
+    let definitions = params.iter().map(|ident| {
+        let placeholder = placeholder_ident(ident);
+        let name = ident.to_string();
+
+        quote! {
+            #[allow(non_camel_case_types)]
+            pub struct #placeholder;
+            impl #crate_ref::Type for #placeholder {
+                fn definition(_: &mut #crate_ref::Types) -> datatype::DataType {
+                    datatype::Generic::new(Cow::Borrowed(#name)).into()
+                }
+            }
+        }
+    });
+
+    quote!(#(#definitions)*)
+}
+
+/// Whether any of the `predicates` bounds `ident`.
+fn predicates_bound_param<'a>(
+    predicates: impl Iterator<Item = &'a syn::WherePredicate>,
+    ident: &syn::Ident,
+) -> bool {
+    predicates.into_iter().any(|predicate| {
+        matches!(
+            predicate,
+            syn::WherePredicate::Type(predicate)
+                if !predicate.bounds.is_empty()
+                    && matches!(
+                        &predicate.bounded_ty,
+                        syn::Type::Path(bounded)
+                            if bounded.qself.is_none()
+                                && bounded.path.segments.len() == 1
+                                && &bounded.path.segments[0].ident == ident
+                    )
+        )
+    })
+}
+
+/// Generic parameters that declare at least one bound, inline, in the
+/// container's `where` clause, or via `#[specta(bound = "...")]`.
+fn bounded_params(
+    generics: &syn::Generics,
+    custom_bounds: Option<&[syn::WherePredicate]>,
+    used_generic_types: &[syn::Ident],
+) -> HashSet<String> {
+    used_generic_types
+        .iter()
+        .filter(|ident| {
+            let inline = matches!(
+                generics
+                    .params
+                    .iter()
+                    .find(|param| matches!(param, GenericParam::Type(param) if &param.ident == *ident)),
+                Some(GenericParam::Type(param)) if !param.bounds.is_empty()
+            );
+
+            let where_clause = generics
+                .where_clause
+                .as_ref()
+                .is_some_and(|where_clause| {
+                    predicates_bound_param(where_clause.predicates.iter(), ident)
+                });
+
+            let custom = custom_bounds
+                .is_some_and(|predicates| predicates_bound_param(predicates.iter(), ident));
+
+            inline || where_clause || custom
+        })
+        .map(ToString::to_string)
+        .collect()
 }

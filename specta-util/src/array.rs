@@ -42,7 +42,7 @@ pub struct FixedArray<const N: usize, T: Type>(PhantomData<[T; N]>);
 
 impl<const N: usize, T: Type> Type for FixedArray<N, T> {
     fn definition(types: &mut Types) -> DataType {
-        let mut l = List::new(T::definition(types));
+        let mut l = List::new(types.define::<T>());
         // Refer to the type documentation for the safety around this.
         l.length = Some(N);
         DataType::List(l)

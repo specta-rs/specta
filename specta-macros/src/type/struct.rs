@@ -4,6 +4,7 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+use std::collections::HashSet;
 use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
@@ -26,6 +27,8 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
+    used_generic_types: &[syn::Ident],
+    bounded_params: &HashSet<String>,
 ) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -63,6 +66,8 @@ pub fn parse_struct(
             field_attrs,
             &field_ty,
             raw_attrs,
+            used_generic_types,
+            bounded_params,
         )?;
 
         return Ok(quote!(datatype::Struct::unnamed().field(#field).build()));
@@ -92,6 +97,8 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        used_generic_types,
+                        bounded_params,
                     )?;
                     Ok(quote!(builder.field_mut(#field_name, #inner);))
                 })
@@ -123,6 +130,8 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        used_generic_types,
+                        bounded_params,
                     )
                     .map(|inner| quote!(builder.field_mut(#inner);))
                 })

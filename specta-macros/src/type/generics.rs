@@ -41,7 +41,92 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<TokenStream> {
+/// Visitor that records whether the node it is handed mentions a lifetime.
+struct LifetimeFinder {
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for LifetimeFinder {
+    fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
+        self.found = true;
+    }
+}
+
+/// Whether `visit` finds a lifetime in the node it is handed.
+fn mentions_lifetime(visit: impl FnOnce(&mut LifetimeFinder)) -> bool {
+    let mut finder = LifetimeFinder { found: false };
+    visit(&mut finder);
+    finder.found
+}
+
+/// Whether a bound mentions any lifetime.
+fn bound_uses_lifetime(bound: &syn::TypeParamBound) -> bool {
+    mentions_lifetime(|finder| finder.visit_type_param_bound(bound))
+}
+
+/// Whether a `where` predicate mentions any lifetime.
+pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
+    mentions_lifetime(|finder| finder.visit_where_predicate(predicate))
+}
+
+/// Reduce a `where` predicate to the bounds [`build_where_clause`] can keep.
+///
+/// `build` is a nested fn and so cannot mention the container's lifetime
+/// parameters, but a predicate may bundle a lifetime bound with bounds that
+/// `build`'s body still needs (`T: 'a + Trait`). Only the lifetime bounds are
+/// dropped; `None` comes back when nothing usable remains.
+fn strip_lifetime_bounds(predicate: &syn::WherePredicate) -> Option<syn::WherePredicate> {
+    let syn::WherePredicate::Type(bounded) = predicate else {
+        return (!predicate_uses_lifetime(predicate)).then(|| predicate.clone());
+    };
+
+    // A lifetime inside the bounded type itself (`&'a T: Trait`) cannot be
+    // rewritten, so the whole predicate goes.
+    if mentions_lifetime(|finder| finder.visit_type(&bounded.bounded_ty)) {
+        return None;
+    }
+
+    let bounds = bounded
+        .bounds
+        .iter()
+        .filter(|bound| !bound_uses_lifetime(bound))
+        .cloned()
+        .collect::<syn::punctuated::Punctuated<_, syn::Token![+]>>();
+
+    (!bounds.is_empty()).then(|| {
+        syn::WherePredicate::Type(syn::PredicateType {
+            lifetimes: bounded.lifetimes.clone(),
+            bounded_ty: bounded.bounded_ty.clone(),
+            colon_token: bounded.colon_token,
+            bounds,
+        })
+    })
+}
+
+/// Whether `bound` is the `crate_ref::Type` bound that [`build_where_clause`]
+/// re-adds as a `where` predicate.
+///
+/// The whole path is compared, not just its last segment: a user trait that
+/// happens to be named `Type` (`other::Type`) is a real bound `build` needs.
+fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
+    let syn::TypeParamBound::Trait(bound) = bound else {
+        return false;
+    };
+
+    quote!(#bound).to_string() == quote!(#crate_ref::Type).to_string()
+}
+
+/// The `build` fn parameter list.
+///
+/// `build` is a nested fn, so it cannot name the container's lifetime
+/// parameters; lifetime bounds and `crate_ref::Type` bounds are dropped. The
+/// former are never needed because field types are rewritten to inferred `'_`
+/// lifetimes, and the latter are re-added to the `where` clause by
+/// [`build_where_clause`].
+pub fn generics_with_ident_and_bounds_no_lifetimes(
+    crate_ref: &TokenStream,
+    generics: &Generics,
+) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -50,7 +135,19 @@ pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<Toke
             use GenericParam::*;
 
             generics.params.iter().filter_map(|param| match param {
-                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
+                Type(TypeParam { ident, bounds, .. }) => {
+                    let bounds = bounds
+                        .iter()
+                        .filter(|bound| {
+                            !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref)
+                        })
+                        .collect::<Vec<_>>();
+                    if bounds.is_empty() {
+                        Some(quote!(#ident))
+                    } else {
+                        Some(quote!(#ident: #(#bounds)+*))
+                    }
+                }
                 Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
@@ -64,11 +161,44 @@ pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<Toke
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn build_type_where_clause(
-    ty: &TokenStream,
+/// The `where` clause for the `build` fn.
+///
+/// It carries the container's declared bounds (so `build`'s body type-checks
+/// wherever it mentions a bounded field type) plus the automatic `Type`
+/// predicates. Lifetime bounds are dropped: `build` cannot name the container's
+/// lifetime parameters, and field types use inferred `'_` lifetimes so they are
+/// never required.
+pub fn build_where_clause(
+    crate_ref: &TokenStream,
+    generics: &Generics,
+    custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
 ) -> Option<WhereClause> {
-    type_predicates(ty, used_generic_types).map(|preds| parse_quote! { where #(#preds),* })
+    let mut predicates: Vec<syn::WherePredicate> = Vec::new();
+
+    if let Some(where_clause) = &generics.where_clause {
+        predicates.extend(
+            where_clause
+                .predicates
+                .iter()
+                .filter_map(strip_lifetime_bounds),
+        );
+    }
+    if let Some(custom_bounds) = custom_bounds {
+        predicates.extend(custom_bounds.iter().filter_map(strip_lifetime_bounds));
+    }
+
+    let mut seen = HashSet::new();
+    predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
+
+    for ident in used_generic_types {
+        let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
+        if seen.insert(quote!(#predicate).to_string()) {
+            predicates.push(predicate);
+        }
+    }
+
+    (!predicates.is_empty()).then(|| parse_quote!(where #(#predicates),*))
 }
 
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
@@ -178,6 +308,150 @@ pub fn used_type_params(
         .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
         .cloned()
         .collect())
+}
+
+/// The placeholder type used to stand in for a generic parameter while the
+/// canonical declaration of a type is being built.
+pub fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
+    quote::format_ident!("__SPECTA_GENERIC_PLACEHOLDER_{}", ident)
+}
+
+/// Rewrites single-segment paths that name one of `params` to their
+/// placeholder type, so the declaration is built with `Generic` placeholders
+/// instead of the concrete arguments.
+pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
+    struct Rewrite<'a> {
+        params: &'a [syn::Ident],
+    }
+
+    impl VisitMut for Rewrite<'_> {
+        fn visit_type_path_mut(&mut self, node: &mut syn::TypePath) {
+            if node.qself.is_none()
+                && node.path.leading_colon.is_none()
+                && node.path.segments.len() == 1
+            {
+                let ident = node.path.segments[0].ident.clone();
+                if self.params.contains(&ident) {
+                    node.path.segments[0].ident = placeholder_ident(&ident);
+                }
+            }
+            syn::visit_mut::visit_type_path_mut(self, node);
+        }
+    }
+
+    let mut ty = ty.clone();
+    Rewrite { params }.visit_type_mut(&mut ty);
+    ty
+}
+
+/// Builds the expression that resolves `ty` to a [`DataType`].
+///
+/// For the canonical declaration (`conditional == true`, selected by the
+/// generated `declaration` flag) generic parameters are replaced by placeholder
+/// types that resolve to `Generic`, so the declaration stays generic without
+/// baking the concrete arguments in.
+///
+/// Parameters that declare trait bounds can't be replaced by a placeholder (the
+/// placeholder cannot satisfy an arbitrary user trait) — the field's own type
+/// declaration may require the bound — so those are resolved through the
+/// scoped generic substitution on [`specta::Types`] instead. Parameters with no
+/// declared bounds cannot be required by any field type (the container would not
+/// compile otherwise), so the precise placeholder path is used for them.
+pub fn resolve_ty_expr(
+    crate_ref: &TokenStream,
+    ty: &Type,
+    used_generic_types: &[syn::Ident],
+    bounded_params: &HashSet<String>,
+    conditional: bool,
+) -> TokenStream {
+    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
+
+    let mentioned = type_params_used_in(ty, used_generic_types);
+    let unbounded = mentioned
+        .iter()
+        .filter(|ident| !bounded_params.contains(&ident.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let bounded = mentioned
+        .iter()
+        .filter(|ident| bounded_params.contains(&ident.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let declaration_ty = rewrite_generics_with_placeholders(ty, &unbounded);
+    let rewritten =
+        declaration_ty.to_token_stream().to_string() != ty.to_token_stream().to_string();
+
+    // When the placeholder rewrite could not reach a parameter — an opaque
+    // `macro!`-typed field, `Type::Verbatim`, ... — substitute every parameter
+    // the type might mention by name instead, or the first instantiation's
+    // concrete argument would be baked into the shared declaration.
+    let substituted = if rewritten {
+        bounded.clone()
+    } else {
+        mentioned.clone()
+    };
+
+    // Nothing to rewrite and no parameter to substitute: resolve concretely.
+    if !rewritten && mentioned.is_empty() {
+        return concrete;
+    }
+
+    let mut declaration = quote!(types.define::<#declaration_ty>());
+
+    if !substituted.is_empty() {
+        let substitutions = substituted.iter().map(|ident| {
+            let name = ident.to_string();
+            quote!((
+                ::std::any::type_name::<#ident>(),
+                #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(#name)),
+            ))
+        });
+        declaration = quote!(types.with_generic_substitution(
+            &[#(#substitutions),*],
+            |types| #declaration,
+        ));
+    }
+
+    if !conditional {
+        return declaration;
+    }
+
+    quote!(if declaration { #declaration } else { #concrete })
+}
+
+/// Returns the subset of `candidates` that appear in `ty`, conservatively
+/// returning every candidate when the type can't be analysed (e.g. a macro).
+///
+/// Used to scope declaration-time generic substitution to the parameters a
+/// given field actually mentions.
+pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ident> {
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+
+    let known_generics = candidates
+        .iter()
+        .map(ToString::to_string)
+        .collect::<HashSet<_>>();
+
+    let mut visitor = GenericTypeUseVisitor {
+        known_generics: &known_generics,
+        used_generics: HashSet::new(),
+        conservative: false,
+        unsupported_associated_item: None,
+    };
+    visitor.visit_type(ty);
+
+    if visitor.conservative {
+        return candidates.to_vec();
+    }
+
+    candidates
+        .iter()
+        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
+        .cloned()
+        .collect()
 }
 
 fn visit_field_type(

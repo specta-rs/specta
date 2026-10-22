@@ -1,11 +1,12 @@
 use std::{
     collections::{HashMap, hash_map},
     fmt,
+    panic::{self, AssertUnwindSafe},
 };
 
 use crate::{
     Type,
-    datatype::{DataType, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -111,6 +112,16 @@ pub struct Types {
     /// the length is safe to include. This does not fix the core issue, but it
     /// gives the user a way to assert the specific use site is correct.
     pub(crate) has_const_params: bool,
+
+    /// Active generic-parameter substitutions, innermost scope last.
+    ///
+    /// While `#[derive(Type)]` builds the canonical declaration for a generic
+    /// type it records each parameter here so that resolving the parameter's
+    /// concrete type through [`Types::define`] yields a `Generic` placeholder
+    /// instead. This lets the declaration be built from the *concrete* generic
+    /// arguments (which satisfies any user trait bounds a field's own type
+    /// declaration requires) without baking those arguments in.
+    pub(crate) generic_substitutions: Vec<(&'static str, Generic)>,
 }
 
 #[derive(Debug, Clone)]
@@ -143,6 +154,62 @@ impl Types {
         let root = T::definition(self);
         self.roots.push(root);
         self
+    }
+
+    /// Resolves `T` like [`Type::definition`], honouring any active generic
+    /// substitution.
+    ///
+    /// This exists so the `#[derive(Type)]` generated code can resolve a field
+    /// type through the concrete generic arguments (satisfying any bounds the
+    /// field's own type declaration requires) while still emitting `Generic`
+    /// placeholders into the canonical declaration. See
+    /// [`Types::with_generic_substitution`].
+    ///
+    /// # Contract
+    ///
+    /// Every generic `Type` implementation — the derive, the built-in impls in
+    /// this crate, `specta_util`, exporters, and hand-written impls — **must**
+    /// resolve its generic arguments through this method rather than
+    /// `<T as Type>::definition(types)`. Otherwise a canonical declaration can
+    /// bake in the first instantiation's concrete argument.
+    #[doc(hidden)]
+    pub fn define<T: Type + ?Sized>(&mut self) -> DataType {
+        let name = std::any::type_name::<T>();
+        if let Some((_, generic)) = self
+            .generic_substitutions
+            .iter()
+            .rev()
+            .find(|(substituted, _)| *substituted == name)
+        {
+            return DataType::Generic(generic.clone());
+        }
+
+        T::definition(self)
+    }
+
+    /// Runs `f` with `substitutions` active for the duration of the call.
+    ///
+    /// While active, [`Types::define`] returns the paired [`Generic`] for a type
+    /// whose [`std::any::type_name`] matches an entry, instead of resolving that
+    /// type. Scopes nest: the innermost matching entry wins.
+    ///
+    /// The scope is restored on unwind (the panic is then re-raised) so a panic
+    /// in a nested resolution cannot leak substitutions into the surrounding
+    /// scope.
+    #[doc(hidden)]
+    pub fn with_generic_substitution<R>(
+        &mut self,
+        substitutions: &[(&'static str, Generic)],
+        f: impl FnOnce(&mut Types) -> R,
+    ) -> R {
+        let previous_len = self.generic_substitutions.len();
+        self.generic_substitutions.extend_from_slice(substitutions);
+        let result = panic::catch_unwind(AssertUnwindSafe(|| f(self)));
+        self.generic_substitutions.truncate(previous_len);
+        match result {
+            Ok(result) => result,
+            Err(payload) => panic::resume_unwind(payload),
+        }
     }
 
     /// Returns the concrete datatypes explicitly registered as top-level roots.

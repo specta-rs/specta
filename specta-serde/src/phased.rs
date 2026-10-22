@@ -47,8 +47,8 @@ pub fn phased(serialize: DataType, deserialize: DataType) -> DataType {
 
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {
     fn definition(types: &mut Types) -> DataType {
-        let serialize = Serialize::definition(types);
-        let deserialize = Deserialize::definition(types);
+        let serialize = types.define::<Serialize>();
+        let deserialize = types.define::<Deserialize>();
 
         phased(serialize, deserialize)
     }

@@ -13,6 +13,7 @@ macro_rules! register {
 }
 
 mod bound;
+mod bound_nested;
 mod builtin_wire_mappings;
 mod core_type_impls;
 mod csharp;

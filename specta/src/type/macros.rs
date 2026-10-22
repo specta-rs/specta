@@ -14,7 +14,7 @@ macro_rules! _impl_tuple {
         impl<$($i: Type),*> Type for ($($i,)*) {
             fn definition(_types: &mut Types) -> DataType {
                 DataType::Tuple(datatype::Tuple {
-                    elements: vec![$(<$i as Type>::definition(_types)),*],
+                    elements: vec![$(_types.define::<$i>()),*],
                 })
             }
         }
@@ -390,10 +390,10 @@ macro_rules! _impl_ndt {
                                 }
                             }
                         )*
-                        ndt.ty = Some(<$as_ty as Type>::definition(types));
+                        ndt.ty = Some(types.define::<$as_ty>());
                     }
                 },
-                |types| <$as_ty as Type>::definition(types),
+                |types| types.define::<$as_ty>(),
             ))
         };
 
@@ -407,7 +407,7 @@ macro_rules! _impl_ndt {
         if $inline && !$typed_generics {
             datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
         } else {
-            <$generic as Type>::definition($types)
+            $types.define::<$generic>()
         }
     };
 

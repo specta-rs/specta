@@ -77,7 +77,7 @@ where
     T::Item: Type,
 {
     fn definition(types: &mut Types) -> DataType {
-        <[T::Item]>::definition(types)
+        types.define::<[T::Item]>()
     }
 }
 
