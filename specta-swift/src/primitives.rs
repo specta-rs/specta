@@ -565,7 +565,6 @@ pub fn export_type(
     // Format based on type
     match ndt_ty.expect("checked above") {
         DataType::Struct(s) => {
-            let type_def = struct_to_swift(swift, format, types, s, generic_scope.clone())?;
             let name = swift.naming.convert(&ndt.name);
             let generics = if ndt.generics.is_empty() {
                 String::new()
@@ -580,8 +579,30 @@ pub fn export_type(
                 )
             };
 
+            // serde only key-encodes named fields; a newtype writes its bare
+            // value and a tuple struct writes an array, so those shapes need a
+            // custom `Codable` rather than the synthesised keyed one.
+            let shape = struct_wire_shape(s, tuple_as_struct.is_some());
+            let body = match &shape {
+                StructWireShape::Keyed => {
+                    struct_to_swift(swift, format, types, s, generic_scope.clone())?
+                }
+                StructWireShape::Unit => unit_struct_body(&name),
+                StructWireShape::Newtype(field) => {
+                    newtype_struct_body(swift, format, types, &name, field, generic_scope.clone())?
+                }
+                StructWireShape::Sequence(fields) => sequence_struct_body(
+                    swift,
+                    format,
+                    types,
+                    &name,
+                    fields,
+                    generic_scope.clone(),
+                )?,
+            };
+
             result.push_str(&format!("public struct {}{}: Codable {{\n", name, generics));
-            result.push_str(&type_def);
+            result.push_str(&body);
             result.push('}');
         }
         DataType::Enum(e) => {
@@ -1121,6 +1142,330 @@ fn struct_to_swift(
             Ok(result)
         }
     }
+}
+
+/// The serde wire shape of a named struct, which decides which `Codable`
+/// container the generated Swift has to use.
+///
+/// serde only key-encodes structs with named fields. A newtype struct writes its
+/// bare inner value and a tuple struct writes a JSON array, so relying on the
+/// synthesised keyed `Codable` cannot round-trip either shape
+/// (<https://github.com/specta-rs/specta/issues/596>).
+enum StructWireShape<'a> {
+    /// A named-field struct: the synthesised keyed `Codable` matches serde.
+    Keyed,
+    /// A unit struct: serde writes `null`.
+    Unit,
+    /// A genuine newtype struct (declared arity 1): serde writes the bare inner
+    /// value, so the codec needs a single-value container.
+    Newtype(&'a Field),
+    /// A tuple struct, or a named `DataType::Tuple` definition: serde writes a
+    /// JSON array, so the codec needs an unkeyed container. Each declared field
+    /// keeps its position so a skipped slot does not renumber the live elements.
+    Sequence(Vec<(usize, &'a Field)>),
+}
+
+fn struct_wire_shape<'a>(strct: &'a Struct, from_tuple_definition: bool) -> StructWireShape<'a> {
+    if from_tuple_definition {
+        // `export_type` synthesises this from a `DataType::Tuple`, which serde
+        // always writes as an array -- even a one-element tuple.
+        let Fields::Unnamed(fields) = &strct.fields else {
+            unreachable!("a tuple definition is built with unnamed fields")
+        };
+        return StructWireShape::Sequence(fields.fields.iter().enumerate().collect());
+    }
+
+    match &strct.fields {
+        Fields::Unit => StructWireShape::Unit,
+        Fields::Named(_) => StructWireShape::Keyed,
+        Fields::Unnamed(fields) => match fields.fields.as_slice() {
+            [] => StructWireShape::Sequence(Vec::new()),
+            [field] => StructWireShape::Newtype(field),
+            fields => StructWireShape::Sequence(fields.iter().enumerate().collect()),
+        },
+    }
+}
+
+/// A live element of a newtype or tuple struct's wire sequence.
+struct WireElement<'a> {
+    /// The generated Swift property name: `value` for a newtype, `field{i}`
+    /// (using the declared index) for a tuple.
+    property: String,
+    /// The declared field, which carries the element's optionality.
+    field: &'a Field,
+    /// The element's datatype with any `Nullable` unwrapped, so the property
+    /// type and the container `decode` call agree on optionality.
+    ty: &'a DataType,
+    /// Whether the wire value may be `null` (`Option<T>`).
+    nullable: bool,
+}
+
+fn wire_elements<'a>(
+    struct_name: &str,
+    fields: &[(usize, &'a Field)],
+    newtype: bool,
+) -> Result<Vec<WireElement<'a>>, Error> {
+    let mut elements = Vec::new();
+    for (index, field) in fields {
+        // A skipped slot (`ty: None`) preserves the declared arity but never
+        // reaches the wire.
+        let Some(ty) = field_decode_type(field) else {
+            continue;
+        };
+        if unsupported_payload(ty) {
+            return Err(Error::UnsupportedType(format!(
+                "struct `{struct_name}` has an element that Swift's `Codable` cannot encode \
+                 (a tuple or empty payload)"
+            )));
+        }
+        elements.push(WireElement {
+            property: if newtype {
+                "value".to_string()
+            } else {
+                format!("field{index}")
+            },
+            field,
+            ty,
+            nullable: matches!(field.ty.as_ref(), Some(DataType::Nullable(_))),
+        });
+    }
+    Ok(elements)
+}
+
+/// The Swift type of a wire element's generated property, including the `?` a
+/// trailing omittable element needs.
+fn element_property_type(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    element: &WireElement<'_>,
+    generic_scope: Vec<Generic>,
+) -> Result<String, Error> {
+    let original = element
+        .field
+        .ty
+        .as_ref()
+        .expect("a live element has a type");
+    let base = datatype_to_swift(swift, format, types, original, generic_scope)?;
+    Ok(format!(
+        "{base}{}",
+        optional_suffix(element.field, original)
+    ))
+}
+
+/// The Swift type to pass to `decode`: the element's `Nullable` is unwrapped and
+/// re-applied as `?` so a `null` decodes to `nil` without a second `?`.
+fn element_decode_type(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    element: &WireElement<'_>,
+    generic_scope: Vec<Generic>,
+) -> Result<String, Error> {
+    let base = datatype_to_swift(swift, format, types, element.ty, generic_scope)?;
+    Ok(if element.nullable {
+        format!("{base}?")
+    } else {
+        base
+    })
+}
+
+/// serde only accepts a truncated sequence for a *trailing* run of omittable
+/// elements, so an omittable element before a required one cannot be expressed.
+fn validate_trailing_optional(
+    struct_name: &str,
+    elements: &[WireElement<'_>],
+) -> Result<(), Error> {
+    let mut saw_optional = false;
+    for element in elements {
+        if element.field.optional {
+            saw_optional = true;
+        } else if saw_optional {
+            return Err(Error::UnsupportedType(format!(
+                "tuple struct `{struct_name}` has an omittable element before a required one, \
+                 which serde cannot round-trip and Swift's `Codable` cannot express"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Render a unit struct's body. serde writes `null` for a unit struct, whereas
+/// the synthesised keyed `Codable` would write `{}`.
+fn unit_struct_body(struct_name: &str) -> String {
+    let mut body = String::new();
+    body.push_str("    public init() {}\n\n");
+    body.push_str("    public init(from decoder: Decoder) throws {\n");
+    body.push_str("        let container = try decoder.singleValueContainer()\n");
+    body.push_str("        if !container.decodeNil() {\n");
+    body.push_str(&format!(
+        "            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Expected null for unit struct {struct_name}\"))\n"
+    ));
+    body.push_str("        }\n");
+    body.push_str("    }\n\n");
+    body.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    body.push_str("        var container = encoder.singleValueContainer()\n");
+    body.push_str("        try container.encodeNil()\n");
+    body.push_str("    }\n");
+    body
+}
+
+/// Render a genuine newtype struct's body: serde delegates straight to the inner
+/// value, so the codec uses a single-value container.
+fn newtype_struct_body(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    struct_name: &str,
+    field: &Field,
+    generic_scope: Vec<Generic>,
+) -> Result<String, Error> {
+    let Some(element) = wire_elements(struct_name, &[(0, field)], true)?
+        .into_iter()
+        .next()
+    else {
+        // The sole declared field is skipped. serde ignores `skip` on a
+        // newtype's only field, so this cannot be a serde-shaped datatype; the
+        // keyed `Codable` that would otherwise be emitted silently disagrees
+        // with the wire.
+        return Err(Error::UnsupportedType(format!(
+            "newtype struct `{struct_name}` has no live field, which Swift's `Codable` cannot \
+             express"
+        )));
+    };
+
+    let property_type =
+        element_property_type(swift, format, types, &element, generic_scope.clone())?;
+    let decode_type = element_decode_type(swift, format, types, &element, generic_scope)?;
+
+    let mut body = String::new();
+    body.push_str(&format!("    public let value: {property_type}\n\n"));
+    body.push_str(&format!(
+        "    public init(value: {property_type}) {{\n        self.value = value\n    }}\n\n"
+    ));
+    body.push_str("    public init(from decoder: Decoder) throws {\n");
+    body.push_str("        let container = try decoder.singleValueContainer()\n");
+    body.push_str(&format!(
+        "        self.value = try container.decode({decode_type}.self)\n"
+    ));
+    body.push_str("    }\n\n");
+    body.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    body.push_str("        var container = encoder.singleValueContainer()\n");
+    body.push_str("        try container.encode(value)\n");
+    body.push_str("    }\n");
+    Ok(body)
+}
+
+/// Render a tuple struct's body: serde writes a JSON array, so the codec uses an
+/// unkeyed container. Skipped slots are omitted (serde compacts the sequence)
+/// and a trailing run of omittable elements is decoded by container exhaustion
+/// rather than an unconditional `Optional`.
+fn sequence_struct_body(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    struct_name: &str,
+    fields: &[(usize, &Field)],
+    generic_scope: Vec<Generic>,
+) -> Result<String, Error> {
+    let elements = wire_elements(struct_name, fields, false)?;
+    validate_trailing_optional(struct_name, &elements)?;
+
+    let mut body = String::new();
+    let mut parameters = Vec::new();
+    let mut assignments = Vec::new();
+    for element in &elements {
+        let property_type =
+            element_property_type(swift, format, types, element, generic_scope.clone())?;
+        body.push_str(&format!(
+            "    public let {}: {property_type}\n",
+            element.property
+        ));
+        parameters.push(format!("{}: {property_type}", element.property));
+        assignments.push(format!(
+            "        self.{} = {}",
+            element.property, element.property
+        ));
+    }
+
+    if elements.is_empty() {
+        body.push_str("    public init() {}\n\n");
+    } else {
+        body.push('\n');
+        body.push_str(&format!(
+            "    public init({}) {{\n{}\n    }}\n\n",
+            parameters.join(", "),
+            assignments.join("\n")
+        ));
+    }
+    body.push_str("    public init(from decoder: Decoder) throws {\n");
+    if elements.is_empty() {
+        body.push_str("        let container = try decoder.unkeyedContainer()\n");
+        body.push_str("        if !container.isAtEnd {\n");
+        body.push_str("            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Expected an empty array\"))\n");
+        body.push_str("        }\n");
+    } else {
+        body.push_str("        var container = try decoder.unkeyedContainer()\n");
+        for element in &elements {
+            let decode_type =
+                element_decode_type(swift, format, types, element, generic_scope.clone())?;
+            if element.field.optional {
+                let property_type =
+                    element_property_type(swift, format, types, element, generic_scope.clone())?;
+                body.push_str(&format!(
+                    "        let {}: {property_type}\n",
+                    element.property
+                ));
+                body.push_str("        if container.isAtEnd {\n");
+                body.push_str(&format!("            {} = nil\n", element.property));
+                body.push_str("        } else {\n");
+                body.push_str(&format!(
+                    "            {} = try container.decode({decode_type}.self)\n",
+                    element.property
+                ));
+                body.push_str("        }\n");
+            } else {
+                body.push_str(&format!(
+                    "        let {} = try container.decode({decode_type}.self)\n",
+                    element.property
+                ));
+            }
+        }
+        let arguments = elements
+            .iter()
+            .map(|element| format!("{}: {}", element.property, element.property))
+            .collect::<Vec<_>>()
+            .join(", ");
+        body.push_str(&format!("        self.init({arguments})\n"));
+    }
+    body.push_str("    }\n\n");
+
+    body.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    if elements.is_empty() {
+        body.push_str("        _ = encoder.unkeyedContainer()\n");
+    } else {
+        body.push_str("        var container = encoder.unkeyedContainer()\n");
+        for element in &elements {
+            if element.field.optional {
+                body.push_str(&format!(
+                    "        if let {} = {} {{\n",
+                    element.property, element.property
+                ));
+                body.push_str(&format!(
+                    "            try container.encode({})\n",
+                    element.property
+                ));
+                body.push_str("        }\n");
+            } else {
+                body.push_str(&format!(
+                    "        try container.encode({})\n",
+                    element.property
+                ));
+            }
+        }
+    }
+    body.push_str("    }\n");
+    Ok(body)
 }
 
 /// Convert enum types to Swift.
