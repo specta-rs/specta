@@ -1132,6 +1132,13 @@ fn enum_to_swift(
     generic_scope: Vec<Generic>,
     enum_name: Option<&str>,
 ) -> Result<String, Error> {
+    // An inline enum with no variants is uninhabited, which Swift names `Never`. A named
+    // one is declared as an empty enum by the caller instead, but this path only builds
+    // the type to splice in, so it would otherwise splice in nothing at all.
+    if enum_name.is_none() && e.variants.iter().all(|(_, variant)| variant.skip) {
+        return Ok("Never".to_owned());
+    }
+
     let mut result = String::new();
 
     // Check if this is a string enum

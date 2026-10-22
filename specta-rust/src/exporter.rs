@@ -836,6 +836,8 @@ fn render_datatype(
                 });
             }
         },
+        // An enum with no variants is uninhabited, which `Infallible` names in Rust.
+        DataType::Enum(enm) if enm.variants.is_empty() => "std::convert::Infallible".into(),
         DataType::Enum(enm) if matches!(enm.variants.as_slice(), [(_, variant)] if matches!(variant.fields, Fields::Unit)) => {
             "()".into()
         }

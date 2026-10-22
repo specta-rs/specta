@@ -1047,3 +1047,29 @@ fn unit_only_enums_survive_the_lowered_graph() {
         .expect("a payload-free enum should still export over a lowered graph");
     assert!(output.contains("pub enum Visibility"), "{output}");
 }
+
+/// The datatype `ty!([])` builds: a list whose element type is uninhabited, which Specta
+/// represents as an enum with no variants. `std::convert::Infallible` is the same shape.
+struct Uninhabited;
+
+impl Type for Uninhabited {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Enum(Enum::default())
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct HoldsUninhabited {
+    field: Vec<Uninhabited>,
+}
+
+/// `std::convert::Infallible` names an uninhabited type in Rust. Every anonymous enum
+/// used to be rejected, so an uninhabited one could not be exported at all.
+#[test]
+fn rust_renders_an_uninhabited_element_type_as_infallible() {
+    let output = Rust::default()
+        .export(&Types::default().register::<HoldsUninhabited>(), Identity)
+        .expect("an uninhabited element type should export");
+    assert!(output.contains("Vec<std::convert::Infallible>"), "{output}");
+}

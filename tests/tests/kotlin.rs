@@ -1,7 +1,10 @@
 use std::{borrow::Cow, collections::BTreeMap, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
-use specta::{Format, Type, Types, datatype::DataType};
+use specta::{
+    Format, Type, Types,
+    datatype::{DataType, Enum},
+};
 use specta_kotlin::{
     Error, IndentStyle, Kotlin, Layout, NamingConvention, Serialization, UnknownType,
 };
@@ -958,4 +961,34 @@ fn kotlin_exports_shared_type_corpus() {
     exporter
         .export(&phased_types, specta_serde::PhasesFormat)
         .expect("the phased Serde shared datatype corpus should export to Kotlin");
+}
+
+/// The datatype `ty!([])` builds: a list whose element type is uninhabited, which Specta
+/// represents as an enum with no variants. `std::convert::Infallible` is the same shape.
+struct Uninhabited;
+
+impl Type for Uninhabited {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Enum(Enum::default())
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct HoldsUninhabited {
+    field: Vec<Uninhabited>,
+}
+
+/// `kotlin.Never` describes an uninhabited enum. The unit-only arm below it must not be
+/// reached, since `all(..)` is vacuously true for an empty variant list and would report
+/// it as a string enum.
+#[test]
+fn kotlin_renders_an_uninhabited_element_type_as_never() {
+    let output = Kotlin::default()
+        .export(
+            &Types::default().register::<HoldsUninhabited>(),
+            IdentityFormat,
+        )
+        .expect("an uninhabited element type should export");
+    assert!(output.contains("kotlin.Never"), "{output}");
 }
