@@ -15,7 +15,7 @@ use specta::{
         NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
         Struct, Tuple, Variant,
     },
-    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER},
+    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER, FINITE_NUMBER_MARKER},
 };
 
 use crate::{
@@ -3198,7 +3198,7 @@ fn enum_dt(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
+    let is_finite_number = e.attributes.get_named_as(FINITE_NUMBER_MARKER) == Some(&true);
 
     if e.attributes.get_named_as(DEFERRED_ALIAS_UNION_MARKER) == Some(&true) {
         return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);

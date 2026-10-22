@@ -43,7 +43,7 @@ fn thiserror_method_call_arguments_compile_and_serde_attributes_are_captured() {
     let untagged = match data_type {
         DataType::Enum(data_type) => data_type
             .attributes
-            .get_named_as::<bool>("serde:container:untagged")
+            .get_named_as::<bool>(specta::markers::SERDE_CONTAINER_UNTAGGED)
             .copied(),
         _ => None,
     };

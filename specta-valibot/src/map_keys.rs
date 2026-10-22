@@ -3,13 +3,10 @@ use std::collections::HashSet;
 use specta::{
     Types,
     datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
+    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED, SERDE_VARIANT_UNTAGGED},
 };
 
 use crate::{Error, opaque};
-
-const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
-const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
-const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
 
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
@@ -33,7 +30,7 @@ fn validate_map_key_inner(
         )),
         DataType::Enum(enm) => {
             let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-            let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+            let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
             for (variant_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip)
             {
                 match &variant.fields {

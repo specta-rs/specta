@@ -10,6 +10,7 @@ use specta::{
         DataType, Deprecated, Enum, Field, Fields, Generic, NamedDataType, NamedReferenceType,
         Primitive, Reference, Struct,
     },
+    markers::ENUM_REPR_REWRITTEN_MARKER,
 };
 
 use crate::{Error, Java, Layout, OptionalStyle, reserved_names::is_keyword};
@@ -938,10 +939,7 @@ fn string_literal_raw_value(datatype: &DataType) -> Option<&str> {
     let DataType::Enum(value) = datatype else {
         return None;
     };
-    if !value
-        .attributes
-        .contains_key("specta_serde:enum_repr_rewritten")
-    {
+    if !value.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
         return None;
     }
     let [(raw_value, variant)] = value.variants.as_slice() else {

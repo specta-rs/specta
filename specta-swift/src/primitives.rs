@@ -6,6 +6,7 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, NamedReferenceType, Primitive, Reference, Struct,
         Variant,
     },
+    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_FIELD_FLATTEN, SERIALIZE_OMISSION_MARKER},
 };
 
 use crate::error::Error;
@@ -116,19 +117,6 @@ fn normalized_payload<'a>(variant_name: &str, payload: &'a DataType) -> &'a Data
     current
 }
 
-/// Marker `specta-serde` leaves on the single-variant unit enums it synthesises
-/// for serde tags (and on the enums it has rewritten).
-const ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
-
-/// Field attribute recorded by the derive macro for `#[serde(flatten)]`.
-const FLATTENED_FIELD: &str = "serde:field:flatten";
-
-/// Field marker `specta-serde` records for `#[serde(skip_serializing_if)]`,
-/// which lets serde omit an element from a tuple struct's sequence. It is kept
-/// after the raw parser attribute is stripped so the omission can be told apart
-/// from a `#[serde(default)]`-optional element, which serde still writes.
-const SERIALIZE_OMISSION_FIELD: &str = "specta_serde:serialize_omission";
-
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
     /// The wire key carrying the discriminant (serde's `tag`).
@@ -148,7 +136,7 @@ fn tag_literal_value(dt: &DataType) -> Option<&str> {
         return None;
     };
 
-    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN) {
+    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
         return None;
     }
 
@@ -1264,7 +1252,7 @@ fn wire_elements<'a>(
             field,
             ty,
             nullable: matches!(field.ty.as_ref(), Some(DataType::Nullable(_))),
-            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_FIELD),
+            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_MARKER),
         });
     }
     Ok(elements)
@@ -1662,7 +1650,7 @@ fn generate_enum_structs(
         let mut field_mappings = Vec::new();
         for (original_field_name, field) in &wrapper {
             if let Some(ty) = field.ty.as_ref() {
-                if field.attributes.contains_key(FLATTENED_FIELD) {
+                if field.attributes.contains_key(SERDE_FIELD_FLATTEN) {
                     return Err(Error::UnsupportedType(format!(
                         "variant `{original_variant_name}` flattens field `{original_field_name}` \
                          into the variant, which the Swift exporter cannot express"

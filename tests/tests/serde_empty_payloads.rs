@@ -1033,7 +1033,7 @@ fn tuple_struct_all_skipped_exports_empty_array() {
 // an array even though its declared arity is > 1. `#[specta(transparent =
 // false)]` keeps Specta from resolving the container to its inner type at
 // derive time, so specta-serde sees the struct with its
-// `serde:container:transparent` attribute intact.
+// `SERDE_CONTAINER_TRANSPARENT` attribute intact.
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(transparent)]

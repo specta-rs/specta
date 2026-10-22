@@ -3,6 +3,7 @@ use std::{borrow::Cow, collections::HashMap, path::Path};
 use specta::{
     Format as FormatTrait, Types,
     datatype::{DataType, Fields, NamedReferenceType, Reference},
+    markers::{SERDE_CONTAINER_TAG, SERDE_CONTAINER_UNTAGGED},
 };
 
 use crate::{
@@ -157,14 +158,14 @@ fn validate_serde_datatype(dt: &DataType) -> Result<()> {
         DataType::Enum(enumeration) => {
             let untagged = enumeration
                 .attributes
-                .get_named_as::<bool>("serde:container:untagged")
+                .get_named_as::<bool>(SERDE_CONTAINER_UNTAGGED)
                 == Some(&true);
             if untagged {
                 return Err(Error::UnsupportedType(
                     "Serde untagged enums cannot be represented as ReScript variants".to_string(),
                 ));
             }
-            if enumeration.attributes.contains_key("serde:container:tag") {
+            if enumeration.attributes.contains_key(SERDE_CONTAINER_TAG) {
                 return Err(Error::UnsupportedType(
                     "Serde internally and adjacently tagged enums cannot be represented as ReScript variants"
                         .to_string(),

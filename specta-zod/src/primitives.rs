@@ -8,15 +8,13 @@ use specta::{
         DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
-    markers::STRICT_OBJECT_MARKER,
+    markers::{OPTIONAL_FLATTEN_UNION_MARKER, STRICT_OBJECT_MARKER},
 };
 use specta_typescript::{Layout as TypescriptLayout, Typescript};
 
 use crate::{Error, Layout, Zod, map_keys, opaque, reserved_names::RESERVED_TYPE_NAMES};
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
-
-const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
 
 fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
     match &r.inner {

@@ -9,6 +9,7 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, NamedDataType, NamedReferenceType, Primitive,
         Reference, Struct, Variant,
     },
+    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED},
 };
 
 use crate::{
@@ -498,10 +499,8 @@ fn render_enum(
         .iter()
         .filter(|(_, variant)| !variant.skip)
         .collect::<Vec<_>>();
-    let serde_rewritten = enm
-        .attributes
-        .contains_key("specta_serde:enum_repr_rewritten");
-    let serde_untagged = enm.attributes.contains_key("serde:container:untagged");
+    let serde_rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+    let serde_untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
     let mut used_names = std::iter::once(name.to_owned())
         .chain(generics.iter().cloned())
         .map(|name| semantic_identifier(&name).to_owned())

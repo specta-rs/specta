@@ -32,7 +32,7 @@ fn assert_untagged(data_type: &DataType) {
     assert_eq!(
         data_type
             .attributes
-            .get_named_as::<bool>("serde:container:untagged"),
+            .get_named_as::<bool>(specta::markers::SERDE_CONTAINER_UNTAGGED),
         Some(&true)
     );
 }

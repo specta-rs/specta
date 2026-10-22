@@ -888,7 +888,7 @@ fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
     fn string_literal(value: &'static str) -> DataType {
         let mut enm = Enum::default();
         enm.attributes
-            .insert("specta_serde:enum_repr_rewritten", true);
+            .insert(specta::markers::ENUM_REPR_REWRITTEN_MARKER, true);
         enm.variants.push((value.into(), Variant::unit()));
         enm.into()
     }
@@ -897,7 +897,7 @@ fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
     NamedDataType::new("MixedUntaggedOther", &mut types, |_, ndt| {
         let mut enm = Enum::default();
         enm.attributes
-            .insert("specta_serde:enum_repr_rewritten", true);
+            .insert(specta::markers::ENUM_REPR_REWRITTEN_MARKER, true);
         enm.variants.push((
             "Known".into(),
             Variant::named()
@@ -912,7 +912,7 @@ fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
                 .build(),
         ));
         let mut attributes = Attributes::default();
-        attributes.insert("specta_serde:variant_other", true);
+        attributes.insert(specta::markers::ENUM_OTHER_VARIANT_MARKER, true);
         enm.variants.push((
             "Other".into(),
             Variant::named()
