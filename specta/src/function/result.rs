@@ -13,7 +13,7 @@ pub trait FunctionResult<TMarker> {
 pub enum FunctionValueMarker {}
 impl<T: Type> FunctionResult<FunctionValueMarker> for T {
     fn to_datatype(types: &mut Types) -> DataType {
-        T::definition(types)
+        types.define::<T>()
     }
 }
 
@@ -25,6 +25,6 @@ where
     F::Output: Type,
 {
     fn to_datatype(types: &mut Types) -> DataType {
-        F::Output::definition(types)
+        types.define::<F::Output>()
     }
 }

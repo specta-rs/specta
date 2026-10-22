@@ -9,7 +9,7 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, generics_with_ident_and_bounds_no_lifetimes,
+    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
     generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
     resolve_ty_expr, type_with_inferred_lifetimes, used_type_params,
 };
@@ -157,7 +157,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         &container_attrs.skip_attrs,
     )?;
 
-    let bounded = bounded_params(generics, &used_generic_types);
+    let bounded = bounded_params(
+        generics,
+        container_attrs.bound.as_deref(),
+        &used_generic_types,
+    );
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         let container_ty = type_with_inferred_lifetimes(container_ty);
@@ -214,11 +218,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // bounds a field's own type declaration requires are satisfied) and the
     // declaration then rewrites those arguments back to `Generic` placeholders.
     // It therefore needs the declared inline bounds on the parameter list plus
-    // the container's `where` clause and the automatic `Type` predicates.
-    let build_ty_where_bound = add_type_to_where_clause(
-        &quote!(#crate_ref::Type),
+    // the container's `where` clause, the `#[specta(bound = "...")]` override
+    // and the automatic `Type` predicates.
+    let build_ty_where_bound = build_where_clause(
+        &crate_ref,
         generics,
-        None,
+        container_attrs.bound.as_deref(),
         &used_generic_types,
     );
     let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(generics);
@@ -430,9 +435,34 @@ fn placeholder_definitions(crate_ref: &TokenStream, params: &[syn::Ident]) -> To
     quote!(#(#definitions)*)
 }
 
-/// Generic parameters that declare at least one bound, inline or in the
-/// container's `where` clause.
-fn bounded_params(generics: &syn::Generics, used_generic_types: &[syn::Ident]) -> HashSet<String> {
+/// Whether any of the `predicates` bounds `ident`.
+fn predicates_bound_param<'a>(
+    predicates: impl Iterator<Item = &'a syn::WherePredicate>,
+    ident: &syn::Ident,
+) -> bool {
+    predicates.into_iter().any(|predicate| {
+        matches!(
+            predicate,
+            syn::WherePredicate::Type(predicate)
+                if !predicate.bounds.is_empty()
+                    && matches!(
+                        &predicate.bounded_ty,
+                        syn::Type::Path(bounded)
+                            if bounded.qself.is_none()
+                                && bounded.path.segments.len() == 1
+                                && &bounded.path.segments[0].ident == ident
+                    )
+        )
+    })
+}
+
+/// Generic parameters that declare at least one bound, inline, in the
+/// container's `where` clause, or via `#[specta(bound = "...")]`.
+fn bounded_params(
+    generics: &syn::Generics,
+    custom_bounds: Option<&[syn::WherePredicate]>,
+    used_generic_types: &[syn::Ident],
+) -> HashSet<String> {
     used_generic_types
         .iter()
         .filter(|ident| {
@@ -444,23 +474,17 @@ fn bounded_params(generics: &syn::Generics, used_generic_types: &[syn::Ident]) -
                 Some(GenericParam::Type(param)) if !param.bounds.is_empty()
             );
 
-            inline
-                || generics.where_clause.as_ref().is_some_and(|where_clause| {
-                    where_clause.predicates.iter().any(|predicate| {
-                        matches!(
-                            predicate,
-                            syn::WherePredicate::Type(predicate)
-                                if !predicate.bounds.is_empty()
-                                    && matches!(
-                                        &predicate.bounded_ty,
-                                        syn::Type::Path(bounded)
-                                            if bounded.qself.is_none()
-                                                && bounded.path.segments.len() == 1
-                                                && &bounded.path.segments[0].ident == *ident
-                                    )
-                        )
-                    })
-                })
+            let where_clause = generics
+                .where_clause
+                .as_ref()
+                .is_some_and(|where_clause| {
+                    predicates_bound_param(where_clause.predicates.iter(), ident)
+                });
+
+            let custom = custom_bounds
+                .is_some_and(|predicates| predicates_bound_param(predicates.iter(), ident));
+
+            inline || where_clause || custom
         })
         .map(ToString::to_string)
         .collect()

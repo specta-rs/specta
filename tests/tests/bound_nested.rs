@@ -83,6 +83,78 @@ pub struct OtherImpl;
 
 impl Trait for OtherImpl {}
 
+// --- lifetime bounds on generic parameters ---
+//
+// `build` is a nested fn and cannot name the container's lifetime parameters, so
+// lifetime predicates must not be copied onto it.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct LifetimeOutlives<'a, T>
+where
+    'a: 'static,
+{
+    a: &'a T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct ParamOutlivesLifetime<'a, T>
+where
+    T: 'a,
+{
+    a: &'a T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct InlineLifetimeBound<'a, T: 'a> {
+    a: &'a T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct LifetimeAndTraitBound<'a, T: Trait + 'a> {
+    a: &'a Wrapper<T>,
+}
+
+// --- `#[specta(bound = "...")]` combined with a field requiring that bound ---
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Wrapper2<T: Trait, U>(T, U);
+
+#[derive(Type)]
+#[specta(bound = "T: Trait + Type", collect = false)]
+pub struct CustomBoundNested<T: Trait> {
+    a: Wrapper2<T, T>,
+}
+
+// --- a `macro!`-typed field mentioning a generic parameter ---
+macro_rules! ty_of {
+    ($t:ty) => {
+        $t
+    };
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MacroTypedField<T> {
+    a: ty_of!(T),
+}
+
+// --- two bounded parameters sharing a concrete type ---
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct TwoParamsReversed<K: Trait, V: Trait> {
+    map: HashMap<V, K>,
+}
+
+// --- `FixedArray` must route its element through `Types::define` ---
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct FixedArrayHolder<T: Trait + Type> {
+    a: specta_util::FixedArray<3, T>,
+}
+
 fn field_ty<'a>(ty: &'a DataType, name: &str) -> &'a DataType {
     let DataType::Struct(s) = ty else {
         panic!("expected struct, got {ty:?}");
@@ -226,10 +298,96 @@ fn multi_parameter_generics_keep_distinct_placeholders() {
 }
 
 #[test]
-fn repeated_concrete_type_for_multiple_parameters_compiles() {
+fn lifetime_bounds_on_generic_parameters_compile() {
+    let mut types = specta::Types::default();
+    let _ = LifetimeOutlives::<'_, Impl>::definition(&mut types);
+    let _ = ParamOutlivesLifetime::<'_, Impl>::definition(&mut types);
+    let _ = InlineLifetimeBound::<'_, Impl>::definition(&mut types);
+    let _ = LifetimeAndTraitBound::<'_, Impl>::definition(&mut types);
+}
+
+#[test]
+fn custom_bound_with_bounded_field_compiles() {
+    let mut types = specta::Types::default();
+    let _ = CustomBoundNested::<Impl>::definition(&mut types);
+}
+
+#[test]
+fn macro_typed_field_is_not_baked() {
+    let mut types = specta::Types::default();
+    let _ = MacroTypedField::<Impl>::definition(&mut types);
+
+    let ty = find_exported(&types, "MacroTypedField");
+    assert!(
+        matches!(field_ty(ty, "a"), DataType::Generic(_)),
+        "a `macro!`-typed field baked the first instantiation's concrete type: {:?}",
+        field_ty(ty, "a")
+    );
+}
+
+#[test]
+fn fixed_array_element_is_generic() {
+    let mut types = specta::Types::default();
+    let _ = FixedArrayHolder::<Impl>::definition(&mut types);
+
+    let ty = find_exported(&types, "FixedArrayHolder");
+    let DataType::List(list) = field_ty(ty, "a") else {
+        panic!("expected list, got {:?}", field_ty(ty, "a"));
+    };
+    assert_eq!(
+        generic_name(&list.ty).map(|g| g.name().to_string()),
+        Some("T".to_string())
+    );
+}
+
+/// KNOWN LIMITATION (tracked in #591): when two *bounded* parameters share the
+/// same concrete type, the declaration-time substitution is keyed by that
+/// concrete type and cannot tell the parameters apart, so both arguments resolve
+/// to the same `Generic`. Unbounded parameters (and every field whose parameter
+/// has no declared bounds) use the precise placeholder path and are unaffected.
+#[test]
+fn repeated_concrete_type_for_multiple_parameters_is_a_known_limitation() {
     let mut types = specta::Types::default();
     let _ = GenericMap::<Impl, Impl>::definition(&mut types);
+    let ty = find_exported(&types, "GenericMap");
+    let DataType::Map(map) = unwrap_inline(field_ty(ty, "map")) else {
+        panic!("expected map");
+    };
+    assert_eq!(
+        generic_name(map.key_ty()).map(|g| g.name().to_string()),
+        Some("V".to_string())
+    );
+    assert_eq!(
+        generic_name(map.value_ty()).map(|g| g.name().to_string()),
+        Some("V".to_string())
+    );
+
+    // The reversed argument order behaves the same way.
+    let mut types = specta::Types::default();
+    let _ = TwoParamsReversed::<Impl, Impl>::definition(&mut types);
+    let ty = find_exported(&types, "TwoParamsReversed");
+    let DataType::Map(map) = unwrap_inline(field_ty(ty, "map")) else {
+        panic!("expected map");
+    };
+    assert_eq!(
+        generic_name(map.key_ty()).map(|g| g.name().to_string()),
+        Some("V".to_string())
+    );
+    assert_eq!(
+        generic_name(map.value_ty()).map(|g| g.name().to_string()),
+        Some("V".to_string())
+    );
+
+    // Concrete instantiation is still correct regardless.
     let _ = A::<Impl>::definition(&mut types);
+}
+
+fn find_exported<'a>(types: &'a specta::Types, name: &str) -> &'a DataType {
+    types
+        .into_sorted_iter()
+        .find(|ndt| ndt.name == name)
+        .and_then(|ndt| ndt.ty.as_ref())
+        .unwrap_or_else(|| panic!("{name} not exported"))
 }
 
 fn contains_generic(ty: &DataType) -> bool {

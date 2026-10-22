@@ -41,10 +41,52 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-/// The `build` fn parameter list: type parameters keep their declared inline
-/// bounds because the body may mention field types whose own declarations
-/// require them. Lifetimes are still omitted since field types use inferred `'_`
-/// lifetimes.
+/// Whether a bound mentions any lifetime.
+fn bound_uses_lifetime(bound: &syn::TypeParamBound) -> bool {
+    struct Finder {
+        found: bool,
+    }
+    impl<'ast> Visit<'ast> for Finder {
+        fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
+            self.found = true;
+        }
+    }
+
+    let mut finder = Finder { found: false };
+    finder.visit_type_param_bound(bound);
+    finder.found
+}
+
+/// Whether a `where` predicate mentions any lifetime.
+pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
+    struct Finder {
+        found: bool,
+    }
+    impl<'ast> Visit<'ast> for Finder {
+        fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
+            self.found = true;
+        }
+    }
+
+    let mut finder = Finder { found: false };
+    finder.visit_where_predicate(predicate);
+    finder.found
+}
+
+fn is_type_bound(bound: &syn::TypeParamBound) -> bool {
+    matches!(
+        bound,
+        syn::TypeParamBound::Trait(bound)
+            if bound.path.segments.last().is_some_and(|segment| segment.ident == "Type")
+    )
+}
+
+/// The `build` fn parameter list.
+///
+/// `build` is a nested fn, so it cannot name the container's lifetime
+/// parameters; lifetime bounds and `Type` bounds are dropped. The former are
+/// never needed because field types are rewritten to inferred `'_` lifetimes,
+/// and the latter are re-added to the `where` clause by [`build_where_clause`].
 pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
@@ -54,12 +96,17 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Optio
             use GenericParam::*;
 
             generics.params.iter().filter_map(|param| match param {
-                Type(TypeParam {
-                    ident,
-                    colon_token,
-                    bounds,
-                    ..
-                }) => Some(quote!(#ident #colon_token #bounds)),
+                Type(TypeParam { ident, bounds, .. }) => {
+                    let bounds = bounds
+                        .iter()
+                        .filter(|bound| !bound_uses_lifetime(bound) && !is_type_bound(bound))
+                        .collect::<Vec<_>>();
+                    if bounds.is_empty() {
+                        Some(quote!(#ident))
+                    } else {
+                        Some(quote!(#ident: #(#bounds)+*))
+                    }
+                }
                 Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
@@ -71,6 +118,52 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Optio
             })
         })
         .map(|gs| quote!(<#(#gs),*>))
+}
+
+/// The `where` clause for the `build` fn.
+///
+/// It carries the container's declared bounds (so `build`'s body type-checks
+/// wherever it mentions a bounded field type) plus the automatic `Type`
+/// predicates. Lifetime predicates are dropped: `build` cannot name the
+/// container's lifetime parameters, and field types use inferred `'_` lifetimes
+/// so they are never required.
+pub fn build_where_clause(
+    crate_ref: &TokenStream,
+    generics: &Generics,
+    custom_bounds: Option<&[syn::WherePredicate]>,
+    used_generic_types: &[syn::Ident],
+) -> Option<WhereClause> {
+    let mut predicates: Vec<syn::WherePredicate> = Vec::new();
+
+    if let Some(where_clause) = &generics.where_clause {
+        predicates.extend(
+            where_clause
+                .predicates
+                .iter()
+                .filter(|predicate| !predicate_uses_lifetime(predicate))
+                .cloned(),
+        );
+    }
+    if let Some(custom_bounds) = custom_bounds {
+        predicates.extend(
+            custom_bounds
+                .iter()
+                .filter(|predicate| !predicate_uses_lifetime(predicate))
+                .cloned(),
+        );
+    }
+
+    let mut seen = HashSet::new();
+    predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
+
+    for ident in used_generic_types {
+        let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
+        if seen.insert(quote!(#predicate).to_string()) {
+            predicates.push(predicate);
+        }
+    }
+
+    (!predicates.is_empty()).then(|| parse_quote!(where #(#predicates),*))
 }
 
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
@@ -251,10 +344,28 @@ pub fn resolve_ty_expr(
         .collect::<Vec<_>>();
 
     let declaration_ty = rewrite_generics_with_placeholders(ty, &unbounded);
+    let rewritten =
+        declaration_ty.to_token_stream().to_string() != ty.to_token_stream().to_string();
+
+    // When the placeholder rewrite could not reach a parameter — an opaque
+    // `macro!`-typed field, `Type::Verbatim`, ... — substitute every parameter
+    // the type might mention by name instead, or the first instantiation's
+    // concrete argument would be baked into the shared declaration.
+    let substituted = if rewritten {
+        bounded.clone()
+    } else {
+        mentioned.clone()
+    };
+
+    // Nothing to rewrite and no parameter to substitute: resolve concretely.
+    if !rewritten && mentioned.is_empty() {
+        return concrete;
+    }
+
     let mut declaration = quote!(types.define::<#declaration_ty>());
 
-    if !bounded.is_empty() {
-        let substitutions = bounded.iter().map(|ident| {
+    if !substituted.is_empty() {
+        let substitutions = substituted.iter().map(|ident| {
             let name = ident.to_string();
             quote!((
                 ::std::any::type_name::<#ident>(),
@@ -265,12 +376,6 @@ pub fn resolve_ty_expr(
             &[#(#substitutions),*],
             |types| #declaration,
         ));
-    }
-
-    if declaration_ty.to_token_stream().to_string() == ty.to_token_stream().to_string()
-        && bounded.is_empty()
-    {
-        return concrete;
     }
 
     if !conditional {

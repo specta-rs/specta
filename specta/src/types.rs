@@ -164,6 +164,14 @@ impl Types {
     /// field's own type declaration requires) while still emitting `Generic`
     /// placeholders into the canonical declaration. See
     /// [`Types::with_generic_substitution`].
+    ///
+    /// # Contract
+    ///
+    /// Every generic `Type` implementation — the derive, the built-in impls in
+    /// this crate, `specta_util`, exporters, and hand-written impls — **must**
+    /// resolve its generic arguments through this method rather than
+    /// `<T as Type>::definition(types)`. Otherwise a canonical declaration can
+    /// bake in the first instantiation's concrete argument.
     #[doc(hidden)]
     pub fn define<T: Type + ?Sized>(&mut self) -> DataType {
         let name = std::any::type_name::<T>();
@@ -184,6 +192,10 @@ impl Types {
     /// While active, [`Types::define`] returns the paired [`Generic`] for a type
     /// whose [`std::any::type_name`] matches an entry, instead of resolving that
     /// type. Scopes nest: the innermost matching entry wins.
+    ///
+    /// The scope is restored on unwind (the panic is then re-raised) so a panic
+    /// in a nested resolution cannot leak substitutions into the surrounding
+    /// scope.
     #[doc(hidden)]
     pub fn with_generic_substitution<R>(
         &mut self,
