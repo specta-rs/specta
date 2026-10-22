@@ -59,6 +59,9 @@ fn map_key_shape_inner(
 ) -> MapKeyShape {
     match key_ty {
         DataType::Primitive(primitive) => match primitive {
+            // `f16`/`f128` are rejected by `primitive_is_valid_key` before a
+            // key is ever rendered, but classify them as `Number` defensively
+            // so this match stays total over the primitive set.
             Primitive::f16 | Primitive::f32 | Primitive::f64 | Primitive::f128 => {
                 MapKeyShape::Number
             }

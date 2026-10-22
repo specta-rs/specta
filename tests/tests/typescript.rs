@@ -1463,43 +1463,43 @@ fn typescript_map_keys_render_as_valid_property_keys() {
     #[derive(Type)]
     #[specta(collect = false)]
     struct FloatKeyMap {
-        map: HashMap<f32, String>,
+        floats: HashMap<f32, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct IntegerKeyMap {
-        map: HashMap<i32, String>,
+        integers: HashMap<i32, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct BoolKeyMap {
-        map: HashMap<bool, String>,
+        booleans: HashMap<bool, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct GenericKeyMap<K> {
-        map: HashMap<K, String>,
+        generic: HashMap<K, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct NamedWrapperKeyMap {
-        map: HashMap<MaybeValidKey<String>, String>,
+        named_wrapper: HashMap<MaybeValidKey<String>, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct GenericWrapperKeyMap<K> {
-        map: HashMap<MaybeValidKey<K>, String>,
+        generic_wrapper: HashMap<MaybeValidKey<K>, String>,
     }
 
     #[derive(Type)]
     #[specta(collect = false)]
     struct NestedKeyMap {
-        map: HashMap<String, HashMap<f32, String>>,
+        nested: HashMap<String, HashMap<f32, String>>,
     }
 
     let types = Types::default()
@@ -1519,38 +1519,40 @@ fn typescript_map_keys_render_as_valid_property_keys() {
     // A float value renders `number | null`, which is not assignable to
     // `PropertyKey`. The key drops the `null` branch.
     assert!(
-        output.contains("map: { [key in number]: string }"),
+        output.contains("floats: { [key in number]: string }"),
         "float map keys must render as a key-safe `number`:\n{output}"
     );
     // Integer keys keep their existing `number` rendering.
     assert!(
-        output.contains("map: { [key in number]: string }"),
+        output.contains("integers: { [key in number]: string }"),
         "integer map keys must keep rendering as `number`:\n{output}"
     );
     // Boolean keys keep their stringified literal rendering and `Partial<>`.
     assert!(
-        output.contains(r#"map: Partial<{ [key in "true" | "false"]: string }>"#),
+        output.contains(r#"booleans: Partial<{ [key in "true" | "false"]: string }>"#),
         "boolean map keys must keep their stringified literal rendering:\n{output}"
     );
     // A bare type parameter is not constrained to `PropertyKey`, so it is
-    // intersected locally rather than silently collapsing to an empty map.
+    // intersected locally to keep the mapped type valid. This does not
+    // prevent collapse for a non-key instantiation: `GenericKeyMap<boolean>`
+    // yields `boolean & PropertyKey` == `never`, i.e. an empty map.
     assert!(
-        output.contains("map: { [key in K & PropertyKey]: string }"),
+        output.contains("generic: { [key in K & PropertyKey]: string }"),
         "generic map keys must be constrained to `PropertyKey`:\n{output}"
     );
     // A concrete named wrapper is already a valid key, so it keeps its name.
     assert!(
-        output.contains("map: { [key in MaybeValidKey<string>]: string }"),
+        output.contains("named_wrapper: { [key in MaybeValidKey<string>]: string }"),
         "concrete named wrapper keys must keep their name:\n{output}"
     );
     // A generic wrapper over a type parameter is constrained locally too.
     assert!(
-        output.contains("map: { [key in MaybeValidKey<K> & PropertyKey]: string }"),
+        output.contains("generic_wrapper: { [key in MaybeValidKey<K> & PropertyKey]: string }"),
         "generic wrapper map keys must be constrained to `PropertyKey`:\n{output}"
     );
     // Nested maps route the inner key through the key path as well.
     assert!(
-        output.contains("map: { [key in string]: { [key in number]: string } }"),
+        output.contains("nested: { [key in string]: { [key in number]: string } }"),
         "nested map keys must render key-safely at every level:\n{output}"
     );
     assert!(
@@ -1653,5 +1655,66 @@ fn typescript_lossless_map_keys_stay_key_safe() {
     assert!(
         output.contains("export type WideId = bigint;"),
         "wide integer values must keep remapping to `bigint`:\n{output}"
+    );
+}
+
+/// `PropertyKey` and `Partial` are emitted bare by map-key rendering, so a user
+/// type with one of those names would shadow the built-in and silently produce
+/// invalid TypeScript. They are reserved like any other keyword, so the export
+/// fails loudly instead of emitting a broken mapped key.
+///
+/// Regression coverage for https://github.com/specta-rs/specta/issues/594.
+#[test]
+fn map_key_helper_names_are_reserved() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct PropertyKey {
+        value: String,
+    }
+
+    let mut types = Types::default();
+    let ndt = match PropertyKey::definition(&mut types) {
+        DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+        _ => panic!("expected named reference"),
+    };
+    let err = primitives::export(&Typescript::default(), &types, iter::once(ndt), "")
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.contains("reserved keyword") && err.contains("PropertyKey"),
+        "a user type named `PropertyKey` must be rejected so it cannot shadow the built-in:\n{err}"
+    );
+
+    // Renaming it keeps the same shape exportable, and a generic map key still
+    // references the built-in `PropertyKey` rather than the user type.
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(rename = "PropertyKeyModel")]
+    struct RenamedPropertyKey {
+        value: String,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct UsesGenericMapKey<K> {
+        map: HashMap<K, String>,
+    }
+
+    let output = Typescript::default()
+        .export(
+            &Types::default()
+                .register::<RenamedPropertyKey>()
+                .register::<UsesGenericMapKey<String>>(),
+            specta_serde::Format,
+        )
+        .expect("a renamed type and a generic map key must export");
+
+    assert!(
+        output.contains("export type PropertyKeyModel = {"),
+        "the renamed type must export under its new name:\n{output}"
+    );
+    assert!(
+        output.contains("map: { [key in K & PropertyKey]: string }"),
+        "the generic map key must still reference the built-in `PropertyKey`:\n{output}"
     );
 }
