@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "generate": "cargo run -p specta-tests --example typescript_typecheck",
+    "typecheck": "bun run generate && tsc -p tsconfig.json",
+    "test": "bun run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

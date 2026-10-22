@@ -60,4 +60,9 @@ pub(crate) const RESERVED_TYPE_NAMES: &[&str] = &[
     "type",
     "from",
     "of",
+    // Globals emitted bare by the renderer. A user type with one of these
+    // names would shadow the built-in and silently produce invalid TypeScript
+    // (`Partial<...>` map wrappers and `K & PropertyKey` mapped keys).
+    "Partial",
+    "PropertyKey",
 ];

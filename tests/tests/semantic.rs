@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use specta::{Type, Types, datatype::DataType};
 use specta_typescript::{
     Typescript, define, primitives,
@@ -83,6 +85,13 @@ struct MixedIdentityPayload {
 #[specta(collect = false)]
 struct Wrapper<T> {
     value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct SemanticMapPayload {
+    sites: HashMap<String, Website>,
+    wide: HashMap<u64, u64>,
 }
 
 fn semantic_config() -> Configuration {
@@ -389,4 +398,57 @@ fn semantic_identity_descendants_are_pruned_from_real_runtime_transforms() {
         .apply_deserialize(&types, &dt, "payload")
         .expect("Website deserialization should require a runtime transform");
     assert_eq!(deserialize, "({...payload,site:new URL(payload.site)})");
+}
+
+/// Map keys are JSON object property names: semantic transforms rewrite the
+/// *value* only (the key stays the runtime property name), and lossless
+/// built-in remaps must not rewrite the key type either.
+///
+/// Regression coverage for https://github.com/specta-rs/specta/issues/594.
+#[test]
+fn semantic_map_keys_are_not_remapped_or_transformed() {
+    let semantic = semantic_config();
+    let mut types = Types::default();
+    let dt = SemanticMapPayload::definition(&mut types);
+
+    // Custom rules transform map values, not keys.
+    let (_, serialize) = semantic
+        .apply_serialize(&types, &dt, "payload")
+        .expect("Website map values should require a runtime transform");
+    assert_eq!(
+        serialize,
+        "({...payload,sites:Object.fromEntries(Object.entries(payload.sites).map(([k,v])=>[k,v.toString()]))})"
+    );
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &dt, "payload")
+        .expect("Website map values should require a runtime transform");
+    assert_eq!(
+        deserialize,
+        "({...payload,sites:Object.fromEntries(Object.entries(payload.sites).map(([k,v])=>[k,new URL(v)]))})"
+    );
+
+    // The lossless BigInt remap applies to the map value but not its key, so
+    // the key stays a lexical string while the value becomes a `bigint`.
+    let lossless = Configuration::empty().enable_lossless_bigints();
+    let semantic_types = lossless.apply_types(&types).into_owned();
+    let rendered = Typescript::default()
+        .export(&semantic_types, specta_serde::Format)
+        .expect("lossless map keys and values should export");
+
+    assert!(
+        rendered.contains("wide: { [key in string]: bigint }"),
+        "lossless BigInt map keys must stay string keys:\n{rendered}"
+    );
+    assert!(
+        !rendered.contains("[key in bigint]"),
+        "lossless BigInt map keys must not be remapped:\n{rendered}"
+    );
+
+    let (_, deserialize) = lossless
+        .apply_deserialize(&types, &dt, "payload")
+        .expect("lossless BigInt map values should require a runtime transform");
+    assert_eq!(
+        deserialize,
+        "({...payload,wide:Object.fromEntries(Object.entries(payload.wide).map(([k,v])=>[k,BigInt(v)]))})"
+    );
 }
