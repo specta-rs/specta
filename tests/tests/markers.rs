@@ -12,9 +12,15 @@
 
 use specta::markers::*;
 
-#[test]
-fn marker_key_values_are_stable() {
-    let table: &[(&str, &str)] = &[
+/// The source of [`specta::markers`], read at compile time.
+///
+/// Rust has no runtime reflection over constants, so counting the declarations
+/// in the module itself is the only way to prove the table below covers
+/// *every* constant rather than only the ones it happens to list.
+const MARKERS_SOURCE: &str = include_str!("../../specta/src/markers.rs");
+
+fn marker_table() -> &'static [(&'static str, &'static str)] {
+    &[
         // `serde:*` container attributes.
         (
             SERDE_CONTAINER_RENAME_SERIALIZE,
@@ -184,12 +190,29 @@ fn marker_key_values_are_stable() {
         (SERIALIZE_OMISSION_MARKER, "specta_serde:serialize_omission"),
         (ALIAS_UNION_MARKER, "specta_serde:alias_union"),
         (FLATTENED_PAYLOAD_MARKER, "specta_serde:flattened_payload"),
-    ];
+    ]
+}
 
-    for (actual, expected) in table {
+#[test]
+fn marker_key_values_are_stable() {
+    for (actual, expected) in marker_table() {
         assert_eq!(
             actual, expected,
             "marker key `{expected}` changed value; this is an internal wire protocol"
         );
     }
+}
+
+#[test]
+fn every_marker_constant_is_pinned() {
+    let declared = MARKERS_SOURCE.matches("pub const ").count();
+    assert!(
+        declared > 0,
+        "could not read any `pub const` declarations out of specta/src/markers.rs"
+    );
+    assert_eq!(
+        marker_table().len(),
+        declared,
+        "every `pub const` in specta/src/markers.rs needs a row in the value table"
+    );
 }

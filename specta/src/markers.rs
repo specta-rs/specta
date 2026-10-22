@@ -12,22 +12,27 @@
 //!
 //! # Producers and consumers
 //!
-//! - The [`Type`](crate::Type) derive in `specta-macros` writes the `serde:*`
-//!   attribute keys (`SERDE_CONTAINER_*`, `SERDE_VARIANT_*`, `SERDE_FIELD_*`)
+//! - The [`Type`](crate::Type) derive in `specta-macros` writes every `serde:*`
+//!   attribute key (`SERDE_CONTAINER_*`, `SERDE_VARIANT_*`, `SERDE_FIELD_*`)
 //!   plus [`TYPE_OVERRIDE_MARKER`], [`SERDE_NEWTYPE_SKIP_IGNORED_MARKER`] and
 //!   [`NULLABLE_MARKER`]. The `serde:*` keys are an inert copy of the parsed
 //!   `#[serde(...)]` attributes; the derive records them but never interprets
 //!   them.
-//! - The hand-written `Type` implementations in `specta` itself write the
-//!   `serde:*` keys for built-in types whose serde representation is fixed
-//!   (for example `serde_json::Value`) and [`FINITE_NUMBER_MARKER`].
-//! - `specta-serde` consumes the `serde:*` keys, interprets them, and writes the
-//!   `specta_serde:*` markers that describe the rewrite it performed. It also
-//!   reads and writes [`STRICT_OBJECT_MARKER`].
-//! - The language exporters (`specta-typescript`, `specta-zod`,
-//!   `specta-valibot`, `specta-jsonschema`, `specta-swift`, `specta-rust`,
-//!   `specta-kotlin`, `specta-java`, `specta-csharp`, `specta-rescript`, ...)
-//!   read both families back.
+//! - The hand-written `Type` implementations in `specta` itself write
+//!   [`SERDE_CONTAINER_UNTAGGED`], [`SERDE_CONTAINER_TAG`] and
+//!   [`SERDE_FIELD_FLATTEN`] for built-in types whose serde representation is
+//!   fixed (for example `serde_json::Value`), and [`FINITE_NUMBER_MARKER`].
+//! - `specta-serde` reads the `serde:*` keys, interprets them, and writes every
+//!   `specta_serde:*` marker that describes the rewrite it performed. It also
+//!   *writes* [`STRICT_OBJECT_MARKER`] on the wrappers it generates; it never
+//!   reads that key back.
+//! - The language exporters read the markers back. Each exporter reads the
+//!   subset it needs: `specta-zod` and `specta-valibot` read
+//!   [`STRICT_OBJECT_MARKER`] and [`OPTIONAL_FLATTEN_UNION_MARKER`],
+//!   `specta-typescript` reads [`FINITE_NUMBER_MARKER`],
+//!   [`DEFERRED_ALIAS_UNION_MARKER`] and [`ALIAS_EXCLUSION_MARKER`], and
+//!   `specta-swift` reads [`SERDE_FIELD_FLATTEN`] and
+//!   [`SERIALIZE_OMISSION_MARKER`].
 //!
 //! # Rules
 //!
@@ -44,6 +49,20 @@
 //!   contract, not part of the public API.
 //!
 //! [tests]: https://github.com/specta-rs/specta/blob/main/tests/tests/markers.rs
+//!
+//! # Why the keys live in core
+//!
+//! The workspace's `AGENTS.md` asks `specta` and `specta-macros` to stay
+//! format-agnostic, yet this module hosts `serde:*` and `specta_serde:*`
+//! literals inside core. That deviation is deliberate and forced, not an
+//! oversight: the derive has to emit a marker key through a path that resolves
+//! from the *user's* crate, and the only crate guaranteed to be reachable there
+//! is the one the derive already targets for `#[specta(crate = ...)]` (the
+//! `specta` facade). The constants therefore have to be reachable from core no
+//! matter which crate consumes them, and giving them a second home would only
+//! recreate the duplication this module exists to remove. The format-agnostic
+//! rule is restored properly by the typed metadata protocol that replaces this
+//! channel (specta-rs/specta#598), not by moving the literals again.
 //!
 //! # This is not public API
 //!
