@@ -143,6 +143,37 @@ enum UntaggedEnum {
 
 #[derive(Type, serde::Serialize, serde::Deserialize)]
 #[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedDistinct {
+    Site(Website),
+    Count(u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithUnit {
+    Site(Website),
+    Nothing,
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedObj {
+    Site { site: Website },
+    Count(u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct MixedContainer {
+    site: Website,
+    choice: UntaggedEnum,
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
 struct Moment(String);
 
 #[derive(Type, serde::Serialize, serde::Deserialize)]
@@ -697,26 +728,69 @@ fn semantic_nullable_and_nested_enum_payloads_transform() {
     assert_runtime_js(&deserialize, "{ Count: 3 }", "out.Count === 3");
 }
 
-// A recursive enum cannot be fully expanded into one expression; the shared
-// stack cutoff stops the walk so the transform terminates (the same behavior
-// structs already have). The reachable top-level branch still transforms.
+// A recursive enum cannot be expanded into one expression. Rather than emit a
+// transform that only rewrites the top level while the exported type claims the
+// whole structure is remapped (which node confirms leaves `Next.Leaf` a
+// string), the truncation is reported as unsupported. Struct recursion is
+// unchanged (out of scope).
 #[test]
-fn semantic_recursive_enum_transforms_terminate() {
+fn semantic_recursive_enum_is_reported_unsupported() {
     let semantic = semantic_config();
     let (types, dt) = mapped_types::<RecursiveEnum>();
 
-    let (_, deserialize) = semantic
-        .try_apply_deserialize(&types, &dt, "value")
-        .expect("recursive enum deserialization should terminate")
-        .expect("recursive enum deserialization should require a transform");
+    for result in [
+        semantic.try_apply_serialize(&types, &dt, "value"),
+        semantic.try_apply_deserialize(&types, &dt, "value"),
+    ] {
+        let error = result.expect_err("a recursive enum must be reported as unsupported");
+        assert!(
+            error.to_string().contains("the enum is recursive"),
+            "{error}"
+        );
+        assert!(
+            error.to_string().contains("RecursiveEnum"),
+            "the diagnostic should name the enum: {error}"
+        );
+    }
+
+    // The infallible API does not panic; it simply cannot transform the root.
     assert_eq!(
-        deserialize,
-        "value!=null&&value.Leaf!==undefined?({...value,Leaf:new URL(value.Leaf)}):value"
+        semantic.apply_deserialize(&types, &dt, "value"),
+        None,
+        "a root recursive enum has no transform"
     );
+
+    // Evidence: the partial expansion that used to be emitted is wrong - the
+    // nested `Next.Leaf` stays a string even though the exported type says URL.
+    assert_runtime_js(
+        "value!=null&&value.Leaf!==undefined?({...value,Leaf:new URL(value.Leaf)}):value",
+        "{ Next: { Leaf: \"https://example.com/\" } }",
+        "typeof out.Next.Leaf === \"string\"",
+    );
+}
+
+#[test]
+fn semantic_untagged_enum_mixed_container_keeps_the_supported_field() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<MixedContainer>();
+
+    // The unsupported nested enum is reported...
+    assert!(
+        semantic
+            .try_apply_deserialize(&types, &dt, "value")
+            .is_err(),
+        "the ambiguous nested enum should be reported"
+    );
+
+    // ...but the enclosing struct still transforms the field it can.
+    let (_, deserialize) = semantic
+        .apply_deserialize(&types, &dt, "value")
+        .expect("the enclosing struct should still transform its supported field");
+    assert_eq!(deserialize, "({...value,site:new URL(value.site)})");
     assert_runtime_js(
         &deserialize,
-        "{ Leaf: \"https://example.com/\" }",
-        "out.Leaf instanceof URL",
+        "{ site: \"https://example.com/\", choice: \"Other\" }",
+        "out.site instanceof URL && out.choice === \"Other\"",
     );
 }
 
@@ -812,7 +886,7 @@ fn semantic_external_enum_with_non_identifier_keys_transforms() {
 }
 
 #[test]
-fn semantic_untagged_enum_with_a_required_transform_is_rejected() {
+fn semantic_ambiguous_untagged_enum_is_rejected() {
     let semantic = semantic_config();
     let (types, dt) = mapped_types::<UntaggedEnum>();
 
@@ -830,9 +904,71 @@ fn semantic_untagged_enum_with_a_required_transform_is_rejected() {
 }
 
 #[test]
-#[should_panic(expected = "cannot be discriminated without guessing")]
-fn semantic_untagged_enum_panics_through_the_infallible_api() {
+fn semantic_ambiguous_untagged_enum_does_not_panic() {
     let semantic = semantic_config();
     let (types, dt) = mapped_types::<UntaggedEnum>();
-    let _ = semantic.apply_deserialize(&types, &dt, "value");
+
+    // The infallible API skips the unsupported root rather than aborting.
+    assert_eq!(semantic.apply_serialize(&types, &dt, "value"), None);
+    assert_eq!(semantic.apply_deserialize(&types, &dt, "value"), None);
+}
+
+#[test]
+fn semantic_untagged_enums_with_distinct_shapes_transform() {
+    let semantic = semantic_config();
+
+    // `Website | u32` -> `URL | number`, disjoint by `typeof`.
+    let (types, dt) = mapped_types::<UntaggedDistinct>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("a shape-disjoint untagged enum should be supported")
+        .expect("it should require a transform");
+    assert_eq!(
+        deserialize,
+        "typeof value===\"number\"?value:new URL(value)"
+    );
+    assert_runtime_js(
+        &deserialize,
+        "\"https://example.com/\"",
+        "out instanceof URL",
+    );
+    assert_runtime_js(&deserialize, "7", "out === 7");
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("serialization should be supported")
+        .expect("it should require a transform");
+    assert_runtime_js(
+        &serialize,
+        "new URL(\"https://example.com/\")",
+        "out === \"https://example.com/\"",
+    );
+    assert_runtime_js(&serialize, "7", "out === 7");
+
+    // `Website | ()` -> `URL | null`, disjoint by `null`.
+    let (types, dt) = mapped_types::<UntaggedWithUnit>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("a null-disjoint untagged enum should be supported")
+        .expect("it should require a transform");
+    assert_eq!(deserialize, "value===null?value:new URL(value)");
+    assert_runtime_js(&deserialize, "null", "out === null");
+    assert_runtime_js(
+        &deserialize,
+        "\"https://example.com/\"",
+        "out instanceof URL",
+    );
+
+    // `{ site: Website } | u32` -> `{ site: URL } | number`, object vs number.
+    let (types, dt) = mapped_types::<UntaggedObj>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("an object/number-disjoint untagged enum should be supported")
+        .expect("it should require a transform");
+    assert_runtime_js(
+        &deserialize,
+        "{ site: \"https://example.com/\" }",
+        "out.site instanceof URL",
+    );
+    assert_runtime_js(&deserialize, "3", "out === 3");
 }
