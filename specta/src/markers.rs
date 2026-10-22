@@ -1,5 +1,5 @@
-//! Internal wire-format marker keys shared by the derive, `specta-serde` and the
-//! language exporters.
+//! Internal wire-format marker keys shared by `specta-serde` and the language
+//! exporters.
 //!
 //! These keys are inserted into a datatype's attribute map to carry a semantic
 //! that cannot be recovered from the exported shape alone (for example, whether a

@@ -38,12 +38,12 @@
 
 ### Legend
 
-- ✅ **Stable**: Production-ready, with a stable API and comprehensive test coverage.
+- ✅ **Stable**: Production-ready and widely used, with comprehensive test coverage.
 - 🧪 **Experimental**: Pre-1.0 and still evolving. The API and generated output may change, and the range of Rust and Serde shapes each exporter supports differs substantially — check the Features column and the crate's documentation before relying on one.
 
 ## Implementation Status
 
-The Specta ecosystem is pre-1.0 and actively developed, and exporter maturity varies widely. TypeScript and Swift are stable and production-ready. The remaining exporters are experimental and each supports a different subset of Rust and Serde shapes, so there is no single "completeness" ranking between them — see the Features column above and each crate's documentation and issue tracker for the shapes a given exporter supports.
+The Specta exporter crates are pre-1.0 and actively developed, and their maturity varies widely. TypeScript and Swift are stable and production-ready. The remaining exporters are experimental and each supports a different subset of Rust and Serde shapes, so there is no single "completeness" ranking between them — see the Features column above and each crate's documentation and issue tracker for the shapes a given exporter supports.
 
 ## Ecosystem
 
@@ -64,16 +64,16 @@ cargo add specta
 # Language exporters (choose one or more)
 cargo add specta_typescript  # TypeScript (stable)
 cargo add specta_swift       # Swift (stable)
-cargo add specta_rust        # Rust (partial)
-cargo add specta_openapi     # OpenAPI 3.0 schemas (JSON or YAML)
-cargo add specta_java        # Java 17 (partial)
-cargo add specta_go           # Go (partial)
-cargo add specta-python      # Python 3.13 type hints (partial)
-cargo add specta_kotlin       # Kotlin (partial)
-cargo add specta_jsonschema   # JSON Schema (partial)
-cargo add specta_zod          # Zod schemas (partial)
-cargo add specta-valibot      # Valibot schemas (partial)
-cargo add specta-csharp       # C# (partial)
+cargo add specta_rust        # Rust (experimental)
+cargo add specta_openapi     # OpenAPI 3.1 schemas by default, 3.0 opt-in (JSON or YAML)
+cargo add specta_java        # Java 17 (experimental)
+cargo add specta_go           # Go (experimental)
+cargo add specta-python      # Python 3.13 type hints (experimental)
+cargo add specta_kotlin       # Kotlin (experimental)
+cargo add specta_jsonschema   # JSON Schema (experimental)
+cargo add specta_zod          # Zod schemas (experimental)
+cargo add specta-valibot      # Valibot schemas (experimental)
+cargo add specta-csharp       # C# (experimental)
 ```
 
 Then you can use Specta like following:
