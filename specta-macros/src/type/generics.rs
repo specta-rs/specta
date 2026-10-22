@@ -41,53 +41,92 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
+/// Visitor that records whether the node it is handed mentions a lifetime.
+struct LifetimeFinder {
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for LifetimeFinder {
+    fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
+        self.found = true;
+    }
+}
+
+/// Whether `visit` finds a lifetime in the node it is handed.
+fn mentions_lifetime(visit: impl FnOnce(&mut LifetimeFinder)) -> bool {
+    let mut finder = LifetimeFinder { found: false };
+    visit(&mut finder);
+    finder.found
+}
+
 /// Whether a bound mentions any lifetime.
 fn bound_uses_lifetime(bound: &syn::TypeParamBound) -> bool {
-    struct Finder {
-        found: bool,
-    }
-    impl<'ast> Visit<'ast> for Finder {
-        fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
-            self.found = true;
-        }
-    }
-
-    let mut finder = Finder { found: false };
-    finder.visit_type_param_bound(bound);
-    finder.found
+    mentions_lifetime(|finder| finder.visit_type_param_bound(bound))
 }
 
 /// Whether a `where` predicate mentions any lifetime.
 pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
-    struct Finder {
-        found: bool,
-    }
-    impl<'ast> Visit<'ast> for Finder {
-        fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
-            self.found = true;
-        }
-    }
-
-    let mut finder = Finder { found: false };
-    finder.visit_where_predicate(predicate);
-    finder.found
+    mentions_lifetime(|finder| finder.visit_where_predicate(predicate))
 }
 
-fn is_type_bound(bound: &syn::TypeParamBound) -> bool {
-    matches!(
-        bound,
-        syn::TypeParamBound::Trait(bound)
-            if bound.path.segments.last().is_some_and(|segment| segment.ident == "Type")
-    )
+/// Reduce a `where` predicate to the bounds [`build_where_clause`] can keep.
+///
+/// `build` is a nested fn and so cannot mention the container's lifetime
+/// parameters, but a predicate may bundle a lifetime bound with bounds that
+/// `build`'s body still needs (`T: 'a + Trait`). Only the lifetime bounds are
+/// dropped; `None` comes back when nothing usable remains.
+fn strip_lifetime_bounds(predicate: &syn::WherePredicate) -> Option<syn::WherePredicate> {
+    let syn::WherePredicate::Type(bounded) = predicate else {
+        return (!predicate_uses_lifetime(predicate)).then(|| predicate.clone());
+    };
+
+    // A lifetime inside the bounded type itself (`&'a T: Trait`) cannot be
+    // rewritten, so the whole predicate goes.
+    if mentions_lifetime(|finder| finder.visit_type(&bounded.bounded_ty)) {
+        return None;
+    }
+
+    let bounds = bounded
+        .bounds
+        .iter()
+        .filter(|bound| !bound_uses_lifetime(bound))
+        .cloned()
+        .collect::<syn::punctuated::Punctuated<_, syn::Token![+]>>();
+
+    (!bounds.is_empty()).then(|| {
+        syn::WherePredicate::Type(syn::PredicateType {
+            lifetimes: bounded.lifetimes.clone(),
+            bounded_ty: bounded.bounded_ty.clone(),
+            colon_token: bounded.colon_token,
+            bounds,
+        })
+    })
+}
+
+/// Whether `bound` is the `crate_ref::Type` bound that [`build_where_clause`]
+/// re-adds as a `where` predicate.
+///
+/// The whole path is compared, not just its last segment: a user trait that
+/// happens to be named `Type` (`other::Type`) is a real bound `build` needs.
+fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
+    let syn::TypeParamBound::Trait(bound) = bound else {
+        return false;
+    };
+
+    quote!(#bound).to_string() == quote!(#crate_ref::Type).to_string()
 }
 
 /// The `build` fn parameter list.
 ///
 /// `build` is a nested fn, so it cannot name the container's lifetime
-/// parameters; lifetime bounds and `Type` bounds are dropped. The former are
-/// never needed because field types are rewritten to inferred `'_` lifetimes,
-/// and the latter are re-added to the `where` clause by [`build_where_clause`].
-pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
+/// parameters; lifetime bounds and `crate_ref::Type` bounds are dropped. The
+/// former are never needed because field types are rewritten to inferred `'_`
+/// lifetimes, and the latter are re-added to the `where` clause by
+/// [`build_where_clause`].
+pub fn generics_with_ident_and_bounds_no_lifetimes(
+    crate_ref: &TokenStream,
+    generics: &Generics,
+) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -99,7 +138,9 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Optio
                 Type(TypeParam { ident, bounds, .. }) => {
                     let bounds = bounds
                         .iter()
-                        .filter(|bound| !bound_uses_lifetime(bound) && !is_type_bound(bound))
+                        .filter(|bound| {
+                            !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref)
+                        })
                         .collect::<Vec<_>>();
                     if bounds.is_empty() {
                         Some(quote!(#ident))
@@ -124,9 +165,9 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Optio
 ///
 /// It carries the container's declared bounds (so `build`'s body type-checks
 /// wherever it mentions a bounded field type) plus the automatic `Type`
-/// predicates. Lifetime predicates are dropped: `build` cannot name the
-/// container's lifetime parameters, and field types use inferred `'_` lifetimes
-/// so they are never required.
+/// predicates. Lifetime bounds are dropped: `build` cannot name the container's
+/// lifetime parameters, and field types use inferred `'_` lifetimes so they are
+/// never required.
 pub fn build_where_clause(
     crate_ref: &TokenStream,
     generics: &Generics,
@@ -140,17 +181,11 @@ pub fn build_where_clause(
             where_clause
                 .predicates
                 .iter()
-                .filter(|predicate| !predicate_uses_lifetime(predicate))
-                .cloned(),
+                .filter_map(strip_lifetime_bounds),
         );
     }
     if let Some(custom_bounds) = custom_bounds {
-        predicates.extend(
-            custom_bounds
-                .iter()
-                .filter(|predicate| !predicate_uses_lifetime(predicate))
-                .cloned(),
-        );
+        predicates.extend(custom_bounds.iter().filter_map(strip_lifetime_bounds));
     }
 
     let mut seen = HashSet::new();

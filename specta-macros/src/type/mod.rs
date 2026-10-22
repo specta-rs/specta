@@ -226,7 +226,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         container_attrs.bound.as_deref(),
         &used_generic_types,
     );
-    let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(generics);
+    let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(&crate_ref, generics);
     let placeholder_params = used_generic_types
         .iter()
         .filter(|ident| !bounded.contains(&ident.to_string()))

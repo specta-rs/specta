@@ -77,6 +77,17 @@ pub struct Impl;
 
 impl Trait for Impl {}
 
+pub trait Trait2 {}
+
+impl Trait2 for Impl {}
+
+// A user trait literally named `Type`, in another module.
+pub mod other {
+    pub trait Type {}
+}
+
+impl other::Type for Impl {}
+
 #[derive(Type)]
 #[specta(collect = false)]
 pub struct OtherImpl;
@@ -117,6 +128,27 @@ pub struct LifetimeAndTraitBound<'a, T: Trait + 'a> {
     a: &'a Wrapper<T>,
 }
 
+// A `where` predicate that bundles a lifetime bound with non-lifetime bounds.
+// Only the lifetime part may be dropped: dropping the whole predicate loses the
+// `Trait` bound `build`'s body needs, and the field type fails to type-check.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MixedWhere<'a, T>
+where
+    T: 'a + Trait,
+{
+    a: &'a Wrapper<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MixedWhereTwo<'a, T>
+where
+    T: 'a + Trait + Trait2,
+{
+    a: &'a Wrapper<T>,
+}
+
 // --- `#[specta(bound = "...")]` combined with a field requiring that bound ---
 #[derive(Type)]
 #[specta(collect = false)]
@@ -153,6 +185,21 @@ pub struct TwoParamsReversed<K: Trait, V: Trait> {
 #[specta(collect = false)]
 pub struct FixedArrayHolder<T: Trait + Type> {
     a: specta_util::FixedArray<3, T>,
+}
+
+// --- a user trait literally named `Type`, in another module ---
+//
+// `build`'s automatic `Type` predicate only replaces specta's own `Type` bound.
+// Matching on the last path segment would mistake `other::Type` for it and drop
+// a bound the field's own declaration requires.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Wrapper3<T: other::Type>(T);
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct UsesWrapper3<T: other::Type> {
+    a: Wrapper3<T>,
 }
 
 fn field_ty<'a>(ty: &'a DataType, name: &str) -> &'a DataType {
@@ -304,6 +351,19 @@ fn lifetime_bounds_on_generic_parameters_compile() {
     let _ = ParamOutlivesLifetime::<'_, Impl>::definition(&mut types);
     let _ = InlineLifetimeBound::<'_, Impl>::definition(&mut types);
     let _ = LifetimeAndTraitBound::<'_, Impl>::definition(&mut types);
+}
+
+#[test]
+fn mixed_where_predicate_keeps_non_lifetime_bounds() {
+    let mut types = specta::Types::default();
+    let _ = MixedWhere::<'_, Impl>::definition(&mut types);
+    let _ = MixedWhereTwo::<'_, Impl>::definition(&mut types);
+}
+
+#[test]
+fn user_trait_named_type_is_not_dropped() {
+    let mut types = specta::Types::default();
+    let _ = UsesWrapper3::<Impl>::definition(&mut types);
 }
 
 #[test]
