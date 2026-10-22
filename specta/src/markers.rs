@@ -27,12 +27,14 @@
 //!   *writes* [`STRICT_OBJECT_MARKER`] on the wrappers it generates; it never
 //!   reads that key back.
 //! - The language exporters read the markers back. Each exporter reads the
-//!   subset it needs: `specta-zod` and `specta-valibot` read
+//!   subset it needs; for example `specta-zod` and `specta-valibot` read
 //!   [`STRICT_OBJECT_MARKER`] and [`OPTIONAL_FLATTEN_UNION_MARKER`],
 //!   `specta-typescript` reads [`FINITE_NUMBER_MARKER`],
-//!   [`DEFERRED_ALIAS_UNION_MARKER`] and [`ALIAS_EXCLUSION_MARKER`], and
+//!   [`DEFERRED_ALIAS_UNION_MARKER`] and [`ALIAS_EXCLUSION_MARKER`],
+//!   `specta-jsonschema` reads [`STRICT_OBJECT_MARKER`],
+//!   [`ENUM_REPR_REWRITTEN_MARKER`] and [`FLATTENED_PAYLOAD_MARKER`], and
 //!   `specta-swift` reads [`SERDE_FIELD_FLATTEN`] and
-//!   [`SERIALIZE_OMISSION_MARKER`].
+//!   [`SERIALIZE_OMISSION_MARKER`]. That list is illustrative, not exhaustive.
 //!
 //! # Rules
 //!
@@ -42,8 +44,8 @@
 //!   a producer from its consumers.
 //! - **The string values are a wire protocol.** They are byte-for-byte stable
 //!   and must never be renamed or re-spelled; only the Rust constant names may
-//!   change. [`tests/tests/markers.rs`][tests] pins every value so an accidental
-//!   edit is caught.
+//!   change. [`tests/tests/markers.rs`][tests] pins every key and its value so
+//!   an accidental edit is caught.
 //! - **Exporters must read markers through this module**, never by matching the
 //!   literal. The literals are an implementation detail of the internal
 //!   contract, not part of the public API.
@@ -80,8 +82,12 @@
 // ---------------------------------------------------------------------------
 // `serde:*` container attributes
 //
-// Written by the derive (or by a hand-written `Type` impl for a built-in whose
-// serde representation is fixed) and interpreted by `specta-serde`.
+// All three `serde:*` sections below are written by the derive -- or, for the
+// built-ins whose serde representation is fixed, by a hand-written `Type` impl
+// in `specta` (`SERDE_CONTAINER_TAG`, `SERDE_CONTAINER_UNTAGGED` and
+// `SERDE_FIELD_FLATTEN`). They are interpreted by `specta-serde`, which also
+// rewrites a few of them in place while lowering the representation. A handful
+// are read directly by an exporter as well, which the item itself notes.
 // ---------------------------------------------------------------------------
 
 /// `#[serde(rename = "...")]` on a container, serialize direction.
@@ -99,16 +105,28 @@ pub const SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE: &str =
 pub const SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE: &str =
     "serde:container:rename_all_fields_deserialize";
 /// `#[serde(tag = "...")]` on a container.
+///
+/// Read by `specta-rust` and `specta-rescript` (to refuse a tagged enum) as
+/// well as by `specta-serde`.
 pub const SERDE_CONTAINER_TAG: &str = "serde:container:tag";
 /// `#[serde(content = "...")]` on an adjacently tagged container.
+///
+/// Read by `specta-rust` as well as by `specta-serde`.
 pub const SERDE_CONTAINER_CONTENT: &str = "serde:container:content";
 /// `#[serde(untagged)]` on a container.
+///
+/// Read by `specta-jsonschema`, `specta-kotlin`, `specta-rescript`,
+/// `specta-rust`, `specta-valibot` and `specta-zod` as well as by
+/// `specta-serde`.
 pub const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 /// `#[serde(default)]` on a container.
 pub const SERDE_CONTAINER_DEFAULT: &str = "serde:container:default";
 /// `#[serde(transparent)]` on a container.
 pub const SERDE_CONTAINER_TRANSPARENT: &str = "serde:container:transparent";
 /// `#[serde(deny_unknown_fields)]` on a container.
+///
+/// Read by `specta-jsonschema` (to close the generated object) as well as by
+/// `specta-serde`. Distinct from [`STRICT_OBJECT_MARKER`].
 pub const SERDE_CONTAINER_DENY_UNKNOWN_FIELDS: &str = "serde:container:deny_unknown_fields";
 /// The `type_src` half of `#[serde(from = "...")]` on a container.
 pub const SERDE_CONTAINER_FROM_TYPE_SRC: &str = "serde:container:from_type_src";
@@ -154,6 +172,9 @@ pub const SERDE_VARIANT_HAS_WITH: &str = "serde:variant:has_with";
 /// `#[serde(other)]` on a variant.
 pub const SERDE_VARIANT_OTHER: &str = "serde:variant:other";
 /// `#[serde(untagged)]` on a variant.
+///
+/// Read by `specta-jsonschema`, `specta-valibot` and `specta-zod` as well as by
+/// `specta-serde`.
 pub const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 
 // ---------------------------------------------------------------------------
@@ -169,6 +190,9 @@ pub const SERDE_FIELD_ALIASES: &str = "serde:field:aliases";
 /// `#[serde(default)]` on a field.
 pub const SERDE_FIELD_DEFAULT: &str = "serde:field:default";
 /// `#[serde(flatten)]` on a field.
+///
+/// Read by `specta-swift` (which refuses a flattened variant field) as well as
+/// by `specta-serde`.
 pub const SERDE_FIELD_FLATTEN: &str = "serde:field:flatten";
 /// `#[serde(skip_serializing)]` on a field.
 pub const SERDE_FIELD_SKIP_SERIALIZING: &str = "serde:field:skip_serializing";
@@ -186,10 +210,10 @@ pub const SERDE_FIELD_HAS_WITH: &str = "serde:field:has_with";
 // ---------------------------------------------------------------------------
 // `specta:*` markers
 //
-// Written by the derive (or by `specta` itself) and read by `specta-serde` and
-// the exporters. Unlike the `serde:*` keys these are not a copy of a serde
-// attribute: they record facts about the declared Rust source that the exported
-// shape cannot express.
+// Unlike the `serde:*` keys these are not a copy of a serde attribute: they
+// record facts about the declared Rust source that the exported shape cannot
+// express. They are written by the `Type` derive, by `specta`'s built-in `Type`
+// impls, or by `specta-serde`, and read by whichever crate needs the fact.
 // ---------------------------------------------------------------------------
 
 /// Marks a generated object wrapper whose wire format rejects unknown keys.
@@ -201,18 +225,25 @@ pub const SERDE_FIELD_HAS_WITH: &str = "serde:field:has_with";
 /// representation itself -- so such a wrapper is closed regardless of the
 /// exporter's schema policy. Adjacently tagged variants deliberately do not
 /// carry it, because serde does accept extra keys alongside `tag`/`content`.
+///
+/// Written by `specta-serde`; read by `specta-jsonschema`, `specta-zod` and
+/// `specta-valibot`, never by `specta-serde` itself.
 pub const STRICT_OBJECT_MARKER: &str = "specta:strict_object";
 
 /// Marks a field or variant whose exported shape came from an explicit
 /// `#[specta(type = ...)]` override rather than the declared Rust type. It lets
 /// `specta-serde` accept a custom `serialize_with`/`deserialize_with`/`with`
 /// codec (whose wire shape specta cannot know) without the exporter guessing.
+///
+/// Written by the derive; read by `specta-serde`.
 pub const TYPE_OVERRIDE_MARKER: &str = "specta:type_override";
 
 /// Marks the sole field of a newtype struct whose `#[serde(skip)]` serde
 /// ignores: it serializes the bare inner value anyway. The derive keeps the
 /// field live and records this marker instead, so the declared newtype arity
 /// survives while the skipped-field provenance stays visible to `specta-serde`.
+///
+/// Written by the derive; read by `specta-serde`.
 pub const SERDE_NEWTYPE_SKIP_IGNORED_MARKER: &str = "specta:serde_newtype_skip_ignored";
 
 /// Marks a field whose *declared Rust type* was `Option<T>`.
@@ -220,31 +251,42 @@ pub const SERDE_NEWTYPE_SKIP_IGNORED_MARKER: &str = "specta:serde_newtype_skip_i
 /// Serde's `missing_field` helper special-cases `Option` on deserialize (a
 /// missing key yields `None`), which changes what an adjacently tagged newtype
 /// variant requires for its `content` key -- both when the sole field is skipped
-/// (collapse handling) and when it is live. Written exclusively by the derive
-/// from the real field syntax, never inferred from the exported datatype: a
-/// `#[specta(type = Option<...>)]` override produces a
+/// (collapse handling) and when it is live. Never inferred from the exported
+/// datatype: a `#[specta(type = Option<...>)]` override produces a
 /// [`Nullable`](crate::datatype::DataType::Nullable) that serde knows nothing
 /// about.
+///
+/// Written exclusively by the derive from the real field syntax; read by
+/// `specta-serde`.
 pub const NULLABLE_MARKER: &str = "specta:nullable";
 
 /// Marks a built-in number type that is finite on the wire, so an exporter can
 /// collapse a `f64`/`i64` union to a plain number without inheriting the
 /// nullability of an arbitrary `f64`.
+///
+/// Written by `specta`'s built-in `Type` impl for `serde_json::Number`; read by
+/// `specta-typescript`, never by `specta-serde`.
 pub const FINITE_NUMBER_MARKER: &str = "specta:finite_number";
 
 // ---------------------------------------------------------------------------
 // `specta_serde:*` markers
 //
-// Written by `specta-serde` after it rewrites a type and read by the exporters.
+// Written by `specta-serde` after it rewrites a type. Most are read back by one
+// or more language exporters; a few only round-trip inside `specta-serde`
+// itself, and those say so below.
 // ---------------------------------------------------------------------------
 
 /// Marks alias unions that an exporter may preserve symbolically instead of
 /// distributing their enclosing intersection into a Cartesian union.
+///
+/// Written and removed by `specta-serde`; read by `specta-typescript`.
 pub const DEFERRED_ALIAS_UNION_MARKER: &str = "specta_serde:deferred_alias_union";
 
 /// Marks optional `never` fields synthesized solely to make alias spellings
 /// mutually exclusive. Genuine user-authored uninhabited fields must survive
 /// contextual flatten relaxation.
+///
+/// Written by `specta-serde`; read by `specta-serde` and `specta-typescript`.
 pub const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 
 /// Marks an [`Enum`](crate::datatype::Enum) once it is in its final serde
@@ -256,20 +298,31 @@ pub const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 /// "already rewritten" enums by inspecting variant shapes. That heuristic was
 /// unsound: every shape the transform produces is also a valid shape a user can
 /// author directly.
+///
+/// Written by `specta-serde`; read by `specta-serde` itself and by every
+/// exporter that renders enums (`specta-rust`, `specta-swift`,
+/// `specta-jsonschema`, `specta-zod`, `specta-valibot`, `specta-kotlin`,
+/// `specta-java`, `specta-csharp`).
 pub const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
 
 /// Marks an external variant whose serde payload was hidden from Specta before
 /// the enum was rewritten. The generated string-literal shape is otherwise
 /// indistinguishable from a genuine unit variant.
+///
+/// Only read back by `specta-serde` itself; no exporter consults it.
 pub const HIDDEN_EXTERNAL_PAYLOAD_MARKER: &str = "specta_serde:hidden_external_payload";
 
-/// Marks a rewritten deserialize-only `#[serde(other)]` branch. Exporters use it
-/// to distinguish the widened catch-all from authored variant-level untagged
-/// branches with an equally broad string field.
+/// Marks a rewritten deserialize-only `#[serde(other)]` branch. It lets an
+/// exporter distinguish the widened catch-all from authored variant-level
+/// untagged branches with an equally broad string field.
+///
+/// Written by `specta-serde`; read by `specta-jsonschema`.
 pub const ENUM_OTHER_VARIANT_MARKER: &str = "specta_serde:variant_other";
 
 /// Marks the synthetic present/absent union produced for optional flattened
 /// payloads, so exporters can reject malformed values that use payload keys.
+///
+/// Written by `specta-serde`; read by `specta-zod` and `specta-valibot`.
 pub const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
 
 /// Marks the payload structs generated for a variant when skipped `ty: None`
@@ -277,26 +330,36 @@ pub const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_u
 /// skip-reduced single live element still renders as a sequence). Later rewrite
 /// passes honor it by keeping those slots instead of applying the default
 /// live-fields-only retain for unnamed structs.
+///
+/// Only read back by `specta-serde` itself; no exporter consults it.
 pub const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_payload";
 
 /// Marks flattened fields whose payload may be absent from serialization.
 /// [`Field::optional`](crate::datatype::Field) cannot carry this distinction
 /// because serde defaults can also set it, while defaults do not make flattened
 /// payloads optional.
+///
+/// Only read back by `specta-serde` itself; no exporter consults it.
 pub const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
 
 /// Marks a field that `#[serde(skip_serializing_if = ...)]` may omit from a
 /// serialized sequence. The raw parser attribute is stripped during the phase
 /// rewrite (a phase-split field already carries the decision in
-/// [`Field::optional`](crate::datatype::Field)), so exporters read this semantic
-/// marker to tell the omission apart from a `#[serde(default)]`-optional field,
-/// which serde still writes.
+/// [`Field::optional`](crate::datatype::Field)), so an exporter reads this
+/// semantic marker to tell the omission apart from a `#[serde(default)]`-optional
+/// field, which serde still writes.
+///
+/// Written by `specta-serde`; read by `specta-swift`.
 pub const SERIALIZE_OMISSION_MARKER: &str = "specta_serde:serialize_omission";
 
 /// Marks a union synthesized for a set of `#[serde(alias = "...")]` spellings.
+///
+/// Only read back by `specta-serde` itself; no exporter consults it.
 pub const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
 
 /// Marks a struct that `specta-serde` inlined as a flattened payload. Serde
 /// ignores an inner struct's `deny_unknown_fields` when it is flattened, so a
 /// marked part must not close the merged object.
+///
+/// Written by `specta-serde`; read by `specta-jsonschema`.
 pub const FLATTENED_PAYLOAD_MARKER: &str = "specta_serde:flattened_payload";
