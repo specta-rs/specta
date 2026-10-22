@@ -21,7 +21,7 @@ export type LegacyImpls = {
 	array_string: string,
 	smallvec: number[],
 	toml_datetime: {
-		v: string,
+		$__toml_private_datetime: string,
 	},
 	ulid: string,
 	chrono_naive_datetime: string,

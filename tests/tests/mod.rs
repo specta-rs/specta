@@ -13,6 +13,7 @@ macro_rules! register {
 }
 
 mod bound;
+mod builtin_wire_mappings;
 mod core_type_impls;
 mod csharp;
 mod errors;
@@ -40,6 +41,7 @@ mod serde_conversions;
 mod serde_default_phases;
 mod serde_empty_payloads;
 mod serde_enum_rewrite;
+mod serde_enum_variant_flatten;
 mod serde_flatten_option;
 mod serde_identifiers;
 mod serde_internal_tag_payloads;

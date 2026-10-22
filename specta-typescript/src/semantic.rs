@@ -1184,12 +1184,10 @@ fn apply_builtin_remaps(
             apply_builtin_remaps(&mut list.ty, remap_bigint, lossless_bigint, lossless_floats)
         }
         DataType::Map(map) => {
-            apply_builtin_remaps(
-                map.key_ty_mut(),
-                remap_bigint,
-                lossless_bigint,
-                lossless_floats,
-            );
+            // Built-in lossless remaps (`BigInt`, `Number`) must not rewrite a
+            // map key, including through generic/inline wrappers: keys are
+            // JSON object property names, which the serializer stringifies.
+            // `primitives::map_key_datatype` renders the key shape instead.
             apply_builtin_remaps(
                 map.value_ty_mut(),
                 remap_bigint,
