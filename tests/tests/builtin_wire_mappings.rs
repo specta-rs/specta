@@ -80,6 +80,7 @@ fn c_string_and_c_str_match_serde_bytes() {
 // OS strings (platform specific)
 // ---------------------------------------------------------------------------
 
+#[cfg(any(unix, windows))]
 fn assert_os_string_shape<T: Type + ?Sized>(variant: &str, element: Primitive) {
     let mut types = Types::default();
     let data_type = T::definition(&mut types);

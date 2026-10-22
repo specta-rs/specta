@@ -54,15 +54,19 @@ graph, so every built-in `Type` impl describes the shape a JSON-style serializer
 sees. This is independent of any concrete output format:
 
 - `CString`/`CStr` serialize as a byte list (`serialize_bytes`), not a string.
-- `OsString`/`OsStr` serialize as the externally tagged `Unix` newtype variant
-  holding raw bytes on Unix, and the `Windows` newtype variant holding UTF-16 code
-  units on Windows. Serde provides no encoding on other targets, so Specta keeps
-  the historical `str` mapping there to stay source-compatible.
+- `OsString`/`OsStr` serialize as an externally tagged enum: the `Unix` newtype
+  variant carries the `as_bytes()` sequence on Unix, and the `Windows` newtype
+  variant carries UTF-16 code units on Windows. Unlike the `CString` case, the
+  Unix payload is an ordinary byte sequence, not `serialize_bytes`. Serde provides
+  no encoding on other targets, so Specta keeps the historical `str` mapping there
+  to stay source-compatible.
 - `serde_yaml::value::TaggedValue` serializes as a single-entry map keyed by the
   tag string, e.g. `{"!Thing": true}`. A dynamic one-entry key cannot be expressed
   statically, so Specta maps it to a string-keyed map of `serde_yaml::Value`.
 - `toml::value::Datetime` serializes as the
   `{"$__toml_private_datetime": "2026-01-01"}` struct emitted by `toml`.
+- `bit_vec::BitVec<B>` serializes via its derived `Serialize` layout, i.e. the
+  `{ storage: [B], nbits: usize }` struct, not a sequence of booleans.
 
 Native YAML (`!Thing true`) and native TOML (`2026-01-01`) encode tags and
 datetimes natively instead. Specta has no target-format-aware lowering, so the
