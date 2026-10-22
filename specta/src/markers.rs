@@ -85,18 +85,30 @@
 // All three `serde:*` sections below are written by the derive -- or, for the
 // built-ins whose serde representation is fixed, by a hand-written `Type` impl
 // in `specta` (`SERDE_CONTAINER_TAG`, `SERDE_CONTAINER_UNTAGGED` and
-// `SERDE_FIELD_FLATTEN`). They are interpreted by `specta-serde`, which also
-// rewrites a few of them in place while lowering the representation. A handful
-// are read directly by an exporter as well, which the item itself notes.
+// `SERDE_FIELD_FLATTEN`). `specta-serde` interprets them, and also writes a few
+// itself while lowering the representation: it rewrites the container renames
+// in place, and stamps `SERDE_CONTAINER_DENY_UNKNOWN_FIELDS` onto the synthetic
+// payload structs and rewritten enums it generates. Ten of the keys are read
+// directly by an exporter as well, and each of those says so on its own item.
 // ---------------------------------------------------------------------------
 
 /// `#[serde(rename = "...")]` on a container, serialize direction.
+///
+/// Read by `specta-rust` (which reproduces the rename on the generated type) as
+/// well as by `specta-serde`.
 pub const SERDE_CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
 /// `#[serde(rename(deserialize = "..."))]` on a container.
+///
+/// Read by `specta-rust` as well as by `specta-serde`.
 pub const SERDE_CONTAINER_RENAME_DESERIALIZE: &str = "serde:container:rename_deserialize";
 /// `#[serde(rename_all = "...")]` on a container, serialize direction.
+///
+/// Read by `specta-rust` (which reproduces the rule on the generated type) as
+/// well as by `specta-serde`.
 pub const SERDE_CONTAINER_RENAME_ALL_SERIALIZE: &str = "serde:container:rename_all_serialize";
 /// `#[serde(rename_all(deserialize = "..."))]` on a container.
+///
+/// Read by `specta-rust` as well as by `specta-serde`.
 pub const SERDE_CONTAINER_RENAME_ALL_DESERIALIZE: &str = "serde:container:rename_all_deserialize";
 /// `#[serde(rename_all_fields = "...")]` on an enum, serialize direction.
 pub const SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE: &str =
@@ -299,10 +311,12 @@ pub const ALIAS_EXCLUSION_MARKER: &str = "specta_serde:alias_exclusion";
 /// unsound: every shape the transform produces is also a valid shape a user can
 /// author directly.
 ///
-/// Written by `specta-serde`; read by `specta-serde` itself and by every
-/// exporter that renders enums (`specta-rust`, `specta-swift`,
-/// `specta-jsonschema`, `specta-zod`, `specta-valibot`, `specta-kotlin`,
-/// `specta-java`, `specta-csharp`).
+/// Written by `specta-serde`; read by `specta-serde` itself and, among the
+/// exporters, only by `specta-rust`, `specta-swift`, `specta-jsonschema`,
+/// `specta-zod`, `specta-valibot`, `specta-kotlin`, `specta-java` and
+/// `specta-csharp`. Exporters that do not need to know the representation was
+/// rewritten (for example `specta-rescript`, `specta-go` and `specta-python`)
+/// do not read it.
 pub const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
 
 /// Marks an external variant whose serde payload was hidden from Specta before
