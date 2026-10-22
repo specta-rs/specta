@@ -37,7 +37,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
     fn definition(types: &mut Types) -> DataType {
-        let mut l = List::new(<T as Type>::definition(types));
+        let mut l = List::new(types.define::<T>());
         l.unique = true;
         DataType::List(l)
     }
@@ -48,8 +48,8 @@ pub(crate) struct PrimitiveMap<K, V>(PhantomData<K>, PhantomData<V>);
 impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
     fn definition(types: &mut Types) -> DataType {
         DataType::Map(crate::datatype::Map::new(
-            K::definition(types),
-            V::definition(types),
+            types.define::<K>(),
+            types.define::<V>(),
         ))
     }
 }
@@ -178,7 +178,7 @@ const _: () = {
     struct BaseRange<T>(PhantomData<T>);
     impl<T: Type> Type for BaseRange<T> {
         fn definition(types: &mut Types) -> DataType {
-            let ty = T::definition(types);
+            let ty = types.define::<T>();
             datatype::Struct::named()
                 .field("start", Field::new(ty.clone()))
                 .field("end", Field::new(ty))
@@ -194,13 +194,13 @@ const _: () = {
                     (
                         "Ok".into(),
                         datatype::Variant::unnamed()
-                            .field(Field::new(<T as Type>::definition(types)))
+                            .field(Field::new(types.define::<T>()))
                             .build(),
                     ),
                     (
                         "Err".into(),
                         datatype::Variant::unnamed()
-                            .field(Field::new(<E as Type>::definition(types)))
+                            .field(Field::new(types.define::<E>()))
                             .build(),
                     ),
                 ],
@@ -219,13 +219,13 @@ impl_ndt!(
 
 impl<T: Type + ?Sized> Type for &T {
     fn definition(types: &mut Types) -> DataType {
-        T::definition(types)
+        types.define::<T>()
     }
 }
 
 impl<T: Type> Type for [T] {
     fn definition(types: &mut Types) -> DataType {
-        let mut l = List::new(<T as Type>::definition(types));
+        let mut l = List::new(types.define::<T>());
         l.unique = false;
         DataType::List(l)
     }
@@ -233,7 +233,7 @@ impl<T: Type> Type for [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(types: &mut Types) -> DataType {
-        let mut l = List::new(T::definition(types));
+        let mut l = List::new(types.define::<T>());
 
         // Refer to the documentation for `Types::has_const_params` to understand this.
         // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
@@ -247,6 +247,6 @@ impl<const N: usize, T: Type> Type for [T; N] {
 
 impl<T: Type> Type for Option<T> {
     fn definition(types: &mut Types) -> DataType {
-        DataType::Nullable(Box::new(T::definition(types)))
+        DataType::Nullable(Box::new(types.define::<T>()))
     }
 }

@@ -41,7 +41,11 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<TokenStream> {
+/// The `build` fn parameter list: type parameters keep their declared inline
+/// bounds because the body may mention field types whose own declarations
+/// require them. Lifetimes are still omitted since field types use inferred `'_`
+/// lifetimes.
+pub fn generics_with_ident_and_bounds_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -50,7 +54,12 @@ pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<Toke
             use GenericParam::*;
 
             generics.params.iter().filter_map(|param| match param {
-                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
+                Type(TypeParam {
+                    ident,
+                    colon_token,
+                    bounds,
+                    ..
+                }) => Some(quote!(#ident #colon_token #bounds)),
                 Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
@@ -62,13 +71,6 @@ pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<Toke
             })
         })
         .map(|gs| quote!(<#(#gs),*>))
-}
-
-pub fn build_type_where_clause(
-    ty: &TokenStream,
-    used_generic_types: &[syn::Ident],
-) -> Option<WhereClause> {
-    type_predicates(ty, used_generic_types).map(|preds| parse_quote! { where #(#preds),* })
 }
 
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
@@ -178,6 +180,138 @@ pub fn used_type_params(
         .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
         .cloned()
         .collect())
+}
+
+/// The placeholder type used to stand in for a generic parameter while the
+/// canonical declaration of a type is being built.
+pub fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
+    quote::format_ident!("__SPECTA_GENERIC_PLACEHOLDER_{}", ident)
+}
+
+/// Rewrites single-segment paths that name one of `params` to their
+/// placeholder type, so the declaration is built with `Generic` placeholders
+/// instead of the concrete arguments.
+pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
+    struct Rewrite<'a> {
+        params: &'a [syn::Ident],
+    }
+
+    impl VisitMut for Rewrite<'_> {
+        fn visit_type_path_mut(&mut self, node: &mut syn::TypePath) {
+            if node.qself.is_none()
+                && node.path.leading_colon.is_none()
+                && node.path.segments.len() == 1
+            {
+                let ident = node.path.segments[0].ident.clone();
+                if self.params.contains(&ident) {
+                    node.path.segments[0].ident = placeholder_ident(&ident);
+                }
+            }
+            syn::visit_mut::visit_type_path_mut(self, node);
+        }
+    }
+
+    let mut ty = ty.clone();
+    Rewrite { params }.visit_type_mut(&mut ty);
+    ty
+}
+
+/// Builds the expression that resolves `ty` to a [`DataType`].
+///
+/// For the canonical declaration (`conditional == true`, selected by the
+/// generated `declaration` flag) generic parameters are replaced by placeholder
+/// types that resolve to `Generic`, so the declaration stays generic without
+/// baking the concrete arguments in.
+///
+/// Parameters that declare trait bounds can't be replaced by a placeholder (the
+/// placeholder cannot satisfy an arbitrary user trait) — the field's own type
+/// declaration may require the bound — so those are resolved through the
+/// scoped generic substitution on [`specta::Types`] instead. Parameters with no
+/// declared bounds cannot be required by any field type (the container would not
+/// compile otherwise), so the precise placeholder path is used for them.
+pub fn resolve_ty_expr(
+    crate_ref: &TokenStream,
+    ty: &Type,
+    used_generic_types: &[syn::Ident],
+    bounded_params: &HashSet<String>,
+    conditional: bool,
+) -> TokenStream {
+    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
+
+    let mentioned = type_params_used_in(ty, used_generic_types);
+    let unbounded = mentioned
+        .iter()
+        .filter(|ident| !bounded_params.contains(&ident.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let bounded = mentioned
+        .iter()
+        .filter(|ident| bounded_params.contains(&ident.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let declaration_ty = rewrite_generics_with_placeholders(ty, &unbounded);
+    let mut declaration = quote!(types.define::<#declaration_ty>());
+
+    if !bounded.is_empty() {
+        let substitutions = bounded.iter().map(|ident| {
+            let name = ident.to_string();
+            quote!((
+                ::std::any::type_name::<#ident>(),
+                #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(#name)),
+            ))
+        });
+        declaration = quote!(types.with_generic_substitution(
+            &[#(#substitutions),*],
+            |types| #declaration,
+        ));
+    }
+
+    if declaration_ty.to_token_stream().to_string() == ty.to_token_stream().to_string()
+        && bounded.is_empty()
+    {
+        return concrete;
+    }
+
+    if !conditional {
+        return declaration;
+    }
+
+    quote!(if declaration { #declaration } else { #concrete })
+}
+
+/// Returns the subset of `candidates` that appear in `ty`, conservatively
+/// returning every candidate when the type can't be analysed (e.g. a macro).
+///
+/// Used to scope declaration-time generic substitution to the parameters a
+/// given field actually mentions.
+pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ident> {
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+
+    let known_generics = candidates
+        .iter()
+        .map(ToString::to_string)
+        .collect::<HashSet<_>>();
+
+    let mut visitor = GenericTypeUseVisitor {
+        known_generics: &known_generics,
+        used_generics: HashSet::new(),
+        conservative: false,
+        unsupported_associated_item: None,
+    };
+    visitor.visit_type(ty);
+
+    if visitor.conservative {
+        return candidates.to_vec();
+    }
+
+    candidates
+        .iter()
+        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
+        .cloned()
+        .collect()
 }
 
 fn visit_field_type(

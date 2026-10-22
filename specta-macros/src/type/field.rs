@@ -1,12 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::HashSet;
 use syn::Type;
 
 use crate::r#type::attr::deprecated_as_tokens;
 
 use super::{
     AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
-    generics::type_with_inferred_lifetimes,
+    generics::{resolve_ty_expr, type_with_inferred_lifetimes},
 };
 
 pub fn construct_field(
@@ -15,6 +16,8 @@ pub fn construct_field(
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
+    used_generic_types: &[syn::Ident],
+    bounded_params: &HashSet<String>,
 ) -> syn::Result<TokenStream> {
     construct_field_with_variant_skip(
         crate_ref,
@@ -22,6 +25,8 @@ pub fn construct_field(
         attrs,
         field_ty,
         raw_attrs,
+        used_generic_types,
+        bounded_params,
         false,
     )
 }
@@ -32,6 +37,8 @@ pub fn construct_field_with_variant_skip(
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
+    used_generic_types: &[syn::Ident],
+    bounded_params: &HashSet<String>,
     variant_skip: bool,
 ) -> syn::Result<TokenStream> {
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
@@ -83,12 +90,23 @@ pub fn construct_field_with_variant_skip(
     let nullable_attribute =
         declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
 
+    // The canonical declaration is built with each generic parameter replaced by
+    // a placeholder type that resolves to `Generic`. Concrete instantiation
+    // (`declaration == false`) resolves the real parameter.
+    let resolve = resolve_ty_expr(
+        crate_ref,
+        &field_ty,
+        used_generic_types,
+        bounded_params,
+        true,
+    );
+
     let field_ty = if attrs.skip || variant_skip {
         quote!()
     } else if attrs.inline {
-        quote!(field.ty = Some(datatype::inline(types, |types| <#field_ty as #crate_ref::Type>::definition(types)));)
+        quote!(field.ty = Some(datatype::inline(types, |types| #resolve));)
     } else {
-        quote!(field.ty = Some(<#field_ty as #crate_ref::Type>::definition(types));)
+        quote!(field.ty = Some(#resolve);)
     };
 
     Ok(quote!({
