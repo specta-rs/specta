@@ -1030,30 +1030,41 @@ fn rewrite_datatype_for_phase_inner(
                     conditional_omission_applies,
                 )?;
 
-                let has_flattened_aliases = matches!(&variant.fields, Fields::Named(named)
-                    if named.fields.iter().any(|(_, field)| field_is_flattened(field)))
-                    && fields_have_flattened_aliases(
-                        &variant.fields,
+                // A named variant payload with `#[serde(flatten)]` merges the
+                // flattened field's keys into the payload object, exactly like
+                // a named struct. Lower it through the same struct pipeline
+                // (flatten plus field aliases) here, once, before the
+                // representation-specific transform wraps it. Doing it here -
+                // rather than inside `variant_payload_field` - keeps every
+                // representation (external, adjacent, untagged, and
+                // per-variant `#[serde(untagged)]`) on one shared routine and
+                // never depends on a later rewrite pass visiting the generated
+                // payload. A plain internally tagged variant is excluded
+                // because `transform_internal_variant` lowers flatten itself,
+                // in context with the container's tag key; a variant-level
+                // `#[serde(untagged)]` drops that tag, so it is lowered here.
+                let has_flattened = matches!(&variant.fields, Fields::Named(named)
+                    if named.fields.iter().any(|(_, field)| field_is_flattened(field)));
+                let internal_variant = matches!(&repr, EnumRepr::Internal { .. });
+                let variant_is_untagged = SerdeVariantAttrs::from_attributes(&variant.attributes)?
+                    .is_some_and(|attrs| attrs.untagged);
+
+                let lowered = if has_flattened && (!internal_variant || variant_is_untagged) {
+                    let mut strct = Struct::unit();
+                    std::mem::swap(&mut strct.fields, &mut variant.fields);
+                    lower_flattened_struct_inner(
+                        &mut strct,
                         mode,
                         original_types,
-                        &mut FlattenedAliasVisits::default(),
-                    );
-
-                let lowered = if has_flattened_aliases {
-                    if matches!(&repr, EnumRepr::Internal { .. }) {
-                        None
-                    } else {
-                        let mut strct = Struct::unit();
-                        std::mem::swap(&mut strct.fields, &mut variant.fields);
-                        lower_flattened_struct_inner(
-                            &mut strct,
-                            mode,
-                            original_types,
-                            generated,
-                            split_types,
-                            expanding_flattened,
-                        )?
-                    }
+                        generated,
+                        split_types,
+                        expanding_flattened,
+                    )?
+                } else if has_flattened {
+                    // A plain internally tagged variant: `transform_internal_variant`
+                    // lowers flatten (and its aliases) itself, in context with
+                    // the tag key, so lowering again here would double-apply it.
+                    None
                 } else {
                     lower_field_aliases_for_phase(&mut variant.fields, mode, true)?
                 };

@@ -397,7 +397,9 @@ fn swift_tagged_tuple_payload_reports_error() {
 }
 
 /// A `#[serde(flatten)]`ed field inside a tagged variant's payload is merged
-/// into the variant's object, which the generated wrapper struct cannot express.
+/// into the variant's object by `specta-serde`, which the generated wrapper
+/// struct cannot express. The merged payload surfaces as an intersection,
+/// which the Swift exporter rejects.
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenInner {
@@ -424,7 +426,11 @@ fn swift_tagged_flattened_payload_reports_error() {
         )
         .expect_err("a flattened payload cannot be expressed in Swift");
 
-    assert!(err.to_string().contains("flattens field"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("Intersection types are not supported"),
+        "{err}"
+    );
 }
 
 /// `#[serde(default)] Option<T>` is optional on the wire, so its generated
