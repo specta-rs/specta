@@ -94,9 +94,9 @@ GenericStruct<i32>: {
 GenericStruct<String>: {
 	arg: T,
 }
-FlattenEnumStruct: ({
+FlattenEnumStruct: {
 	outer: string,
-}) & (FlattenEnum)
+} & FlattenEnum
 OverridenStruct: {
 	overriden_field: string,
 }
@@ -125,9 +125,9 @@ Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
-FlattenOnNestedEnum: ({
+FlattenOnNestedEnum: {
 	id: string,
-}) & (NestedEnum)
+} & NestedEnum
 MyEmptyInput: Record<string, never>
 (String): string
 (String,): [string]
@@ -377,8 +377,8 @@ DoubleFlattened: {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
 }
-FlattenedInner: (Inner)
-BoxFlattened: (BoxedInner)
+FlattenedInner: Inner
+BoxFlattened: BoxedInner
 BoxInline: {
 	c: {
 		a: number,
@@ -390,10 +390,10 @@ First: {
 Second: {
 	a: number,
 }
-Third: ({
+Third: {
 	b: { [key in string]: string },
 	c: First,
-}) & (First)
+} & First
 Fourth: {
 	a: First,
 	b: {
@@ -466,7 +466,7 @@ InternallyTaggedF: { type: "A" }
 InternallyTaggedH: { type: "A" }
 InternallyTaggedL: {
 	type: "A",
-} & { type: "A" } | { type: "B" }
+} & ({ type: "A" } | { type: "B" })
 InternallyTaggedM: { type: "A" }
 Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
 Issue221UntaggedMixed: ({ a: string }) & { b?: never; values?: never } | ({ b: string }) & { a?: never; values?: never } | ({ values: { [key in string]: string } }) & { a?: never; b?: never }
@@ -500,26 +500,26 @@ FlattenA: {
 	a: number,
 	b: number,
 }
-FlattenB: ({
+FlattenB: {
 	c: number,
-}) & (FlattenA)
-FlattenC: ({
+} & FlattenA
+FlattenC: {
 	c: number,
-}) & (FlattenA)
+} & FlattenA
 FlattenD: {
 	a: FlattenA,
 	c: number,
 }
 FlattenE: {
-	b: ({
+	b: {
 		c: number,
-	}) & (FlattenA),
+	} & FlattenA,
 	d: number,
 }
 FlattenF: {
-	b: ({
+	b: {
 		c: number,
-	}) & (FlattenA),
+	} & FlattenA,
 	d: number,
 }
 FlattenG: {
@@ -568,12 +568,12 @@ InlineGenericNested<String>: [string, string[], [string, string], { [key in stri
 InlineFlattenGenericsG<()>: {
 	t: T,
 }
-InlineFlattenGenerics: ({
+InlineFlattenGenerics: {
 	g: InlineFlattenGenericsG<string>,
 	gi: {
 		t: string,
 	},
-}) & (InlineFlattenGenericsG<string>)
+} & InlineFlattenGenericsG<string>
 GenericDefault: {
 	value: T,
 }

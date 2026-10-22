@@ -1115,10 +1115,10 @@ InternallyTaggedH: /**
 InternallyTaggedL: /**
 	* @typedef {{
 	* 	type: "A",
-	* } & { type: "A" } | { type: "B" }} InternallyTaggedL
+	* } & ({ type: "A" } | { type: "B" })} InternallyTaggedL
 	* @property {{
 	* 	type: "A",
-	* } & { type: "A" } | { type: "B" }} A
+	* } & ({ type: "A" } | { type: "B" })} A
 	*/
 
 InternallyTaggedM: /**
@@ -1264,27 +1264,27 @@ FlattenD: /**
 
 FlattenE: /**
 	* @typedef {{
-	*		b: ({
+	*		b: {
 	*			c: number,
-	*		}) & (FlattenA),
+	*		} & FlattenA,
 	*		d: number,
 	*	}} FlattenE
-	* @property {({
+	* @property {{
 	*		c: number,
-	*	}) & (FlattenA)} b
+	*	} & FlattenA} b
 	* @property {number} d
 	*/
 
 FlattenF: /**
 	* @typedef {{
-	*		b: ({
+	*		b: {
 	*			c: number,
-	*		}) & (FlattenA),
+	*		} & FlattenA,
 	*		d: number,
 	*	}} FlattenF
-	* @property {({
+	* @property {{
 	*		c: number,
-	*	}) & (FlattenA)} b
+	*	} & FlattenA} b
 	* @property {number} d
 	*/
 

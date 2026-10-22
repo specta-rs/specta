@@ -542,7 +542,7 @@ export type InternallyTaggedH = { type: "A" };
 
 export type InternallyTaggedL = {
 	type: "A",
-} & { type: "A" } | { type: "B" };
+} & ({ type: "A" } | { type: "B" });
 
 export type InternallyTaggedM = { type: "A" };
 
@@ -611,16 +611,16 @@ export type FlattenD = {
 };
 
 export type FlattenE = {
-	b: ({
+	b: {
 		c: number,
-	}) & (FlattenA),
+	} & FlattenA,
 	d: number,
 };
 
 export type FlattenF = {
-	b: ({
+	b: {
 		c: number,
-	}) & (FlattenA),
+	} & FlattenA,
 	d: number,
 };
 

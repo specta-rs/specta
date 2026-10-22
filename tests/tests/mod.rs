@@ -52,6 +52,7 @@ mod serde_validate_recursion;
 mod swift;
 mod types;
 mod typescript;
+mod typescript_precedence;
 mod utils;
 mod valibot;
 mod zod;
