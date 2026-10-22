@@ -30,6 +30,9 @@ pub use r#type::Type;
 #[doc(inline)]
 pub use types::Types;
 
+#[doc(hidden)]
+pub use types::GenericSubstitutionSlot;
+
 #[doc(inline)]
 #[cfg(feature = "collect")]
 #[cfg_attr(docsrs, doc(cfg(feature = "collect")))]
