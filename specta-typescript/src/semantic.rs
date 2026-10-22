@@ -1323,8 +1323,23 @@ fn array_transform(js_ident: &str, len: usize, parts: Vec<(usize, String)>) -> S
     format!("([{}])", items.join(","))
 }
 
+/// Render a property read of `name` on `base`.
+///
+/// `__proto__` needs an own-property-safe read: both `base.__proto__` and
+/// `base["__proto__"]` resolve to the inherited `Object.prototype` accessor
+/// when no own property exists, so a transform body would run against the
+/// prototype object (`new URL(Object.prototype)`). The descriptor form yields
+/// the own value when present and `undefined` otherwise, and stays a valid base
+/// expression for nested reads (`?.[]` short-circuits the whole chain).
+///
+/// Regression coverage for https://github.com/specta-rs/specta/issues/611.
 fn js_property_access(base: &str, name: &str) -> String {
-    if is_identifier(name) {
+    if name == "__proto__" {
+        format!(
+            "Object.getOwnPropertyDescriptor({base},{})?.value",
+            js_string_literal(name)
+        )
+    } else if is_identifier(name) {
         format!("{base}.{name}")
     } else {
         format!("{base}[\"{}\"]", escape_typescript_string_literal(name))
