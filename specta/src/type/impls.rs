@@ -144,6 +144,17 @@ const _: () = {
         }
     };
 
+    // Serde has no `Serialize` for `OsStr`/`OsString` on this target, so there is
+    // no wire shape to mirror. Keep the historical `str` mapping so `#[derive(Type)]`
+    // on these types keeps compiling (it does not depend on Serde).
+    #[cfg(not(any(unix, windows)))]
+    const _: () = {
+        impl_ndt!(
+            std::ffi::OsString as str = inline;
+            std::ffi::OsStr as str = inline;
+        );
+    };
+
     impl_ndt!(
         std::path::Path as str = inline;
         std::path::PathBuf as str = inline;

@@ -93,7 +93,9 @@ impl_ndt!(
 const _: () = {
     // `bit_vec::BitVec` derives `Serialize` from its private layout, so the wire
     // shape is `{ storage: [B], nbits: usize }`, not a sequence of booleans.
-    // Specta's `bit-vec` feature enables `bit-vec/serde` for this to hold.
+    // The `BitBlock` bound is stricter than the derived `B: Serialize` bound, but
+    // every `BitBlock` is one of the primitive integer types Serde supports, so the
+    // two are equivalent in practice.
     // https://github.com/specta-rs/specta/issues/597
     impl<B: bit_vec::BitBlock + Type> Type for bit_vec::BitVec<B> {
         fn definition(types: &mut Types) -> DataType {

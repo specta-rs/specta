@@ -11,7 +11,9 @@
 //! their own encodings for tags and datetimes; those are asserted below to
 //! document the divergence, and the JSON shape is what Specta maps to.
 
-use std::ffi::{CStr, CString, OsStr, OsString};
+use std::ffi::{CStr, CString};
+#[cfg(any(unix, windows))]
+use std::ffi::{OsStr, OsString};
 
 use specta::{
     Type, Types,
