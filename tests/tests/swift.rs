@@ -797,6 +797,62 @@ struct SwiftMidOmittable(
     u8,
 );
 
+// Regression tests for named structs.
+// https://github.com/specta-rs/specta/issues/610
+//
+// The Swift exporter used to leave a named struct's `Codable` to the compiler,
+// which encodes optionals with `encodeIfPresent` and therefore omits every nil.
+// Serde writes a plain `Option<T>` and a `#[serde(default)] Option<T>` as
+// `null`, and omits the key only for `#[serde(skip_serializing_if = ...)]`.
+// These tests compile and *run* the generated Swift against fixtures produced by
+// serde itself.
+
+/// A plain `Option<T>` field: serde writes `null` and reads a missing key as
+/// `None`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedPlain {
+    x: Option<u8>,
+    y: u8,
+}
+
+/// A `#[serde(default)] Option<T>` field: serde still writes `null`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedDefaultOption {
+    #[serde(default)]
+    x: Option<u8>,
+    y: u8,
+}
+
+/// A `#[serde(skip_serializing_if = "Option::is_none")]` field: serde omits the
+/// key when it is nil, and reads a missing key as `None`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedSkipIf {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    x: Option<u8>,
+    y: u8,
+}
+
+/// A required non-optional field: serde always writes it and requires the key on
+/// deserialize.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedRequired {
+    x: u8,
+    y: String,
+}
+
+/// Nested optionals: `None` and `Some(None)` both write `null`; only
+/// `Some(Some(v))` writes `v`, and `null` reads back as `None`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedNestedOptional {
+    x: Option<Option<u8>>,
+    y: u8,
+}
+
 fn swift_wire_types() -> Types {
     Types::default()
         .register::<SwiftNewtype>()
@@ -1197,7 +1253,9 @@ func check(_ condition: Bool, _ label: String) {{
 }}
 
 func encode<T: Encodable>(_ value: T) -> String {{
-    String(data: try! JSONEncoder().encode(value), encoding: .utf8)!
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
 }}
 
 func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
@@ -1250,6 +1308,313 @@ check(decode(newtypeOptNullJSON, SwiftNewtypeOptDeserialize.self).value == nil, 
 print("SWIFT-OK")
 "#,
         swift_fixtures()
+    );
+
+    run_swift(&exported, &harness);
+}
+
+/// serde's JSON for `value` with object keys sorted, so it can be compared
+/// byte-for-byte with Swift's `JSONEncoder` under `.sortedKeys`. Foundation does
+/// not otherwise define key order, and `serde_json`'s default map is a
+/// `BTreeMap`, so this is the canonical form both sides agree on.
+fn swift_sorted_json(value: &impl Serialize) -> String {
+    serde_json::to_string(&serde_json::to_value(value).unwrap()).unwrap()
+}
+
+/// The serde wire fixtures the named-struct harnesses assert against, so a
+/// future serde change cannot silently invalidate their expectations.
+fn swift_named_fixtures() -> String {
+    format!(
+        "let namedPlainNullJSON = {}\n\
+         let namedPlainSomeJSON = {}\n\
+         let namedPlainMissingJSON = {}\n\
+         let namedDefaultNullJSON = {}\n\
+         let namedDefaultMissingJSON = {}\n\
+         let namedSkipOmittedJSON = {}\n\
+         let namedSkipPresentJSON = {}\n\
+         let namedSkipNullJSON = {}\n\
+         let namedRequiredJSON = {}\n\
+         let namedNestedNullJSON = {}\n\
+         let namedNestedSomeJSON = {}\n",
+        swift_literal(&swift_sorted_json(&SwiftNamedPlain { x: None, y: 1 })),
+        swift_literal(&swift_sorted_json(&SwiftNamedPlain { x: Some(2), y: 1 })),
+        swift_literal(r#"{"y":1}"#),
+        swift_literal(&swift_sorted_json(&SwiftNamedDefaultOption {
+            x: None,
+            y: 1
+        })),
+        swift_literal(r#"{"y":1}"#),
+        swift_literal(&swift_sorted_json(&SwiftNamedSkipIf { x: None, y: 1 })),
+        swift_literal(&swift_sorted_json(&SwiftNamedSkipIf { x: Some(2), y: 1 })),
+        swift_literal(r#"{"x":null,"y":1}"#),
+        swift_literal(&swift_sorted_json(&SwiftNamedRequired {
+            x: 1,
+            y: "a".into(),
+        })),
+        swift_literal(&swift_sorted_json(&SwiftNamedNestedOptional {
+            x: None,
+            y: 1
+        })),
+        swift_literal(&swift_sorted_json(&SwiftNamedNestedOptional {
+            x: Some(Some(2)),
+            y: 1,
+        })),
+    )
+}
+
+/// The serde wire formats the named-struct harnesses have to match, asserted
+/// here so a serde change cannot silently invalidate them.
+#[test]
+fn swift_named_option_wire_ground_truth() {
+    // A plain `Option<T>` field is written as `null`, not omitted, and a
+    // missing key still reads as `None`.
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedPlain { x: None, y: 1 }).unwrap(),
+        r#"{"x":null,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedPlain { x: Some(2), y: 1 }).unwrap(),
+        r#"{"x":2,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftNamedPlain>(r#"{"y":1}"#)
+            .unwrap()
+            .x,
+        None
+    );
+
+    // `#[serde(default)]` does not change the serialize shape.
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedDefaultOption { x: None, y: 1 }).unwrap(),
+        r#"{"x":null,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftNamedDefaultOption>(r#"{"y":1}"#)
+            .unwrap()
+            .x,
+        None
+    );
+
+    // Only `skip_serializing_if` omits the key.
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedSkipIf { x: None, y: 1 }).unwrap(),
+        r#"{"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedSkipIf { x: Some(2), y: 1 }).unwrap(),
+        r#"{"x":2,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftNamedSkipIf>(r#"{"y":1}"#)
+            .unwrap()
+            .x,
+        None
+    );
+
+    // A required non-optional field is always written and always required.
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedRequired {
+            x: 1,
+            y: "a".into()
+        })
+        .unwrap(),
+        r#"{"x":1,"y":"a"}"#
+    );
+    assert!(serde_json::from_str::<SwiftNamedRequired>(r#"{"y":"a"}"#).is_err());
+
+    // Nested optionals: `None` and `Some(None)` both write `null`; `null` reads
+    // back as `None`.
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedNestedOptional { x: None, y: 1 }).unwrap(),
+        r#"{"x":null,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedNestedOptional {
+            x: Some(None),
+            y: 1,
+        })
+        .unwrap(),
+        r#"{"x":null,"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedNestedOptional {
+            x: Some(Some(2)),
+            y: 1,
+        })
+        .unwrap(),
+        r#"{"x":2,"y":1}"#
+    );
+    assert!(
+        serde_json::from_str::<SwiftNamedNestedOptional>(r#"{"x":null,"y":1}"#)
+            .unwrap()
+            .x
+            .is_none()
+    );
+}
+
+fn swift_named_types() -> Types {
+    Types::default()
+        .register::<SwiftNamedPlain>()
+        .register::<SwiftNamedDefaultOption>()
+        .register::<SwiftNamedSkipIf>()
+        .register::<SwiftNamedRequired>()
+        .register::<SwiftNamedNestedOptional>()
+}
+
+/// Named structs must write a nil `Option<T>` as `null` (serde does), and omit
+/// the key only for `skip_serializing_if`. The synthesised `Codable` used
+/// `encodeIfPresent` and omitted every nil.
+#[test]
+fn swift_named_struct_optionals_round_trip() {
+    let exported = Swift::default()
+        .export(&swift_named_types(), specta_serde::Format)
+        .expect("named structs should export");
+
+    assert!(
+        exported.contains("try container.encode(x, forKey: .x)"),
+        "a plain optional must be written unconditionally:\n{exported}"
+    );
+    assert!(
+        !exported.contains("encodeIfPresent"),
+        "the hand-written codec must not use `encodeIfPresent`:\n{exported}"
+    );
+
+    let harness = format!(
+        r#"{}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+// A plain `Option<T>` field is written as `null` (serde does not omit it).
+expect(encode(SwiftNamedPlain(x: nil, y: 1)), namedPlainNullJSON, "plain nil encodes null")
+expect(encode(SwiftNamedPlain(x: 2, y: 1)), namedPlainSomeJSON, "plain some encodes value")
+check(decode(namedPlainNullJSON, SwiftNamedPlain.self).x == nil, "plain decode null")
+check(decode(namedPlainMissingJSON, SwiftNamedPlain.self).x == nil, "plain decode missing")
+check(decode(namedPlainSomeJSON, SwiftNamedPlain.self).x == 2, "plain decode some")
+
+// `#[serde(default)] Option<T>` is still written as `null`.
+expect(encode(SwiftNamedDefaultOption(x: nil, y: 1)), namedDefaultNullJSON, "default nil encodes null")
+check(decode(namedDefaultMissingJSON, SwiftNamedDefaultOption.self).x == nil, "default decode missing")
+
+// `skip_serializing_if` omits the key when nil, and still reads a missing key.
+expect(encode(SwiftNamedSkipIf(x: nil, y: 1)), namedSkipOmittedJSON, "skip-if nil omits key")
+expect(encode(SwiftNamedSkipIf(x: 2, y: 1)), namedSkipPresentJSON, "skip-if some writes key")
+check(decode(namedSkipOmittedJSON, SwiftNamedSkipIf.self).x == nil, "skip-if decode omitted")
+check(decode(namedSkipNullJSON, SwiftNamedSkipIf.self).x == nil, "skip-if decode null")
+
+// A required non-optional field is always present.
+expect(encode(SwiftNamedRequired(x: 1, y: "a")), namedRequiredJSON, "required encodes")
+let required = decode(namedRequiredJSON, SwiftNamedRequired.self)
+expect(required.y, "a", "required decode")
+
+// Nested optionals: nil and `.some(nil)` both write `null`; only
+// `.some(.some(v))` writes the value.
+expect(encode(SwiftNamedNestedOptional(x: nil, y: 1)), namedNestedNullJSON, "nested nil writes null")
+expect(encode(SwiftNamedNestedOptional(x: .some(nil), y: 1)), namedNestedNullJSON, "nested some-nil writes null")
+expect(encode(SwiftNamedNestedOptional(x: .some(.some(2)), y: 1)), namedNestedSomeJSON, "nested some-some writes value")
+check(decode(namedNestedNullJSON, SwiftNamedNestedOptional.self).x == nil, "nested decode null")
+check(decode(namedNestedSomeJSON, SwiftNamedNestedOptional.self).x! == 2, "nested decode some-some")
+
+print("SWIFT-OK")
+"#,
+        swift_named_fixtures()
+    );
+
+    run_swift(&exported, &harness);
+}
+
+/// `PhasesFormat` splits a named struct whose serialize and deserialize shapes
+/// differ into `*Serialize`/`*Deserialize` types. The serialize half writes
+/// `null` for a plain/defaulted `Option<T>` and omits only a `skip_serializing_if`
+/// field; the deserialize half tolerates the absence serde tolerates.
+#[test]
+fn swift_named_struct_phase_split_round_trip() {
+    let exported = Swift::default()
+        .export(&swift_named_types(), specta_serde::PhasesFormat)
+        .expect("phase-split named structs should export");
+
+    for name in [
+        "SwiftNamedPlainSerialize",
+        "SwiftNamedPlainDeserialize",
+        "SwiftNamedDefaultOptionSerialize",
+        "SwiftNamedDefaultOptionDeserialize",
+        "SwiftNamedSkipIfSerialize",
+        "SwiftNamedSkipIfDeserialize",
+        "SwiftNamedNestedOptionalSerialize",
+        "SwiftNamedNestedOptionalDeserialize",
+    ] {
+        assert!(
+            exported.contains(&format!("public struct {name}: Codable {{")),
+            "expected the split phase type `{name}`:\n{exported}"
+        );
+    }
+
+    let harness = format!(
+        r#"{}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+// The serialize half writes `null` for a plain option; the deserialize half
+// reads both `null` and an absent key.
+expect(encode(SwiftNamedPlainSerialize(x: nil, y: 1)), namedPlainNullJSON, "phase plain serialize null")
+expect(encode(SwiftNamedPlainSerialize(x: 2, y: 1)), namedPlainSomeJSON, "phase plain serialize some")
+check(decode(namedPlainNullJSON, SwiftNamedPlainDeserialize.self).x == nil, "phase plain deserialize null")
+check(decode(namedPlainMissingJSON, SwiftNamedPlainDeserialize.self).x == nil, "phase plain deserialize missing")
+
+// A defaulted option is written as `null` by both halves.
+expect(encode(SwiftNamedDefaultOptionSerialize(x: nil, y: 1)), namedDefaultNullJSON, "phase default serialize null")
+check(decode(namedDefaultMissingJSON, SwiftNamedDefaultOptionDeserialize.self).x == nil, "phase default deserialize missing")
+
+// `skip_serializing_if`: the serialize half omits the absent key, the
+// deserialize half still accepts it.
+expect(encode(SwiftNamedSkipIfSerialize(x: nil, y: 1)), namedSkipOmittedJSON, "phase skip-if serialize omits")
+expect(encode(SwiftNamedSkipIfSerialize(x: 2, y: 1)), namedSkipPresentJSON, "phase skip-if serialize present")
+check(decode(namedSkipOmittedJSON, SwiftNamedSkipIfDeserialize.self).x == nil, "phase skip-if deserialize omitted")
+
+// A required struct has the same shape in both phases and is not split.
+expect(encode(SwiftNamedRequired(x: 1, y: "a")), namedRequiredJSON, "phase required serialize")
+check(decode(namedRequiredJSON, SwiftNamedRequired.self).y == "a", "phase required deserialize")
+
+// Nested optionals split too.
+expect(encode(SwiftNamedNestedOptionalSerialize(x: nil, y: 1)), namedNestedNullJSON, "phase nested serialize null")
+check(decode(namedNestedNullJSON, SwiftNamedNestedOptionalDeserialize.self).x == nil, "phase nested deserialize null")
+
+print("SWIFT-OK")
+"#,
+        swift_named_fixtures()
     );
 
     run_swift(&exported, &harness);
