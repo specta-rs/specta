@@ -133,17 +133,28 @@ fn os_string_matches_unix_serde_shape() {
 #[cfg(windows)]
 #[test]
 fn os_string_matches_windows_serde_shape() {
-    let owned = OsString::from("hi");
-    assert_eq!(
-        serde_json::to_value(&owned).unwrap(),
-        serde_json::json!({ "Windows": [104, 0, 105, 0] })
-    );
+    use std::os::windows::ffi::OsStrExt;
 
-    let borrowed = OsStr::new("hi");
-    assert_eq!(
-        serde_json::to_value(borrowed).unwrap(),
-        serde_json::json!({ "Windows": [104, 0, 105, 0] })
-    );
+    // Serde's Windows `OsString` impl serializes `encode_wide()`, i.e. the UTF-16
+    // *code units* as a `[u16]` sequence, not the little-endian byte expansion.
+    // Deriving the expectation from the platform API keeps the assertion honest,
+    // and a non-ASCII value distinguishes the two: `"é"` is `[233]` as code units
+    // but `[195, 169]` as UTF-8 bytes.
+    for value in ["hi", "héllo"] {
+        let expected: Vec<u16> = OsStr::new(value).encode_wide().collect();
+
+        let owned = OsString::from(value);
+        assert_eq!(
+            serde_json::to_value(&owned).unwrap(),
+            serde_json::json!({ "Windows": expected })
+        );
+
+        let borrowed = OsStr::new(value);
+        assert_eq!(
+            serde_json::to_value(borrowed).unwrap(),
+            serde_json::json!({ "Windows": expected })
+        );
+    }
 
     assert_os_string_shape::<OsString>("Windows", Primitive::u16);
     assert_os_string_shape::<OsStr>("Windows", Primitive::u16);
