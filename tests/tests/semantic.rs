@@ -85,6 +85,89 @@ struct Wrapper<T> {
     value: T,
 }
 
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum ExternalEnum {
+    Unit,
+    Newtype(Website),
+    Named { site: Website },
+    Tuple(Website, u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum InternalEnum {
+    Unit,
+    Named { site: Website },
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", content = "data")]
+enum AdjacentEnum {
+    Unit,
+    Newtype(Website),
+    Named { site: Website },
+    Tuple(Website, u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum NestedEnum {
+    Site(ExternalEnum),
+    Count(u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum NullableEnum {
+    Some(Option<Website>),
+    None,
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum RecursiveEnum {
+    Leaf(Website),
+    Next(Box<RecursiveEnum>),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedEnum {
+    Site(Website),
+    Other(String),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct Moment(String);
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum DateEnum {
+    At(Moment),
+    Count(u32),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum BigintEnum {
+    Id(u64),
+    Name(String),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum RenamedEnum {
+    #[serde(rename = "some-value")]
+    Value(Website),
+    #[serde(rename = "other-value")]
+    Other(String),
+}
+
 fn semantic_config() -> Configuration {
     Configuration::empty().define::<Website>(
         |_| define("URL").into(),
@@ -99,6 +182,58 @@ fn identity_semantic_config() -> Configuration {
         Some(Transform::identity()),
         Some(Transform::identity()),
     )
+}
+
+fn date_semantic_config() -> Configuration {
+    Configuration::empty().define::<Moment>(
+        |_| define("Date").into(),
+        Some(Transform::new(|value| format!("{value}.toISOString()"))),
+        Some(Transform::new(|value| format!("new Date({value})"))),
+    )
+}
+
+/// Build the format-lowered graph the way a framework would before applying
+/// semantic rules: map with `specta_serde::Format` first, then transform.
+fn mapped_types<T: Type>() -> (Types, DataType) {
+    let mut types = Types::default();
+    let dt = T::definition(&mut types);
+    let types = specta::Format::map_types(&specta_serde::Format, &types)
+        .expect("serde mapping should succeed")
+        .into_owned();
+    (types, dt)
+}
+
+fn node_available() -> bool {
+    std::process::Command::new("node")
+        .arg("--version")
+        .output()
+        .is_ok()
+}
+
+/// Execute `transform` (an expression built around `value`) on `input` in a
+/// real JavaScript runtime and assert `assertion` holds for the result.
+///
+/// The generated expression is only meaningful as JavaScript, so this is the
+/// only way to check that the runtime value actually matches the exported type.
+fn assert_runtime_js(transform: &str, input: &str, assertion: &str) {
+    if !node_available() {
+        return;
+    }
+
+    let script = format!(
+        "const value = {input};\nconst out = {transform};\nif (!({assertion})) {{ throw new Error(\"assertion failed: \" + JSON.stringify(out)); }}"
+    );
+    let output = std::process::Command::new("node")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .expect("node should be executable");
+
+    assert!(
+        output.status.success(),
+        "node rejected transform {transform:?} for input {input:?}:\n{}\nscript:\n{script}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 // Regression coverage for https://github.com/specta-rs/specta/issues/578.
@@ -389,4 +524,315 @@ fn semantic_identity_descendants_are_pruned_from_real_runtime_transforms() {
         .apply_deserialize(&types, &dt, "payload")
         .expect("Website deserialization should require a runtime transform");
     assert_eq!(deserialize, "({...payload,site:new URL(payload.site)})");
+}
+
+// Regression coverage for https://github.com/specta-rs/specta/issues/595.
+#[test]
+fn semantic_external_enum_runtime_transforms_match_the_exported_type() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<ExternalEnum>();
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("external enum serialization should be supported")
+        .expect("external enum serialization should require a transform");
+    assert_eq!(
+        serialize,
+        "value!=null&&value.Newtype!==undefined?({...value,Newtype:value.Newtype.toString()}):value!=null&&value.Named!==undefined?({...value,Named:({...value.Named,site:value.Named.site.toString()})}):value!=null&&value.Tuple!==undefined?({...value,Tuple:([value.Tuple[0].toString(),value.Tuple[1]])}):value"
+    );
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("external enum deserialization should be supported")
+        .expect("external enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value.Newtype!==undefined?({...value,Newtype:new URL(value.Newtype)}):value!=null&&value.Named!==undefined?({...value,Named:({...value.Named,site:new URL(value.Named.site)})}):value!=null&&value.Tuple!==undefined?({...value,Tuple:([new URL(value.Tuple[0]),value.Tuple[1]])}):value"
+    );
+
+    // The unit variant is a bare string and stays untouched.
+    assert_runtime_js(&deserialize, "\"Unit\"", "out === \"Unit\"");
+    assert_runtime_js(
+        &deserialize,
+        "{ Newtype: \"https://example.com/\" }",
+        "out.Newtype instanceof URL && out.Newtype.href === \"https://example.com/\"",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ Named: { site: \"https://example.com/\" } }",
+        "out.Named.site instanceof URL",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ Tuple: [\"https://example.com/\", 7] }",
+        "out.Tuple[0] instanceof URL && out.Tuple[1] === 7",
+    );
+
+    // Serialization is the inverse: a real URL becomes the wire string.
+    assert_runtime_js(&serialize, "\"Unit\"", "out === \"Unit\"");
+    assert_runtime_js(
+        &serialize,
+        "{ Newtype: new URL(\"https://example.com/\") }",
+        "out.Newtype === \"https://example.com/\"",
+    );
+    assert_runtime_js(
+        &serialize,
+        "{ Named: { site: new URL(\"https://example.com/\") } }",
+        "out.Named.site === \"https://example.com/\"",
+    );
+    assert_runtime_js(
+        &serialize,
+        "{ Tuple: [new URL(\"https://example.com/\"), 7] }",
+        "out.Tuple[0] === \"https://example.com/\" && out.Tuple[1] === 7",
+    );
+
+    let rendered = Typescript::default()
+        .export(&semantic.apply_types(&types), specta_serde::Format)
+        .expect("external enum should export");
+    assert!(rendered.contains("Newtype: URL"), "{rendered}");
+    assert!(rendered.contains("site: URL"), "{rendered}");
+    assert!(rendered.contains("[URL, number]"), "{rendered}");
+}
+
+#[test]
+fn semantic_internal_enum_runtime_transforms_dispatch_on_the_tag() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<InternalEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("internal enum deserialization should be supported")
+        .expect("internal enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value.kind===\"Named\"?({...value,site:new URL(value.site)}):value"
+    );
+
+    assert_runtime_js(
+        &deserialize,
+        "{ kind: \"Unit\" }",
+        "out.kind === \"Unit\" && !(\"site\" in out)",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ kind: \"Named\", site: \"https://example.com/\" }",
+        "out.site instanceof URL && out.kind === \"Named\"",
+    );
+
+    let rendered = Typescript::default()
+        .export(&semantic.apply_types(&types), specta_serde::Format)
+        .expect("internal enum should export");
+    assert!(rendered.contains("site: URL"), "{rendered}");
+}
+
+#[test]
+fn semantic_adjacent_enum_runtime_transforms_dispatch_on_the_tag() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<AdjacentEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("adjacent enum deserialization should be supported")
+        .expect("adjacent enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value.kind===\"Newtype\"?({...value,data:new URL(value.data)}):value!=null&&value.kind===\"Named\"?({...value,data:({...value.data,site:new URL(value.data.site)})}):value!=null&&value.kind===\"Tuple\"?({...value,data:([new URL(value.data[0]),value.data[1]])}):value"
+    );
+
+    assert_runtime_js(&deserialize, "{ kind: \"Unit\" }", "out.kind === \"Unit\"");
+    assert_runtime_js(
+        &deserialize,
+        "{ kind: \"Newtype\", data: \"https://example.com/\" }",
+        "out.data instanceof URL",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ kind: \"Named\", data: { site: \"https://example.com/\" } }",
+        "out.data.site instanceof URL",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ kind: \"Tuple\", data: [\"https://example.com/\", 7] }",
+        "out.data[0] instanceof URL && out.data[1] === 7",
+    );
+
+    let rendered = Typescript::default()
+        .export(&semantic.apply_types(&types), specta_serde::Format)
+        .expect("adjacent enum should export");
+    assert!(rendered.contains("data: URL"), "{rendered}");
+}
+
+#[test]
+fn semantic_nullable_and_nested_enum_payloads_transform() {
+    let semantic = semantic_config();
+
+    let (types, dt) = mapped_types::<NullableEnum>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("nullable enum deserialization should be supported")
+        .expect("nullable enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value.Some!==undefined?({...value,Some:value.Some==null?value.Some:new URL(value.Some)}):value"
+    );
+    assert_runtime_js(&deserialize, "{ Some: null }", "out.Some === null");
+    assert_runtime_js(
+        &deserialize,
+        "{ Some: \"https://example.com/\" }",
+        "out.Some instanceof URL",
+    );
+    assert_runtime_js(&deserialize, "\"None\"", "out === \"None\"");
+
+    // A nested enum is transformed with the same representation-aware rules.
+    let (types, dt) = mapped_types::<NestedEnum>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("nested enum deserialization should be supported")
+        .expect("nested enum deserialization should require a transform");
+    assert_runtime_js(
+        &deserialize,
+        "{ Site: { Newtype: \"https://example.com/\" } }",
+        "out.Site.Newtype instanceof URL",
+    );
+    assert_runtime_js(&deserialize, "{ Count: 3 }", "out.Count === 3");
+}
+
+// A recursive enum cannot be fully expanded into one expression; the shared
+// stack cutoff stops the walk so the transform terminates (the same behavior
+// structs already have). The reachable top-level branch still transforms.
+#[test]
+fn semantic_recursive_enum_transforms_terminate() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<RecursiveEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("recursive enum deserialization should terminate")
+        .expect("recursive enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value.Leaf!==undefined?({...value,Leaf:new URL(value.Leaf)}):value"
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ Leaf: \"https://example.com/\" }",
+        "out.Leaf instanceof URL",
+    );
+}
+
+#[test]
+fn semantic_identity_rule_inside_an_enum_emits_no_runtime_transform() {
+    let semantic = identity_semantic_config();
+    let (types, dt) = mapped_types::<ExternalEnum>();
+
+    assert_eq!(
+        semantic
+            .try_apply_serialize(&types, &dt, "value")
+            .expect("identity rule should not fail"),
+        None
+    );
+    assert_eq!(
+        semantic
+            .try_apply_deserialize(&types, &dt, "value")
+            .expect("identity rule should not fail"),
+        None
+    );
+}
+
+#[test]
+fn semantic_date_enum_payloads_transform() {
+    let semantic = date_semantic_config();
+    let (types, dt) = mapped_types::<DateEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("date enum deserialization should be supported")
+        .expect("date enum deserialization should require a transform");
+    assert_runtime_js(
+        &deserialize,
+        "{ At: \"2020-01-01T00:00:00.000Z\" }",
+        "out.At instanceof Date && out.At.toISOString() === \"2020-01-01T00:00:00.000Z\"",
+    );
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("date enum serialization should be supported")
+        .expect("date enum serialization should require a transform");
+    assert_runtime_js(
+        &serialize,
+        "{ At: new Date(\"2020-01-01T00:00:00.000Z\") }",
+        "out.At === \"2020-01-01T00:00:00.000Z\"",
+    );
+}
+
+#[test]
+fn semantic_lossless_bigint_enum_payloads_transform() {
+    let semantic = Configuration::empty().enable_lossless_bigints();
+    let (types, dt) = mapped_types::<BigintEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("bigint enum deserialization should be supported")
+        .expect("bigint enum deserialization should require a transform");
+    assert_runtime_js(
+        &deserialize,
+        "{ Id: 123 }",
+        "typeof out.Id === \"bigint\" && out.Id === 123n",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ Name: \"specta\" }",
+        "out.Name === \"specta\"",
+    );
+}
+
+#[test]
+fn semantic_external_enum_with_non_identifier_keys_transforms() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<RenamedEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("renamed enum deserialization should be supported")
+        .expect("renamed enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&value[\"some-value\"]!==undefined?({...value,\"some-value\":new URL(value[\"some-value\"])}):value"
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ \"some-value\": \"https://example.com/\" }",
+        "out[\"some-value\"] instanceof URL",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ \"other-value\": \"plain\" }",
+        "out[\"other-value\"] === \"plain\"",
+    );
+}
+
+#[test]
+fn semantic_untagged_enum_with_a_required_transform_is_rejected() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<UntaggedEnum>();
+
+    for result in [
+        semantic.try_apply_serialize(&types, &dt, "value"),
+        semantic.try_apply_deserialize(&types, &dt, "value"),
+    ] {
+        let err = result.expect_err("an overlapping untagged enum must be rejected");
+        let message = err.to_string();
+        assert!(
+            message.contains("cannot be discriminated without guessing"),
+            "{message}"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "cannot be discriminated without guessing")]
+fn semantic_untagged_enum_panics_through_the_infallible_api() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<UntaggedEnum>();
+    let _ = semantic.apply_deserialize(&types, &dt, "value");
 }

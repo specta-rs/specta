@@ -190,6 +190,14 @@ enum ErrorKind {
         path: String,
         reason: Cow<'static, str>,
     },
+    /// A runtime semantic transform is required beneath a construct whose
+    /// wire shape cannot be discriminated without guessing (for example an
+    /// overlapping `#[serde(untagged)]` enum). Emitting a transform here
+    /// would risk the exported type and the runtime value diverging, so the
+    /// request is rejected instead.
+    UnsupportedSemanticTransform {
+        reason: Cow<'static, str>,
+    },
 }
 
 impl Error {
@@ -381,6 +389,12 @@ impl Error {
             reason: reason.into(),
         })
     }
+
+    pub(crate) fn unsupported_semantic_transform(reason: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(ErrorKind::UnsupportedSemanticTransform {
+            reason: reason.into(),
+        })
+    }
 }
 
 impl From<io::Error> for Error {
@@ -535,6 +549,10 @@ impl fmt::Display for Error {
                 f,
                 "Attempted to export {} but it is part of a recursive type-alias cycle that cannot be collapsed into valid TypeScript: {reason}. TypeScript rejects self-referential type aliases (TS2456); restructure the type so the recursion passes through an object, array, or tuple instead of a bare (untagged/transparent) reference.",
                 display_path(path)
+            ),
+            ErrorKind::UnsupportedSemanticTransform { reason } => write!(
+                f,
+                "Unable to generate a runtime semantic transform: {reason}. The exported type would otherwise disagree with the value crossing the wire."
             ),
         }?;
 
