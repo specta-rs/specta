@@ -1132,6 +1132,14 @@ fn push_list(s: &mut String, ty: &str, length: Option<usize>) {
     }
 }
 
+/// Whether a primitive renders as a union.
+///
+/// Floats render as `number | null` because NaN and Infinity are not
+/// representable as JSON numbers.
+fn primitive_is_union(p: &Primitive) -> bool {
+    matches!(p, Primitive::f16 | Primitive::f32 | Primitive::f64)
+}
+
 /// Whether `ty` can be written as an operand of a TypeScript intersection
 /// without parentheses.
 ///
@@ -1142,14 +1150,12 @@ fn push_list(s: &mut String, ty: &str, length: Option<usize>) {
 ///
 /// Precedence would ideally be carried alongside the rendered text. Until the
 /// renderer does that, we classify the datatype instead, treating anything we
-/// cannot prove atomic as non-atomic. Inline references and branded payloads
-/// are the cases where the rendered shape is not visible from the datatype.
+/// cannot prove atomic as non-atomic. Inline references, branded payloads and
+/// newtypes are the cases where the rendered shape is not visible from the
+/// datatype at the boundary.
 fn intersection_operand_is_atomic(ty: &DataType) -> bool {
     match ty {
-        // Floats render as `number | null` (NaN/Infinity are not representable
-        // as JSON numbers), so they are a union even though they are a
-        // primitive.
-        DataType::Primitive(p) => !matches!(p, Primitive::f16 | Primitive::f32 | Primitive::f64),
+        DataType::Primitive(p) => !primitive_is_union(p),
         DataType::Nullable(_) => false,
         // An enum renders a union of its variants (or `never` when empty), and
         // even a single-variant enum can render a union when its payload is
@@ -1158,6 +1164,19 @@ fn intersection_operand_is_atomic(ty: &DataType) -> bool {
         DataType::Intersection(parts) if parts.len() == 1 => {
             intersection_operand_is_atomic(&parts[0])
         }
+        // A genuine newtype (one declared unnamed field) renders as its bare
+        // inner type, so it inherits that type's precedence. Every other struct
+        // shape renders an object literal or tuple, both primary expressions.
+        // `inline_struct_with_generics` delegates unnamed fields to `struct_dt`,
+        // so this covers the inline path too.
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => unnamed
+                .fields
+                .first()
+                .and_then(|field| field.ty.as_ref())
+                .is_none_or(intersection_operand_is_atomic),
+            _ => true,
+        },
         // An inline reference is expanded where it is used. Its datatype is
         // attached to the reference (not resolved through `Types`), so we can
         // classify the shape that will actually be rendered.
@@ -1799,6 +1818,8 @@ fn trailing_optional_run<'a>(fields: impl Iterator<Item = &'a Field>) -> usize {
 /// while `[number, number | null?]` is not, and likewise for intersections.
 fn optional_element_needs_parens(ty: &DataType) -> bool {
     match ty {
+        // Floats render as `number | null`, which cannot take a trailing `?`.
+        DataType::Primitive(p) => primitive_is_union(p),
         DataType::Nullable(_) | DataType::Enum(_) | DataType::Intersection(_) => true,
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => optional_element_needs_parens(dt),

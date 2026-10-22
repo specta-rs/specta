@@ -1982,7 +1982,7 @@ struct InternallyTaggedIInner(String);
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
-enum InternallyTaggedL {
+pub(crate) enum InternallyTaggedL {
     // Internally tag enum with inlined field that is itself internally tagged
     #[specta(inline)]
     A(InternallyTaggedLInner),
@@ -1991,7 +1991,7 @@ enum InternallyTaggedL {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
-enum InternallyTaggedLInner {
+pub(crate) enum InternallyTaggedLInner {
     A,
     B,
 }

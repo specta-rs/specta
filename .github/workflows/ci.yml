@@ -101,3 +101,20 @@ jobs:
       - name: Typecheck and run generated Valibot schemas
         working-directory: tests/valibot-typecheck
         run: bun run test
+
+  # `tests/tests/typescript_precedence.rs` shells out to a TypeScript compiler
+  # to assert assignability of the generated types. It skips when no compiler
+  # is installed, so this job installs one and runs the module.
+  typescript-precedence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - name: Install TypeScript
+        run: bun install --global typescript@5.9.3
+      - name: Typecheck generated TypeScript
+        run: cargo test -p specta-tests --test test typescript_precedence

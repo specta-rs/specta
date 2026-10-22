@@ -88,6 +88,39 @@ fn inline_api_parenthesises_flattened_union() {
     );
 }
 
+/// A genuine newtype renders as its bare inner type. If that inner type is a
+/// union, it must still be parenthesised inside the flattened intersection.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum NewtypeUnion {
+    A { a: String },
+    B { b: u32 },
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NewtypeWrapper(#[specta(inline)] NewtypeUnion);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct NewtypeOuter {
+    x: bool,
+    #[serde(flatten)]
+    #[specta(inline)]
+    inner: NewtypeWrapper,
+}
+
+#[test]
+fn flattened_inline_newtype_union_is_parenthesised() {
+    let rendered = export::<NewtypeOuter>();
+    let expected = "export type NewtypeOuter = {\n\tx: boolean,\n} & (({ a: string }) & { b?: never } | ({ b: number }) & { a?: never });";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
 branded!(#[derive(Serialize)] pub struct Brand(Option<String>) as "Brand");
 
 #[derive(Type)]
@@ -158,6 +191,23 @@ struct Marker {
     x: bool,
 }
 
+/// An optional trailing tuple element whose type renders a union must be
+/// parenthesised before the `?`, or the output is a TypeScript syntax error
+/// (`[string, number | null?]`, TS17019).
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct OptionalFloatTuple(String, #[serde(default)] f32);
+
+#[test]
+fn optional_float_tuple_element_is_parenthesised() {
+    let rendered = export::<OptionalFloatTuple>();
+    let expected = "export type OptionalFloatTuple = [string, (number | null)?];";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
 /// Every operand that renders something other than a primary expression must be
 /// parenthesised. `Marker` and `T` render bare names and stay unwrapped.
 #[test]
@@ -191,27 +241,80 @@ fn intersection_operands_are_parenthesised_by_rendered_shape() {
     );
 }
 
+/// Wire evidence for the `InternallyTaggedL` fixture: an internally tagged enum
+/// whose inlined newtype variant wraps another internally tagged enum using the
+/// *same* tag key. Serde emits the inner enum's own tag into the outer map,
+/// producing duplicate `type` keys; `JSON.parse` keeps the last one, so the
+/// wire value collapses to `{ type: "B" }`. Serde itself cannot deserialize it
+/// back (`duplicate field`), so the fixture has no round-trippable contract.
+///
+/// The export requires the outer tag in every arm, which is the correct
+/// intersection semantics even though it cannot match the collapsed wire value.
+/// Pin the emitted type so this is a deliberate decision rather than a silently
+/// blessed snapshot.
+#[test]
+fn same_tag_key_nested_internal_enum_has_no_wire_contract() {
+    use crate::types::{InternallyTaggedL, InternallyTaggedLInner};
+
+    let value = InternallyTaggedL::A(InternallyTaggedLInner::B);
+    let serialized = serde_json::to_string(&value).unwrap();
+    assert_eq!(serialized, r#"{"type":"A","type":"B"}"#);
+    assert!(
+        serde_json::from_str::<InternallyTaggedL>(&serialized).is_err(),
+        "Serde rejects the duplicate tag key it just produced"
+    );
+
+    let rendered = export::<InternallyTaggedL>();
+    let expected = "export type InternallyTaggedL = {\n\ttype: \"A\",\n} & ({ type: \"A\" } | { type: \"B\" });";
+    assert!(
+        rendered.contains(expected),
+        "expected:\n{expected}\n\ngot:\n{rendered}"
+    );
+}
+
 /// Locate a TypeScript compiler, if one is installed.
 ///
-/// `SPECTA_TSC` overrides the lookup with a whitespace-separated command (for
-/// example `bunx tsc`). CI does not install Node, so the assignability checks
-/// are skipped there and the exact-string assertions above remain the
-/// authoritative coverage.
+/// `SPECTA_TSC` overrides the lookup. Its value is split on whitespace, so it
+/// cannot express arguments containing spaces; point it at a wrapper script if
+/// that is needed. Setting it to an empty value is an error rather than a
+/// silent skip.
+///
+/// Without an override the candidates are tried in order: `tsc`, `bunx tsc`,
+/// then `npx --yes --package typescript tsc`. When none is available the
+/// assignability check is skipped and the exact-string assertions above remain
+/// the authoritative coverage.
 fn typescript_compiler() -> Option<Vec<String>> {
     if let Ok(command) = std::env::var("SPECTA_TSC") {
         let parts = command
             .split_whitespace()
             .map(str::to_string)
             .collect::<Vec<_>>();
-        return (!parts.is_empty()).then_some(parts);
+        assert!(
+            !parts.is_empty(),
+            "SPECTA_TSC is set but does not resolve to a command"
+        );
+        return Some(parts);
     }
 
-    Command::new("tsc")
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|_| vec!["tsc".to_string()])
+    [
+        vec!["tsc".to_string()],
+        vec!["bunx".to_string(), "tsc".to_string()],
+        vec![
+            "npx".to_string(),
+            "--yes".to_string(),
+            "--package".to_string(),
+            "typescript".to_string(),
+            "tsc".to_string(),
+        ],
+    ]
+    .into_iter()
+    .find(|candidate| {
+        Command::new(&candidate[0])
+            .args(&candidate[1..])
+            .arg("--version")
+            .output()
+            .is_ok_and(|output| output.status.success())
+    })
 }
 
 /// Negative assignability: the shapes `tsc` used to accept must now be
@@ -228,6 +331,8 @@ fn generated_typescript_passes_strict_typecheck() {
 
     let types = Types::default()
         .register::<FlattenedOuter>()
+        .register::<NewtypeOuter>()
+        .register::<OptionalFloatTuple>()
         .register::<BrandHolder>()
         .register::<Alias>();
     let generated = Typescript::default()
@@ -240,6 +345,19 @@ const flattenedA: FlattenedOuter = { x: true, a: "value" };
 const flattenedB: FlattenedOuter = { x: true, b: 1 };
 // @ts-expect-error `x` is required; before the fix the second arm escaped the intersection.
 const missingX: FlattenedOuter = { b: 1 };
+
+// A newtype renders as its bare inner union, which must still be parenthesised.
+const newtypeA: NewtypeOuter = { x: true, a: "value" };
+const newtypeB: NewtypeOuter = { x: true, b: 1 };
+// @ts-expect-error `x` is required in every arm of the newtype's union.
+const newtypeMissingX: NewtypeOuter = { b: 1 };
+
+// A trailing optional float tuple element must be parenthesised to parse.
+const tupleShort: OptionalFloatTuple = ["value"];
+const tupleNull: OptionalFloatTuple = ["value", null];
+const tupleNumber: OptionalFloatTuple = ["value", 1.5];
+// @ts-expect-error the second element must be a number or null.
+const tupleBad: OptionalFloatTuple = ["value", "bad"];
 
 // A branded value is its payload intersected with the brand marker.
 const branded: BrandHolder["value"] = "value" as string & { readonly __brand: "Brand" };
@@ -257,6 +375,13 @@ const missingOther: Alias_Deserialize = { a: 1 };
 void flattenedA;
 void flattenedB;
 void missingX;
+void newtypeA;
+void newtypeB;
+void newtypeMissingX;
+void tupleShort;
+void tupleNull;
+void tupleNumber;
+void tupleBad;
 void branded;
 void unbranded;
 void nullBrand;
@@ -272,6 +397,7 @@ void missingOther;
     std::fs::write(&file, format!("{generated}\n{assertions}")).unwrap();
 
     let program = compiler.remove(0);
+    eprintln!("typechecking generated TypeScript with {program}");
     let output = Command::new(&program)
         .args(&compiler)
         .args([
