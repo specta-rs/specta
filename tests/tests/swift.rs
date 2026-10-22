@@ -853,6 +853,31 @@ struct SwiftNamedNestedOptional {
     y: u8,
 }
 
+/// A `#[serde(skip_serializing_if = "Vec::is_empty")]` non-`Option` field: serde
+/// omits it when serializing but still *requires* the key when deserializing.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedSkipVec {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    x: Vec<u8>,
+    y: u8,
+}
+
+/// A container-level `#[serde(default)]`: serde tolerates an absent key for
+/// every field.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct SwiftNamedContainerDefault {
+    x: u8,
+    y: u8,
+}
+
+/// An empty named struct: serde writes and reads `{}`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNamedEmpty {}
+
 fn swift_wire_types() -> Types {
     Types::default()
         .register::<SwiftNewtype>()
@@ -1475,6 +1500,10 @@ fn swift_named_struct_optionals_round_trip() {
         "a plain optional must be written unconditionally:\n{exported}"
     );
     assert!(
+        exported.contains("public init(from decoder: Decoder) throws {"),
+        "a hand-written codec must replace the synthesised one:\n{exported}"
+    );
+    assert!(
         !exported.contains("encodeIfPresent"),
         "the hand-written codec must not use `encodeIfPresent`:\n{exported}"
     );
@@ -1615,6 +1644,113 @@ check(decode(namedNestedNullJSON, SwiftNamedNestedOptionalDeserialize.self).x ==
 print("SWIFT-OK")
 "#,
         swift_named_fixtures()
+    );
+
+    run_swift(&exported, &harness);
+}
+
+/// A bare `#[serde(skip_serializing_if = ...)]` does not make a field
+/// absent-tolerant on deserialize: serde omits the key when serializing but
+/// still errors on the absent key. The unified codec must reproduce that
+/// asymmetry, while a container-level `#[serde(default)]` (which *does*
+/// tolerate absence) must still decode an absent key, and an empty named struct
+/// must stay constructible and round-trip as `{}`.
+#[test]
+fn swift_named_skip_if_and_default_decode_tolerance() {
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedSkipVec { x: vec![], y: 1 }).unwrap(),
+        r#"{"y":1}"#
+    );
+    assert_eq!(
+        serde_json::to_string(&SwiftNamedSkipVec { x: vec![1], y: 1 }).unwrap(),
+        r#"{"x":[1],"y":1}"#
+    );
+    assert!(
+        serde_json::from_str::<SwiftNamedSkipVec>(r#"{"y":1}"#).is_err(),
+        "serde requires the key when deserializing a bare `skip_serializing_if` field"
+    );
+    assert!(serde_json::from_str::<SwiftNamedSkipVec>(r#"{"x":[],"y":1}"#).is_ok());
+    assert!(serde_json::from_str::<SwiftNamedContainerDefault>(r#"{}"#).is_ok());
+    assert_eq!(serde_json::to_string(&SwiftNamedEmpty {}).unwrap(), r#"{}"#);
+    assert!(serde_json::from_str::<SwiftNamedEmpty>(r#"{}"#).is_ok());
+
+    let types = Types::default()
+        .register::<SwiftNamedSkipVec>()
+        .register::<SwiftNamedContainerDefault>()
+        .register::<SwiftNamedEmpty>();
+    let exported = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect("named structs should export");
+    assert!(
+        exported.contains("self.x = try container.decode([UInt8].self, forKey: .x)"),
+        "a bare `skip_serializing_if` field must be required on decode:\n{exported}"
+    );
+    assert!(
+        exported.contains("public init() {}"),
+        "an empty named struct needs a public initializer:\n{exported}"
+    );
+
+    let harness = format!(
+        r#"let skipVecOmittedJSON = {}
+let skipVecPresentJSON = {}
+let containerDefaultEmptyJSON = {}
+let emptyJSON = {}
+{}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+func throwsError(_ body: () throws -> Void) -> Bool {{
+    do {{
+        try body()
+        return false
+    }} catch {{
+        return true
+    }}
+}}
+
+// `skip_serializing_if` omits the key when serializing...
+expect(encode(SwiftNamedSkipVec(x: nil, y: 1)), skipVecOmittedJSON, "skip-if nil omits key")
+expect(encode(SwiftNamedSkipVec(x: [1], y: 1)), skipVecPresentJSON, "skip-if value writes key")
+// ...but serde still requires it when deserializing, and so must the codec.
+check(
+    throwsError {{ _ = try JSONDecoder().decode(SwiftNamedSkipVec.self, from: skipVecOmittedJSON.data(using: .utf8)!) }},
+    "skip-if absent key must throw"
+)
+check(decode(skipVecPresentJSON, SwiftNamedSkipVec.self).x == [1], "skip-if present decodes")
+
+// A container-level `#[serde(default)]` does tolerate an absent key.
+check(decode(containerDefaultEmptyJSON, SwiftNamedContainerDefault.self).x == nil, "container default decodes empty")
+expect(encode(SwiftNamedContainerDefault(x: nil, y: nil)), containerDefaultEmptyJSON, "container default nil omits both")
+
+// An empty named struct writes and reads an empty object and is publicly
+// constructible.
+expect(encode(SwiftNamedEmpty()), emptyJSON, "empty encodes object")
+_ = decode(emptyJSON, SwiftNamedEmpty.self)
+
+print("SWIFT-OK")
+"#,
+        swift_literal(&swift_sorted_json(&SwiftNamedSkipVec { x: vec![], y: 1 })),
+        swift_literal(&swift_sorted_json(&SwiftNamedSkipVec { x: vec![1], y: 1 })),
+        swift_literal(r#"{}"#),
+        swift_literal(r#"{}"#),
+        "",
     );
 
     run_swift(&exported, &harness);

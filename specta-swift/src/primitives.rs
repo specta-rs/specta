@@ -129,6 +129,17 @@ const FLATTENED_FIELD: &str = "serde:field:flatten";
 /// from a `#[serde(default)]`-optional element, which serde still writes.
 const SERIALIZE_OMISSION_FIELD: &str = "specta_serde:serialize_omission";
 
+/// Field attribute recorded by the derive macro for `#[serde(default)]`.
+/// `specta-serde` sets `Field::optional` for it, but so does
+/// `#[serde(skip_serializing_if)]`, which serde does *not* tolerate an absent
+/// key for on its own -- so the attribute itself is what distinguishes a
+/// genuinely absent-tolerant field.
+const DEFAULTED_FIELD: &str = "serde:field:default";
+
+/// Container attribute for `#[serde(default)]` on a struct: serde applies the
+/// container's `Default` to every absent field, so each one is absent-tolerant.
+const DEFAULTED_CONTAINER: &str = "serde:container:default";
+
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
     /// The wire key carrying the discriminant (serde's `tag`).
@@ -1124,12 +1135,22 @@ fn struct_to_swift(
             }
         }
         specta::datatype::Fields::Named(fields) => {
-            let live = keyed_fields(swift, format, types, fields, &generic_scope)?;
+            let container_default = s.attributes.contains_key(DEFAULTED_CONTAINER);
+            let live = keyed_fields(
+                swift,
+                format,
+                types,
+                fields,
+                container_default,
+                &generic_scope,
+            )?;
 
             // An empty named struct writes `{}` and reads `{}`, which the
-            // synthesised keyed `Codable` already produces exactly.
+            // synthesised keyed `Codable` already produces exactly. Only the
+            // public initializer is added so it stays constructible from
+            // another module, like every other named struct.
             if live.is_empty() {
-                return Ok(String::new());
+                return Ok("    public init() {}\n".to_string());
             }
 
             let mut result = String::new();
@@ -1168,9 +1189,10 @@ fn struct_to_swift(
                 "\n    public init({parameters}) {{\n{assignments}\n    }}\n"
             ));
 
-            // serde accepts an absent key wherever the field is `Option<T>` or
-            // `#[serde(default)]`-ed (a `skip_serializing_if` field is also
-            // absent-tolerant on read), and requires it otherwise.
+            // serde accepts an absent key only for an `Option<T>` or a
+            // `#[serde(default)]` field (see `may_be_absent_on_decode`); every
+            // other field, including one with a bare `skip_serializing_if`, is
+            // required.
             result.push_str("\n    public init(from decoder: Decoder) throws {\n");
             result.push_str(
                 "        let container = try decoder.container(keyedBy: CodingKeys.self)\n",
@@ -1231,6 +1253,9 @@ struct KeyedField<'a> {
     /// `Nullable` is unwrapped so a single `?` from `decodeIfPresent` yields
     /// the property's optionality.
     decode_type: String,
+    /// Whether serde tolerates an absent key for this field on its own: it
+    /// carries `#[serde(default)]`, or its struct does.
+    defaulted: bool,
 }
 
 impl KeyedField<'_> {
@@ -1251,11 +1276,18 @@ impl KeyedField<'_> {
             || (self.field.optional && !self.is_nullable())
     }
 
-    /// Whether serde accepts an absent key when decoding (`Option<T>` or a
-    /// `#[serde(default)]`/`skip_serializing_if` field), as opposed to
+    /// Whether serde accepts an absent key when decoding, as opposed to
     /// requiring it.
+    ///
+    /// serde tolerates absence only for an `Option<T>` (a missing key yields
+    /// `None`) or a `#[serde(default)]` field/struct. A bare
+    /// `#[serde(skip_serializing_if = ...)]` does *not*: it omits the key when
+    /// serializing but still errors on the absent key when deserializing.
+    /// `specta-serde` marks such a field `optional`, so this cannot key off
+    /// `Field::optional` alone. A field whose property is not optional must
+    /// still `decode` (a `decodeIfPresent` would not fit the property type).
     fn may_be_absent_on_decode(&self) -> bool {
-        field_is_optional(self.field)
+        field_is_optional(self.field) && (self.is_nullable() || self.defaulted)
     }
 }
 
@@ -1265,6 +1297,7 @@ fn keyed_fields<'a>(
     format: Option<&dyn Format>,
     types: &Types,
     fields: &'a NamedFields,
+    container_default: bool,
     generic_scope: &[Generic],
 ) -> Result<Vec<KeyedField<'a>>, Error> {
     let mut out = Vec::new();
@@ -1291,6 +1324,7 @@ fn keyed_fields<'a>(
             field,
             property_type,
             decode_type,
+            defaulted: container_default || field.attributes.contains_key(DEFAULTED_FIELD),
         });
     }
     Ok(out)
