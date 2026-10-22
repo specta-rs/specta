@@ -651,7 +651,13 @@ impl Configuration {
 
                 match &r.inner {
                     NamedReferenceType::Inline { dt, .. } => self.apply_inner(walk, dt, js_ident),
-                    NamedReferenceType::Recursive(_) => None,
+                    // An inline cycle was cut short during definition. Treat it
+                    // like the cycle-stack cutoff so an enclosing enum reports
+                    // it rather than emitting a silently partial transform.
+                    NamedReferenceType::Recursive(_) => {
+                        walk.recursion_cut = true;
+                        None
+                    }
                     NamedReferenceType::Reference { .. } => {
                         let ndt = walk.types.get(r)?;
 
@@ -1414,6 +1420,12 @@ fn tag_branch_guards(
 /// serialized name, while a unit (or collapsed) variant is the bare string.
 /// The discriminators must be distinct so overlapping shapes are rejected
 /// rather than mis-dispatched.
+///
+/// The keyed guard uses an own-property check rather than `value.name !==
+/// undefined`: the latter is also true for members inherited from
+/// `Object.prototype` (a variant named `constructor`, `valueOf`, `toString`,
+/// … would otherwise be selected for any object). The `=== literal` guard for
+/// unit variants compares against a specific string, so it is unaffected.
 fn external_branch_guards(
     active: &[&(Cow<'static, str>, Variant)],
     js_ident: &str,
@@ -1426,8 +1438,8 @@ fn external_branch_guards(
             Fields::Named(named) if named.fields.len() == 1 => {
                 let name = named.fields[0].0.to_string();
                 let guard = format!(
-                    "{js_ident}!=null&&{}!==undefined",
-                    js_property_access(js_ident, &name),
+                    "{js_ident}!=null&&Object.prototype.hasOwnProperty.call({js_ident},{})",
+                    js_string_literal(&name),
                 );
                 (name, guard)
             }

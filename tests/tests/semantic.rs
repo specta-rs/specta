@@ -199,6 +199,23 @@ enum RenamedEnum {
     Other(String),
 }
 
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum PrototypeEnum {
+    #[serde(rename = "valueOf")]
+    ValueOf(Website),
+    #[serde(rename = "constructor")]
+    Constructor(Website),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum InlineRecursiveEnum {
+    Leaf(Website),
+    #[specta(inline)]
+    Next(Box<InlineRecursiveEnum>),
+}
+
 fn semantic_config() -> Configuration {
     Configuration::empty().define::<Website>(
         |_| define("URL").into(),
@@ -234,11 +251,19 @@ fn mapped_types<T: Type>() -> (Types, DataType) {
     (types, dt)
 }
 
+/// Whether a `node` executable is on `PATH`.
+///
+/// Runtime assertions are executed with `node` when it is available. GitHub's
+/// hosted runners ship Node, so CI exercises them; on a machine without Node
+/// they are skipped (set `SPECTA_REQUIRE_NODE=1` to turn that into a failure).
 fn node_available() -> bool {
-    std::process::Command::new("node")
-        .arg("--version")
-        .output()
-        .is_ok()
+    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *AVAILABLE.get_or_init(|| {
+        std::process::Command::new("node")
+            .arg("--version")
+            .output()
+            .is_ok()
+    })
 }
 
 /// Execute `transform` (an expression built around `value`) on `input` in a
@@ -246,8 +271,17 @@ fn node_available() -> bool {
 ///
 /// The generated expression is only meaningful as JavaScript, so this is the
 /// only way to check that the runtime value actually matches the exported type.
+///
+/// If `node` is not on `PATH` the assertion is **skipped**, so the suite still
+/// passes on machines without Node; set `SPECTA_REQUIRE_NODE=1` to make a
+/// missing runtime fail instead. CI runs with Node available, so the "executed
+/// under node" evidence is reproducible there.
 fn assert_runtime_js(transform: &str, input: &str, assertion: &str) {
     if !node_available() {
+        assert!(
+            std::env::var_os("SPECTA_REQUIRE_NODE").is_none(),
+            "SPECTA_REQUIRE_NODE is set but `node` was not found on PATH; cannot execute the generated JavaScript"
+        );
         return;
     }
 
@@ -569,7 +603,7 @@ fn semantic_external_enum_runtime_transforms_match_the_exported_type() {
         .expect("external enum serialization should require a transform");
     assert_eq!(
         serialize,
-        "value!=null&&value.Newtype!==undefined?({...value,Newtype:value.Newtype.toString()}):value!=null&&value.Named!==undefined?({...value,Named:({...value.Named,site:value.Named.site.toString()})}):value!=null&&value.Tuple!==undefined?({...value,Tuple:([value.Tuple[0].toString(),value.Tuple[1]])}):value"
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"Newtype\")?({...value,Newtype:value.Newtype.toString()}):value!=null&&Object.prototype.hasOwnProperty.call(value,\"Named\")?({...value,Named:({...value.Named,site:value.Named.site.toString()})}):value!=null&&Object.prototype.hasOwnProperty.call(value,\"Tuple\")?({...value,Tuple:([value.Tuple[0].toString(),value.Tuple[1]])}):value"
     );
 
     let (_, deserialize) = semantic
@@ -578,7 +612,7 @@ fn semantic_external_enum_runtime_transforms_match_the_exported_type() {
         .expect("external enum deserialization should require a transform");
     assert_eq!(
         deserialize,
-        "value!=null&&value.Newtype!==undefined?({...value,Newtype:new URL(value.Newtype)}):value!=null&&value.Named!==undefined?({...value,Named:({...value.Named,site:new URL(value.Named.site)})}):value!=null&&value.Tuple!==undefined?({...value,Tuple:([new URL(value.Tuple[0]),value.Tuple[1]])}):value"
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"Newtype\")?({...value,Newtype:new URL(value.Newtype)}):value!=null&&Object.prototype.hasOwnProperty.call(value,\"Named\")?({...value,Named:({...value.Named,site:new URL(value.Named.site)})}):value!=null&&Object.prototype.hasOwnProperty.call(value,\"Tuple\")?({...value,Tuple:([new URL(value.Tuple[0]),value.Tuple[1]])}):value"
     );
 
     // The unit variant is a bare string and stays untouched.
@@ -704,7 +738,7 @@ fn semantic_nullable_and_nested_enum_payloads_transform() {
         .expect("nullable enum deserialization should require a transform");
     assert_eq!(
         deserialize,
-        "value!=null&&value.Some!==undefined?({...value,Some:value.Some==null?value.Some:new URL(value.Some)}):value"
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"Some\")?({...value,Some:value.Some==null?value.Some:new URL(value.Some)}):value"
     );
     assert_runtime_js(&deserialize, "{ Some: null }", "out.Some === null");
     assert_runtime_js(
@@ -763,9 +797,40 @@ fn semantic_recursive_enum_is_reported_unsupported() {
     // Evidence: the partial expansion that used to be emitted is wrong - the
     // nested `Next.Leaf` stays a string even though the exported type says URL.
     assert_runtime_js(
-        "value!=null&&value.Leaf!==undefined?({...value,Leaf:new URL(value.Leaf)}):value",
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"Leaf\")?({...value,Leaf:new URL(value.Leaf)}):value",
         "{ Next: { Leaf: \"https://example.com/\" } }",
         "typeof out.Next.Leaf === \"string\"",
+    );
+}
+
+// `#[specta(inline)]` recursion resolves to `NamedReferenceType::Recursive`,
+// which the exporter rejects. The semantic layer must report it as a recursive
+// enum too (with type context) rather than emitting a silently partial
+// transform with the misleading untagged-ambiguity reason.
+#[test]
+fn semantic_inline_recursive_enum_is_reported_unsupported() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<InlineRecursiveEnum>();
+
+    for result in [
+        semantic.try_apply_serialize(&types, &dt, "value"),
+        semantic.try_apply_deserialize(&types, &dt, "value"),
+    ] {
+        let error = result.expect_err("an inline recursive enum must be reported");
+        assert!(
+            error.to_string().contains("the enum is recursive"),
+            "{error}"
+        );
+        assert!(
+            error.to_string().contains("InlineRecursiveEnum"),
+            "the diagnostic should name the enum: {error}"
+        );
+    }
+
+    assert_eq!(
+        semantic.apply_deserialize(&types, &dt, "value"),
+        None,
+        "an inline recursive enum has no transform"
     );
 }
 
@@ -871,7 +936,7 @@ fn semantic_external_enum_with_non_identifier_keys_transforms() {
         .expect("renamed enum deserialization should require a transform");
     assert_eq!(
         deserialize,
-        "value!=null&&value[\"some-value\"]!==undefined?({...value,\"some-value\":new URL(value[\"some-value\"])}):value"
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"some-value\")?({...value,\"some-value\":new URL(value[\"some-value\"])}):value"
     );
     assert_runtime_js(
         &deserialize,
@@ -882,6 +947,52 @@ fn semantic_external_enum_with_non_identifier_keys_transforms() {
         &deserialize,
         "{ \"other-value\": \"plain\" }",
         "out[\"other-value\"] === \"plain\"",
+    );
+}
+
+// Regression coverage: `value.<Name> !== undefined` is also true for members
+// inherited from `Object.prototype`, so a variant renamed to a prototype member
+// (`valueOf`, `constructor`, `toString`, …) used to be selected for any object.
+#[test]
+fn semantic_external_enum_guards_ignore_prototype_members() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<PrototypeEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("prototype-named enum deserialization should be supported")
+        .expect("prototype-named enum deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"valueOf\")?({...value,valueOf:new URL(value.valueOf)}):value!=null&&Object.prototype.hasOwnProperty.call(value,\"constructor\")?({...value,constructor:new URL(value.constructor)}):value"
+    );
+
+    // `{ valueOf: ... }` must take the `valueOf` branch. Before the fix the
+    // inherited `constructor` matched first, so `new URL(Object)` threw.
+    assert_runtime_js(
+        &deserialize,
+        "{ valueOf: \"https://example.com/vof\" }",
+        "out.valueOf instanceof URL && out.valueOf.href === \"https://example.com/vof\"",
+    );
+    assert_runtime_js(
+        &deserialize,
+        "{ constructor: \"https://example.com/ctor\" }",
+        "out.constructor instanceof URL && out.constructor.href === \"https://example.com/ctor\"",
+    );
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("prototype-named enum serialization should be supported")
+        .expect("prototype-named enum serialization should require a transform");
+    assert_runtime_js(
+        &serialize,
+        "{ valueOf: new URL(\"https://example.com/vof\") }",
+        "out.valueOf === \"https://example.com/vof\"",
+    );
+    assert_runtime_js(
+        &serialize,
+        "{ constructor: new URL(\"https://example.com/ctor\") }",
+        "out.constructor === \"https://example.com/ctor\"",
     );
 }
 
