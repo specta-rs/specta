@@ -360,8 +360,9 @@ fn deserialize_phase_schema(types: &Types, format: &dyn Format, base: &str) -> s
 
 /// An externally or adjacently tagged variant's *named payload* object must be
 /// closed when the enum container carries `deny_unknown_fields` — Serde rejects
-/// unknown keys there too. The tag wrapper is strict either way; this covers the
-/// payload nested inside it.
+/// unknown keys there too. This covers the payload nested inside the wrapper;
+/// the wrapper's own top-level keys are covered by
+/// `jsonschema_external_wrapper_is_always_strict_but_adjacent_is_not`.
 ///
 /// Asserted against real `serde_json` accept/reject under the
 /// deserialization-compatible mode, in both format phases.
@@ -454,4 +455,151 @@ fn jsonschema_deny_unknown_fields_closes_external_and_adjacent_payloads() {
         "adjacent payload must be closed: {}",
         adjacent["$defs"]["AdjacentDeny"]
     );
+}
+
+/// Serde's external tagging accepts exactly one key, so an externally tagged
+/// enum's wrapper must reject a second top-level key even in the
+/// deserialization-compatible mode — for deny-marked *and* ordinary enums.
+///
+/// Adjacent tagging is deliberately left open: Serde accepts extra keys
+/// alongside `tag`/`content` unless the container also denies unknown fields.
+#[test]
+fn jsonschema_external_wrapper_is_always_strict_but_adjacent_is_not() {
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    enum ExternalOpen {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    enum ExternalDeny {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c")]
+    enum AdjacentOpen {
+        V { a: i32 },
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c", deny_unknown_fields)]
+    enum AdjacentDeny {
+        V { a: i32 },
+    }
+
+    let types = Types::default()
+        .register::<ExternalOpen>()
+        .register::<ExternalDeny>()
+        .register::<AdjacentOpen>()
+        .register::<AdjacentDeny>();
+
+    let external_second_key = serde_json::json!({ "V": { "a": 1 }, "W": 1 });
+    let adjacent_extra_key = serde_json::json!({ "t": "V", "c": { "a": 1 }, "extra": true });
+
+    // Ground truth from Serde: external tagging rejects the second key with or
+    // without `deny_unknown_fields`; adjacent tagging only rejects it when the
+    // container denies.
+    assert!(serde_json::from_value::<ExternalOpen>(external_second_key.clone()).is_err());
+    assert!(serde_json::from_value::<ExternalDeny>(external_second_key.clone()).is_err());
+    assert!(serde_json::from_value::<AdjacentOpen>(adjacent_extra_key.clone()).is_ok());
+    assert!(serde_json::from_value::<AdjacentDeny>(adjacent_extra_key.clone()).is_err());
+
+    for (phase, format) in [
+        ("unified", &specta_serde::Format as &dyn Format),
+        ("phases", &specta_serde::PhasesFormat as &dyn Format),
+    ] {
+        for (shape, name, json, closed) in [
+            ("external open", "ExternalOpen", &external_second_key, true),
+            ("external deny", "ExternalDeny", &external_second_key, true),
+            ("adjacent open", "AdjacentOpen", &adjacent_extra_key, false),
+            ("adjacent deny", "AdjacentDeny", &adjacent_extra_key, true),
+        ] {
+            let schema = deserialize_phase_schema(&types, format, name);
+            let validator = jsonschema::validator_for(&schema)
+                .unwrap_or_else(|err| panic!("{phase}: {shape} schema invalid: {err}"));
+            assert_eq!(
+                validator.is_valid(json),
+                !closed,
+                "{phase}: the {shape} wrapper must {} a second top-level key",
+                if closed { "reject" } else { "accept" }
+            );
+        }
+    }
+}
+
+/// Two rows of the representation table that need their own coverage:
+///
+/// - a newtype variant wrapping a named type is **not** closed by the
+///   container's `deny_unknown_fields`, because Serde does not propagate it into
+///   the inner type's own deserializer;
+/// - an inline (anonymous) named struct **is** closed by its own
+///   `deny_unknown_fields`.
+#[test]
+fn jsonschema_newtype_and_inline_payloads_match_serde() {
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct Inner {
+        a: i32,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(deny_unknown_fields)]
+    enum ExternalNewtypeDeny {
+        V(Inner),
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false, inline)]
+    #[serde(deny_unknown_fields)]
+    struct InlineStrict {
+        a: i32,
+    }
+
+    #[derive(Type, Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct InlineHolder {
+        inner: InlineStrict,
+    }
+
+    let types = Types::default()
+        .register::<ExternalNewtypeDeny>()
+        .register::<InlineHolder>();
+
+    let newtype_payload = serde_json::json!({ "V": { "a": 1, "extra": true } });
+    let inline_payload = serde_json::json!({ "inner": { "a": 1, "extra": true } });
+
+    // Ground truth from Serde.
+    assert!(serde_json::from_value::<ExternalNewtypeDeny>(newtype_payload.clone()).is_ok());
+    assert!(serde_json::from_value::<InlineHolder>(inline_payload.clone()).is_err());
+
+    for (phase, format) in [
+        ("unified", &specta_serde::Format as &dyn Format),
+        ("phases", &specta_serde::PhasesFormat as &dyn Format),
+    ] {
+        for (shape, name, json, closed) in [
+            (
+                "external newtype",
+                "ExternalNewtypeDeny",
+                &newtype_payload,
+                false,
+            ),
+            ("inline struct", "InlineHolder", &inline_payload, true),
+        ] {
+            let schema = deserialize_phase_schema(&types, format, name);
+            let validator = jsonschema::validator_for(&schema)
+                .unwrap_or_else(|err| panic!("{phase}: {shape} schema invalid: {err}"));
+            assert_eq!(
+                validator.is_valid(json),
+                !closed,
+                "{phase}: the {shape} schema must {} an unknown key, matching Serde",
+                if closed { "reject" } else { "accept" }
+            );
+        }
+    }
 }

@@ -16,10 +16,17 @@ use crate::{Error, SchemaVersion};
 
 const INLINE_RECURSION_LIMIT: usize = 128;
 const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
-/// Authored `#[serde(deny_unknown_fields)]`. Distinct from the synthetic
-/// `specta:strict_object` marker that specta-serde puts on externally-tagged
-/// wrappers, which must stay strict regardless of the schema policy.
+/// Authored `#[serde(deny_unknown_fields)]`. Distinct from
+/// [`SERDE_STRICT_OBJECT_MARKER`], which specta-serde puts on the wrapper it
+/// generates for an externally tagged variant.
 const SERDE_CONTAINER_DENY_UNKNOWN_FIELDS: &str = "serde:container:deny_unknown_fields";
+/// Marks a synthetic object wrapper whose wire format accepts exactly one key.
+/// specta-serde sets it on the wrapper it generates for an externally tagged
+/// variant. This is not authored metadata — it describes the tagging
+/// representation itself — so such a wrapper is closed regardless of the schema
+/// policy. Adjacently tagged variants deliberately do not carry it: Serde does
+/// accept extra keys alongside `tag`/`content`.
+const SERDE_STRICT_OBJECT_MARKER: &str = "specta:strict_object";
 const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
 const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
 const SERDE_ENUM_OTHER_VARIANT: &str = "specta_serde:variant_other";
@@ -993,12 +1000,19 @@ impl<'a> Renderer<'a> {
                     }
                 }
                 Fields::Named(fields) => {
+                    // A specta-serde rewritten external variant renders its
+                    // one-key tag wrapper here (not through
+                    // `external_variant_schema`), and Serde rejects a second key
+                    // in that wrapper even without `deny_unknown_fields`, so it
+                    // stays closed regardless of the schema policy.
+                    let strict_wrapper =
+                        rewritten && variant.attributes.contains_key(SERDE_STRICT_OBJECT_MARKER);
                     let payload = self.render_fields(
                         &Fields::Named(fields.clone()),
                         generics,
                         path,
                         depth + 1,
-                        deny_unknown_fields,
+                        deny_unknown_fields || strict_wrapper,
                     )?;
                     if rewritten {
                         payload
@@ -1049,9 +1063,13 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    /// An externally-tagged variant's wrapper: exactly one key, the variant
-    /// name. Genuinely strict regardless of the schema policy, because Serde
-    /// rejects a second key here even without `deny_unknown_fields`.
+    /// Wrapper for an externally-tagged variant that has *not* been rewritten by
+    /// specta-serde (no Serde format applied). Serde's external tagging accepts
+    /// exactly one key, so this is strict regardless of the schema policy.
+    ///
+    /// A rewritten external variant never reaches here: it renders as a named
+    /// object through `render_fields`, where the same one-key rule is applied
+    /// via [`SERDE_STRICT_OBJECT_MARKER`].
     fn external_variant_schema(&self, name: &str, payload: Value) -> Value {
         let mut properties = Map::new();
         properties.insert(name.to_string(), payload);
