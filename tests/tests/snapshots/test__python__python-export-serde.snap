@@ -478,9 +478,7 @@ _specta_typed_dict_test__types__Issue221UntaggedMixedA = _specta_typing.TypedDic
 
 _specta_typed_dict_test__types__Issue221UntaggedMixedB = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedMixedB", {"b": "_specta_builtins.str"})
 
-_specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe", {"values": "_specta_builtins.dict[_specta_builtins.str, _specta_builtins.str]"})
-
-type Issue221UntaggedMixed = _specta_typed_dict_test__types__Issue221UntaggedMixedA | _specta_typed_dict_test__types__Issue221UntaggedMixedB | _specta_typed_dict_test__types__Issue221UntaggedMixedUnsafe
+type Issue221UntaggedMixed = _specta_builtins.dict[_specta_builtins.str, _specta_builtins.str] | _specta_typed_dict_test__types__Issue221UntaggedMixedA | _specta_typed_dict_test__types__Issue221UntaggedMixedB
 
 _specta_typed_dict_test__types__Issue221UntaggedSafeA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221UntaggedSafeA", {"a": "_specta_builtins.str"})
 
@@ -557,9 +555,7 @@ _specta_typed_dict_test__types__MyEnumTaggedVariantintersection0 = _specta_typin
 
 type MyEnumTagged = _specta_typed_dict_test__types__MyEnumTaggedVariantintersection0
 
-_specta_typed_dict_test__types__MyEnumUntaggedVariant = _specta_typing.TypedDict("_specta_typed_dict_test__types__MyEnumUntaggedVariant", {"inner": "First"})
-
-type MyEnumUntagged = _specta_typed_dict_test__types__MyEnumUntaggedVariant
+type MyEnumUntagged = First
 
 class NamedConstGeneric(_specta_typing.TypedDict):
     data: _specta_builtins.list[_specta_builtins.int]

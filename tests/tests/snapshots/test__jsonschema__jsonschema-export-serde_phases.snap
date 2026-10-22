@@ -3319,19 +3319,15 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
           "type": "object"
         },
         {
-          "additionalProperties": false,
-          "properties": {
-            "values": {
+          "allOf": [
+            {
               "additionalProperties": {
                 "type": "string"
               },
               "type": "object"
             }
-          },
-          "required": [
-            "values"
           ],
-          "type": "object"
+          "unevaluatedProperties": false
         }
       ],
       "title": "Issue221UntaggedMixed"
@@ -3700,12 +3696,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "c": {
           "additionalProperties": false,
           "properties": {
-            "inner": {
-              "$ref": "#/$defs/First"
+            "a": {
+              "type": "string"
             }
           },
           "required": [
-            "inner"
+            "a"
           ],
           "type": "object"
         },
@@ -3726,12 +3722,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
         "Variant": {
           "additionalProperties": false,
           "properties": {
-            "inner": {
-              "$ref": "#/$defs/First"
+            "a": {
+              "type": "string"
             }
           },
           "required": [
-            "inner"
+            "a"
           ],
           "type": "object"
         }
@@ -3762,12 +3758,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
     "MyEnumUntagged": {
       "additionalProperties": false,
       "properties": {
-        "inner": {
-          "$ref": "#/$defs/First"
+        "a": {
+          "type": "string"
         }
       },
       "required": [
-        "inner"
+        "a"
       ],
       "title": "MyEnumUntagged",
       "type": "object"
@@ -7478,16 +7474,12 @@ expression: "JsonSchema::default().export(&phased, specta_serde::PhasesFormat).u
       "additionalProperties": false,
       "properties": {
         "A": {
-          "additionalProperties": false,
-          "properties": {
-            "demo": {
+          "allOf": [
+            {
               "$ref": "#/$defs/RecursiveInEnum"
             }
-          },
-          "required": [
-            "demo"
           ],
-          "type": "object"
+          "unevaluatedProperties": false
         }
       },
       "required": [
