@@ -5,7 +5,7 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use specta::{
     Format, Type, Types,
-    datatype::{DataType, Enum},
+    datatype::{DataType, Enum, Field, NamedDataType, Struct},
 };
 use specta_swift::Swift;
 use tempfile::TempDir;
@@ -719,6 +719,32 @@ struct SwiftSkipIfTuple(
     #[serde(skip_serializing_if = "Option::is_none")] Option<u8>,
 );
 
+/// A run of two trailing `#[serde(default)]` elements: only a nil *suffix* may
+/// be omitted, and a nil interior element cannot be represented at all.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftTwoTrailing(u8, #[serde(default)] u8, #[serde(default)] u8);
+
+/// Container-level `#[serde(default)]` makes every element omittable, with the
+/// same trailing-suffix rule as per-field defaults.
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct SwiftContainerDefault(u8, u8);
+
+/// A defaulted `Option<T>` element is written as `null` (serde does not omit a
+/// defaulted element without `skip_serializing_if`).
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftTrailOpt(u8, #[serde(default)] Option<u8>);
+
+/// `#[serde(default)]` on a newtype's only field is ignored by serde (it still
+/// writes the bare value and rejects `null`), so the property must be
+/// non-optional.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftNewtypeDefault(#[serde(default)] u8);
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct SwiftEmptyTuple();
@@ -733,6 +759,30 @@ struct SwiftUnitStruct;
 #[specta(collect = false)]
 struct SwiftNestedTuple((u8, u8));
 
+/// The inner type is a tuple struct, so `#[specta(inline)]` would splice its
+/// body into a type position.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftInlinePair(String, u32);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftOuterInline(#[specta(inline)] SwiftInlinePair);
+
+/// A hand-built newtype whose only declared field is skipped. `specta-serde`
+/// never produces this (a skipped newtype field keeps `ty: Some(..)`), so this
+/// covers the defensive "no live field" error.
+struct HandBuiltSkippedNewtype;
+
+impl Type for HandBuiltSkippedNewtype {
+    fn definition(types: &mut Types) -> DataType {
+        let ndt = NamedDataType::new("HandBuiltSkippedNewtype", types, |_, ndt| {
+            ndt.ty = Some(Struct::unnamed().field(Field::default()).build());
+        });
+        DataType::Reference(ndt.reference(vec![]))
+    }
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct SwiftMidOmittable(
@@ -746,12 +796,16 @@ fn swift_wire_types() -> Types {
         .register::<SwiftNewtype>()
         .register::<SwiftNewtypeNested>()
         .register::<SwiftNewtypeOpt>()
+        .register::<SwiftNewtypeDefault>()
         .register::<SwiftPair>()
         .register::<SwiftTriple>()
         .register::<SwiftOptPair>()
         .register::<SwiftSkipMiddle>()
         .register::<SwiftSkipReduced>()
         .register::<SwiftTrailingDefault>()
+        .register::<SwiftTwoTrailing>()
+        .register::<SwiftContainerDefault>()
+        .register::<SwiftTrailOpt>()
         .register::<SwiftEmptyTuple>()
         .register::<SwiftUnitStruct>()
 }
@@ -849,6 +903,19 @@ func decode<T: Decodable>(_ json: String, _: T.Type) -> T {
     try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
 }
 
+func encodeThrowing<T: Encodable>(_ value: T) throws -> String {
+    String(data: try JSONEncoder().encode(value), encoding: .utf8)!
+}
+
+func throwsError(_ body: () throws -> Void) -> Bool {
+    do {
+        try body()
+        return false
+    } catch {
+        return true
+    }
+}
+
 // Newtype: serde writes the bare inner value, not `{"value": ...}`.
 expect(encode(SwiftNewtype(value: "hello")), newtypeJSON, "newtype encode")
 expect(decode(newtypeJSON, SwiftNewtype.self).value, "hello", "newtype decode")
@@ -866,6 +933,11 @@ expect(encode(SwiftNewtypeOpt(value: nil)), newtypeOptNullJSON, "optional newtyp
 check(decode(newtypeOptNullJSON, SwiftNewtypeOpt.self).value == nil, "optional newtype decode null")
 expect(encode(SwiftNewtypeOpt(value: 5)), newtypeOptJSON, "optional newtype encode value")
 check(decode(newtypeOptJSON, SwiftNewtypeOpt.self).value == 5, "optional newtype decode value")
+
+// `#[serde(default)]` is ignored on a newtype's only field: serde writes the
+// bare value and rejects `null`.
+expect(encode(SwiftNewtypeDefault(value: 7)), newtypeDefaultJSON, "newtype default encode")
+check(decode(newtypeDefaultJSON, SwiftNewtypeDefault.self).value == 7, "newtype default decode")
 
 // Tuple struct: serde writes a JSON array.
 expect(encode(SwiftPair(field0: "hello", field1: 5)), pairJSON, "tuple encode")
@@ -896,6 +968,31 @@ expect(encode(SwiftTrailingDefault(field0: 1, field1: nil)), trailingDefaultTrun
 check(decode(trailingDefaultTruncatedJSON, SwiftTrailingDefault.self).field1 == nil, "trailing default decode short")
 check(decode(trailingDefaultJSON, SwiftTrailingDefault.self).field1 == 2, "trailing default decode full")
 
+// A run of two trailing defaults: only a nil *suffix* is omitted.
+expect(encode(SwiftTwoTrailing(field0: 1, field1: 2, field2: 3)), twoTrailingJSON, "two trailing encode full")
+expect(encode(SwiftTwoTrailing(field0: 1, field1: 2, field2: nil)), twoTrailingShortJSON, "two trailing encode one nil")
+expect(encode(SwiftTwoTrailing(field0: 1, field1: nil, field2: nil)), twoTrailingShorterJSON, "two trailing encode two nil")
+check(decode(twoTrailingShortJSON, SwiftTwoTrailing.self).field1 == 2, "two trailing decode one nil")
+// A nil interior element cannot be represented in a serde sequence, so the
+// encoder must reject it instead of silently shifting the following value.
+check(
+    throwsError { _ = try encodeThrowing(SwiftTwoTrailing(field0: 1, field1: nil, field2: 2)) },
+    "two trailing interior nil must throw"
+)
+
+// Container-level `#[serde(default)]` follows the same rule.
+expect(encode(SwiftContainerDefault(field0: 1, field1: 2)), containerDefaultJSON, "container default encode full")
+expect(encode(SwiftContainerDefault(field0: 1, field1: nil)), containerDefaultShortJSON, "container default encode one nil")
+check(
+    throwsError { _ = try encodeThrowing(SwiftContainerDefault(field0: nil, field1: 2)) },
+    "container default interior nil must throw"
+)
+
+// A defaulted `Option<T>` element is written as `null`, not omitted.
+expect(encode(SwiftTrailOpt(field0: 1, field1: nil)), trailOptNullJSON, "default option encodes null")
+expect(encode(SwiftTrailOpt(field0: 1, field1: 2)), trailOptSomeJSON, "default option encodes value")
+check(decode(trailOptNullJSON, SwiftTrailOpt.self).field1 == nil, "default option decode null")
+
 // An empty tuple struct is an empty array; a unit struct is `null`.
 expect(encode(SwiftEmptyTuple()), emptyTupleJSON, "empty tuple encode")
 _ = decode(emptyTupleJSON, SwiftEmptyTuple.self)
@@ -911,6 +1008,7 @@ fn swift_fixtures() -> String {
          let nestedNewtypeJSON = {}\n\
          let newtypeOptNullJSON = {}\n\
          let newtypeOptJSON = {}\n\
+         let newtypeDefaultJSON = {}\n\
          let pairJSON = {}\n\
          let tripleJSON = {}\n\
          let optPairNullJSON = {}\n\
@@ -922,6 +1020,13 @@ fn swift_fixtures() -> String {
          let skipIfNullJSON = {}\n\
          let trailingDefaultJSON = {}\n\
          let trailingDefaultTruncatedJSON = {}\n\
+         let twoTrailingJSON = {}\n\
+         let twoTrailingShortJSON = {}\n\
+         let twoTrailingShorterJSON = {}\n\
+         let containerDefaultJSON = {}\n\
+         let containerDefaultShortJSON = {}\n\
+         let trailOptNullJSON = {}\n\
+         let trailOptSomeJSON = {}\n\
          let emptyTupleJSON = {}\n\
          let unitStructJSON = {}\n",
         swift_literal(&serde_json::to_string(&SwiftNewtype("hello".into())).unwrap()),
@@ -930,6 +1035,7 @@ fn swift_fixtures() -> String {
         ),
         swift_literal(&serde_json::to_string(&SwiftNewtypeOpt(None)).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftNewtypeOpt(Some(5))).unwrap()),
+        swift_literal(&serde_json::to_string(&SwiftNewtypeDefault(7)).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftPair("hello".into(), 5)).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftTriple(1, 2, 3)).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftOptPair(1, None)).unwrap()),
@@ -946,6 +1052,15 @@ fn swift_fixtures() -> String {
         // serde always *writes* both elements; the truncated form is a valid
         // deserialize-only input (asserted in `swift_struct_wire_ground_truth`).
         swift_literal("[1]"),
+        swift_literal(&serde_json::to_string(&SwiftTwoTrailing(1, 2, 3)).unwrap()),
+        // A nil suffix is omitted by the generated codec; serde reads the
+        // shorter sequence as `(1, 2, 0)` / `(1, 0, 0)`.
+        swift_literal("[1,2]"),
+        swift_literal("[1]"),
+        swift_literal(&serde_json::to_string(&SwiftContainerDefault(1, 2)).unwrap()),
+        swift_literal("[1]"),
+        swift_literal(&serde_json::to_string(&SwiftTrailOpt(1, None)).unwrap()),
+        swift_literal(&serde_json::to_string(&SwiftTrailOpt(1, Some(2))).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftEmptyTuple()).unwrap()),
         swift_literal(&serde_json::to_string(&SwiftUnitStruct).unwrap()),
     )
@@ -971,6 +1086,30 @@ fn swift_struct_wire_ground_truth() {
     assert_eq!(serde_json::to_string(&SwiftUnitStruct).unwrap(), "null");
     assert!(serde_json::from_str::<SwiftSkipReduced>("[]").is_ok());
     assert!(serde_json::from_str::<SwiftTrailingDefault>("[1]").is_ok());
+    // serde ignores `#[serde(default)]` on a newtype's only field.
+    assert_eq!(serde_json::to_string(&SwiftNewtypeDefault(7)).unwrap(), "7");
+    assert!(serde_json::from_str::<SwiftNewtypeDefault>("null").is_err());
+    // serde writes a defaulted `Option<T>` element as `null`.
+    assert_eq!(
+        serde_json::to_string(&SwiftTrailOpt(1, None)).unwrap(),
+        r#"[1,null]"#
+    );
+    // A nil suffix omits trailing defaults; serde reads the shorter sequence as
+    // the defaulted value.
+    assert_eq!(
+        serde_json::to_string(&SwiftTwoTrailing(1, 2, 3)).unwrap(),
+        r#"[1,2,3]"#
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftTwoTrailing>("[1,2]").unwrap().2,
+        0
+    );
+    assert_eq!(
+        serde_json::from_str::<SwiftContainerDefault>("[1]")
+            .unwrap()
+            .1,
+        0
+    );
 }
 
 #[test]
@@ -991,7 +1130,14 @@ fn swift_newtype_and_tuple_structs_round_trip() {
         exported.contains("var container = encoder.unkeyedContainer()"),
         "a tuple struct must encode through an unkeyed container:\n{exported}"
     );
-
+    assert!(
+        exported.contains("public let value: UInt8\n"),
+        "`#[serde(default)]` on a newtype's only field must not make it optional:\n{exported}"
+    );
+    assert!(
+        !exported.contains("public let value: UInt8?"),
+        "the newtype default must not produce a double-optional property:\n{exported}"
+    );
     let harness = format!("{}\n{SWIFT_ROUND_TRIP_HARNESS}", swift_fixtures());
     run_swift(&exported, &harness);
 }
@@ -1004,7 +1150,9 @@ fn swift_phase_split_structs_round_trip() {
     let types = Types::default()
         .register::<SwiftSkipReduced>()
         .register::<SwiftTrailingDefault>()
+        .register::<SwiftTwoTrailing>()
         .register::<SwiftSkipIfTuple>()
+        .register::<SwiftTrailOpt>()
         .register::<SwiftNewtypeOpt>();
     let exported = Swift::default()
         .export(&types, specta_serde::PhasesFormat)
@@ -1015,8 +1163,12 @@ fn swift_phase_split_structs_round_trip() {
         "SwiftSkipReducedDeserialize",
         "SwiftTrailingDefaultSerialize",
         "SwiftTrailingDefaultDeserialize",
+        "SwiftTwoTrailingSerialize",
+        "SwiftTwoTrailingDeserialize",
         "SwiftSkipIfTupleSerialize",
         "SwiftSkipIfTupleDeserialize",
+        "SwiftTrailOptSerialize",
+        "SwiftTrailOptDeserialize",
         "SwiftNewtypeOptSerialize",
         "SwiftNewtypeOptDeserialize",
     ] {
@@ -1075,6 +1227,16 @@ expect(encode(SwiftSkipIfTupleSerialize(field0: 1, field1: 2)), skipIfPresentJSO
 check(decode(skipIfPresentJSON, SwiftSkipIfTupleDeserialize.self).field1 == 2, "phase skip-if deserialize present")
 check(decode(skipIfNullJSON, SwiftSkipIfTupleDeserialize.self).field1 == nil, "phase skip-if deserialize null")
 
+// A defaulted `Option<T>` is written as `null` by both halves (serde does not
+// omit it without `skip_serializing_if`).
+expect(encode(SwiftTrailOptSerialize(field0: 1, field1: nil)), trailOptNullJSON, "phase default option serialize null")
+check(decode(trailOptNullJSON, SwiftTrailOptDeserialize.self).field1 == nil, "phase default option deserialize null")
+
+// A run of trailing defaults: the serialize half writes every element, the
+// deserialize half accepts the truncated suffix.
+expect(encode(SwiftTwoTrailingSerialize(field0: 1, field1: 2, field2: 3)), twoTrailingJSON, "phase two trailing serialize")
+check(decode(twoTrailingShortJSON, SwiftTwoTrailingDeserialize.self).field2 == nil, "phase two trailing deserialize short")
+
 // An optional newtype stays a bare value in both halves.
 expect(encode(SwiftNewtypeOptSerialize(value: nil)), newtypeOptNullJSON, "phase optional newtype serialize null")
 check(decode(newtypeOptNullJSON, SwiftNewtypeOptDeserialize.self).value == nil, "phase optional newtype deserialize null")
@@ -1114,5 +1276,31 @@ fn swift_unrepresentable_struct_shapes_report_errors() {
     assert!(
         mid_omittable.to_string().contains("final live field"),
         "{mid_omittable}"
+    );
+
+    // An inlined tuple struct would splice its body into a type position.
+    let inline_tuple = Swift::default()
+        .export(
+            &Types::default().register::<SwiftOuterInline>(),
+            specta_serde::Format,
+        )
+        .expect_err("an inlined tuple struct cannot be expressed in Swift");
+    assert!(
+        inline_tuple.to_string().contains("cannot"),
+        "{inline_tuple}"
+    );
+
+    // Defensive: a newtype with no live field cannot be a `Codable` value.
+    // `specta-serde` never produces this shape (a skipped newtype field keeps
+    // `ty: Some(..)`), so the raw graph is used to reach the guard.
+    let skipped_newtype = Swift::default()
+        .export(
+            &Types::default().register::<HandBuiltSkippedNewtype>(),
+            IdentityFormat,
+        )
+        .expect_err("a newtype with no live field cannot be expressed in Swift");
+    assert!(
+        skipped_newtype.to_string().contains("no live field"),
+        "{skipped_newtype}"
     );
 }

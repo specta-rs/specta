@@ -123,6 +123,12 @@ const ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
 /// Field attribute recorded by the derive macro for `#[serde(flatten)]`.
 const FLATTENED_FIELD: &str = "serde:field:flatten";
 
+/// Field marker `specta-serde` records for `#[serde(skip_serializing_if)]`,
+/// which lets serde omit an element from a tuple struct's sequence. It is kept
+/// after the raw parser attribute is stripped so the omission can be told apart
+/// from a `#[serde(default)]`-optional element, which serde still writes.
+const SERIALIZE_OMISSION_FIELD: &str = "specta_serde:serialize_omission";
+
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
     /// The wire key carrying the discriminant (serde's `tag`).
@@ -336,6 +342,9 @@ fn payload_renders_empty(ty: &DataType) -> bool {
 /// Whether a payload datatype renders as something Swift's `Codable` cannot
 /// carry: a Swift tuple, an unnamed struct (a tuple payload with an optional
 /// element), or an empty payload.
+///
+/// An inlined reference (`#[specta(inline)]`) splices its target's body into a
+/// type position, so it is checked as the type it renders as.
 fn unsupported_payload(ty: &DataType) -> bool {
     match ty {
         DataType::Tuple(_) => true,
@@ -343,6 +352,18 @@ fn unsupported_payload(ty: &DataType) -> bool {
             Fields::Unit => true,
             Fields::Unnamed(_) => true,
             Fields::Named(fields) => fields.fields.iter().all(|(_, field)| field.ty.is_none()),
+        },
+        // `reference_to_swift` only splices an inline reference when it is not
+        // an enum and not recursive; mirror that so a recursive inline
+        // reference (rendered as the named type) is not rejected.
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. }
+                if !matches!(dt.as_ref(), DataType::Enum(_))
+                    && !contains_recursive_reference(dt) =>
+            {
+                unsupported_payload(dt)
+            }
+            _ => false,
         },
         _ => false,
     }
@@ -1198,6 +1219,22 @@ struct WireElement<'a> {
     ty: &'a DataType,
     /// Whether the wire value may be `null` (`Option<T>`).
     nullable: bool,
+    /// Whether serde may omit the element from the serialized sequence
+    /// (`#[serde(skip_serializing_if = ...)]`).
+    omittable: bool,
+}
+
+impl WireElement<'_> {
+    /// Whether the element may be absent from the serialized sequence.
+    ///
+    /// A `skip_serializing_if` element is omitted whenever it is nil. A
+    /// `#[serde(default)]` element with a non-`Option` datatype is also
+    /// omittable on encode: Swift cannot know the Rust default, so a nil value
+    /// is only representable by dropping the element. A defaulted `Option<T>`
+    /// is *not* omittable — serde writes it as `null`.
+    fn may_be_absent(&self) -> bool {
+        self.omittable || (self.field.optional && !self.nullable)
+    }
 }
 
 fn wire_elements<'a>(
@@ -1227,6 +1264,7 @@ fn wire_elements<'a>(
             field,
             ty,
             nullable: matches!(field.ty.as_ref(), Some(DataType::Nullable(_))),
+            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_FIELD),
         });
     }
     Ok(elements)
@@ -1268,26 +1306,6 @@ fn element_decode_type(
     } else {
         base
     })
-}
-
-/// serde only accepts a truncated sequence for a *trailing* run of omittable
-/// elements, so an omittable element before a required one cannot be expressed.
-fn validate_trailing_optional(
-    struct_name: &str,
-    elements: &[WireElement<'_>],
-) -> Result<(), Error> {
-    let mut saw_optional = false;
-    for element in elements {
-        if element.field.optional {
-            saw_optional = true;
-        } else if saw_optional {
-            return Err(Error::UnsupportedType(format!(
-                "tuple struct `{struct_name}` has an omittable element before a required one, \
-                 which serde cannot round-trip and Swift's `Codable` cannot express"
-            )));
-        }
-    }
-    Ok(())
 }
 
 /// Render a unit struct's body. serde writes `null` for a unit struct, whereas
@@ -1334,8 +1352,10 @@ fn newtype_struct_body(
         )));
     };
 
-    let property_type =
-        element_property_type(swift, format, types, &element, generic_scope.clone())?;
+    // serde ignores `#[serde(default)]` on a newtype's only field, so it must
+    // not make the property optional; a `Nullable` already renders as `T?`.
+    let original = field.ty.as_ref().expect("a live element has a type");
+    let property_type = datatype_to_swift(swift, format, types, original, generic_scope.clone())?;
     let decode_type = element_decode_type(swift, format, types, &element, generic_scope)?;
 
     let mut body = String::new();
@@ -1369,7 +1389,6 @@ fn sequence_struct_body(
     generic_scope: Vec<Generic>,
 ) -> Result<String, Error> {
     let elements = wire_elements(struct_name, fields, false)?;
-    validate_trailing_optional(struct_name, &elements)?;
 
     let mut body = String::new();
     let mut parameters = Vec::new();
@@ -1445,22 +1464,48 @@ fn sequence_struct_body(
         body.push_str("        _ = encoder.unkeyedContainer()\n");
     } else {
         body.push_str("        var container = encoder.unkeyedContainer()\n");
-        for element in &elements {
-            if element.field.optional {
-                body.push_str(&format!(
-                    "        if let {} = {} {{\n",
-                    element.property, element.property
-                ));
-                body.push_str(&format!(
-                    "            try container.encode({})\n",
-                    element.property
-                ));
-                body.push_str("        }\n");
-            } else {
+        for (index, element) in elements.iter().enumerate() {
+            if !element.may_be_absent() {
                 body.push_str(&format!(
                     "        try container.encode({})\n",
                     element.property
                 ));
+                continue;
+            }
+
+            body.push_str(&format!(
+                "        if let {} = {} {{\n",
+                element.property, element.property
+            ));
+            body.push_str(&format!(
+                "            try container.encode({})\n",
+                element.property
+            ));
+
+            // Only a nil *suffix* may be omitted: serde's sequence format has
+            // no way to express a gap, so a nil element followed by a present
+            // one would silently shift every following value.
+            let later = &elements[index + 1..];
+            let throw = format!(
+                "            throw EncodingError.invalidValue(self, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: \"`{}` is nil but a later element is present, which serde's sequence format cannot represent\"))\n",
+                element.property
+            );
+            if later.is_empty() {
+                body.push_str("        }\n");
+            } else if later.iter().any(|later| !later.may_be_absent()) {
+                // A later element is always present.
+                body.push_str("        } else {\n");
+                body.push_str(&throw);
+                body.push_str("        }\n");
+            } else {
+                let condition = later
+                    .iter()
+                    .map(|later| format!("{} != nil", later.property))
+                    .collect::<Vec<_>>()
+                    .join(" || ");
+                body.push_str(&format!("        }} else if {condition} {{\n"));
+                body.push_str(&throw);
+                body.push_str("        }\n");
             }
         }
     }
