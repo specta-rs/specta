@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
-use specta::{Format, Type, Types};
+use specta::{
+    Format, Type, Types,
+    datatype::{DataType, Enum},
+};
 use specta_swift::Swift;
 
 struct IdentityFormat;
@@ -629,4 +632,33 @@ fn swift_tagged_unit_enum_has_no_raw_type() {
         !rendered.contains("public enum TaggedUnitEnum: String"),
         "{rendered}"
     );
+}
+
+/// The datatype `ty!([])` builds: a list whose element type is uninhabited, which Specta
+/// represents as an enum with no variants. `std::convert::Infallible` is the same shape.
+struct Uninhabited;
+
+impl Type for Uninhabited {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Enum(Enum::default())
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct HoldsUninhabited {
+    field: Vec<Uninhabited>,
+}
+
+/// Swift names an uninhabited type `Never`. Without it the inline enum path returned an
+/// empty string and spliced that into the surrounding type.
+#[test]
+fn swift_renders_an_uninhabited_element_type_as_never() {
+    let output = Swift::default()
+        .export(
+            &Types::default().register::<HoldsUninhabited>(),
+            IdentityFormat,
+        )
+        .expect("an uninhabited element type should export");
+    assert!(output.contains("[Never]"), "{output}");
 }

@@ -1082,6 +1082,10 @@ fn datatype(
                 reason: "structural union has no inferred Kotlinx serializer",
             });
         }
+        // An enum with no variants is uninhabited, which `kotlin.Never` describes. This
+        // has to come before the unit-only arm below, whose `all(..)` is vacuously true
+        // for an empty variant list and would otherwise report it as a string enum.
+        DataType::Enum(enm) if enm.variants.is_empty() => "kotlin.Never".to_owned(),
         DataType::Enum(enm)
             if enm
                 .variants
