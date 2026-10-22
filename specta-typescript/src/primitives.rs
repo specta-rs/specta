@@ -1064,34 +1064,9 @@ fn render_datatype(
                 s.push(']');
             }
         },
-        (RenderMode::Normal, DataType::Intersection(parts)) => {
-            for (idx, ty) in parts.iter().enumerate() {
-                if idx != 0 {
-                    s.push_str(" & ");
-                }
-
-                let needs_parentheses = parts.len() > 1 && intersection_part_is_union(ty);
-                if needs_parentheses {
-                    s.push('(');
-                }
-                render_datatype(s, ctx, ty, location.clone(), mode)?;
-                if needs_parentheses {
-                    s.push(')');
-                }
-            }
+        (_, DataType::Intersection(parts)) => {
+            write_intersection(s, ctx, parts, location, mode)?;
         }
-        (RenderMode::ShallowInline, DataType::Intersection(parts)) => intersection_dt(
-            s,
-            ctx.exporter,
-            ctx.format,
-            ctx.types,
-            parts,
-            location,
-            ctx.parent_name,
-            ctx.prefix,
-            ctx.generics,
-            mode,
-        )?,
         (RenderMode::Normal, DataType::Reference(r)) => reference_dt(
             s,
             ctx.exporter,
@@ -1156,12 +1131,77 @@ fn push_list(s: &mut String, ty: &str, length: Option<usize>) {
     }
 }
 
-fn intersection_part_is_union(ty: &DataType) -> bool {
+/// Whether a primitive renders as a union.
+///
+/// Floats render as `number | null` because NaN and Infinity are not
+/// representable as JSON numbers.
+fn primitive_is_union(p: &Primitive) -> bool {
+    matches!(p, Primitive::f16 | Primitive::f32 | Primitive::f64)
+}
+
+/// Whether `ty` can be written as an operand of a TypeScript intersection
+/// without parentheses.
+///
+/// `&` binds tighter than `|`, so an operand that renders a top-level union
+/// escapes the intersection: `{ x: boolean } & A | B` parses as
+/// `({ x: boolean } & A) | B`, dropping the required `x` from the second arm.
+/// Every operand that is not a primary expression must therefore be wrapped.
+///
+/// Precedence would ideally be carried alongside the rendered text. Until the
+/// renderer does that, we classify the datatype instead, treating anything we
+/// cannot prove atomic as non-atomic. Inline references, branded payloads and
+/// newtypes are the cases where the rendered shape is not visible from the
+/// datatype at the boundary.
+fn intersection_operand_is_atomic(ty: &DataType) -> bool {
     match ty {
-        DataType::Nullable(_) => true,
-        DataType::Enum(enm) => enm.variants.len() > 1,
-        DataType::Intersection(parts) if parts.len() == 1 => intersection_part_is_union(&parts[0]),
-        _ => false,
+        DataType::Primitive(p) => !primitive_is_union(p),
+        DataType::Nullable(_) => false,
+        // An enum renders a union of its variants (or `never` when empty), and
+        // even a single-variant enum can render a union when its payload is
+        // itself a union. Treat every enum as non-atomic.
+        DataType::Enum(_) => false,
+        DataType::Intersection(parts) if parts.len() == 1 => {
+            intersection_operand_is_atomic(&parts[0])
+        }
+        // A genuine newtype (one declared unnamed field) renders as its bare
+        // inner type, so it inherits that type's precedence. Every other struct
+        // shape renders an object literal or tuple, both primary expressions.
+        // `inline_struct_with_generics` delegates unnamed fields to `struct_dt`,
+        // so this covers the inline path too.
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => unnamed
+                .fields
+                .first()
+                .and_then(|field| field.ty.as_ref())
+                .is_none_or(intersection_operand_is_atomic),
+            _ => true,
+        },
+        // An inline reference is expanded where it is used. Its datatype is
+        // attached to the reference (not resolved through `Types`), so we can
+        // classify the shape that will actually be rendered.
+        DataType::Reference(Reference::Named(r)) => match &r.inner {
+            NamedReferenceType::Inline { dt, .. } => intersection_operand_is_atomic(dt),
+            _ => true,
+        },
+        // `Branded` renders `<payload> & { readonly __brand: ... }` and `Define`
+        // renders arbitrary caller-supplied text; neither is a primary
+        // expression we can prove atomic.
+        DataType::Reference(Reference::Opaque(r)) => {
+            !(r.downcast_ref::<Branded>().is_some() || r.downcast_ref::<opaque::Define>().is_some())
+        }
+        _ => true,
+    }
+}
+
+/// Append an already-rendered intersection operand, wrapping it in parentheses
+/// unless [`intersection_operand_is_atomic`] proves it is a primary expression.
+fn push_intersection_operand(s: &mut String, ty: &DataType, rendered: &str) {
+    if intersection_operand_is_atomic(ty) {
+        s.push_str(rendered);
+    } else {
+        s.push('(');
+        s.push_str(rendered);
+        s.push(')');
     }
 }
 
@@ -1312,38 +1352,31 @@ fn shallow_inline_datatype(
     )
 }
 
-fn intersection_dt(
+/// Join `parts` with ` & `, parenthesising every operand that is not a primary
+/// expression (see [`intersection_operand_is_atomic`]).
+fn write_intersection(
     s: &mut String,
-    exporter: &Exporter,
-    format: Option<&dyn Format>,
-    types: &Types,
+    ctx: RenderCtx<'_>,
     parts: &[DataType],
     location: Vec<Cow<'static, str>>,
-    parent_name: Option<&str>,
-    prefix: &str,
-    generics: &[(GenericReference, DataType)],
     mode: RenderMode,
 ) -> Result<(), Error> {
-    let mut rendered = Vec::with_capacity(parts.len());
-    for part in parts {
-        let mut out = String::new();
-        mode.render_intersection_part(
-            &mut out,
-            RenderCtx {
-                exporter,
-                format,
-                types,
-                parent_name,
-                prefix,
-                generics,
-            },
-            part,
-            location.clone(),
-        )?;
-        rendered.push(format!("({out})"));
+    for (idx, part) in parts.iter().enumerate() {
+        if idx != 0 {
+            s.push_str(" & ");
+        }
+
+        let mut rendered = String::new();
+        mode.render_intersection_part(&mut rendered, ctx, part, location.clone())?;
+        // A lone operand is the whole expression, so it needs no parentheses
+        // here; an enclosing intersection wraps it if it needs wrapping.
+        if parts.len() > 1 {
+            push_intersection_operand(s, part, &rendered);
+        } else {
+            s.push_str(&rendered);
+        }
     }
 
-    s.push_str(&rendered.join(" & "));
     Ok(())
 }
 
@@ -1433,16 +1466,18 @@ fn inline_datatype(
         }
         DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
-        DataType::Intersection(types_) => intersection_dt(
+        DataType::Intersection(types_) => write_intersection(
             s,
-            exporter,
-            format,
-            types,
+            RenderCtx {
+                exporter,
+                format,
+                types,
+                parent_name,
+                prefix,
+                generics,
+            },
             types_,
             location,
-            parent_name,
-            prefix,
-            generics,
             RenderMode::Normal,
         )?,
         DataType::Reference(r) => {
@@ -1848,11 +1883,19 @@ fn trailing_optional_run<'a>(fields: impl Iterator<Item = &'a Field>) -> usize {
 /// while `[number, number | null?]` is not, and likewise for intersections.
 fn optional_element_needs_parens(ty: &DataType) -> bool {
     match ty {
+        // Floats render as `number | null`, which cannot take a trailing `?`.
+        DataType::Primitive(p) => primitive_is_union(p),
         DataType::Nullable(_) | DataType::Enum(_) | DataType::Intersection(_) => true,
         DataType::Reference(Reference::Named(reference)) => match &reference.inner {
             NamedReferenceType::Inline { dt, .. } => optional_element_needs_parens(dt),
             _ => false,
         },
+        // `Branded` renders `<payload> & { readonly __brand: ... }` and `Define`
+        // renders arbitrary caller-supplied text; both need parentheses before
+        // the trailing `?`, matching [`intersection_operand_is_atomic`].
+        DataType::Reference(Reference::Opaque(r)) => {
+            r.downcast_ref::<Branded>().is_some() || r.downcast_ref::<opaque::Define>().is_some()
+        }
         // A lone live unnamed field renders as its bare inner type.
         DataType::Struct(strct) => match &strct.fields {
             Fields::Unnamed(unnamed) if unnamed.fields.len() == 1 => unnamed
@@ -2207,10 +2250,10 @@ fn enum_variant_datatype(
     ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>, Error> {
     match &variant.fields {
-        Fields::Unit if name.is_empty() => Err(Error::unsupported_anonymous_enum_variant(
-            path_string(&location),
-            "unit",
-        )),
+        // An empty name is a legitimate wire value: `#[serde(rename = "")]`
+        // serializes a unit variant as the empty string, which renders as the
+        // `""` literal. The diagnostic is kept for the anonymous named-field
+        // shape, which has no tag to render.
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
         Fields::Named(_) if name.is_empty() => Err(Error::unsupported_anonymous_enum_variant(
             path_string(&location),
@@ -3426,12 +3469,20 @@ fn reference_opaque_dt(
             return Ok(());
         }
 
+        let mut payload = String::new();
         match def.ty() {
-            DataType::Reference(r) => {
-                reference_dt(s, exporter, format, types, r, location.clone(), "", &[])?
-            }
+            DataType::Reference(r) => reference_dt(
+                &mut payload,
+                exporter,
+                format,
+                types,
+                r,
+                location.clone(),
+                "",
+                &[],
+            )?,
             ty => inline_datatype(
-                s,
+                &mut payload,
                 exporter,
                 format,
                 types,
@@ -3443,6 +3494,10 @@ fn reference_opaque_dt(
                 &[],
             )?,
         }
+        // The brand is intersected with the payload, so a payload that renders a
+        // top-level union must be parenthesised or the brand is swallowed:
+        // `string | null & Brand` parses as `string | (null & Brand)`.
+        push_intersection_operand(s, def.ty(), &payload);
         s.push_str(r#" & { readonly __brand: ""#);
         s.push_str(&escape_typescript_string_literal(def.brand()));
         s.push_str("\" }");

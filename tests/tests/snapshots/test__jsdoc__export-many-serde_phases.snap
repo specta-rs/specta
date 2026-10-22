@@ -837,10 +837,10 @@ expression: output
 	*
 	* @typedef {{
 	* 	type: "A",
-	* } & { type: "A" } | { type: "B" }} InternallyTaggedL
+	* } & ({ type: "A" } | { type: "B" })} InternallyTaggedL
 	* @property {{
 	* 	type: "A",
-	* } & { type: "A" } | { type: "B" }} A
+	* } & ({ type: "A" } | { type: "B" })} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
@@ -938,25 +938,25 @@ expression: output
 	* @property {number} c
 	*
 	* @typedef {{
-	*		b: ({
+	*		b: {
 	*			c: number,
-	*		}) & (FlattenA),
+	*		} & FlattenA,
 	*		d: number,
 	*	}} FlattenE
-	* @property {({
+	* @property {{
 	*		c: number,
-	*	}) & (FlattenA)} b
+	*	} & FlattenA} b
 	* @property {number} d
 	*
 	* @typedef {{
-	*		b: ({
+	*		b: {
 	*			c: number,
-	*		}) & (FlattenA),
+	*		} & FlattenA,
 	*		d: number,
 	*	}} FlattenF
-	* @property {({
+	* @property {{
 	*		c: number,
-	*	}) & (FlattenA)} b
+	*	} & FlattenA} b
 	* @property {number} d
 	*
 	* @typedef {{
