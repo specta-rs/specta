@@ -360,19 +360,24 @@ macro_rules! _impl_ndt {
         ];
 
         let definition = |types: &mut Types| {
-            DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+            let __specta_generic_base = types.generic_substitution_cursor();
+            let __specta_instantiation_generics = &[
+                $(
+                    (
+                        datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                        impl_ndt!(@generic_dt $typed_generics $inline $generic types),
+                    ),
+                )*
+            ];
+            let __specta_generic_after = types.generic_substitution_cursor();
+
+            let reference = datatype::NamedDataType::init_with_sentinel(
                 SENTINEL,
-                &[
-                    $(
-                        (
-                            datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
-                            impl_ndt!(@generic_dt $typed_generics $inline $generic types),
-                        ),
-                    )*
-                ],
+                __specta_instantiation_generics,
                 &[$(::std::any::type_name::<$generic>()),*],
                 $has_const_param,
                 $container,
+                __specta_generic_base,
                 types,
                 |types, ndt| {
                     ndt.name = ::std::borrow::Cow::Borrowed(impl_ndt!(@type_name $($type_name)*));
@@ -394,7 +399,11 @@ macro_rules! _impl_ndt {
                     }
                 },
                 |types| types.define::<$as_ty>(),
-            ))
+            );
+
+            types.set_generic_substitution_cursor(__specta_generic_after);
+
+            DataType::Reference(reference)
         };
 
         if $inline {
@@ -407,7 +416,7 @@ macro_rules! _impl_ndt {
         if $inline && !$typed_generics {
             datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
         } else {
-            $types.define::<$generic>()
+            $types.define_param::<$generic>()
         }
     };
 

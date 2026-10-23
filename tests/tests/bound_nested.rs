@@ -180,6 +180,117 @@ pub struct TwoParamsReversed<K: Trait, V: Trait> {
     map: HashMap<V, K>,
 }
 
+// --- three bounded parameters sharing a concrete type ---
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct ThreeParams<K: Trait, V: Trait, W: Trait> {
+    map: HashMap<K, HashMap<V, W>>,
+}
+
+// --- a parameter mentioned only by a skipped field ---
+//
+// `A` is mentioned by `SkipMid`'s `#[specta(skip)]`ed field, so `SkipMid` never
+// resolves it. The enclosing substitution scope must still leave `B` mapped to
+// the argument that sits at `B`'s position (`V`), not the one at `A`'s.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct SkipMid<A: Trait + Type, B: Trait + Type> {
+    #[specta(skip)]
+    a: std::marker::PhantomData<A>,
+    b: B,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct SkipTop<K: Trait + Type, V: Trait + Type> {
+    m: SkipMid<K, V>,
+}
+
+// The skipped parameter's argument is itself a compound, so it occupies more
+// than one occurrence of the enclosing parameters.
+pub struct Compound<A, B>(std::marker::PhantomData<(A, B)>);
+
+impl<A: Trait, B: Trait> Trait for Compound<A, B> {}
+
+impl<A: Type, B: Type> Type for Compound<A, B> {
+    fn definition(types: &mut specta::Types) -> DataType {
+        let a = types.define::<A>();
+        let b = types.define::<B>();
+        DataType::Tuple(specta::datatype::Tuple::new(vec![a, b]))
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct SkipCompoundMid<A: Trait + Type, B: Trait + Type> {
+    #[specta(skip)]
+    a: std::marker::PhantomData<A>,
+    b: B,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct SkipCompoundTop<K: Trait + Type, V: Trait + Type, W: Trait + Type> {
+    m: SkipCompoundMid<Compound<K, V>, W>,
+}
+
+// --- a manual impl that resolves its own arguments out of order ---
+//
+// `define` must search only the innermost scope, or an enclosing type's
+// parameters leak into this type's own.
+pub struct ReversedPair<K, V>(std::marker::PhantomData<(K, V)>);
+
+impl<K: Type, V: Type> Type for ReversedPair<K, V> {
+    fn definition(types: &mut specta::Types) -> DataType {
+        let v = types.define::<V>();
+        let k = types.define::<K>();
+        DataType::Tuple(specta::datatype::Tuple::new(vec![v, k]))
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct ReversedPairHolder<K: Trait, V: Trait> {
+    p: ReversedPair<K, V>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Mid<A: Trait, B: Trait> {
+    p: ReversedPair<A, B>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MidHolder<K: Trait, V: Trait> {
+    m: Mid<K, V>,
+}
+
+// --- a concrete field inside a nested generic ---
+//
+// `items` mentions no enclosing parameter, so it must resolve concretely even
+// when `Page` is built while resolving `Response<Item>` — the enclosing
+// substitution scope must not be reachable from a field that has none of its
+// own.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Item;
+
+impl Trait for Item {}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Page<T: Trait> {
+    items: Vec<Item>,
+    t: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Response<T: Trait> {
+    page: Page<T>,
+}
+
 // --- `FixedArray` must route its element through `Types::define` ---
 #[derive(Type)]
 #[specta(collect = false)]
@@ -400,13 +511,11 @@ fn fixed_array_element_is_generic() {
     );
 }
 
-/// KNOWN LIMITATION (tracked in #591): when two *bounded* parameters share the
-/// same concrete type, the declaration-time substitution is keyed by that
-/// concrete type and cannot tell the parameters apart, so both arguments resolve
-/// to the same `Generic`. Unbounded parameters (and every field whose parameter
-/// has no declared bounds) use the precise placeholder path and are unaffected.
+/// When two *bounded* parameters share the same concrete type the substitution
+/// entries are consumed positionally, so each parameter keeps its own `Generic`
+/// name. See <https://github.com/specta-rs/specta/issues/609>.
 #[test]
-fn repeated_concrete_type_for_multiple_parameters_is_a_known_limitation() {
+fn repeated_concrete_type_for_multiple_parameters_keeps_distinct_generics() {
     let mut types = specta::Types::default();
     let _ = GenericMap::<Impl, Impl>::definition(&mut types);
     let ty = find_exported(&types, "GenericMap");
@@ -415,14 +524,14 @@ fn repeated_concrete_type_for_multiple_parameters_is_a_known_limitation() {
     };
     assert_eq!(
         generic_name(map.key_ty()).map(|g| g.name().to_string()),
-        Some("V".to_string())
+        Some("K".to_string())
     );
     assert_eq!(
         generic_name(map.value_ty()).map(|g| g.name().to_string()),
         Some("V".to_string())
     );
 
-    // The reversed argument order behaves the same way.
+    // The reversed argument order keeps its own order too.
     let mut types = specta::Types::default();
     let _ = TwoParamsReversed::<Impl, Impl>::definition(&mut types);
     let ty = find_exported(&types, "TwoParamsReversed");
@@ -435,11 +544,159 @@ fn repeated_concrete_type_for_multiple_parameters_is_a_known_limitation() {
     );
     assert_eq!(
         generic_name(map.value_ty()).map(|g| g.name().to_string()),
-        Some("V".to_string())
+        Some("K".to_string())
     );
 
     // Concrete instantiation is still correct regardless.
+    let mut types = specta::Types::default();
+    let concrete = GenericMap::<Impl, Impl>::definition(&mut types);
+    assert!(
+        !contains_generic(&concrete),
+        "concrete instantiation leaked a Generic node: {concrete:?}"
+    );
     let _ = A::<Impl>::definition(&mut types);
+}
+
+#[test]
+fn three_repeated_concrete_types_keep_distinct_generics() {
+    let mut types = specta::Types::default();
+    let _ = ThreeParams::<Impl, Impl, Impl>::definition(&mut types);
+    let ty = find_exported(&types, "ThreeParams");
+
+    let DataType::Map(map) = unwrap_inline(field_ty(ty, "map")) else {
+        panic!("expected map");
+    };
+    assert_eq!(
+        generic_name(map.key_ty()).map(|g| g.name().to_string()),
+        Some("K".to_string())
+    );
+
+    let DataType::Map(inner) = unwrap_inline(map.value_ty()) else {
+        panic!("expected nested map");
+    };
+    assert_eq!(
+        generic_name(inner.key_ty()).map(|g| g.name().to_string()),
+        Some("V".to_string())
+    );
+    assert_eq!(
+        generic_name(inner.value_ty()).map(|g| g.name().to_string()),
+        Some("W".to_string())
+    );
+}
+
+#[test]
+fn parameter_skipped_by_nested_type_keeps_its_own_slot() {
+    let mut types = specta::Types::default();
+    let _ = SkipTop::<Impl, Impl>::definition(&mut types);
+
+    let ty = find_exported(&types, "SkipTop");
+    let generics = named_generics(field_ty(ty, "m")).expect("`m` should reference SkipMid");
+    assert_eq!(generics.len(), 1, "SkipMid only resolves `B`: {generics:?}");
+    assert_eq!(
+        generic_name(&generics[0].1).map(|g| g.name().to_string()),
+        Some("V".to_string()),
+        "the skipped `A` shifted the slot: {generics:?}"
+    );
+}
+
+#[test]
+fn skipped_compound_argument_does_not_shift_later_slots() {
+    let mut types = specta::Types::default();
+    let _ = SkipCompoundTop::<Impl, Impl, Impl>::definition(&mut types);
+
+    let ty = find_exported(&types, "SkipCompoundTop");
+    let generics = named_generics(field_ty(ty, "m")).expect("`m` should reference SkipCompoundMid");
+    assert_eq!(
+        generics.len(),
+        1,
+        "SkipCompoundMid only resolves `B`: {generics:?}"
+    );
+    assert_eq!(
+        generic_name(&generics[0].1).map(|g| g.name().to_string()),
+        Some("W".to_string()),
+        "the skipped compound `HashMap<K, V>` shifted the slot: {generics:?}"
+    );
+}
+
+#[test]
+fn manual_impl_resolving_arguments_out_of_order_keeps_them_distinct() {
+    let mut types = specta::Types::default();
+    let _ = ReversedPairHolder::<Impl, OtherImpl>::definition(&mut types);
+
+    let ty = find_exported(&types, "ReversedPairHolder");
+    let DataType::Tuple(tuple) = field_ty(ty, "p") else {
+        panic!("expected tuple, got {:?}", field_ty(ty, "p"));
+    };
+    assert_eq!(
+        generic_name(&tuple.elements[0]).map(|g| g.name().to_string()),
+        Some("V".to_string()),
+        "{tuple:?}"
+    );
+    assert_eq!(
+        generic_name(&tuple.elements[1]).map(|g| g.name().to_string()),
+        Some("K".to_string()),
+        "{tuple:?}"
+    );
+}
+
+#[test]
+fn enclosing_parameters_do_not_leak_into_a_nested_declaration() {
+    let mut types = specta::Types::default();
+    let _ = MidHolder::<Impl, OtherImpl>::definition(&mut types);
+
+    // `Mid`'s own declaration must name its own parameters, never the enclosing
+    // `K`/`V`.
+    let mid = find_exported(&types, "Mid");
+    let DataType::Tuple(tuple) = field_ty(mid, "p") else {
+        panic!("expected tuple, got {:?}", field_ty(mid, "p"));
+    };
+    assert_eq!(
+        generic_name(&tuple.elements[0]).map(|g| g.name().to_string()),
+        Some("B".to_string()),
+        "enclosing parameters leaked into Mid: {tuple:?}"
+    );
+    assert_eq!(
+        generic_name(&tuple.elements[1]).map(|g| g.name().to_string()),
+        Some("A".to_string()),
+        "enclosing parameters leaked into Mid: {tuple:?}"
+    );
+}
+
+fn assert_concrete_items(types: &specta::Types, context: &str) {
+    let page = types
+        .into_sorted_iter()
+        .find(|ndt| ndt.name == "Page")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .unwrap_or_else(|| panic!("{context}: Page not exported"));
+
+    let items = field_ty(page, "items");
+    assert!(
+        !contains_generic(items),
+        "{context}: `items` baked an enclosing parameter: {items:?}"
+    );
+}
+
+#[test]
+fn concrete_field_does_not_bake_an_enclosing_parameter() {
+    let mut types = specta::Types::default();
+    let _ = Response::<Item>::definition(&mut types);
+
+    assert_concrete_items(&types, "through Response<Item>");
+}
+
+#[test]
+fn concrete_field_is_stable_regardless_of_resolution_order() {
+    // `Page`'s declaration is registered once, so whichever of `Page`/`Response`
+    // is resolved first must not change what the other sees.
+    let mut page_first = specta::Types::default();
+    let _ = Page::<Item>::definition(&mut page_first);
+    let _ = Response::<Item>::definition(&mut page_first);
+    assert_concrete_items(&page_first, "Page first");
+
+    let mut response_first = specta::Types::default();
+    let _ = Response::<Item>::definition(&mut response_first);
+    let _ = Page::<Item>::definition(&mut response_first);
+    assert_concrete_items(&response_first, "Response first");
 }
 
 fn find_exported<'a>(types: &'a specta::Types, name: &str) -> &'a DataType {

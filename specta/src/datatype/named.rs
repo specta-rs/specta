@@ -127,6 +127,11 @@ impl NamedDataType {
     /// `build_ndt` fills metadata and, for exported named types, `NamedDataType::ty`. `build_ty`
     /// builds the datatype used by inline references. If `build_ndt` panics, this removes the
     /// placeholder entry and restores the previous resolution context before resuming the panic.
+    ///
+    /// `generic_substitution_base` is the position the caller's generic-substitution scope held
+    /// before it resolved this type's generic arguments. Both `build_ndt` and `build_ty` re-resolve
+    /// those arguments, so this rewinds the scope to that position first, keeping the two
+    /// traversals in lockstep instead of letting one consume the other's slots.
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
@@ -135,10 +140,12 @@ impl NamedDataType {
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
         passthrough: bool,
+        generic_substitution_base: usize,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
+        types.set_generic_substitution_cursor(generic_substitution_base);
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
         let caller_inline = types.should_inline;

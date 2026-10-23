@@ -236,59 +236,62 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let build_ty_passthrough_args =
         generic_type_and_const_args(generics, |ty| ty.ident.to_token_stream());
 
-    let (generics_for_ndt, instantiation_generics) = generics
-        .params
-        .iter()
-        .map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => Ok(None),
-            GenericParam::Type(t) => {
-                let i = &t.ident;
+    // `generics_for_ndt` is the declaration's generic list; `instantiation_steps`
+    // resolves the type's own arguments in parameter order. Unused parameters
+    // still step over a substitution slot so the parameters after them stay
+    // aligned (issue #609).
+    let mut generics_for_ndt: Vec<TokenStream> = Vec::new();
+    let mut instantiation_steps: Vec<TokenStream> = Vec::new();
 
-                let skip_default = parse_attrs(&t.attrs)?
-                    .extract("specta", "skip_default_generic")
-                    .map(|attr| attr.parse_bool_or_true())
-                    .transpose()?
-                    .unwrap_or(false);
+    for param in &generics.params {
+        let GenericParam::Type(t) = param else {
+            continue;
+        };
 
-                if !used_generic_types.iter().any(|used| used == i) && !skip_default {
-                    return Ok(None);
-                }
+        let i = &t.ident;
+        let i_str = i.to_string();
+        let used = used_generic_types.iter().any(|used| used == i);
 
-                let i_str = i.to_string();
-                let default = match (&t.default, skip_default) {
-                    (_, true) | (None, false) => quote!(None),
-                    (Some(default), false) => {
-                        // A default may reference another parameter (`U = T`), so
-                        // resolve it with the same placeholder rewriting.
-                        let resolve = resolve_ty_expr(
-                            &crate_ref,
-                            default,
-                            &used_generic_types,
-                            &bounded,
-                            false,
-                        );
-                        quote!(Some(#resolve))
-                    }
-                };
-                let reference = used_generic_types.iter().any(|used| used == i).then(|| {
-                    quote!((
-                        #crate_ref::datatype::Generic::new(Cow::Borrowed(#i_str)),
-                        types.define::<#i>(),
-                    ))
-                });
-                Ok(Some((
-                    quote!(#crate_ref::datatype::GenericDefinition::new(
-                        Cow::Borrowed(#i_str),
-                        #default,
-                    )),
-                    reference,
-                )))
+        let skip_default = parse_attrs(&t.attrs)?
+            .extract("specta", "skip_default_generic")
+            .map(|attr| attr.parse_bool_or_true())
+            .transpose()?
+            .unwrap_or(false);
+
+        if !used {
+            instantiation_steps.push(quote!(types.skip_param_slot();));
+
+            if skip_default {
+                generics_for_ndt.push(quote!(#crate_ref::datatype::GenericDefinition::new(
+                    Cow::Borrowed(#i_str),
+                    None,
+                )));
             }
-        })
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .flatten()
-        .collect::<(Vec<_>, Vec<_>)>();
+            continue;
+        }
+
+        let default = match (&t.default, skip_default) {
+            (_, true) | (None, false) => quote!(None),
+            (Some(default), false) => {
+                // A default may reference another parameter (`U = T`), so
+                // resolve it with the same placeholder rewriting.
+                let resolve =
+                    resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
+                quote!(Some(#resolve))
+            }
+        };
+
+        generics_for_ndt.push(quote!(#crate_ref::datatype::GenericDefinition::new(
+            Cow::Borrowed(#i_str),
+            #default,
+        )));
+        instantiation_steps.push(quote!(
+            __specta_instantiation_generics.push((
+                #crate_ref::datatype::Generic::new(Cow::Borrowed(#i_str)),
+                types.define_param::<#i>(),
+            ));
+        ));
+    }
 
     if cfg!(feature = "DO_NOT_USE_collect")
         && has_const_param
@@ -359,13 +362,22 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
     let definition = quote! {
-        datatype::DataType::Reference(
-            datatype::NamedDataType::init_with_sentinel(
+        {
+            let __specta_generic_base = types.generic_substitution_cursor();
+            let mut __specta_instantiation_generics: ::std::vec::Vec<(
+                datatype::Generic,
+                datatype::DataType,
+            )> = ::std::vec::Vec::new();
+            #(#instantiation_steps)*
+            let __specta_generic_after = types.generic_substitution_cursor();
+
+            let reference = datatype::NamedDataType::init_with_sentinel(
                 SENTINEL,
-                &[#(#instantiation_generics),*],
+                &__specta_instantiation_generics,
                 &[#(#instantiation_generic_identities),*],
                 #has_const_param,
                 false,
+                __specta_generic_base,
                 types,
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
@@ -377,8 +389,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #ndt_ty
                 },
                 |types| build #build_ty_passthrough_args (types, false)
-            )
-        )
+            );
+
+            types.set_generic_substitution_cursor(__specta_generic_after);
+
+            datatype::DataType::Reference(reference)
+        }
     };
 
     let definition = if container_attrs.inline {
