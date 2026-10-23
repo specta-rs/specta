@@ -364,14 +364,21 @@ pub fn resolve_ty_expr(
     bounded_params: &HashSet<String>,
     conditional: bool,
 ) -> TokenStream {
-    // The concrete (use-site) resolution must not see the enclosing field's
-    // substitution scope: a field that mentions no enclosing parameter would
-    // otherwise let its own concrete element type match an enclosing slot and
-    // bake that parameter into a nested declaration (issue #609).
-    let concrete = quote!(types.with_generic_substitution(
+    // A field that mentions no enclosing parameter is resolved at its own use
+    // site. It must not see the enclosing field's substitution scope: its own
+    // concrete element type could otherwise match an enclosing slot and bake
+    // that parameter into a nested declaration (issue #609).
+    let isolated = quote!(types.with_generic_substitution(
         &[],
         |types| <#ty as #crate_ref::Type>::definition(types),
     ));
+    // The concrete half of a conditional resolution instead inherits whatever
+    // scope is active. That scope belongs to an enclosing *declaration* whose
+    // slots describe this field's own arguments, which is what an inlined
+    // generic type needs to rewrite its expansion back to `Generic` (issue
+    // #613 regressed this: an empty scope baked the first instantiation's
+    // concrete arguments into a generic inline declaration).
+    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
 
     let mentioned = type_params_used_in(ty, used_generic_types);
     let unbounded = mentioned
@@ -399,9 +406,10 @@ pub fn resolve_ty_expr(
         mentioned.clone()
     };
 
-    // Nothing to rewrite and no parameter to substitute: resolve concretely.
+    // Nothing to rewrite and no parameter to substitute: resolve concretely,
+    // isolated from the enclosing scope.
     if !rewritten && mentioned.is_empty() {
-        return concrete;
+        return isolated;
     }
 
     let mut declaration = quote!(types.define_root::<#declaration_ty>());
