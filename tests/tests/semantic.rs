@@ -210,6 +210,45 @@ enum PrototypeEnum {
     Constructor(Website),
 }
 
+// `__proto__` is special-cased by the language: writing it as an object-literal
+// key sets the prototype rather than defining an own property. Regression
+// coverage for https://github.com/specta-rs/specta/issues/611.
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+enum ProtoVariantEnum {
+    #[serde(rename = "__proto__")]
+    Proto(Website),
+    #[serde(rename = "other-value")]
+    Other(String),
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct ProtoFieldPayload {
+    #[serde(rename = "__proto__")]
+    proto: Website,
+    site: Website,
+}
+
+// `__proto__` fields whose key can be absent on the wire: `Option` fields are
+// optional in the deserialize phase, and `skip_serializing_if` omits the key on
+// serialize. A plain `value.__proto__` read then leaks `Object.prototype`.
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct OptionalProtoField {
+    #[serde(rename = "__proto__")]
+    proto: Option<Website>,
+    site: Website,
+}
+
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[specta(collect = false)]
+struct SkippedProtoField {
+    #[serde(rename = "__proto__", skip_serializing_if = "Option::is_none")]
+    proto: Option<Website>,
+    site: Website,
+}
+
 #[derive(Type, serde::Serialize, serde::Deserialize)]
 #[specta(collect = false)]
 enum InlineRecursiveEnum {
@@ -1002,6 +1041,142 @@ fn semantic_external_enum_guards_ignore_prototype_members() {
         &serialize,
         "{ constructor: new URL(\"https://example.com/ctor\") }",
         "out.constructor === \"https://example.com/ctor\"",
+    );
+}
+
+// Regression coverage for https://github.com/specta-rs/specta/issues/611.
+//
+// An externally tagged variant renamed `__proto__` used to be rewritten into
+// `{...value, __proto__: ...}`, which triggers the language's prototype setter
+// instead of defining an own property, so the field kept its wire value.
+#[test]
+fn semantic_external_enum_variant_named_proto_is_rewritten() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<ProtoVariantEnum>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("prototype-named variant deserialization should be supported")
+        .expect("prototype-named variant deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"__proto__\")?({...value,[\"__proto__\"]:new URL(Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value)}):value"
+    );
+
+    // `JSON.parse` defines `__proto__` as an own property (as the wire layer
+    // does), so the guard selects the branch and the body must rewrite it.
+    assert_runtime_js(
+        &deserialize,
+        "JSON.parse('{\"__proto__\":\"https://example.com/\"}')",
+        "out[\"__proto__\"] instanceof URL && Object.prototype.hasOwnProperty.call(out,\"__proto__\") && out[\"__proto__\"].href === \"https://example.com/\"",
+    );
+    // The other variant is untouched.
+    assert_runtime_js(
+        &deserialize,
+        "{ \"other-value\": \"plain\" }",
+        "out[\"other-value\"] === \"plain\" && Object.getPrototypeOf(out) === Object.prototype",
+    );
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("prototype-named variant serialization should be supported")
+        .expect("prototype-named variant serialization should require a transform");
+    assert_eq!(
+        serialize,
+        "value!=null&&Object.prototype.hasOwnProperty.call(value,\"__proto__\")?({...value,[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value.toString()}):value"
+    );
+    assert_runtime_js(
+        &serialize,
+        "Object.defineProperty({}, \"__proto__\", { value: new URL(\"https://example.com/\"), enumerable: true, configurable: true, writable: true })",
+        "out[\"__proto__\"] === \"https://example.com/\" && Object.prototype.hasOwnProperty.call(out,\"__proto__\")",
+    );
+}
+
+// The same rule applies to a `__proto__` field inside a named payload, and a
+// normal identifier key must keep using the plain form.
+#[test]
+fn semantic_struct_proto_field_is_rewritten_and_safe_keys_are_unchanged() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<ProtoFieldPayload>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("prototype-named field deserialization should be supported")
+        .expect("prototype-named field deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "({...value,[\"__proto__\"]:new URL(Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value),site:new URL(value.site)})"
+    );
+
+    assert_runtime_js(
+        &deserialize,
+        "JSON.parse('{\"__proto__\":\"https://example.com/p\",\"site\":\"https://example.com/s\"}')",
+        "out[\"__proto__\"] instanceof URL && Object.prototype.hasOwnProperty.call(out,\"__proto__\") && out.site instanceof URL",
+    );
+}
+
+// Regression coverage for https://github.com/specta-rs/specta/issues/611.
+//
+// An `Option` field is optional in the deserialize phase, so input without the
+// `__proto__` key is a valid wire shape. A plain `value.__proto__` read then
+// leaked `Object.prototype` and the body ran `new URL(Object.prototype)`, which
+// threw. The own-property-safe read must leave the field undefined instead.
+#[test]
+fn semantic_absent_proto_key_does_not_leak_object_prototype_on_deserialize() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<OptionalProtoField>();
+
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("optional prototype-named field deserialization should be supported")
+        .expect("optional prototype-named field deserialization should require a transform");
+    assert_eq!(
+        deserialize,
+        "({...value,[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value==null?Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value:new URL(Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value),site:new URL(value.site)})"
+    );
+
+    // Key absent: must not throw, and the field stays undefined.
+    assert_runtime_js(
+        &deserialize,
+        "{ site: \"https://example.com/s\" }",
+        "out[\"__proto__\"] === undefined && out.site instanceof URL && Object.getPrototypeOf(out) === Object.prototype",
+    );
+    // Key present: still rewritten.
+    assert_runtime_js(
+        &deserialize,
+        "JSON.parse('{\"__proto__\":\"https://example.com/p\",\"site\":\"https://example.com/s\"}')",
+        "out[\"__proto__\"] instanceof URL && out.site instanceof URL",
+    );
+}
+
+// `skip_serializing_if` makes an absent `__proto__` a valid serialize shape. The
+// plain read used to evaluate `Object.prototype.toString()` and inject
+// `__proto__: "[object Object]"` into the output object.
+#[test]
+fn semantic_absent_proto_key_does_not_inject_a_bogus_property_on_serialize() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<SkippedProtoField>();
+
+    let (_, serialize) = semantic
+        .try_apply_serialize(&types, &dt, "value")
+        .expect("skipped prototype-named field serialization should be supported")
+        .expect("skipped prototype-named field serialization should require a transform");
+    assert_eq!(
+        serialize,
+        "({...value,[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value==null?Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value.toString(),site:value.site.toString()})"
+    );
+
+    // Key absent: no throw, and nothing bogus reaches the wire.
+    assert_runtime_js(
+        &serialize,
+        "{ site: new URL(\"https://example.com/s\") }",
+        "out[\"__proto__\"] === undefined && JSON.stringify(out) === JSON.stringify({site:\"https://example.com/s\"}) && Object.getPrototypeOf(out) === Object.prototype",
+    );
+    // Key present: still rewritten to the wire string.
+    assert_runtime_js(
+        &serialize,
+        "(()=>{const v={site:new URL(\"https://example.com/s\")};Object.defineProperty(v,\"__proto__\",{value:new URL(\"https://example.com/p\"),enumerable:true,writable:true,configurable:true});return v;})()",
+        "out[\"__proto__\"] === \"https://example.com/p\" && out.site === \"https://example.com/s\"",
     );
 }
 
