@@ -33,6 +33,11 @@ jobs:
       - name: Build
         run: cargo build --all-features
       - name: Run tests
+        env:
+          # `assert_runtime_js` skips its runtime assertions unless `node` is on
+          # PATH. Runners ship Node, so pin this to turn a missing runtime into
+          # a hard failure instead of a silent skip.
+          SPECTA_REQUIRE_NODE: 1
         run: cargo test --all-features
       - name: Build without default features
         run: cargo build --all --no-default-features

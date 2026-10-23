@@ -7,9 +7,41 @@ public struct MyOtherType: Codable {
     private enum CodingKeys: String, CodingKey {
         case otherField = "other_field"
     }
+
+    public init(otherField: String) {
+        self.otherField = otherField
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.otherField = try container.decode(String.self, forKey: .otherField)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(otherField, forKey: .otherField)
+    }
 }
 
 public struct MyType: Codable {
     public let field: MyOtherType
+
+    private enum CodingKeys: String, CodingKey {
+        case field = "field"
+    }
+
+    public init(field: MyOtherType) {
+        self.field = field
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.field = try container.decode(MyOtherType.self, forKey: .field)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(field, forKey: .field)
+    }
 }
 

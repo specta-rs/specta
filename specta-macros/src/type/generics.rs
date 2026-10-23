@@ -364,7 +364,14 @@ pub fn resolve_ty_expr(
     bounded_params: &HashSet<String>,
     conditional: bool,
 ) -> TokenStream {
-    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
+    // The concrete (use-site) resolution must not see the enclosing field's
+    // substitution scope: a field that mentions no enclosing parameter would
+    // otherwise let its own concrete element type match an enclosing slot and
+    // bake that parameter into a nested declaration (issue #609).
+    let concrete = quote!(types.with_generic_substitution(
+        &[],
+        |types| <#ty as #crate_ref::Type>::definition(types),
+    ));
 
     let mentioned = type_params_used_in(ty, used_generic_types);
     let unbounded = mentioned
@@ -397,18 +404,16 @@ pub fn resolve_ty_expr(
         return concrete;
     }
 
-    let mut declaration = quote!(types.define::<#declaration_ty>());
+    let mut declaration = quote!(types.define_root::<#declaration_ty>());
 
     if !substituted.is_empty() {
-        let substitutions = substituted.iter().map(|ident| {
-            let name = ident.to_string();
-            quote!((
-                ::std::any::type_name::<#ident>(),
-                #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(#name)),
-            ))
-        });
+        // One slot per type argument of the declaration type, in source order.
+        // `Types::define_param` consumes them positionally as the nested type
+        // resolves its own parameters, so two parameters instantiated with the
+        // same concrete type still map to distinct `Generic` names. See #609.
+        let slots = generic_substitution_slots(crate_ref, &declaration_ty, &substituted);
         declaration = quote!(types.with_generic_substitution(
-            &[#(#substitutions),*],
+            &[#(#slots),*],
             |types| #declaration,
         ));
     }
@@ -452,6 +457,144 @@ pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ide
         .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
         .cloned()
         .collect()
+}
+
+/// Builds the positional substitution slots for the type arguments of `ty`.
+///
+/// [`Types::define_param`] consumes these as the nested type resolves its own
+/// parameters, so two parameters instantiated with the same concrete type still
+/// map to distinct `Generic` names; see issue #609.
+///
+/// When `ty` cannot be analysed (a `macro!`/`Verbatim` type, whose expansion
+/// the derive cannot see) the slots collapse to a flat, name-keyed list of
+/// `substituted`. That is best-effort — an opaque field mentioning two
+/// parameters of the same concrete type is still ambiguous — but it preserves
+/// the previous behaviour for opaque fields rather than baking the concrete
+/// argument in.
+pub fn generic_substitution_slots(
+    crate_ref: &TokenStream,
+    ty: &Type,
+    substituted: &[syn::Ident],
+) -> Vec<TokenStream> {
+    if mentions_opaque(ty) {
+        return substituted
+            .iter()
+            .map(|ident| generic_slot(crate_ref, ident))
+            .collect();
+    }
+
+    slots_for_type(crate_ref, ty, substituted)
+}
+
+/// The slots for one type's own type-argument list.
+fn slots_for_type(
+    crate_ref: &TokenStream,
+    ty: &Type,
+    substituted: &[syn::Ident],
+) -> Vec<TokenStream> {
+    if let Some(ident) = bare_param(ty, substituted) {
+        return vec![generic_slot(crate_ref, &ident)];
+    }
+
+    type_arguments(ty)
+        .into_iter()
+        .map(|argument| slot_for_argument(crate_ref, argument, substituted))
+        .collect()
+}
+
+/// The slot for a single type argument.
+fn slot_for_argument(
+    crate_ref: &TokenStream,
+    argument: &Type,
+    substituted: &[syn::Ident],
+) -> TokenStream {
+    if let Some(ident) = bare_param(argument, substituted) {
+        return generic_slot(crate_ref, &ident);
+    }
+
+    if type_params_used_in(argument, substituted).is_empty() {
+        return quote!(#crate_ref::GenericSubstitutionSlot::Skip);
+    }
+
+    let slots = slots_for_type(crate_ref, argument, substituted);
+    quote!(#crate_ref::GenericSubstitutionSlot::Nested(vec![#(#slots),*]))
+}
+
+fn generic_slot(crate_ref: &TokenStream, ident: &syn::Ident) -> TokenStream {
+    let name = ident.to_string();
+    quote!(#crate_ref::GenericSubstitutionSlot::Generic {
+        name: ::std::any::type_name::<#ident>(),
+        generic: #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(#name)),
+    })
+}
+
+/// The ident if `ty` is a bare single-segment path naming one of `substituted`.
+fn bare_param(ty: &Type, substituted: &[syn::Ident]) -> Option<syn::Ident> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+
+    if path.qself.is_some() || path.path.leading_colon.is_some() || path.path.segments.len() != 1 {
+        return None;
+    }
+
+    let segment = path.path.segments.first()?;
+    if !segment.arguments.is_empty() {
+        return None;
+    }
+
+    substituted
+        .iter()
+        .find(|ident| **ident == segment.ident)
+        .cloned()
+}
+
+/// The type arguments of a type constructor, in source order.
+fn type_arguments(ty: &Type) -> Vec<&Type> {
+    match ty {
+        Type::Path(path) if path.qself.is_none() => path
+            .path
+            .segments
+            .last()
+            .map(|segment| match &segment.arguments {
+                syn::PathArguments::AngleBracketed(arguments) => arguments
+                    .args
+                    .iter()
+                    .filter_map(|argument| match argument {
+                        syn::GenericArgument::Type(ty) => Some(ty),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            })
+            .unwrap_or_default(),
+        Type::Reference(reference) => vec![&reference.elem],
+        Type::Tuple(tuple) => tuple.elems.iter().collect(),
+        Type::Slice(slice) => vec![&slice.elem],
+        Type::Array(array) => vec![&array.elem],
+        Type::Ptr(pointer) => vec![&pointer.elem],
+        Type::Paren(paren) => vec![&paren.elem],
+        Type::Group(group) => vec![&group.elem],
+        _ => Vec::new(),
+    }
+}
+
+/// Whether `ty` contains a `macro!`/`Verbatim` node the derive cannot see into.
+fn mentions_opaque(ty: &Type) -> bool {
+    struct OpaqueFinder(bool);
+
+    impl Visit<'_> for OpaqueFinder {
+        fn visit_type(&mut self, node: &syn::Type) {
+            match node {
+                syn::Type::Macro(_) | syn::Type::Verbatim(_) => self.0 = true,
+                _ => visit::visit_type(self, node),
+            }
+        }
+    }
+
+    let mut finder = OpaqueFinder(false);
+    finder.visit_type(ty);
+    finder.0
 }
 
 fn visit_field_type(

@@ -33,8 +33,9 @@
 //!   [`DEFERRED_ALIAS_UNION_MARKER`] and [`ALIAS_EXCLUSION_MARKER`],
 //!   `specta-jsonschema` reads [`STRICT_OBJECT_MARKER`],
 //!   [`ENUM_REPR_REWRITTEN_MARKER`] and [`FLATTENED_PAYLOAD_MARKER`], and
-//!   `specta-swift` reads [`SERDE_FIELD_FLATTEN`] and
-//!   [`SERIALIZE_OMISSION_MARKER`]. That list is illustrative, not exhaustive.
+//!   `specta-swift` reads [`SERDE_FIELD_FLATTEN`], [`SERIALIZE_OMISSION_MARKER`],
+//!   [`NULLABLE_MARKER`], [`SERDE_FIELD_DEFAULT`] and [`SERDE_CONTAINER_DEFAULT`].
+//!   That list is illustrative, not exhaustive.
 //!
 //! # Rules
 //!
@@ -88,7 +89,7 @@
 // `SERDE_FIELD_FLATTEN`). `specta-serde` interprets them, and also writes a few
 // itself while lowering the representation: it rewrites the container renames
 // in place, and stamps `SERDE_CONTAINER_DENY_UNKNOWN_FIELDS` onto the synthetic
-// payload structs and rewritten enums it generates. Ten of the keys are read
+// payload structs and rewritten enums it generates. Twelve of the keys are read
 // directly by an exporter as well, and each of those says so on its own item.
 // ---------------------------------------------------------------------------
 
@@ -132,6 +133,9 @@ pub const SERDE_CONTAINER_CONTENT: &str = "serde:container:content";
 /// `specta-serde`.
 pub const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
 /// `#[serde(default)]` on a container.
+///
+/// Read by `specta-swift` as well as by `specta-serde` to determine whether
+/// missing named fields are accepted during decoding.
 pub const SERDE_CONTAINER_DEFAULT: &str = "serde:container:default";
 /// `#[serde(transparent)]` on a container.
 pub const SERDE_CONTAINER_TRANSPARENT: &str = "serde:container:transparent";
@@ -200,6 +204,9 @@ pub const SERDE_FIELD_RENAME_DESERIALIZE: &str = "serde:field:rename_deserialize
 /// `#[serde(alias = "...")]` on a field, as a list of strings.
 pub const SERDE_FIELD_ALIASES: &str = "serde:field:aliases";
 /// `#[serde(default)]` on a field.
+///
+/// Read by `specta-swift` as well as by `specta-serde` to distinguish decode
+/// defaults from serialization-only omission.
 pub const SERDE_FIELD_DEFAULT: &str = "serde:field:default";
 /// `#[serde(flatten)]` on a field.
 ///
@@ -269,7 +276,7 @@ pub const SERDE_NEWTYPE_SKIP_IGNORED_MARKER: &str = "specta:serde_newtype_skip_i
 /// about.
 ///
 /// Written exclusively by the derive from the real field syntax; read by
-/// `specta-serde`.
+/// `specta-serde` and `specta-swift`.
 pub const NULLABLE_MARKER: &str = "specta:nullable";
 
 /// Marks a built-in number type that is finite on the wire, so an exporter can
