@@ -263,7 +263,7 @@ fn jsonschema_deny_unknown_fields_applies_to_enum_payloads_in_both_phases() {
                     Some(specta::datatype::DataType::Enum(enm))
                         if enm
                             .attributes
-                            .contains_key("serde:container:deny_unknown_fields")
+                            .contains_key(specta::markers::SERDE_CONTAINER_DENY_UNKNOWN_FIELDS)
                 )
             }),
             "deny_unknown_fields must survive the format phase"

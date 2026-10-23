@@ -204,7 +204,7 @@ fn inner(
                 && let [field] = unnamed.fields.as_slice()
                 && !field
                     .attributes
-                    .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
+                    .contains_key(specta::markers::SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
                 && SerdeFieldAttrs::from_attributes(&field.attributes)?
                     .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
             {
@@ -1026,7 +1026,7 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     if mode == ApplyMode::Unified
         && !field
             .attributes
-            .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
+            .contains_key(specta::markers::SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
         && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
     {
         // Plain `#[serde(skip)]` sets both flags and never reaches here.
@@ -1200,7 +1200,7 @@ impl FlattenDirections {
     fn for_field(field: &Field) -> Result<Self, Error> {
         if field
             .attributes
-            .contains_key(crate::SERDE_NEWTYPE_SKIP_IGNORED)
+            .contains_key(specta::markers::SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
         {
             return Ok(Self::LIVE);
         }
@@ -1734,7 +1734,7 @@ fn ensure_codec_override(
 
 fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
     attributes
-        .get_named_as::<bool>("specta:type_override")
+        .get_named_as::<bool>(specta::markers::TYPE_OVERRIDE_MARKER)
         .copied()
         .unwrap_or(false)
 }
@@ -1827,7 +1827,10 @@ fn validate_adjacent_collapsed_newtype_variants(
             continue;
         }
 
-        if field.attributes.contains_key(crate::NULLABLE_FIELD) {
+        if field
+            .attributes
+            .contains_key(specta::markers::NULLABLE_MARKER)
+        {
             continue;
         }
 

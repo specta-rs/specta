@@ -110,7 +110,15 @@ use specta::{
         DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
     },
-    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER, STRICT_OBJECT_MARKER},
+    markers::{
+        ALIAS_EXCLUSION_MARKER, ALIAS_UNION_MARKER, CONDITIONAL_OMISSION_MARKER,
+        DEFERRED_ALIAS_UNION_MARKER, ENUM_OTHER_VARIANT_MARKER, ENUM_REPR_REWRITTEN_MARKER,
+        FLATTENED_PAYLOAD_MARKER, HIDDEN_EXTERNAL_PAYLOAD_MARKER, NULLABLE_MARKER,
+        OPTIONAL_FLATTEN_UNION_MARKER, PRESERVED_ARITY_PAYLOAD_MARKER,
+        SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, SERDE_CONTAINER_FROM_RESOLVED,
+        SERDE_CONTAINER_INTO_RESOLVED, SERDE_CONTAINER_TRY_FROM_RESOLVED,
+        SERDE_NEWTYPE_SKIP_IGNORED_MARKER, SERIALIZE_OMISSION_MARKER, STRICT_OBJECT_MARKER,
+    },
 };
 
 mod error;
@@ -121,15 +129,9 @@ mod repr;
 mod validate;
 
 use inflection::RenameRule;
-use parser::{
-    CONTAINER_DENY_UNKNOWN_FIELDS, CONTAINER_FROM_RESOLVED, CONTAINER_INTO_RESOLVED,
-    CONTAINER_TRY_FROM_RESOLVED, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
-};
+use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
 use phased::PhasedTy;
 use repr::EnumRepr;
-
-const SERDE_NEWTYPE_SKIP_IGNORED: &str = "specta:serde_newtype_skip_ignored";
-const FLATTENED_PAYLOAD_MARKER: &str = "specta_serde:flattened_payload";
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -2332,7 +2334,7 @@ fn alias_field_union(
 
     for name in &names {
         let mut field = field.clone();
-        field.attributes.remove(parser::FIELD_ALIASES);
+        field.attributes.remove(parser::SERDE_FIELD_ALIASES);
 
         let mut fields = vec![(name.clone(), field)];
         if exclude_other_names {
@@ -2454,7 +2456,7 @@ fn rewrite_fields_for_phase(
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
                 if mode == PhaseRewrite::Deserialize
-                    && field.attributes.contains_key(NULLABLE_FIELD)
+                    && field.attributes.contains_key(NULLABLE_MARKER)
                     && !serde_attrs
                         .as_ref()
                         .is_some_and(|attrs| attrs.has_deserialize_with || attrs.has_with)
@@ -2550,7 +2552,9 @@ fn rewrite_field_for_phase(
         // already-split variant — a footgun for downstream callers (e.g.
         // tauri-specta's `validate_exported_command`) that run unified
         // validation on the post-`apply_phases` graph.
-        field.attributes.remove(parser::FIELD_SKIP_SERIALIZING_IF);
+        field
+            .attributes
+            .remove(parser::SERDE_FIELD_SKIP_SERIALIZING_IF);
     }
 
     if mode != PhaseRewrite::Unified {
@@ -2561,10 +2565,10 @@ fn rewrite_field_for_phase(
         // above: unified-mode validation now rejects one-sided renames/skips,
         // and it must keep accepting the already-split shapes.
         for key in [
-            parser::FIELD_RENAME_SERIALIZE,
-            parser::FIELD_RENAME_DESERIALIZE,
-            parser::FIELD_SKIP_SERIALIZING,
-            parser::FIELD_SKIP_DESERIALIZING,
+            parser::SERDE_FIELD_RENAME_SERIALIZE,
+            parser::SERDE_FIELD_RENAME_DESERIALIZE,
+            parser::SERDE_FIELD_SKIP_SERIALIZING,
+            parser::SERDE_FIELD_SKIP_DESERIALIZING,
         ] {
             field.attributes.remove(key);
         }
@@ -2602,10 +2606,10 @@ fn normalize_container_attrs_for_phase(
     // `rename_all` / `rename_all_fields` have already been applied to the
     // field names by `rewrite_fields_for_phase`.
     for key in [
-        parser::CONTAINER_RENAME_ALL_SERIALIZE,
-        parser::CONTAINER_RENAME_ALL_DESERIALIZE,
-        parser::CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
-        parser::CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+        parser::SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
+        parser::SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
+        parser::SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
+        parser::SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
     ] {
         attrs.remove(key);
     }
@@ -2620,11 +2624,11 @@ fn normalize_container_attrs_for_phase(
         PhaseRewrite::Deserialize => parsed.rename_deserialize,
         PhaseRewrite::Unified => unreachable!("handled above"),
     };
-    attrs.remove(parser::CONTAINER_RENAME_SERIALIZE);
-    attrs.remove(parser::CONTAINER_RENAME_DESERIALIZE);
+    attrs.remove(parser::SERDE_CONTAINER_RENAME_SERIALIZE);
+    attrs.remove(parser::SERDE_CONTAINER_RENAME_DESERIALIZE);
     if let Some(rename) = rename {
-        attrs.insert(parser::CONTAINER_RENAME_SERIALIZE, rename.clone());
-        attrs.insert(parser::CONTAINER_RENAME_DESERIALIZE, rename);
+        attrs.insert(parser::SERDE_CONTAINER_RENAME_SERIALIZE, rename.clone());
+        attrs.insert(parser::SERDE_CONTAINER_RENAME_DESERIALIZE, rename);
     }
 
     Ok(())
@@ -2651,12 +2655,12 @@ fn normalize_enum_attrs_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<()
         // and variants skipped in this phase were already dropped by
         // `filter_enum_variants_for_phase`.
         for key in [
-            parser::VARIANT_RENAME_SERIALIZE,
-            parser::VARIANT_RENAME_DESERIALIZE,
-            parser::VARIANT_RENAME_ALL_SERIALIZE,
-            parser::VARIANT_RENAME_ALL_DESERIALIZE,
-            parser::VARIANT_SKIP_SERIALIZING,
-            parser::VARIANT_SKIP_DESERIALIZING,
+            parser::SERDE_VARIANT_RENAME_SERIALIZE,
+            parser::SERDE_VARIANT_RENAME_DESERIALIZE,
+            parser::SERDE_VARIANT_RENAME_ALL_SERIALIZE,
+            parser::SERDE_VARIANT_RENAME_ALL_DESERIALIZE,
+            parser::SERDE_VARIANT_SKIP_SERIALIZING,
+            parser::SERDE_VARIANT_SKIP_DESERIALIZING,
         ] {
             variant.attributes.remove(key);
         }
@@ -2730,7 +2734,10 @@ fn rewrite_struct_repr_for_phase(
 }
 
 fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool, Error> {
-    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
+    if field
+        .attributes
+        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+    {
         return Ok(false);
     }
     let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
@@ -2743,24 +2750,6 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
         PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
     })
 }
-
-/// Marker recording that a field's *declared Rust type* was `Option<T>`.
-/// serde's `missing_field` helper special-cases `Option` on deserialize (a
-/// missing key yields `None`), which changes what an adjacently tagged
-/// newtype variant requires for its `content` key -- both when the sole
-/// field is skipped (collapse handling) and when it is live (a missing
-/// `content` deserializes as `None` even without any skip attrs).
-///
-/// Written exclusively by the `Type` derive from the real field syntax. It
-/// is deliberately NOT inferred from the exported datatype here: a
-/// `#[specta(type = Option<...>)]` override produces a
-/// [`DataType::Nullable`] that serde knows nothing about (and vice versa),
-/// so the exported shape is not evidence of serde's `Option` behavior.
-/// Hand-built datatypes without the marker conservatively keep `content`
-/// required, which is exact for non-`Option` fields and merely conservative
-/// for writers of actual `Option` fields (serde accepts an explicit
-/// `content: null` for those too).
-const NULLABLE_FIELD: &str = "specta:nullable";
 
 /// Whether a tuple struct's skipped `ty: None` slots must survive the
 /// rewrite so the declared arity reaches the renderer. serde keeps the
@@ -2831,62 +2820,6 @@ fn unnamed_live_fields(unnamed: &UnnamedFields) -> impl Iterator<Item = &Field> 
 fn unnamed_live_field_count(unnamed: &UnnamedFields) -> usize {
     unnamed_live_fields(unnamed).count()
 }
-
-/// Marker attribute key recorded on an [`Enum`]'s
-/// [`Attributes`](specta::datatype::Attributes) once it is in its final
-/// serde representation, so a later rewrite pass (e.g. [`PhasesFormat`]'s
-/// second pass over split generated types) doesn't transform it again. It is
-/// set when [`rewrite_enum_repr_for_phase`] rewrites an enum, and at
-/// construction by the synthetic-enum builders ([`string_literal_datatype`],
-/// [`alias_field_union`], [`rewrite_identifier_enum_for_phase`]) whose output
-/// is already final.
-///
-/// This replaces a former shape-sniffing heuristic
-/// (`enum_repr_already_rewritten`) that tried to detect "already rewritten"
-/// enums by inspecting variant shapes. That heuristic was unsound: every
-/// shape the transform produces is also a valid shape a user can author
-/// directly (for example a single unnamed `&'static str` field lowers to
-/// exactly the `DataType::Primitive(Primitive::str)` that the transform
-/// emits for a widened tag), so it could both skip enums that had never been
-/// rewritten and re-transform enums that had. Tracking the rewrite
-/// explicitly makes the check exact.
-const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
-
-/// Marker retained when an external variant's serde payload was hidden only
-/// from Specta before the enum was rewritten. The generated string-literal
-/// shape is otherwise indistinguishable from a genuine unit variant.
-const HIDDEN_EXTERNAL_PAYLOAD_MARKER: &str = "specta_serde:hidden_external_payload";
-
-/// Marker retained on a rewritten deserialize-only `#[serde(other)]` branch.
-/// Exporters use it to distinguish the widened catch-all from authored
-/// variant-level untagged branches with an equally broad string field.
-const ENUM_OTHER_VARIANT_MARKER: &str = "specta_serde:variant_other";
-
-/// Marks the synthetic present/absent union produced for optional flattened
-/// payloads so exporters can reject malformed values that use payload keys.
-const OPTIONAL_FLATTEN_UNION_MARKER: &str = "specta_serde:optional_flatten_union";
-
-/// Marker attribute recorded on the payload structs generated by
-/// [`variant_payload_field`] when skipped `ty: None` slots are kept to
-/// preserve the variant's declared tuple arity (so a skip-reduced single
-/// live element still renders as a sequence). Later rewrite passes honor it
-/// by keeping those marker slots instead of applying the default
-/// live-fields-only retain for unnamed structs.
-const PRESERVED_ARITY_PAYLOAD_MARKER: &str = "specta_serde:preserved_arity_payload";
-
-/// Marks flattened fields whose payload may be absent from serialization.
-/// `Field::optional` cannot carry this distinction because serde defaults can
-/// also set it, while defaults do not make flattened payloads optional.
-const CONDITIONAL_OMISSION_MARKER: &str = "specta_serde:conditional_omission";
-
-/// Marks a field that `#[serde(skip_serializing_if = ...)]` may omit from a
-/// serialized sequence. The raw parser attribute is stripped during the phase
-/// rewrite (a phase-split field already carries the decision in
-/// `Field::optional`), so exporters read this semantic marker to tell the
-/// omission apart from a `#[serde(default)]`-optional field, which serde still
-/// writes.
-const SERIALIZE_OMISSION_MARKER: &str = "specta_serde:serialize_omission";
-const ALIAS_UNION_MARKER: &str = "specta_serde:alias_union";
 
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
@@ -3026,7 +2959,8 @@ fn rewrite_enum_repr_for_phase(
     e.attributes = Default::default();
     e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
     if deny_unknown_fields {
-        e.attributes.insert(CONTAINER_DENY_UNKNOWN_FIELDS, true);
+        e.attributes
+            .insert(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, true);
     }
 
     Ok(())
@@ -3436,7 +3370,9 @@ fn close_named_payload(field: &mut Field) {
     if let Some(DataType::Struct(strct)) = &mut field.ty
         && matches!(&strct.fields, Fields::Named(_))
     {
-        strct.attributes.insert(CONTAINER_DENY_UNKNOWN_FIELDS, true);
+        strct
+            .attributes
+            .insert(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, true);
     }
 }
 
@@ -3919,13 +3855,13 @@ fn sole_field_is_serde_skipped(variant: &Variant, mode: PhaseRewrite) -> Result<
 }
 
 /// Whether a newtype variant's *live* sole payload was declared as
-/// `Option<T>` (see [`NULLABLE_FIELD`]). Declared arity must be 1: a
+/// `Option<T>` (see [`NULLABLE_MARKER`]). Declared arity must be 1: a
 /// multi-field tuple variant deserializes as a sequence, so serde's
 /// `missing_field` `Option` special case never applies to it.
 fn sole_live_field_is_nullable(variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
-            [field] => field.ty.is_some() && field.attributes.contains_key(NULLABLE_FIELD),
+            [field] => field.ty.is_some() && field.attributes.contains_key(NULLABLE_MARKER),
             _ => false,
         },
         Fields::Unit | Fields::Named(_) => false,
@@ -3933,14 +3869,14 @@ fn sole_live_field_is_nullable(variant: &Variant) -> bool {
 }
 
 /// Whether a collapsed newtype variant's skipped sole field was declared as
-/// `Option<T>` (see [`NULLABLE_FIELD`]; the attribute survives on the
+/// `Option<T>` (see [`NULLABLE_MARKER`]; the attribute survives on the
 /// `ty: None` placeholder produced by [`skipped_field_marker`]).
 fn skipped_sole_field_is_nullable(variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unnamed(unnamed) => unnamed
             .fields
             .first()
-            .is_some_and(|field| field.attributes.contains_key(NULLABLE_FIELD)),
+            .is_some_and(|field| field.attributes.contains_key(NULLABLE_MARKER)),
         Fields::Unit | Fields::Named(_) => false,
     }
 }
@@ -5033,9 +4969,9 @@ fn substitute_container_attribute_generics(
     generics: &[(specta::datatype::Generic, DataType)],
 ) {
     for key in [
-        CONTAINER_INTO_RESOLVED,
-        CONTAINER_FROM_RESOLVED,
-        CONTAINER_TRY_FROM_RESOLVED,
+        SERDE_CONTAINER_INTO_RESOLVED,
+        SERDE_CONTAINER_FROM_RESOLVED,
+        SERDE_CONTAINER_TRY_FROM_RESOLVED,
     ] {
         let Some(mut ty) = attributes.get_named_as::<DataType>(key).cloned() else {
             continue;
@@ -5300,8 +5236,8 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
     // `missing_field` helper deserializes a missing `content` key as `None`,
     // so the unified `content?: null` shape is exact for both phases and no
     // split is needed. `Option`-ness is read only from the marker the derive
-    // records from the real field syntax; see [`NULLABLE_FIELD`].
-    if field.attributes.contains_key(NULLABLE_FIELD) {
+    // records from the real field syntax; see [`NULLABLE_MARKER`].
+    if field.attributes.contains_key(NULLABLE_MARKER) {
         return Ok(false);
     }
 
@@ -5361,7 +5297,10 @@ fn unnamed_trailing_default_run(unnamed: &UnnamedFields) -> Result<usize, Error>
 }
 
 fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
-    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
+    if field
+        .attributes
+        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+    {
         return Ok(false);
     }
     if field.ty.is_none() {
@@ -5383,10 +5322,12 @@ fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
 }
 
 fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
-    let ignored_skip = field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED);
+    let ignored_skip = field
+        .attributes
+        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER);
     let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
     let declared_option_is_deserialize_optional = field.ty.is_some()
-        && field.attributes.contains_key(NULLABLE_FIELD)
+        && field.attributes.contains_key(NULLABLE_MARKER)
         && !attrs
             .as_ref()
             .is_some_and(|attrs| attrs.flatten || attrs.has_deserialize_with || attrs.has_with);
@@ -5715,7 +5656,10 @@ fn apply_field_attrs(
     mode: PhaseRewrite,
     container_default: bool,
 ) -> Result<(), Error> {
-    if field.attributes.contains_key(SERDE_NEWTYPE_SKIP_IGNORED) {
+    if field
+        .attributes
+        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+    {
         return Ok(());
     }
     let mut optional = field.optional;
@@ -6068,7 +6012,7 @@ mod tests {
             .map(|(_, field)| {
                 field
                     .attributes
-                    .contains_key(parser::FIELD_SKIP_SERIALIZING_IF)
+                    .contains_key(parser::SERDE_FIELD_SKIP_SERIALIZING_IF)
             })
             .expect("field should exist")
     }

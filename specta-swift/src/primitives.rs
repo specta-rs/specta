@@ -6,6 +6,10 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, NamedFields, NamedReferenceType, Primitive,
         Reference, Struct, Variant,
     },
+    markers::{
+        ENUM_REPR_REWRITTEN_MARKER, NULLABLE_MARKER, SERDE_CONTAINER_DEFAULT, SERDE_FIELD_DEFAULT,
+        SERDE_FIELD_FLATTEN, SERIALIZE_OMISSION_MARKER,
+    },
 };
 
 use crate::error::Error;
@@ -116,38 +120,6 @@ fn normalized_payload<'a>(variant_name: &str, payload: &'a DataType) -> &'a Data
     current
 }
 
-/// Marker `specta-serde` leaves on the single-variant unit enums it synthesises
-/// for serde tags (and on the enums it has rewritten).
-const ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
-
-/// Field attribute recorded by the derive macro for `#[serde(flatten)]`.
-const FLATTENED_FIELD: &str = "serde:field:flatten";
-
-/// Field marker `specta-serde` records for `#[serde(skip_serializing_if)]`,
-/// which lets serde omit an element from a tuple struct's sequence. It is kept
-/// after the raw parser attribute is stripped so the omission can be told apart
-/// from a `#[serde(default)]`-optional element, which serde still writes.
-const SERIALIZE_OMISSION_FIELD: &str = "specta_serde:serialize_omission";
-
-/// Field attribute recorded by the derive macro for `#[serde(default)]`.
-/// `specta-serde` sets `Field::optional` for it, but so does
-/// `#[serde(skip_serializing_if)]`, which serde does *not* tolerate an absent
-/// key for on its own -- so the attribute itself is what distinguishes a
-/// genuinely absent-tolerant field.
-const DEFAULTED_FIELD: &str = "serde:field:default";
-
-/// Container attribute for `#[serde(default)]` on a struct: serde applies the
-/// container's `Default` to every absent field, so each one is absent-tolerant.
-const DEFAULTED_CONTAINER: &str = "serde:container:default";
-
-/// Field attribute the `Type` derive records when the field was *declared* as
-/// `Option<T>`. It survives a `#[specta(type = ...)]` override, which changes
-/// the exported datatype (and its nullability) but not serde's behaviour: serde
-/// still treats the field as an `Option`, writing `null` and tolerating an
-/// absent key. It is deliberately not inferred from the exported datatype,
-/// which a nullable override can make `Nullable` for a non-`Option` field.
-const NULLABLE_FIELD: &str = "specta:nullable";
-
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
     /// The wire key carrying the discriminant (serde's `tag`).
@@ -167,7 +139,7 @@ fn tag_literal_value(dt: &DataType) -> Option<&str> {
         return None;
     };
 
-    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN) {
+    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
         return None;
     }
 
@@ -1143,7 +1115,7 @@ fn struct_to_swift(
             }
         }
         specta::datatype::Fields::Named(fields) => {
-            let container_default = s.attributes.contains_key(DEFAULTED_CONTAINER);
+            let container_default = s.attributes.contains_key(SERDE_CONTAINER_DEFAULT);
             let live = keyed_fields(
                 swift,
                 format,
@@ -1297,7 +1269,9 @@ impl KeyedField<'_> {
     /// An `Option` (including one hidden behind a `#[specta(type = ...)]`
     /// override) is *not* omittable -- serde writes it as `null`.
     fn may_be_absent(&self) -> bool {
-        self.field.attributes.contains_key(SERIALIZE_OMISSION_FIELD)
+        self.field
+            .attributes
+            .contains_key(SERIALIZE_OMISSION_MARKER)
             || (self.field.optional && !self.nullable())
     }
 
@@ -1348,7 +1322,7 @@ fn keyed_fields<'a>(
         let Some(original) = field.ty.as_ref() else {
             continue;
         };
-        let rust_nullable = field.attributes.contains_key(NULLABLE_FIELD);
+        let rust_nullable = field.attributes.contains_key(NULLABLE_MARKER);
         let property_type = format!(
             "{}{}",
             datatype_to_swift(swift, format, types, original, generic_scope.to_vec())?,
@@ -1367,7 +1341,7 @@ fn keyed_fields<'a>(
             field,
             property_type,
             decode_type,
-            defaulted: container_default || field.attributes.contains_key(DEFAULTED_FIELD),
+            defaulted: container_default || field.attributes.contains_key(SERDE_FIELD_DEFAULT),
             rust_nullable,
         });
     }
@@ -1475,7 +1449,7 @@ fn wire_elements<'a>(
             field,
             ty,
             nullable: matches!(field.ty.as_ref(), Some(DataType::Nullable(_))),
-            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_FIELD),
+            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_MARKER),
         });
     }
     Ok(elements)
@@ -1873,7 +1847,7 @@ fn generate_enum_structs(
         let mut field_mappings = Vec::new();
         for (original_field_name, field) in &wrapper {
             if let Some(ty) = field.ty.as_ref() {
-                if field.attributes.contains_key(FLATTENED_FIELD) {
+                if field.attributes.contains_key(SERDE_FIELD_FLATTEN) {
                     return Err(Error::UnsupportedType(format!(
                         "variant `{original_variant_name}` flattens field `{original_field_name}` \
                          into the variant, which the Swift exporter cannot express"

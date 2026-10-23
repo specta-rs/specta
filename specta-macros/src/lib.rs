@@ -30,6 +30,9 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 /// - `#[specta(type = T)]` overrides the generated type definition with `T`.
 ///   `T` may be a path or Rust type, such as `String`, `Vec<T>`, or `(String, i32)`.
 /// - `#[specta(crate = path::to::specta)]` uses a custom path to the `specta` crate.
+///   The target must re-export the `specta` crate wholesale (for example with
+///   `pub use specta;`): the generated code resolves both `Type` and the internal
+///   marker keys through that path, so a partial re-export will not compile.
 /// - `#[specta(inline)]` or `#[specta(inline = true)]` inlines this type where it is referenced.
 ///   Use `#[specta(inline = false)]` to disable it.
 /// - `#[specta(remote = path::ToType)]` implements `Type` for a remote type instead of the

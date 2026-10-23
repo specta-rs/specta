@@ -201,7 +201,7 @@ fn yaml_tagged_value_matches_serde_single_entry_map() {
     assert_eq!(
         value
             .attributes
-            .get_named_as::<bool>("serde:container:untagged"),
+            .get_named_as::<bool>(specta::markers::SERDE_CONTAINER_UNTAGGED),
         Some(&true)
     );
 }

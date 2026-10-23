@@ -10,30 +10,16 @@ use specta::{
         DataType, Deprecated, Enum, Field, Fields, Generic, List, Map as SpectaMap, NamedDataType,
         NamedReference, NamedReferenceType, Primitive, Reference, Struct, Tuple, Variant,
     },
+    markers::{
+        ENUM_OTHER_VARIANT_MARKER, ENUM_REPR_REWRITTEN_MARKER, FLATTENED_PAYLOAD_MARKER,
+        SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, SERDE_CONTAINER_UNTAGGED, SERDE_VARIANT_UNTAGGED,
+        STRICT_OBJECT_MARKER,
+    },
 };
 
 use crate::{Error, SchemaVersion};
 
 const INLINE_RECURSION_LIMIT: usize = 128;
-const SERDE_CONTAINER_UNTAGGED: &str = "serde:container:untagged";
-/// Authored `#[serde(deny_unknown_fields)]`. Distinct from
-/// [`SERDE_STRICT_OBJECT_MARKER`], which specta-serde puts on the wrapper it
-/// generates for an externally tagged variant.
-const SERDE_CONTAINER_DENY_UNKNOWN_FIELDS: &str = "serde:container:deny_unknown_fields";
-/// Marks a synthetic object wrapper whose wire format accepts exactly one key.
-/// specta-serde sets it on the wrapper it generates for an externally tagged
-/// variant. This is not authored metadata — it describes the tagging
-/// representation itself — so such a wrapper is closed regardless of the schema
-/// policy. Adjacently tagged variants deliberately do not carry it: Serde does
-/// accept extra keys alongside `tag`/`content`.
-const SERDE_STRICT_OBJECT_MARKER: &str = "specta:strict_object";
-const SERDE_VARIANT_UNTAGGED: &str = "serde:variant:untagged";
-const SERDE_ENUM_REPR_REWRITTEN: &str = "specta_serde:enum_repr_rewritten";
-const SERDE_ENUM_OTHER_VARIANT: &str = "specta_serde:variant_other";
-/// Marks a struct that specta-serde inlined as a flattened payload. Serde
-/// ignores an inner struct's `deny_unknown_fields` when it is flattened, so a
-/// marked part must not close the merged object.
-const SERDE_FLATTENED_PAYLOAD: &str = "specta_serde:flattened_payload";
 
 type Generics = BTreeMap<Cow<'static, str>, DataType>;
 
@@ -298,7 +284,7 @@ impl<'a> Renderer<'a> {
     fn intersection_denies_unknown_fields(&self, types: &[DataType]) -> bool {
         types.iter().any(|ty| match ty {
             DataType::Struct(strct) => {
-                !strct.attributes.contains_key(SERDE_FLATTENED_PAYLOAD)
+                !strct.attributes.contains_key(FLATTENED_PAYLOAD_MARKER)
                     && strct
                         .attributes
                         .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS)
@@ -527,7 +513,7 @@ impl<'a> Renderer<'a> {
             },
             DataType::Enum(enm) => {
                 let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-                let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+                let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
                 enm.variants
                     .iter()
                     .filter(|(_, variant)| !variant.skip)
@@ -645,7 +631,7 @@ impl<'a> Renderer<'a> {
             },
             DataType::Enum(enm) => {
                 let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-                let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+                let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
                 let mut schemas = Vec::new();
                 for (name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
                     let mut schema = match &variant.fields {
@@ -901,7 +887,7 @@ impl<'a> Renderer<'a> {
         depth: usize,
     ) -> Result<Value, Error> {
         let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-        let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+        let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
         // Serde applies a container's `deny_unknown_fields` to each variant's
         // named-field payload, so it is threaded through to `render_variant`.
         let deny_unknown_fields = self.deny_unknown_fields(
@@ -931,7 +917,7 @@ impl<'a> Renderer<'a> {
                 .variants
                 .iter()
                 .filter(|(_, variant)| !variant.skip)
-                .map(|(_, variant)| variant.attributes.contains_key(SERDE_ENUM_OTHER_VARIANT))
+                .map(|(_, variant)| variant.attributes.contains_key(ENUM_OTHER_VARIANT_MARKER))
                 .collect::<Vec<_>>();
             exclude_known_discriminants(&mut variants, &other_variants);
         }
@@ -1006,7 +992,7 @@ impl<'a> Renderer<'a> {
                     // in that wrapper even without `deny_unknown_fields`, so it
                     // stays closed regardless of the schema policy.
                     let strict_wrapper =
-                        rewritten && variant.attributes.contains_key(SERDE_STRICT_OBJECT_MARKER);
+                        rewritten && variant.attributes.contains_key(STRICT_OBJECT_MARKER);
                     let payload = self.render_fields(
                         &Fields::Named(fields.clone()),
                         generics,
@@ -1069,7 +1055,7 @@ impl<'a> Renderer<'a> {
     ///
     /// A rewritten external variant never reaches here: it renders as a named
     /// object through `render_fields`, where the same one-key rule is applied
-    /// via [`SERDE_STRICT_OBJECT_MARKER`].
+    /// via [`STRICT_OBJECT_MARKER`].
     fn external_variant_schema(&self, name: &str, payload: Value) -> Value {
         let mut properties = Map::new();
         properties.insert(name.to_string(), payload);
@@ -1510,7 +1496,7 @@ fn rust_type_path(ndt: &NamedDataType) -> String {
 }
 
 fn enum_is_string_unit_only(enm: &Enum) -> bool {
-    let rewritten = enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN);
+    let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
     (rewritten || !enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED))
         && enm
             .variants
@@ -1536,7 +1522,7 @@ fn is_string_literal_datatype(dt: &DataType) -> bool {
     let DataType::Enum(enm) = dt else {
         return false;
     };
-    enm.attributes.contains_key(SERDE_ENUM_REPR_REWRITTEN)
+    enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
         && matches!(enm.variants.as_slice(), [(_, variant)] if matches!(variant.fields, Fields::Unit))
 }
 

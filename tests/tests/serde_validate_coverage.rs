@@ -1937,8 +1937,10 @@ fn nested_dead_flatten_datatype(
     use specta::datatype::{Field, Struct};
 
     let mut v = Field::new(<Vec<u8> as Type>::definition(types));
-    v.attributes.insert("serde:field:flatten", true);
-    v.attributes.insert("serde:field:skip_deserializing", true);
+    v.attributes
+        .insert(specta::markers::SERDE_FIELD_FLATTEN, true);
+    v.attributes
+        .insert(specta::markers::SERDE_FIELD_SKIP_DESERIALIZING, true);
     let inner_struct = Struct::named().field("v", v).build();
 
     let mut inner_field = Field::new(inner_struct);
@@ -1957,7 +1959,10 @@ fn phases_map_type_nested_flatten_dead_in_both_phases_is_accepted() {
     use specta::Format as _;
 
     let mut types = Types::default();
-    let dt = nested_dead_flatten_datatype(&mut types, Some("serde:field:skip_serializing"));
+    let dt = nested_dead_flatten_datatype(
+        &mut types,
+        Some(specta::markers::SERDE_FIELD_SKIP_SERIALIZING),
+    );
 
     specta_serde::PhasesFormat.map_type(&types, &dt).expect(
         "the containing field kills serialize and the flatten's own skip kills deserialize",
@@ -1993,15 +1998,17 @@ fn phases_map_type_same_inner_through_dead_and_live_fields_is_rejected() {
 
         let make_inner = |types: &mut Types| {
             let mut v = Field::new(<Vec<u8> as Type>::definition(types));
-            v.attributes.insert("serde:field:flatten", true);
-            v.attributes.insert("serde:field:skip_deserializing", true);
+            v.attributes
+                .insert(specta::markers::SERDE_FIELD_FLATTEN, true);
+            v.attributes
+                .insert(specta::markers::SERDE_FIELD_SKIP_DESERIALIZING, true);
             Struct::named().field("v", v).build()
         };
 
         let mut dead_field = Field::new(make_inner(&mut types));
         dead_field
             .attributes
-            .insert("serde:field:skip_serializing", true);
+            .insert(specta::markers::SERDE_FIELD_SKIP_SERIALIZING, true);
         let live_field = Field::new(make_inner(&mut types));
 
         let builder = Struct::named();
@@ -2100,7 +2107,8 @@ fn conversion_target_datatype(
     use specta::datatype::{DataType, Field, Struct};
 
     let mut v = Field::new(<Vec<u8> as Type>::definition(types));
-    v.attributes.insert("serde:field:flatten", true);
+    v.attributes
+        .insert(specta::markers::SERDE_FIELD_FLATTEN, true);
     v.attributes.insert(wire_flatten_skip, true);
     let wire = Struct::named().field("v", v).build();
 
@@ -2124,8 +2132,8 @@ fn phases_map_type_from_wire_is_not_validated_in_serialize_phase() {
     let mut types = Types::default();
     let dt = conversion_target_datatype(
         &mut types,
-        "serde:container:from_resolved",
-        "serde:field:skip_deserializing",
+        specta::markers::SERDE_CONTAINER_FROM_RESOLVED,
+        specta::markers::SERDE_FIELD_SKIP_DESERIALIZING,
     );
 
     specta_serde::PhasesFormat
@@ -2141,8 +2149,8 @@ fn phases_map_type_into_wire_serialize_live_flatten_is_rejected() {
     let mut types = Types::default();
     let dt = conversion_target_datatype(
         &mut types,
-        "serde:container:into_resolved",
-        "serde:field:skip_deserializing",
+        specta::markers::SERDE_CONTAINER_INTO_RESOLVED,
+        specta::markers::SERDE_FIELD_SKIP_DESERIALIZING,
     );
 
     let err = specta_serde::PhasesFormat
@@ -2163,8 +2171,8 @@ fn phases_map_type_into_wire_deserialize_only_flatten_is_accepted() {
     let mut types = Types::default();
     let dt = conversion_target_datatype(
         &mut types,
-        "serde:container:into_resolved",
-        "serde:field:skip_serializing",
+        specta::markers::SERDE_CONTAINER_INTO_RESOLVED,
+        specta::markers::SERDE_FIELD_SKIP_SERIALIZING,
     );
 
     specta_serde::PhasesFormat.map_type(&types, &dt).expect(

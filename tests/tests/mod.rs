@@ -31,6 +31,7 @@ mod macro_generic_variant_override;
 mod macro_repr_transparent_enum;
 mod macro_structured_deprecated;
 mod macro_thiserror_attrs;
+mod markers;
 mod maybe_undefined;
 mod openapi;
 mod python;

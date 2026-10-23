@@ -12,6 +12,12 @@ use specta::{
         Attributes, DataType, Deprecated, Field, Fields, Generic, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference,
     },
+    markers::{
+        ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_CONTENT,
+        SERDE_CONTAINER_RENAME_ALL_DESERIALIZE, SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
+        SERDE_CONTAINER_RENAME_DESERIALIZE, SERDE_CONTAINER_RENAME_SERIALIZE, SERDE_CONTAINER_TAG,
+        SERDE_CONTAINER_UNTAGGED,
+    },
 };
 
 use crate::Error;
@@ -943,20 +949,6 @@ fn render_derives(out: &mut String, exporter: &Rust, depth: usize) {
     }
 }
 
-/// Container attribute keys recorded by Specta's derive macro, and the marker
-/// `specta-serde` leaves behind once it has lowered an enum's representation.
-///
-/// The exporter reads these keys directly to stay decoupled from how
-/// `specta-serde` models them internally.
-const SERDE_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
-const SERDE_RENAME_DESERIALIZE: &str = "serde:container:rename_deserialize";
-const SERDE_RENAME_ALL_SERIALIZE: &str = "serde:container:rename_all_serialize";
-const SERDE_RENAME_ALL_DESERIALIZE: &str = "serde:container:rename_all_deserialize";
-const SERDE_TAG: &str = "serde:container:tag";
-const SERDE_CONTENT: &str = "serde:container:content";
-const SERDE_UNTAGGED: &str = "serde:container:untagged";
-const ENUM_REPR_REWRITTEN_MARKER: &str = "specta_serde:enum_repr_rewritten";
-
 /// Whether the configured derives make the generated types speak serde's wire
 /// format, and therefore whether container attributes have to be reproduced.
 fn has_serde_derive(exporter: &Rust) -> bool {
@@ -999,27 +991,27 @@ fn render_serde_container(
         &mut args,
         attributes,
         "rename",
-        SERDE_RENAME_SERIALIZE,
-        SERDE_RENAME_DESERIALIZE,
+        SERDE_CONTAINER_RENAME_SERIALIZE,
+        SERDE_CONTAINER_RENAME_DESERIALIZE,
     );
     push_serde_rename(
         &mut args,
         attributes,
         "rename_all",
-        SERDE_RENAME_ALL_SERIALIZE,
-        SERDE_RENAME_ALL_DESERIALIZE,
+        SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
+        SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
     );
     if attributes
-        .get_named_as::<bool>(SERDE_UNTAGGED)
+        .get_named_as::<bool>(SERDE_CONTAINER_UNTAGGED)
         .copied()
         .unwrap_or(false)
     {
         args.push("untagged".to_string());
     }
-    if let Some(tag) = attributes.get_named_as::<String>(SERDE_TAG) {
+    if let Some(tag) = attributes.get_named_as::<String>(SERDE_CONTAINER_TAG) {
         args.push(format!("tag = {}", string_literal(tag)));
     }
-    if let Some(content) = attributes.get_named_as::<String>(SERDE_CONTENT) {
+    if let Some(content) = attributes.get_named_as::<String>(SERDE_CONTAINER_CONTENT) {
         args.push(format!("content = {}", string_literal(content)));
     }
 

@@ -145,10 +145,9 @@ pub fn parse_enum(
                 quote!(v.deprecated = #tokens;)
             });
 
-            let type_overridden_attribute = attrs
-                .r#type
-                .as_ref()
-                .map(|_| quote!(v.attributes.insert("specta:type_override", true);));
+            let type_overridden_attribute = attrs.r#type.as_ref().map(
+                |_| quote!(v.attributes.insert(#crate_ref::markers::TYPE_OVERRIDE_MARKER, true);),
+            );
 
             Ok(quote!((#variant_name_str.into(), {
                 let mut v = #variant_value;

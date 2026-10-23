@@ -73,11 +73,11 @@ pub fn construct_field_with_variant_skip(
     let type_overridden_attribute = attrs
         .r#type
         .as_ref()
-        .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
+        .map(|_| quote!(field.attributes.insert(#crate_ref::markers::TYPE_OVERRIDE_MARKER, true);));
 
-    let serde_newtype_skip_ignored = attrs
-        .serde_newtype_skip_ignored
-        .then(|| quote!(field.attributes.insert("specta:serde_newtype_skip_ignored", true);));
+    let serde_newtype_skip_ignored = attrs.serde_newtype_skip_ignored.then(|| {
+        quote!(field.attributes.insert(#crate_ref::markers::SERDE_NEWTYPE_SKIP_IGNORED_MARKER, true);)
+    });
 
     // Whether a field was declared as `Option<T>` matters to consumers
     // beyond the exported datatype: e.g. serde deserializes a missing value
@@ -87,8 +87,8 @@ pub fn construct_field_with_variant_skip(
     // enters the datatype graph, and elsewhere the exported datatype may be
     // overridden (`#[specta(type = ...)]`), so the real syntax is the only
     // reliable source.
-    let nullable_attribute =
-        declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
+    let nullable_attribute = declared_ty_is_option
+        .then(|| quote!(field.attributes.insert(#crate_ref::markers::NULLABLE_MARKER, true);));
 
     // The canonical declaration is built with each generic parameter replaced by
     // a placeholder type that resolves to `Generic`. Concrete instantiation
