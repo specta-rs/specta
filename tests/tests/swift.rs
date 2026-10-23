@@ -336,6 +336,17 @@ fn swift_serde_tagged_enum_edge_cases() {
         .unwrap(),
         serde_json::json!({ "t": "Keywords", "default": true, "private": 3 })
     );
+    // serde writes a nil `Option` payload field as `null`, not omitted, so the
+    // generated `Codable` must too
+    // (<https://github.com/specta-rs/specta/issues/616>).
+    assert_eq!(
+        serde_json::to_value(TaggedFieldEdgeCases::Optional {
+            opt: None,
+            defaulted: 0
+        })
+        .unwrap(),
+        serde_json::json!({ "t": "Optional", "opt": null, "defaulted": 0 })
+    );
 
     let types = Types::default()
         .register::<TagIsVariantName>()
@@ -1979,4 +1990,169 @@ fn swift_unrepresentable_struct_shapes_report_errors() {
         skipped_newtype.to_string().contains("no live field"),
         "{skipped_newtype}"
     );
+}
+
+/// Regression coverage for <https://github.com/specta-rs/specta/issues/616>.
+///
+/// An internally tagged variant's payload field must use the same absence rules
+/// as a named struct. serde tolerates an absent key only for `Option<T>` or a
+/// `#[serde(default)]` field, and writes a nil `Option<T>` as `null`. A bare
+/// `#[serde(skip_serializing_if = ...)]` omits the key when serializing but
+/// still requires it when deserializing.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum SwiftInternalAbsenceSkipIf {
+    V {
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        x: Vec<u8>,
+        y: u8,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum SwiftInternalAbsenceDefault {
+    V {
+        #[serde(default)]
+        x: Vec<u8>,
+        y: u8,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum SwiftInternalAbsenceOption {
+    V { x: Option<u8>, y: u8 },
+}
+
+#[test]
+fn swift_internal_tag_payload_absence_matches_serde() {
+    // Ground truth from serde: a bare `skip_serializing_if` omits on encode but
+    // is required on decode.
+    assert_eq!(
+        serde_json::to_string(&SwiftInternalAbsenceSkipIf::V {
+            x: Vec::new(),
+            y: 1
+        })
+        .unwrap(),
+        r#"{"t":"V","y":1}"#
+    );
+    assert!(
+        serde_json::to_string(&SwiftInternalAbsenceSkipIf::V { x: vec![1], y: 1 })
+            .unwrap()
+            .contains(r#""x":[1]"#)
+    );
+    assert!(
+        serde_json::from_str::<SwiftInternalAbsenceSkipIf>(r#"{"t":"V","y":1}"#).is_err(),
+        "serde requires the key when deserializing a bare `skip_serializing_if` payload field"
+    );
+    assert!(
+        serde_json::from_str::<SwiftInternalAbsenceSkipIf>(r#"{"t":"V","x":[],"y":1}"#).is_ok()
+    );
+
+    // `#[serde(default)]` tolerates the absent key on decode and writes the
+    // value on encode.
+    assert!(serde_json::from_str::<SwiftInternalAbsenceDefault>(r#"{"t":"V","y":1}"#).is_ok());
+    assert_eq!(
+        serde_json::to_string(&SwiftInternalAbsenceDefault::V {
+            x: Vec::new(),
+            y: 1
+        })
+        .unwrap(),
+        r#"{"t":"V","x":[],"y":1}"#
+    );
+
+    // A nil `Option<T>` is written as `null`, not omitted.
+    assert_eq!(
+        serde_json::to_string(&SwiftInternalAbsenceOption::V { x: None, y: 1 }).unwrap(),
+        r#"{"t":"V","x":null,"y":1}"#
+    );
+    assert!(serde_json::from_str::<SwiftInternalAbsenceOption>(r#"{"t":"V","y":1}"#).is_ok());
+
+    let types = Types::default()
+        .register::<SwiftInternalAbsenceSkipIf>()
+        .register::<SwiftInternalAbsenceDefault>()
+        .register::<SwiftInternalAbsenceOption>();
+    let exported = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect("internally tagged payloads should export");
+
+    assert!(
+        exported.contains(r#"try container.decode([UInt8].self, forKey: CodingKeys("x"))"#),
+        "a bare `skip_serializing_if` payload field must be required on decode:\n{exported}"
+    );
+    assert!(
+        exported
+            .contains(r#"try container.decodeIfPresent([UInt8].self, forKey: CodingKeys("x"))"#),
+        "a `#[serde(default)]` payload field must tolerate an absent key:\n{exported}"
+    );
+    assert!(
+        exported.contains(r#"try container.encode(data.x, forKey: CodingKeys("x"))"#),
+        "a nil `Option` payload field must be written as `null`, not omitted:\n{exported}"
+    );
+
+    let harness = format!(
+        r#"let skipIfOmittedJSON = {}
+let skipIfPresentJSON = {}
+let defaultMissingJSON = {}
+let optionNullJSON = {}
+import Foundation
+
+func expect(_ actual: String, _ expected: String, _ label: String) {{
+    precondition(actual == expected, "\(label): got \(actual), want \(expected)")
+}}
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+func throwsError(_ body: () throws -> Void) -> Bool {{
+    do {{
+        try body()
+        return false
+    }} catch {{
+        return true
+    }}
+}}
+
+// A bare `skip_serializing_if` payload field is required on decode, matching
+// serde, even though the key is omittable on encode.
+check(
+    throwsError {{ _ = try JSONDecoder().decode(SwiftInternalAbsenceSkipIf.self, from: skipIfOmittedJSON.data(using: .utf8)!) }},
+    "skip-if absent payload key must throw"
+)
+let skipIfPresent = decode(skipIfPresentJSON, SwiftInternalAbsenceSkipIf.self)
+expect(encode(skipIfPresent), skipIfPresentJSON, "skip-if present payload round trip")
+
+// `#[serde(default)]` tolerates the absent key; re-encoding omits a nil
+// non-`Option` field, the documented compromise (Swift cannot know the default).
+let defaultMissing = decode(defaultMissingJSON, SwiftInternalAbsenceDefault.self)
+expect(encode(defaultMissing), defaultMissingJSON, "defaulted payload omits nil element")
+
+// A nil `Option` payload field is written as `null`, not omitted.
+let optionNull = decode(optionNullJSON, SwiftInternalAbsenceOption.self)
+expect(encode(optionNull), optionNullJSON, "nil Option payload field writes null")
+
+print("SWIFT-OK")
+"#,
+        serde_json::to_string(r#"{"t":"V","y":1}"#).unwrap(),
+        serde_json::to_string(r#"{"t":"V","x":[1],"y":1}"#).unwrap(),
+        serde_json::to_string(r#"{"t":"V","y":1}"#).unwrap(),
+        serde_json::to_string(r#"{"t":"V","x":null,"y":1}"#).unwrap(),
+    );
+
+    run_swift(&exported, &harness);
 }
