@@ -751,3 +751,103 @@ fn contains_generic(ty: &DataType) -> bool {
         DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => false,
     }
 }
+
+// A generic type resolved through the `#[specta(inline)]` path must keep its
+// parameters in an enclosing generic declaration. `specta-macros` resolves the
+// concrete half of a conditional field type without pushing an empty
+// substitution scope, so the inlined expansion still sees the enclosing
+// declaration's slots. Regression coverage for the #613 follow-up that made it
+// bake the first instantiation's concrete arguments.
+//
+// The parameters must carry an explicit bound: a bound (even just `Type`) makes
+// `bounded_params` skip the placeholder rewrite, which is the path that regressed.
+#[derive(Type)]
+#[specta(collect = false, inline)]
+pub struct InlinePair<K: Trait + Type, V: Trait + Type> {
+    pair: (K, V),
+}
+
+// A *named* generic type inlined at the field, which takes the same path.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct NamedPair<K: Trait + Type, V: Trait + Type> {
+    pair: (K, V),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct InlineHolder<K: Trait + Type, V: Trait + Type> {
+    #[specta(inline)]
+    x: InlinePair<K, V>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct NamedInlineHolder<K: Trait + Type, V: Trait + Type> {
+    #[specta(inline)]
+    x: NamedPair<K, V>,
+}
+
+/// The tuple inside an inlined `pair` field, reached through the inline
+/// reference and its struct field.
+fn inlined_pair<'a>(ty: &'a DataType) -> &'a DataType {
+    let DataType::Reference(Reference::Named(reference)) = ty else {
+        panic!("expected inline reference, got {ty:?}");
+    };
+    let NamedReferenceType::Inline { dt, .. } = &reference.inner else {
+        panic!("expected inline data type, got {reference:?}");
+    };
+    let DataType::Struct(s) = dt.as_ref() else {
+        panic!("expected inlined struct, got {dt:?}");
+    };
+    let Fields::Named(named) = &s.fields else {
+        panic!("expected named fields, got {s:?}");
+    };
+    named
+        .fields
+        .iter()
+        .find(|(field, _)| field == "pair")
+        .and_then(|(_, field)| field.ty.as_ref())
+        .unwrap_or_else(|| panic!("missing inlined `pair` field: {named:?}"))
+}
+
+fn assert_pair_generics(types: &specta::Types, holder: &str, context: &str) {
+    let tuple = inlined_pair(field_ty(find_exported(types, holder), "x"));
+    let DataType::Tuple(tuple) = tuple else {
+        panic!("{context}: expected tuple, got {tuple:?}");
+    };
+    assert_eq!(
+        tuple
+            .elements
+            .iter()
+            .map(|element| generic_name(element).map(|generic| generic.name().to_string()))
+            .collect::<Vec<_>>(),
+        [Some("K".to_string()), Some("V".to_string())],
+        "{context}: the inlined expansion baked a concrete argument: {tuple:?}"
+    );
+}
+
+#[test]
+fn inlined_generic_named_type_keeps_its_parameters() {
+    let mut types = specta::Types::default();
+    let _ = NamedInlineHolder::<Impl, OtherImpl>::definition(&mut types);
+
+    assert_pair_generics(
+        &types,
+        "NamedInlineHolder",
+        "named type inlined at the field",
+    );
+}
+
+#[test]
+fn inlined_generic_inline_type_keeps_its_parameters() {
+    let mut types = specta::Types::default();
+    let _ = InlineHolder::<Impl, OtherImpl>::definition(&mut types);
+
+    assert_pair_generics(&types, "InlineHolder", "type-level inline");
+    // The concrete arguments must not appear anywhere in the holder's shape.
+    assert!(
+        !format!("{:?}", find_exported(&types, "InlineHolder")).contains("Impl"),
+        "the holder's declaration baked a concrete argument"
+    );
+}
