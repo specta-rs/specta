@@ -287,13 +287,64 @@ fn is_external_unit_variant(variant_name: &str, variant: &Variant) -> bool {
     }
 }
 
-/// Whether a payload field may be absent from the wire.
+/// Whether the field's exported datatype is nullable (`Option<T>`).
+fn field_is_nullable_datatype(field: &Field) -> bool {
+    matches!(field.ty.as_ref(), Some(DataType::Nullable(_)))
+}
+
+/// Whether the field was *declared* as `Option<T>`, which the derive records so
+/// it survives a `#[specta(type = ...)]` override that hides the optionality
+/// from the exported datatype.
+fn field_rust_nullable(field: &Field) -> bool {
+    field.attributes.contains_key(NULLABLE_MARKER)
+}
+
+/// Whether serde treats the field as an `Option`, from either the exported
+/// datatype or the declared Rust type behind an override.
+fn field_nullable(field: &Field) -> bool {
+    field_is_nullable_datatype(field) || field_rust_nullable(field)
+}
+
+/// Whether serde tolerates an absent key for the field on its own: it carries
+/// `#[serde(default)]`, or its container does.
+fn field_defaulted(field: &Field, container_default: bool) -> bool {
+    container_default || field.attributes.contains_key(SERDE_FIELD_DEFAULT)
+}
+
+/// Whether the generated property is optional, which every codec branch that
+/// reads a value into it depends on.
+fn field_property_optional(field: &Field) -> bool {
+    field_is_nullable_datatype(field) || field.optional || field_rust_nullable(field)
+}
+
+/// Whether serde may omit the key when encoding.
 ///
-/// `specta-serde` only sets `Field::optional` for `#[serde(default)]`; a plain
-/// `Option<T>` is a `Nullable` datatype, and serde deserializes a missing key
-/// for one to `None`.
-fn field_is_optional(field: &Field) -> bool {
-    field.optional || matches!(field.ty.as_ref(), Some(DataType::Nullable(_)))
+/// `#[serde(skip_serializing_if = ...)]` omits the field when it is nil. A
+/// defaulted non-`Option` field is also omittable: Swift cannot know the Rust
+/// default, so a nil value is only representable by dropping the key. An
+/// `Option` (including one hidden behind a `#[specta(type = ...)]` override) is
+/// *not* omittable -- serde writes it as `null`.
+fn field_may_be_absent(field: &Field) -> bool {
+    field.attributes.contains_key(SERIALIZE_OMISSION_MARKER)
+        || (field.optional && !field_nullable(field))
+}
+
+/// Whether serde accepts an absent key when decoding, as opposed to requiring
+/// it.
+///
+/// serde tolerates absence only for a field whose *declared Rust type* is
+/// `Option<T>` (a missing key yields `None`) or a `#[serde(default)]`
+/// field/struct. A bare `#[serde(skip_serializing_if = ...)]` does *not*: it
+/// omits the key when serializing but still errors on the absent key when
+/// deserializing. Nor does a `#[specta(type = Option<...>)]` override on a
+/// non-`Option` field: it only changes the exported datatype, not what serde
+/// accepts. `specta-serde` marks a `skip_serializing_if` field `optional`, so
+/// this cannot key off `Field::optional` alone. A field whose property is not
+/// optional must still `decode` (a `decodeIfPresent` would not fit the
+/// property type).
+fn field_may_be_absent_on_decode(field: &Field, container_default: bool) -> bool {
+    field_property_optional(field)
+        && (field_rust_nullable(field) || field_defaulted(field, container_default))
 }
 
 /// The `?` a generated property needs when a field tolerates absence but its
@@ -1236,31 +1287,9 @@ struct KeyedField<'a> {
     /// Whether serde tolerates an absent key for this field on its own: it
     /// carries `#[serde(default)]`, or its struct does.
     defaulted: bool,
-    /// Whether the field was *declared* as `Option<T>` (the `specta:nullable`
-    /// marker), which survives a `#[specta(type = ...)]` override that hides
-    /// the optionality from the exported datatype.
-    rust_nullable: bool,
 }
 
 impl KeyedField<'_> {
-    /// Whether the exported datatype is already nullable (`Option<T>`).
-    fn is_nullable(&self) -> bool {
-        matches!(self.field.ty.as_ref(), Some(DataType::Nullable(_)))
-    }
-
-    /// Whether the field is an `Option` to serde, from either the exported
-    /// datatype or the declared Rust type behind a `#[specta(type = ...)]`
-    /// override.
-    fn nullable(&self) -> bool {
-        self.is_nullable() || self.rust_nullable
-    }
-
-    /// Whether the generated property is optional, which every codec branch
-    /// that reads a value into it depends on.
-    fn property_optional(&self) -> bool {
-        self.is_nullable() || self.field.optional || self.rust_nullable
-    }
-
     /// Whether serde may omit the key when encoding.
     ///
     /// `#[serde(skip_serializing_if = ...)]` omits the field when it is nil. A
@@ -1269,27 +1298,13 @@ impl KeyedField<'_> {
     /// An `Option` (including one hidden behind a `#[specta(type = ...)]`
     /// override) is *not* omittable -- serde writes it as `null`.
     fn may_be_absent(&self) -> bool {
-        self.field
-            .attributes
-            .contains_key(SERIALIZE_OMISSION_MARKER)
-            || (self.field.optional && !self.nullable())
+        field_may_be_absent(self.field)
     }
 
     /// Whether serde accepts an absent key when decoding, as opposed to
-    /// requiring it.
-    ///
-    /// serde tolerates absence only for a field whose *declared Rust type* is
-    /// `Option<T>` (a missing key yields `None`) or a `#[serde(default)]`
-    /// field/struct. A bare `#[serde(skip_serializing_if = ...)]` does *not*:
-    /// it omits the key when serializing but still errors on the absent key
-    /// when deserializing. Nor does a `#[specta(type = Option<...>)]` override
-    /// on a non-`Option` field: it only changes the exported datatype, not what
-    /// serde accepts. `specta-serde` marks a `skip_serializing_if` field
-    /// `optional`, so this cannot key off `Field::optional` alone. A field
-    /// whose property is not optional must still `decode` (a `decodeIfPresent`
-    /// would not fit the property type).
+    /// requiring it. See [`field_may_be_absent_on_decode`].
     fn may_be_absent_on_decode(&self) -> bool {
-        self.property_optional() && (self.rust_nullable || self.defaulted)
+        field_may_be_absent_on_decode(self.field, self.defaulted)
     }
 }
 
@@ -1342,7 +1357,6 @@ fn keyed_fields<'a>(
             property_type,
             decode_type,
             defaulted: container_default || field.attributes.contains_key(SERDE_FIELD_DEFAULT),
-            rust_nullable,
         });
     }
     Ok(out)
@@ -1863,7 +1877,7 @@ fn generate_enum_structs(
 
                 let field_type =
                     datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
-                let optional_marker = optional_suffix(field, ty);
+                let optional_marker = keyed_optional_suffix(field, ty, field_rust_nullable(field));
                 let swift_field_name = swift.naming.convert_field(original_field_name);
                 result.push_str(&format!(
                     "    public let {}: {}{}\n",
@@ -2156,7 +2170,7 @@ fn generate_tagged_enum_codable(
             // Appending to a backticked identifier (`` `default`Value ``) does
             // not parse, so build the binding from the raw name.
             let binding = format!("{}Value", swift_field_name.trim_matches('`'));
-            let decode = if field_is_optional(field) {
+            let decode = if field_may_be_absent_on_decode(field, false) {
                 format!(
                     "try container.decodeIfPresent({}.self, forKey: CodingKeys({}))",
                     field_type,
@@ -2239,10 +2253,10 @@ fn generate_tagged_enum_codable(
                 continue;
             }
             let swift_field_name = swift.naming.convert_field(field_name);
-            // serde omits an absent optional/defaulted field rather than
-            // writing `null` (which its non-`Option` types reject), so encode
-            // only what is present.
-            let encode = if field_is_optional(field) {
+            // serde omits a `#[serde(skip_serializing_if = ...)]` field and a
+            // defaulted non-`Option` field (Swift cannot know the Rust default),
+            // but writes a nil `Option<T>` as `null`.
+            let encode = if field_may_be_absent(field) {
                 "encodeIfPresent"
             } else {
                 "encode"
