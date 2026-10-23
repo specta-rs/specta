@@ -3,8 +3,8 @@
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Enum, Field, Fields, Generic, NamedReferenceType, Primitive, Reference, Struct,
-        Variant,
+        DataType, Enum, Field, Fields, Generic, NamedFields, NamedReferenceType, Primitive,
+        Reference, Struct, Variant,
     },
 };
 
@@ -128,6 +128,25 @@ const FLATTENED_FIELD: &str = "serde:field:flatten";
 /// after the raw parser attribute is stripped so the omission can be told apart
 /// from a `#[serde(default)]`-optional element, which serde still writes.
 const SERIALIZE_OMISSION_FIELD: &str = "specta_serde:serialize_omission";
+
+/// Field attribute recorded by the derive macro for `#[serde(default)]`.
+/// `specta-serde` sets `Field::optional` for it, but so does
+/// `#[serde(skip_serializing_if)]`, which serde does *not* tolerate an absent
+/// key for on its own -- so the attribute itself is what distinguishes a
+/// genuinely absent-tolerant field.
+const DEFAULTED_FIELD: &str = "serde:field:default";
+
+/// Container attribute for `#[serde(default)]` on a struct: serde applies the
+/// container's `Default` to every absent field, so each one is absent-tolerant.
+const DEFAULTED_CONTAINER: &str = "serde:container:default";
+
+/// Field attribute the `Type` derive records when the field was *declared* as
+/// `Option<T>`. It survives a `#[specta(type = ...)]` override, which changes
+/// the exported datatype (and its nullability) but not serde's behaviour: serde
+/// still treats the field as an `Option`, writing `null` and tolerating an
+/// absent key. It is deliberately not inferred from the exported datatype,
+/// which a nullable override can make `Nullable` for a non-`Option` field.
+const NULLABLE_FIELD: &str = "specta:nullable";
 
 /// A serde tag that `specta-serde` baked into a rewritten enum variant.
 struct VariantTag<'a> {
@@ -1124,45 +1143,235 @@ fn struct_to_swift(
             }
         }
         specta::datatype::Fields::Named(fields) => {
-            let mut result = String::new();
-            let mut field_mappings = Vec::new();
+            let container_default = s.attributes.contains_key(DEFAULTED_CONTAINER);
+            let live = keyed_fields(
+                swift,
+                format,
+                types,
+                fields,
+                container_default,
+                &generic_scope,
+            )?;
 
-            for (original_field_name, field) in &fields.fields {
-                let Some(ty) = field.ty.as_ref() else {
-                    continue;
-                };
-                let field_type =
-                    datatype_to_swift(swift, format, types, ty, generic_scope.clone())?;
-
-                let optional_marker = optional_suffix(field, ty);
-                let swift_field_name = swift.naming.convert_field(original_field_name.as_ref());
-
-                result.push_str(&format!(
-                    "    public let {}: {}{}\n",
-                    swift_field_name, field_type, optional_marker
-                ));
-
-                field_mappings.push((swift_field_name, original_field_name.to_string()));
+            // An empty named struct writes `{}` and reads `{}`, which the
+            // synthesised keyed `Codable` already produces exactly. Only the
+            // public initializer is added so it stays constructible from
+            // another module, like every other named struct.
+            if live.is_empty() {
+                return Ok("    public init() {}\n".to_string());
             }
 
-            // Generate custom CodingKeys if field names were converted
-            let needs_custom_coding_keys = field_mappings
+            let mut result = String::new();
+            for field in &live {
+                result.push_str(&format!(
+                    "    public let {}: {}\n",
+                    field.property, field.property_type
+                ));
+            }
+
+            // A hand-written codec needs its `CodingKeys` spelled out: the
+            // compiler only synthesises them alongside a synthesised codec.
+            result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
+            for field in &live {
+                result.push_str(&format!(
+                    "        case {} = {}\n",
+                    field.property,
+                    swift_string_literal(field.wire_key)
+                ));
+            }
+            result.push_str("    }\n");
+
+            // The synthesised memberwise initializer is internal, so a public
+            // struct needs an explicit `public init`.
+            let parameters = live
                 .iter()
-                .any(|(swift_name, rust_name)| swift_name != rust_name);
-            if needs_custom_coding_keys {
-                result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
-                for (swift_name, rust_name) in &field_mappings {
+                .map(|field| format!("{}: {}", field.property, field.property_type))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let assignments = live
+                .iter()
+                .map(|field| format!("        self.{} = {}", field.property, field.property))
+                .collect::<Vec<_>>()
+                .join("\n");
+            result.push_str(&format!(
+                "\n    public init({parameters}) {{\n{assignments}\n    }}\n"
+            ));
+
+            // serde accepts an absent key only for an `Option<T>` or a
+            // `#[serde(default)]` field (see `may_be_absent_on_decode`); every
+            // other field, including one with a bare `skip_serializing_if`, is
+            // required.
+            result.push_str("\n    public init(from decoder: Decoder) throws {\n");
+            result.push_str(
+                "        let container = try decoder.container(keyedBy: CodingKeys.self)\n",
+            );
+            for field in &live {
+                let call = if field.may_be_absent_on_decode() {
+                    "decodeIfPresent"
+                } else {
+                    "decode"
+                };
+                result.push_str(&format!(
+                    "        self.{} = try container.{call}({}.self, forKey: .{})\n",
+                    field.property, field.decode_type, field.property
+                ));
+            }
+            result.push_str("    }\n");
+
+            // serde writes every field -- a plain `Option<T>` and a
+            // `#[serde(default)] Option<T>` are written as `null` -- and omits
+            // only a `skip_serializing_if` field. A defaulted non-`Option`
+            // field is also omitted when nil, because Swift cannot know the
+            // Rust default that serde would otherwise write.
+            result.push_str("\n    public func encode(to encoder: Encoder) throws {\n");
+            result
+                .push_str("        var container = encoder.container(keyedBy: CodingKeys.self)\n");
+            for field in &live {
+                if field.may_be_absent() {
                     result.push_str(&format!(
-                        "        case {} = \"{}\"\n",
-                        swift_name, rust_name
+                        "        if let {} = {} {{\n            try container.encode({}, forKey: .{})\n        }}\n",
+                        field.property, field.property, field.property, field.property
+                    ));
+                } else {
+                    result.push_str(&format!(
+                        "        try container.encode({}, forKey: .{})\n",
+                        field.property, field.property
                     ));
                 }
-                result.push_str("    }\n");
             }
+            result.push_str("    }\n");
 
             Ok(result)
         }
     }
+}
+
+/// A live named field of a keyed struct, with the names and types its generated
+/// `Codable` needs.
+struct KeyedField<'a> {
+    /// The generated Swift property name (`convert_field`, keyword-escaped).
+    property: String,
+    /// The wire key serde uses, which the `CodingKeys` case maps to.
+    wire_key: &'a str,
+    /// The declared field, which carries the optionality flags.
+    field: &'a Field,
+    /// The rendered Swift property type, including any `?`.
+    property_type: String,
+    /// The rendered type handed to `decode`/`decodeIfPresent`: the field's
+    /// `Nullable` is unwrapped so a single `?` from `decodeIfPresent` yields
+    /// the property's optionality.
+    decode_type: String,
+    /// Whether serde tolerates an absent key for this field on its own: it
+    /// carries `#[serde(default)]`, or its struct does.
+    defaulted: bool,
+    /// Whether the field was *declared* as `Option<T>` (the `specta:nullable`
+    /// marker), which survives a `#[specta(type = ...)]` override that hides
+    /// the optionality from the exported datatype.
+    rust_nullable: bool,
+}
+
+impl KeyedField<'_> {
+    /// Whether the exported datatype is already nullable (`Option<T>`).
+    fn is_nullable(&self) -> bool {
+        matches!(self.field.ty.as_ref(), Some(DataType::Nullable(_)))
+    }
+
+    /// Whether the field is an `Option` to serde, from either the exported
+    /// datatype or the declared Rust type behind a `#[specta(type = ...)]`
+    /// override.
+    fn nullable(&self) -> bool {
+        self.is_nullable() || self.rust_nullable
+    }
+
+    /// Whether the generated property is optional, which every codec branch
+    /// that reads a value into it depends on.
+    fn property_optional(&self) -> bool {
+        self.is_nullable() || self.field.optional || self.rust_nullable
+    }
+
+    /// Whether serde may omit the key when encoding.
+    ///
+    /// `#[serde(skip_serializing_if = ...)]` omits the field when it is nil. A
+    /// defaulted non-`Option` field is also omittable: Swift cannot know the
+    /// Rust default, so a nil value is only representable by dropping the key.
+    /// An `Option` (including one hidden behind a `#[specta(type = ...)]`
+    /// override) is *not* omittable -- serde writes it as `null`.
+    fn may_be_absent(&self) -> bool {
+        self.field.attributes.contains_key(SERIALIZE_OMISSION_FIELD)
+            || (self.field.optional && !self.nullable())
+    }
+
+    /// Whether serde accepts an absent key when decoding, as opposed to
+    /// requiring it.
+    ///
+    /// serde tolerates absence only for a field whose *declared Rust type* is
+    /// `Option<T>` (a missing key yields `None`) or a `#[serde(default)]`
+    /// field/struct. A bare `#[serde(skip_serializing_if = ...)]` does *not*:
+    /// it omits the key when serializing but still errors on the absent key
+    /// when deserializing. Nor does a `#[specta(type = Option<...>)]` override
+    /// on a non-`Option` field: it only changes the exported datatype, not what
+    /// serde accepts. `specta-serde` marks a `skip_serializing_if` field
+    /// `optional`, so this cannot key off `Field::optional` alone. A field
+    /// whose property is not optional must still `decode` (a `decodeIfPresent`
+    /// would not fit the property type).
+    fn may_be_absent_on_decode(&self) -> bool {
+        self.property_optional() && (self.rust_nullable || self.defaulted)
+    }
+}
+
+/// The `?` a keyed field's generated property needs.
+///
+/// A `Nullable` datatype renders as `T?` on its own. A `#[specta(type = ...)]`
+/// override can hide a declared `Option<T>` behind a non-nullable datatype, but
+/// serde still treats the field as an `Option` (writing `null` and tolerating
+/// an absent key), so the property must be optional to represent that.
+fn keyed_optional_suffix(field: &Field, ty: &DataType, rust_nullable: bool) -> &'static str {
+    if (field.optional || rust_nullable) && !matches!(ty, DataType::Nullable(_)) {
+        "?"
+    } else {
+        ""
+    }
+}
+
+/// The live named fields of a keyed struct, in declaration order.
+fn keyed_fields<'a>(
+    swift: &Swift,
+    format: Option<&dyn Format>,
+    types: &Types,
+    fields: &'a NamedFields,
+    container_default: bool,
+    generic_scope: &[Generic],
+) -> Result<Vec<KeyedField<'a>>, Error> {
+    let mut out = Vec::new();
+    for (name, field) in &fields.fields {
+        // A skipped field (`ty: None`) never reaches the wire.
+        let Some(original) = field.ty.as_ref() else {
+            continue;
+        };
+        let rust_nullable = field.attributes.contains_key(NULLABLE_FIELD);
+        let property_type = format!(
+            "{}{}",
+            datatype_to_swift(swift, format, types, original, generic_scope.to_vec())?,
+            keyed_optional_suffix(field, original, rust_nullable)
+        );
+        let decode_type = datatype_to_swift(
+            swift,
+            format,
+            types,
+            field_decode_type(field).expect("a live field has a decode type"),
+            generic_scope.to_vec(),
+        )?;
+        out.push(KeyedField {
+            property: swift.naming.convert_field(name.as_ref()),
+            wire_key: name.as_ref(),
+            field,
+            property_type,
+            decode_type,
+            defaulted: container_default || field.attributes.contains_key(DEFAULTED_FIELD),
+            rust_nullable,
+        });
+    }
+    Ok(out)
 }
 
 /// The serde wire shape of a named struct, which decides which `Codable`
@@ -1173,7 +1382,9 @@ fn struct_to_swift(
 /// synthesised keyed `Codable` cannot round-trip either shape
 /// (<https://github.com/specta-rs/specta/issues/596>).
 enum StructWireShape<'a> {
-    /// A named-field struct: the synthesised keyed `Codable` matches serde.
+    /// A named-field struct: serde key-encodes every field (a `nil` `Option<T>`
+    /// is written as `null`, not omitted), so the codec is written by hand
+    /// rather than left to the synthesised one, which uses `encodeIfPresent`.
     Keyed,
     /// A unit struct: serde writes `null`.
     Unit,
