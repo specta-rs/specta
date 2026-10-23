@@ -235,6 +235,26 @@ fn swift_serde_tagged_enum_export() {
     );
 }
 
+/// The same tagged enums with `unknown_variants(true)`, so the generated
+/// catch-all is reviewable in a snapshot as well as exercised at runtime.
+#[test]
+fn swift_serde_tagged_enums_unknown_export() {
+    let types = Types::default()
+        .register::<AdjacentReason>()
+        .register::<AdjacentError>()
+        .register::<InternalReason>()
+        .register::<ExternalReason>()
+        .register::<ExternalError>();
+
+    insta::assert_snapshot!(
+        "swift-serde-tagged-enums-unknown",
+        Swift::default()
+            .unknown_variants(true)
+            .export(&types, specta_serde::Format)
+            .unwrap()
+    );
+}
+
 /// A `#[serde(flatten)]`ed payload inside an internally tagged variant is an
 /// intersection, which Swift's `Codable` cannot express. The exporter must say
 /// so instead of emitting invalid Swift.
@@ -640,6 +660,211 @@ fn swift_tagged_unit_enum_has_no_raw_type() {
     assert!(
         !rendered.contains("public enum TaggedUnitEnum: String"),
         "{rendered}"
+    );
+}
+
+// Regression tests for forward-compatible tagged enums.
+// https://github.com/specta-rs/specta/issues/617
+//
+// A generated tagged enum is closed: an `init(from:)` that meets a tag it does
+// not know throws, and the app loses the whole value. `unknown_variants(true)`
+// adds a catch-all case that keeps the tag and its payload as JSON, so a build
+// that predates a variant can still decode it (and re-encode what it read).
+// These tests compile and *run* the generated Swift against unknown payloads.
+
+#[test]
+fn swift_unknown_variants_round_trip() {
+    let types = Types::default()
+        .register::<AdjacentReason>()
+        .register::<AdjacentError>()
+        .register::<InternalReason>()
+        .register::<ExternalReason>()
+        .register::<ExternalError>();
+    let exported = Swift::default()
+        .unknown_variants(true)
+        .export(&types, specta_serde::Format)
+        .expect("tagged enums should export with unknown variants");
+
+    assert!(
+        exported.contains("case unknown(tag: String, content: JSONValue?)"),
+        "{exported}"
+    );
+    assert!(
+        exported.contains("public enum JSONValue: Codable, Equatable {"),
+        "{exported}"
+    );
+
+    let fixtures = format!(
+        "let unknownAdjacentReasonJSON = {}\n\
+         let unknownAdjacentUnitJSON = {}\n\
+         let unknownNestedJSON = {}\n\
+         let unknownInternalJSON = {}\n\
+         let unknownExternalStringJSON = {}\n\
+         let unknownExternalObjectJSON = {}\n\
+         let unknownExternalNestedJSON = {}\n",
+        swift_literal(r#"{"params":{"retry_after":45},"reason":"future"}"#),
+        swift_literal(r#"{"reason":"future"}"#),
+        swift_literal(
+            r#"{"context":"system","data":{"params":{"retry_after":45},"reason":"future"}}"#
+        ),
+        swift_literal(r#"{"reason":"future","retry_after":45}"#),
+        swift_literal(r#""future""#),
+        swift_literal(r#"{"future":{"retry_after":45}}"#),
+        swift_literal(r#"{"auth":"future"}"#),
+    );
+
+    let harness = format!(
+        r#"import Foundation
+
+{}
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func decode<T: Decodable>(_ json: String, _: T.Type) -> T {{
+    try! JSONDecoder().decode(T.self, from: json.data(using: .utf8)!)
+}}
+
+func encode<T: Encodable>(_ value: T) -> String {{
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return String(data: try! encoder.encode(value), encoding: .utf8)!
+}}
+
+// Adjacent tagging: an unknown tag keeps its `content` value.
+let unknownReason = decode(unknownAdjacentReasonJSON, AdjacentReason.self)
+guard case .unknown(let tag, let content) = unknownReason else {{
+    preconditionFailure("expected an unknown reason")
+}}
+check(tag == "future", "unknown tag")
+check(content == .object(["retry_after": .number(45)]), "unknown content")
+check(encode(unknownReason) == unknownAdjacentReasonJSON, "unknown reason round-trip")
+
+// A unit-like unknown variant has no content.
+let unitReason = decode(unknownAdjacentUnitJSON, AdjacentReason.self)
+guard case .unknown(let unitTag, let unitContent) = unitReason else {{
+    preconditionFailure("expected an unknown unit reason")
+}}
+check(unitTag == "future" && unitContent == nil, "unit unknown")
+check(encode(unitReason) == unknownAdjacentUnitJSON, "unit unknown round-trip")
+
+// An unknown inner variant stays inside its known outer case.
+let nested = decode(unknownNestedJSON, AdjacentError.self)
+guard case .system(let outer) = nested, case .unknown(let nestedTag, let nestedContent) = outer.data else {{
+    preconditionFailure("expected a nested unknown")
+}}
+check(nestedTag == "future", "nested tag")
+check(nestedContent == .object(["retry_after": .number(45)]), "nested content")
+
+// Internal tagging: the payload is whatever fields remain beside the tag.
+let internalReason = decode(unknownInternalJSON, InternalReason.self)
+guard case .unknown(let internalTag, let internalContent) = internalReason else {{
+    preconditionFailure("expected an unknown internal reason")
+}}
+check(internalTag == "future", "internal tag")
+check(internalContent == .object(["retry_after": .number(45)]), "internal content")
+check(encode(internalReason) == unknownInternalJSON, "internal round-trip")
+
+// External tagging: a bare string is an unknown unit-like variant...
+let externalString = decode(unknownExternalStringJSON, ExternalReason.self)
+guard case .unknown(let stringTag, let stringContent) = externalString else {{
+    preconditionFailure("expected an unknown external string reason")
+}}
+check(stringTag == "future" && stringContent == nil, "external string unknown")
+check(encode(externalString) == unknownExternalStringJSON, "external string round-trip")
+
+// ...and a single-key object keeps that key's value.
+let externalObject = decode(unknownExternalObjectJSON, ExternalReason.self)
+guard case .unknown(let objectTag, let objectContent) = externalObject else {{
+    preconditionFailure("expected an unknown external object reason")
+}}
+check(objectTag == "future", "external object tag")
+check(objectContent == .object(["retry_after": .number(45)]), "external object content")
+check(encode(externalObject) == unknownExternalObjectJSON, "external object round-trip")
+
+// A known external variant can itself hold an unknown payload.
+let externalNested = decode(unknownExternalNestedJSON, ExternalError.self)
+guard case .auth(let auth) = externalNested, case .unknown(_, _) = auth else {{
+    preconditionFailure("expected a nested external unknown")
+}}
+
+print("SWIFT-OK")
+"#,
+        fixtures
+    );
+
+    run_swift(&exported, &harness);
+}
+
+/// Without the option the generated `Codable` is still closed, which is what
+/// makes `unknown_variants` an opt-in rather than a silent wire change.
+#[test]
+fn swift_unknown_variants_default_still_throws() {
+    let exported = Swift::default()
+        .export(
+            &Types::default().register::<AdjacentReason>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+    assert!(!exported.contains("case unknown"), "{exported}");
+
+    let harness = format!(
+        r#"import Foundation
+
+func check(_ condition: Bool, _ label: String) {{
+    precondition(condition, label)
+}}
+
+func throwsError(_ body: () throws -> Void) -> Bool {{
+    do {{
+        try body()
+        return false
+    }} catch {{
+        return true
+    }}
+}}
+
+let unknown = {}.data(using: .utf8)!
+check(
+    throwsError {{ _ = try JSONDecoder().decode(AdjacentReason.self, from: unknown) }},
+    "an unknown tag must throw without `unknown_variants`"
+)
+
+print("SWIFT-OK")
+"#,
+        swift_literal(r#"{"reason":"future","params":{"retry_after":45}}"#),
+    );
+
+    run_swift(&exported, &harness);
+}
+
+/// A variant already named `Unknown` must not collide with the generated
+/// catch-all, which it would if both rendered as `case unknown`.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c", rename_all = "camelCase")]
+enum UnknownCollision {
+    Unknown { x: u32 },
+    Other { y: u32 },
+}
+
+#[test]
+fn swift_unknown_variant_case_avoids_collision() {
+    let rendered = Swift::default()
+        .unknown_variants(true)
+        .export(
+            &Types::default().register::<UnknownCollision>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    assert!(
+        rendered.contains("case unknown(UnknownCollisionUnknownData)"),
+        "the declared variant keeps its case name: {rendered}"
+    );
+    assert!(
+        rendered.contains("case unknownVariant(tag: String, content: JSONValue?)"),
+        "the catch-all avoids the collision: {rendered}"
     );
 }
 

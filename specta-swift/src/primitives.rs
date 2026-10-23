@@ -515,6 +515,85 @@ fn is_unit_like_variant(variant_name: &str, variant: &Variant) -> bool {
     }
 }
 
+/// Whether the exporter generates a custom `Codable` for this enum instead of
+/// leaving it to the compiler.
+///
+/// This is also exactly the set of enums an unknown-variant case can be added
+/// to: an enum with a synthesised `Codable` (`String` raw values, or a plain
+/// payload-less enum) has no generated codec to extend and is left alone.
+fn enum_needs_custom_codable(format: Option<&dyn Format>, e: &Enum) -> bool {
+    // Internal and adjacent tagging put the discriminant in a field, so a
+    // synthesised `Codable` would read the wrong shape entirely.
+    let has_tagged_variants = e
+        .variants
+        .iter()
+        .any(|(_, variant)| variant_tag(variant).is_some());
+
+    let has_struct_variants = e
+        .variants
+        .iter()
+        .any(|(variant_name, variant)| should_emit_variant_wrapper(variant_name, variant));
+
+    // Externally tagged tuple/newtype payloads wrap the payload in a field named
+    // after the variant, which only `specta-serde` produces.
+    let has_serde_payload_variants = format.is_some()
+        && e.variants.iter().any(|(variant_name, variant)| {
+            serde_variant_payload(variant_name, variant)
+                .is_some_and(|_| !is_unit_like_variant(variant_name, variant))
+        });
+
+    has_tagged_variants || has_struct_variants || has_serde_payload_variants
+}
+
+/// The `content` key of an adjacently tagged enum, recovered from the variants
+/// whose payload is nested under it. `None` means every variant merges its
+/// payload into the tag (internally tagged), so an unknown payload is the
+/// remaining fields rather than a single `content` value.
+fn adjacent_content_key(e: &Enum) -> Option<&str> {
+    e.variants.iter().find_map(|(_, variant)| {
+        if variant.skip {
+            return None;
+        }
+        let tag = variant_tag(variant)?;
+        tagged_payload(variant, tag.key).content_key
+    })
+}
+
+/// The Swift case name for an enum's catch-all unknown variant.
+///
+/// `unknown` is the natural name, but a build may already have a variant that
+/// converts to it, so fall back to an unambiguous alternative rather than
+/// emitting a duplicate case.
+fn unknown_case_name(swift: &Swift, e: &Enum) -> String {
+    let taken = |name: &str| {
+        e.variants.iter().any(|(variant_name, variant)| {
+            !variant.skip && swift.naming.convert_enum_case(variant_name.as_ref()) == name
+        })
+    };
+
+    let mut index = 0;
+    loop {
+        let candidate = match index {
+            0 => "unknown".to_string(),
+            1 => "unknownVariant".to_string(),
+            n => format!("unknownVariant{n}"),
+        };
+        if !taken(&candidate) {
+            return candidate;
+        }
+        index += 1;
+    }
+}
+
+/// Whether any exported enum will gain an `unknown` case, and so needs the
+/// `JSONValue` helper injected alongside it.
+pub fn needs_json_value(swift: &Swift, format: Option<&dyn Format>, types: &Types) -> bool {
+    swift.unknown_variants
+        && types.into_sorted_iter().any(|ndt| {
+            matches!(&ndt.ty, Some(DataType::Enum(e)) if enum_needs_custom_codable(format, e))
+        })
+}
+
 /// Export a single type to Swift.
 pub fn export_type(
     swift: &Swift,
@@ -649,25 +728,12 @@ pub fn export_type(
                 .iter()
                 .any(|(_, variant)| variant_tag(variant).is_some());
 
-            // Check if this enum has struct-like variants (needs custom Codable)
-            let has_struct_variants = e
-                .variants
-                .iter()
-                .any(|(variant_name, variant)| should_emit_variant_wrapper(variant_name, variant));
-
-            let has_serde_payload_variants = format.is_some()
-                && e.variants.iter().any(|(variant_name, variant)| {
-                    serde_variant_payload(variant_name, variant)
-                        .is_some_and(|_| !is_unit_like_variant(variant_name, variant))
-                });
-
             // A tagged enum's variants are string literals only because the tag
             // is one; a `String` raw type would advertise raw values that do not
             // match the wire tag.
             let is_string_enum_val = !has_tagged_variants && resolved_string_enum(e).is_some();
 
-            let needs_custom_codable =
-                has_struct_variants || has_serde_payload_variants || has_tagged_variants;
+            let needs_custom_codable = enum_needs_custom_codable(format, e);
 
             // Determine protocols based on whether we'll generate custom Codable
             let protocols = if is_string_enum_val {
@@ -692,8 +758,17 @@ pub fn export_type(
                 "public enum {}{}{} {{\n",
                 name, generics, protocol_part
             ));
-            let enum_body =
+            let mut enum_body =
                 enum_to_swift(swift, format, types, e, generic_scope.clone(), Some(&name))?;
+            // The catch-all only makes sense where a custom `Codable` reads the
+            // tag; an enum Swift decodes by synthesis has no codec to extend.
+            if needs_custom_codable && swift.unknown_variants {
+                let case = unknown_case_name(swift, e);
+                enum_body.push_str(&format!(
+                    "    case {}(tag: String, content: JSONValue?)\n",
+                    case
+                ));
+            }
             result.push_str(&enum_body);
             result.push('}');
 
@@ -2187,7 +2262,37 @@ fn generate_tagged_enum_codable(
     }
 
     result.push_str("        default:\n");
-    result.push_str("            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Unknown variant \\(tag)\"))\n");
+    if swift.unknown_variants {
+        let case = unknown_case_name(swift, e);
+        if let Some(content_key) = adjacent_content_key(e) {
+            // Adjacent tagging nests the payload under its `content` key, so
+            // keep it there (absent for a unit-like unknown variant).
+            result.push_str(&format!(
+                "            let content = try container.decodeIfPresent(JSONValue.self, forKey: CodingKeys({}))\n",
+                swift_string_literal(content_key)
+            ));
+            result.push_str(&format!(
+                "            self = .{}(tag: tag, content: content)\n",
+                case
+            ));
+        } else {
+            // Internal tagging merges the payload into the tag's object, so the
+            // unknown payload is every other field.
+            result.push_str("            var content: [String: JSONValue] = [:]\n");
+            result.push_str(&format!(
+                "            for key in container.allKeys where key.stringValue != {} {{\n",
+                swift_string_literal(tag_key)
+            ));
+            result.push_str("                content[key.stringValue] = try container.decode(JSONValue.self, forKey: key)\n");
+            result.push_str("            }\n");
+            result.push_str(&format!(
+                "            self = .{}(tag: tag, content: .object(content))\n",
+                case
+            ));
+        }
+    } else {
+        result.push_str("            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Unknown variant \\(tag)\"))\n");
+    }
     result.push_str("        }\n");
     result.push_str("    }\n\n");
 
@@ -2256,6 +2361,33 @@ fn generate_tagged_enum_codable(
         }
     }
 
+    // The catch-all writes back exactly what it read: the tag, then its payload
+    // in the position the representation puts it.
+    if swift.unknown_variants {
+        let case = unknown_case_name(swift, e);
+        result.push_str(&format!("        case .{}(let tag, let content):\n", case));
+        result.push_str(&format!(
+            "            try container.encode(tag, forKey: CodingKeys({}))\n",
+            swift_string_literal(tag_key)
+        ));
+        if let Some(content_key) = adjacent_content_key(e) {
+            result.push_str("            if let content {\n");
+            result.push_str(&format!(
+                "                try container.encode(content, forKey: CodingKeys({}))\n",
+                swift_string_literal(content_key)
+            ));
+            result.push_str("            }\n");
+        } else {
+            result.push_str("            if case .object(let fields) = content {\n");
+            result.push_str("                for (key, value) in fields {\n");
+            result.push_str(
+                "                    try container.encode(value, forKey: CodingKeys(key))\n",
+            );
+            result.push_str("                }\n");
+            result.push_str("            }\n");
+        }
+    }
+
     result.push_str("        }\n");
     result.push_str("    }\n");
     result.push_str("}\n");
@@ -2296,6 +2428,18 @@ fn generate_external_enum_codable(
     }
     result.push_str("    }\n\n");
 
+    // `CodingKeys` only knows the declared variants, so reading back an unknown
+    // tag needs a key type that admits any string.
+    if swift.unknown_variants {
+        result.push_str("    private struct UnknownKeys: CodingKey {\n");
+        result.push_str("        let stringValue: String\n");
+        result.push_str("        var intValue: Int? { nil }\n");
+        result.push_str("        init(_ stringValue: String) { self.stringValue = stringValue }\n");
+        result.push_str("        init?(stringValue: String) { self.stringValue = stringValue }\n");
+        result.push_str("        init?(intValue: Int) { nil }\n");
+        result.push_str("    }\n\n");
+    }
+
     // Externally tagged unit variants serialize as a bare string, while every
     // other variant is a single-key object, so try the string form first.
     let unit_variants: Vec<&str> = e
@@ -2322,13 +2466,42 @@ fn generate_external_enum_codable(
             result.push_str("                return\n");
         }
         result.push_str("            default:\n");
-        result.push_str("                break\n");
+        if swift.unknown_variants {
+            let case = unknown_case_name(swift, e);
+            // A bare string is an unknown unit-like variant: keep the tag and
+            // an absent payload.
+            result.push_str(&format!(
+                "                self = .{}(tag: value, content: nil)\n",
+                case
+            ));
+            result.push_str("                return\n");
+        } else {
+            result.push_str("                break\n");
+        }
         result.push_str("            }\n");
         result.push_str("        }\n\n");
     }
     result.push_str("        let container = try decoder.container(keyedBy: CodingKeys.self)\n");
     result.push_str("        \n");
     result.push_str("        if container.allKeys.count != 1 {\n");
+    if swift.unknown_variants {
+        let case = unknown_case_name(swift, e);
+        // `CodingKeys` drops keys it does not declare, so an unknown object
+        // shows no keys at all. Read it through the permissive key type.
+        result.push_str(
+            "            let unknownContainer = try decoder.container(keyedBy: UnknownKeys.self)\n",
+        );
+        result.push_str("            if unknownContainer.allKeys.count == 1, let key = unknownContainer.allKeys.first {\n");
+        result.push_str(
+            "                let content = try unknownContainer.decode(JSONValue.self, forKey: key)\n",
+        );
+        result.push_str(&format!(
+            "                self = .{}(tag: key.stringValue, content: content)\n",
+            case
+        ));
+        result.push_str("                return\n");
+        result.push_str("            }\n");
+    }
     result.push_str("            throw DecodingError.dataCorrupted(\n");
     result.push_str("                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Invalid number of keys found, expected one.\")\n");
     result.push_str("            )\n");
@@ -2578,6 +2751,23 @@ fn generate_external_enum_codable(
                 }
             }
         }
+    }
+
+    // The catch-all round-trips its payload: a bare string tag when it had no
+    // payload, otherwise the single-key object it was read from.
+    if swift.unknown_variants {
+        let case = unknown_case_name(swift, e);
+        result.push_str(&format!("        case .{}(let tag, let content):\n", case));
+        result.push_str("            if let content {\n");
+        result.push_str(
+            "                var container = encoder.container(keyedBy: UnknownKeys.self)\n",
+        );
+        result
+            .push_str("                try container.encode(content, forKey: UnknownKeys(tag))\n");
+        result.push_str("            } else {\n");
+        result.push_str("                var container = encoder.singleValueContainer()\n");
+        result.push_str("                try container.encode(tag)\n");
+        result.push_str("            }\n");
     }
 
     result.push_str("        }\n");

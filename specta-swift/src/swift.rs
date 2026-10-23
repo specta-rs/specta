@@ -8,7 +8,7 @@ use specta::{
 };
 
 use crate::Error;
-use crate::primitives::{export_type, is_duration_struct};
+use crate::primitives::{export_type, is_duration_struct, needs_json_value};
 
 /// Swift language exporter.
 #[derive(Clone)]
@@ -25,6 +25,10 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
+    /// Generate a catch-all `unknown` case for tagged enums, so a variant this
+    /// build does not know about decodes (keeping its tag and JSON payload)
+    /// instead of throwing.
+    pub unknown_variants: bool,
 }
 
 impl fmt::Debug for Swift {
@@ -36,6 +40,7 @@ impl fmt::Debug for Swift {
             .field("generics", &self.generics)
             .field("optionals", &self.optionals)
             .field("protocols", &self.protocols)
+            .field("unknown_variants", &self.unknown_variants)
             .finish()
     }
 }
@@ -96,6 +101,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
+            unknown_variants: false,
         }
     }
 }
@@ -142,6 +148,19 @@ impl Swift {
         self
     }
 
+    /// Generate a catch-all `unknown` case for tagged enums.
+    ///
+    /// A tagged enum's generated `Codable` normally throws when it meets a tag
+    /// it does not know. With this enabled each such enum instead gains an
+    /// `unknown` case carrying the tag and its payload as JSON, so a client can
+    /// keep decoding against a newer producer (and re-encode what it read
+    /// unchanged). The `JSONValue` type the case refers to is emitted alongside
+    /// the types when it is needed.
+    pub fn unknown_variants(mut self, enabled: bool) -> Self {
+        self.unknown_variants = enabled;
+        self
+    }
+
     /// Export types to a Swift string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
@@ -166,6 +185,12 @@ impl Swift {
         // Check if we need to inject Duration helper
         if needs_duration_helper(raw_types) {
             result.push_str(&generate_duration_helper());
+        }
+
+        // An `unknown` variant case carries an arbitrary JSON payload, so the
+        // `JSONValue` type it refers to has to be injected once up front.
+        if needs_json_value(&exporter, Some(&format), raw_types) {
+            result.push_str(&generate_json_value_helper());
         }
 
         // Export types
@@ -421,6 +446,66 @@ fn needs_duration_helper(types: &Types) -> bool {
         }
     }
     false
+}
+
+/// Generate the `JSONValue` helper enum.
+///
+/// `unknown_variants` cases carry whatever JSON the producer sent for a variant
+/// this build does not know, so a general JSON value type is needed to hold it.
+/// Numbers use `Decimal` rather than `Double` so an integer tag payload (a
+/// retry delay, a timestamp) re-encodes without losing precision.
+fn generate_json_value_helper() -> String {
+    r#"// MARK: - JSONValue Helper
+/// A dynamically typed JSON value, used to carry the payload of an enum
+/// variant this build does not know about.
+public enum JSONValue: Codable, Equatable {
+    case null
+    case bool(Bool)
+    case number(Decimal)
+    case string(String)
+    case array([JSONValue])
+    case object([String: JSONValue])
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode(Decimal.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode([JSONValue].self) {
+            self = .array(value)
+        } else if let value = try? container.decode([String: JSONValue].self) {
+            self = .object(value)
+        } else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .null:
+            try container.encodeNil()
+        case .bool(let value):
+            try container.encode(value)
+        case .number(let value):
+            try container.encode(value)
+        case .string(let value):
+            try container.encode(value)
+        case .array(let value):
+            try container.encode(value)
+        case .object(let value):
+            try container.encode(value)
+        }
+    }
+}
+
+"#
+        .to_string()
 }
 
 /// Generate the Duration helper struct
