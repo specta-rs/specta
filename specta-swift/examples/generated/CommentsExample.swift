@@ -11,24 +11,28 @@ import Foundation
 /// 
 /// The generated Swift code will have properly formatted doc comments
 /// that are compatible with Swift's documentation system.
-public enum ApiResponse<T> {
-    case success(ApiResponseSuccessData)
-    case error(ApiResponseErrorData)
-    case loading(ApiResponseLoadingData)
+public enum ApiResponse<T: Codable> {
+    case success(ApiResponseSuccessData<T>)
+    case error(ApiResponseErrorData<T>)
+    case loading(ApiResponseLoadingData<T>)
 }
-public struct ApiResponseSuccessData: Codable {
+public struct ApiResponseSuccessData<T: Codable>: Codable {
     public let data: T
     public let status: UInt16
     public let headers: [(String, String)]?
 }
 
-public struct ApiResponseErrorData: Codable {
+
+extension ApiResponseSuccessData: Sendable where T: Sendable {}
+public struct ApiResponseErrorData<T: Codable>: Codable {
     public let message: String
     public let code: UInt32
     public let details: String?
 }
 
-public struct ApiResponseLoadingData: Codable {
+
+extension ApiResponseErrorData: Sendable where T: Sendable {}
+public struct ApiResponseLoadingData<T: Codable>: Codable {
     public let progress: Float
     public let estimatedTime: UInt64?
 
@@ -38,6 +42,8 @@ public struct ApiResponseLoadingData: Codable {
     }
 }
 
+
+extension ApiResponseLoadingData: Sendable where T: Sendable {}
 // MARK: - ApiResponse Codable Implementation
 extension ApiResponse: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -58,31 +64,34 @@ extension ApiResponse: Codable {
         let key = container.allKeys.first!
         switch key {
         case .success:
-            let data = try container.decode(ApiResponseSuccessData.self, forKey: .success)
+            let data = try container.decode(ApiResponseSuccessData<T>.self, forKey: .success)
             self = .success(data)
         case .error:
-            let data = try container.decode(ApiResponseErrorData.self, forKey: .error)
+            let data = try container.decode(ApiResponseErrorData<T>.self, forKey: .error)
             self = .error(data)
         case .loading:
-            let data = try container.decode(ApiResponseLoadingData.self, forKey: .loading)
+            let data = try container.decode(ApiResponseLoadingData<T>.self, forKey: .loading)
             self = .loading(data)
         }
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .success(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .success)
         case .error(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .error)
         case .loading(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .loading)
         }
     }
 }
 
+
+extension ApiResponse: Sendable where T: Sendable {}
 
 /// A user account in the system
 /// 
@@ -93,7 +102,7 @@ extension ApiResponse: Codable {
 /// - The `password_hash` field should never be logged or exposed
 /// - The `api_key` is sensitive and should be treated as a secret
 /// - All timestamps are in UTC
-public struct User: Codable {
+public struct User: Codable, Sendable {
     public let id: UInt32
     public let username: String
     public let email: String
@@ -108,6 +117,35 @@ public struct User: Codable {
         case isActive = "is_active"
         case createdAt = "created_at"
         case lastLogin = "last_login"
+    }
+
+    public init(id: UInt32, username: String, email: String, isActive: Bool, createdAt: String, lastLogin: String?) {
+        self.id = id
+        self.username = username
+        self.email = email
+        self.isActive = isActive
+        self.createdAt = createdAt
+        self.lastLogin = lastLogin
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.username = try container.decode(String.self, forKey: .username)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.isActive = try container.decode(Bool.self, forKey: .isActive)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.lastLogin = try container.decodeIfPresent(String.self, forKey: .lastLogin)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(username, forKey: .username)
+        try container.encode(email, forKey: .email)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(lastLogin, forKey: .lastLogin)
     }
 }
 

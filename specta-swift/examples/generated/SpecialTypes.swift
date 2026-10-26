@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - Duration Helper
 /// Helper struct to decode Rust Duration format {"secs": u64, "nanos": u32}
-public struct RustDuration: Codable {
+public struct RustDuration: Codable, Sendable {
     public let secs: UInt64
     public let nanos: UInt32
     
@@ -15,11 +15,11 @@ public struct RustDuration: Codable {
 // MARK: - Generated Types
 
 /// API response with timing information
-public struct ApiResponse: Codable {
+public struct ApiResponse: Codable, Sendable {
     public let data: String
-    public let processingDuration: RustDuration
-    public let cacheDuration: RustDuration?
-    public let transferDuration: RustDuration
+    public let processingDuration: Duration
+    public let cacheDuration: Duration?
+    public let transferDuration: Duration
     public let statusCode: UInt16
 
     private enum CodingKeys: String, CodingKey {
@@ -29,13 +29,66 @@ public struct ApiResponse: Codable {
         case transferDuration = "transfer_duration"
         case statusCode = "status_code"
     }
+
+    public init(data: String, processingDuration: Duration, cacheDuration: Duration?, transferDuration: Duration, statusCode: UInt16) {
+        self.data = data
+        self.processingDuration = processingDuration
+        self.cacheDuration = cacheDuration
+        self.transferDuration = transferDuration
+        self.statusCode = statusCode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.data = try container.decode(String.self, forKey: .data)
+        self.processingDuration = try container.decode(Duration.self, forKey: .processingDuration)
+        self.cacheDuration = try container.decodeIfPresent(Duration.self, forKey: .cacheDuration)
+        self.transferDuration = try container.decode(Duration.self, forKey: .transferDuration)
+        self.statusCode = try container.decode(UInt16.self, forKey: .statusCode)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(data, forKey: .data)
+        try container.encode(processingDuration, forKey: .processingDuration)
+        try container.encode(cacheDuration, forKey: .cacheDuration)
+        try container.encode(transferDuration, forKey: .transferDuration)
+        try container.encode(statusCode, forKey: .statusCode)
+    }
+}
+
+public struct Duration: Codable, Sendable {
+    public let secs: UInt64
+    public let nanos: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case secs = "secs"
+        case nanos = "nanos"
+    }
+
+    public init(secs: UInt64, nanos: UInt32) {
+        self.secs = secs
+        self.nanos = nanos
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.secs = try container.decode(UInt64.self, forKey: .secs)
+        self.nanos = try container.decode(UInt32.self, forKey: .nanos)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(secs, forKey: .secs)
+        try container.encode(nanos, forKey: .nanos)
+    }
 }
 
 /// Struct with various timestamp types
-public struct EventLog: Codable {
+public struct EventLog: Codable, Sendable {
     public let eventId: String
     public let timestamp: String
-    public let duration: RustDuration
+    public let duration: Duration
     public let metadata: [(String, String)]?
 
     private enum CodingKeys: String, CodingKey {
@@ -44,6 +97,29 @@ public struct EventLog: Codable {
         case duration = "duration"
         case metadata = "metadata"
     }
+
+    public init(eventId: String, timestamp: String, duration: Duration, metadata: [(String, String)]?) {
+        self.eventId = eventId
+        self.timestamp = timestamp
+        self.duration = duration
+        self.metadata = metadata
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.eventId = try container.decode(String.self, forKey: .eventId)
+        self.timestamp = try container.decode(String.self, forKey: .timestamp)
+        self.duration = try container.decode(Duration.self, forKey: .duration)
+        self.metadata = try container.decodeIfPresent([(String, String)].self, forKey: .metadata)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(eventId, forKey: .eventId)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(duration, forKey: .duration)
+        try container.encode(metadata, forKey: .metadata)
+    }
 }
 
 /// Example showcasing special type handling in specta-swift
@@ -51,14 +127,15 @@ public struct EventLog: Codable {
 /// This example demonstrates how specta-swift handles special Rust types
 /// like Duration, UUID, chrono types, and other commonly used types
 /// that need special conversion to Swift equivalents.
+/// 
 /// Struct with Duration fields (will be converted to RustDuration helper)
-public struct IndexerMetrics: Codable {
-    public let totalDuration: RustDuration
-    public let discoveryDuration: RustDuration
-    public let processingDuration: RustDuration
-    public let contentDuration: RustDuration
+public struct IndexerMetrics: Codable, Sendable {
+    public let totalDuration: Duration
+    public let discoveryDuration: Duration
+    public let processingDuration: Duration
+    public let contentDuration: Duration
     public let filesProcessed: UInt32
-    public let avgTimePerFile: RustDuration
+    public let avgTimePerFile: Duration
 
     private enum CodingKeys: String, CodingKey {
         case totalDuration = "total_duration"
@@ -68,18 +145,47 @@ public struct IndexerMetrics: Codable {
         case filesProcessed = "files_processed"
         case avgTimePerFile = "avg_time_per_file"
     }
+
+    public init(totalDuration: Duration, discoveryDuration: Duration, processingDuration: Duration, contentDuration: Duration, filesProcessed: UInt32, avgTimePerFile: Duration) {
+        self.totalDuration = totalDuration
+        self.discoveryDuration = discoveryDuration
+        self.processingDuration = processingDuration
+        self.contentDuration = contentDuration
+        self.filesProcessed = filesProcessed
+        self.avgTimePerFile = avgTimePerFile
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.totalDuration = try container.decode(Duration.self, forKey: .totalDuration)
+        self.discoveryDuration = try container.decode(Duration.self, forKey: .discoveryDuration)
+        self.processingDuration = try container.decode(Duration.self, forKey: .processingDuration)
+        self.contentDuration = try container.decode(Duration.self, forKey: .contentDuration)
+        self.filesProcessed = try container.decode(UInt32.self, forKey: .filesProcessed)
+        self.avgTimePerFile = try container.decode(Duration.self, forKey: .avgTimePerFile)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(totalDuration, forKey: .totalDuration)
+        try container.encode(discoveryDuration, forKey: .discoveryDuration)
+        try container.encode(processingDuration, forKey: .processingDuration)
+        try container.encode(contentDuration, forKey: .contentDuration)
+        try container.encode(filesProcessed, forKey: .filesProcessed)
+        try container.encode(avgTimePerFile, forKey: .avgTimePerFile)
+    }
 }
 
 /// Job status with timing
-public enum JobStatus {
+public enum JobStatus: Sendable {
     case queued
     case running(JobStatusRunningData)
     case completed(JobStatusCompletedData)
     case failed(JobStatusFailedData)
 }
-public struct JobStatusRunningData: Codable {
+public struct JobStatusRunningData: Codable, Sendable {
     public let startedAt: String
-    public let elapsedTime: RustDuration
+    public let elapsedTime: Duration
     public let estimatedCompletion: String?
 
     private enum CodingKeys: String, CodingKey {
@@ -89,10 +195,10 @@ public struct JobStatusRunningData: Codable {
     }
 }
 
-public struct JobStatusCompletedData: Codable {
+public struct JobStatusCompletedData: Codable, Sendable {
     public let startedAt: String
     public let completedAt: String
-    public let totalDuration: RustDuration
+    public let totalDuration: Duration
     public let result: String
 
     private enum CodingKeys: String, CodingKey {
@@ -103,10 +209,10 @@ public struct JobStatusCompletedData: Codable {
     }
 }
 
-public struct JobStatusFailedData: Codable {
+public struct JobStatusFailedData: Codable, Sendable {
     public let startedAt: String
     public let failedAt: String
-    public let duration: RustDuration
+    public let duration: Duration
     public let errorMessage: String
 
     private enum CodingKeys: String, CodingKey {
@@ -127,6 +233,16 @@ extension JobStatus: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Queued":
+                self = .queued
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -152,16 +268,18 @@ extension JobStatus: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .queued:
-            try container.encodeNil(forKey: .queued)
+            var container = encoder.singleValueContainer()
+            try container.encode("Queued")
         case .running(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .running)
         case .completed(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .completed)
         case .failed(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .failed)
         }
     }
@@ -169,12 +287,12 @@ extension JobStatus: Codable {
 
 
 /// Performance metrics struct
-public struct PerformanceMetrics: Codable {
-    public let responseTime: RustDuration
-    public let processingTime: RustDuration
-    public let queryTime: RustDuration
-    public let networkLatency: RustDuration
-    public let totalTime: RustDuration
+public struct PerformanceMetrics: Codable, Sendable {
+    public let responseTime: Duration
+    public let processingTime: Duration
+    public let queryTime: Duration
+    public let networkLatency: Duration
+    public let totalTime: Duration
 
     private enum CodingKeys: String, CodingKey {
         case responseTime = "response_time"
@@ -183,13 +301,39 @@ public struct PerformanceMetrics: Codable {
         case networkLatency = "network_latency"
         case totalTime = "total_time"
     }
+
+    public init(responseTime: Duration, processingTime: Duration, queryTime: Duration, networkLatency: Duration, totalTime: Duration) {
+        self.responseTime = responseTime
+        self.processingTime = processingTime
+        self.queryTime = queryTime
+        self.networkLatency = networkLatency
+        self.totalTime = totalTime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.responseTime = try container.decode(Duration.self, forKey: .responseTime)
+        self.processingTime = try container.decode(Duration.self, forKey: .processingTime)
+        self.queryTime = try container.decode(Duration.self, forKey: .queryTime)
+        self.networkLatency = try container.decode(Duration.self, forKey: .networkLatency)
+        self.totalTime = try container.decode(Duration.self, forKey: .totalTime)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(responseTime, forKey: .responseTime)
+        try container.encode(processingTime, forKey: .processingTime)
+        try container.encode(queryTime, forKey: .queryTime)
+        try container.encode(networkLatency, forKey: .networkLatency)
+        try container.encode(totalTime, forKey: .totalTime)
+    }
 }
 
 /// Complex struct mixing Duration with other types
-public struct SystemHealth: Codable {
-    public let uptime: RustDuration
-    public let lastCheck: RustDuration
-    public let avgResponseTime: RustDuration
+public struct SystemHealth: Codable, Sendable {
+    public let uptime: Duration
+    public let lastCheck: Duration
+    public let avgResponseTime: Duration
     public let status: String
     public let memoryUsage: Double
     public let cpuUsage: Double
@@ -202,14 +346,43 @@ public struct SystemHealth: Codable {
         case memoryUsage = "memory_usage"
         case cpuUsage = "cpu_usage"
     }
+
+    public init(uptime: Duration, lastCheck: Duration, avgResponseTime: Duration, status: String, memoryUsage: Double, cpuUsage: Double) {
+        self.uptime = uptime
+        self.lastCheck = lastCheck
+        self.avgResponseTime = avgResponseTime
+        self.status = status
+        self.memoryUsage = memoryUsage
+        self.cpuUsage = cpuUsage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uptime = try container.decode(Duration.self, forKey: .uptime)
+        self.lastCheck = try container.decode(Duration.self, forKey: .lastCheck)
+        self.avgResponseTime = try container.decode(Duration.self, forKey: .avgResponseTime)
+        self.status = try container.decode(String.self, forKey: .status)
+        self.memoryUsage = try container.decode(Double.self, forKey: .memoryUsage)
+        self.cpuUsage = try container.decode(Double.self, forKey: .cpuUsage)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(uptime, forKey: .uptime)
+        try container.encode(lastCheck, forKey: .lastCheck)
+        try container.encode(avgResponseTime, forKey: .avgResponseTime)
+        try container.encode(status, forKey: .status)
+        try container.encode(memoryUsage, forKey: .memoryUsage)
+        try container.encode(cpuUsage, forKey: .cpuUsage)
+    }
 }
 
 /// Configuration struct with timing information
-public struct TaskConfig: Codable {
+public struct TaskConfig: Codable, Sendable {
     public let name: String
-    public let timeout: RustDuration
-    public let retryInterval: RustDuration
-    public let backoffDuration: RustDuration
+    public let timeout: Duration
+    public let retryInterval: Duration
+    public let backoffDuration: Duration
     public let enabled: Bool
 
     private enum CodingKeys: String, CodingKey {
@@ -218,6 +391,32 @@ public struct TaskConfig: Codable {
         case retryInterval = "retry_interval"
         case backoffDuration = "backoff_duration"
         case enabled = "enabled"
+    }
+
+    public init(name: String, timeout: Duration, retryInterval: Duration, backoffDuration: Duration, enabled: Bool) {
+        self.name = name
+        self.timeout = timeout
+        self.retryInterval = retryInterval
+        self.backoffDuration = backoffDuration
+        self.enabled = enabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.timeout = try container.decode(Duration.self, forKey: .timeout)
+        self.retryInterval = try container.decode(Duration.self, forKey: .retryInterval)
+        self.backoffDuration = try container.decode(Duration.self, forKey: .backoffDuration)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(timeout, forKey: .timeout)
+        try container.encode(retryInterval, forKey: .retryInterval)
+        try container.encode(backoffDuration, forKey: .backoffDuration)
+        try container.encode(enabled, forKey: .enabled)
     }
 }
 

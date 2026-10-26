@@ -5,20 +5,23 @@ import Foundation
 /// 
 /// This example demonstrates how specta-swift handles complex enum scenarios
 /// including nested types, generic enums, and custom Codable implementations.
+/// 
 /// Complex enum with mixed variant types
-public enum ApiResult<T, E> {
-    case ok(ApiResultOkData)
-    case err(ApiResultErrData)
-    case loading(ApiResultLoadingData)
+public enum ApiResult<T: Codable, E: Codable> {
+    case ok(ApiResultOkData<T, E>)
+    case err(ApiResultErrData<T, E>)
+    case loading(ApiResultLoadingData<T, E>)
 }
-public struct ApiResultOkData: Codable {
+public struct ApiResultOkData<T: Codable, E: Codable>: Codable {
     public let data: T
     public let status: UInt16
     public let headers: [(String, String)]?
     public let timestamp: String
 }
 
-public struct ApiResultErrData: Codable {
+
+extension ApiResultOkData: Sendable where T: Sendable, E: Sendable {}
+public struct ApiResultErrData<T: Codable, E: Codable>: Codable {
     public let error: E
     public let code: UInt32
     public let message: String
@@ -32,7 +35,9 @@ public struct ApiResultErrData: Codable {
     }
 }
 
-public struct ApiResultLoadingData: Codable {
+
+extension ApiResultErrData: Sendable where T: Sendable, E: Sendable {}
+public struct ApiResultLoadingData<T: Codable, E: Codable>: Codable {
     public let progress: Float
     public let estimatedCompletion: String?
 
@@ -42,6 +47,8 @@ public struct ApiResultLoadingData: Codable {
     }
 }
 
+
+extension ApiResultLoadingData: Sendable where T: Sendable, E: Sendable {}
 // MARK: - ApiResult Codable Implementation
 extension ApiResult: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -62,54 +69,151 @@ extension ApiResult: Codable {
         let key = container.allKeys.first!
         switch key {
         case .ok:
-            let data = try container.decode(ApiResultOkData.self, forKey: .ok)
+            let data = try container.decode(ApiResultOkData<T, E>.self, forKey: .ok)
             self = .ok(data)
         case .err:
-            let data = try container.decode(ApiResultErrData.self, forKey: .err)
+            let data = try container.decode(ApiResultErrData<T, E>.self, forKey: .err)
             self = .err(data)
         case .loading:
-            let data = try container.decode(ApiResultLoadingData.self, forKey: .loading)
+            let data = try container.decode(ApiResultLoadingData<T, E>.self, forKey: .loading)
             self = .loading(data)
         }
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .ok(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .ok)
         case .err(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .err)
         case .loading(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .loading)
         }
     }
 }
 
 
-public struct Color: Codable {
+extension ApiResult: Sendable where T: Sendable, E: Sendable {}
+
+public struct Color: Codable, Sendable {
     public let red: Double
     public let green: Double
     public let blue: Double
     public let alpha: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case red = "red"
+        case green = "green"
+        case blue = "blue"
+        case alpha = "alpha"
+    }
+
+    public init(red: Double, green: Double, blue: Double, alpha: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.red = try container.decode(Double.self, forKey: .red)
+        self.green = try container.decode(Double.self, forKey: .green)
+        self.blue = try container.decode(Double.self, forKey: .blue)
+        self.alpha = try container.decode(Double.self, forKey: .alpha)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(red, forKey: .red)
+        try container.encode(green, forKey: .green)
+        try container.encode(blue, forKey: .blue)
+        try container.encode(alpha, forKey: .alpha)
+    }
 }
 
 /// Generic enum with constraints
-public enum Container<T>: Codable {
+public enum Container<T: Codable> {
     case empty
     case single(T)
     case multiple([T])
     case keyValue([(String, T)])
 }
+// MARK: - Container Codable Implementation
+extension Container: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case empty = "Empty"
+        case single = "Single"
+        case multiple = "Multiple"
+        case keyValue = "KeyValue"
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Empty":
+                self = .empty
+                return
+            default:
+                break
+            }
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if container.allKeys.count != 1 {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
+            )
+        }
+
+        let key = container.allKeys.first!
+        switch key {
+        case .empty:
+            self = .empty
+        case .single:
+            let data = try container.decode(T.self, forKey: .single)
+            self = .single(data)
+        case .multiple:
+            let data = try container.decode([T].self, forKey: .multiple)
+            self = .multiple(data)
+        case .keyValue:
+            let data = try container.decode([(String, T)].self, forKey: .keyValue)
+            self = .keyValue(data)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .empty:
+            var container = encoder.singleValueContainer()
+            try container.encode("Empty")
+        case .single(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .single)
+        case .multiple(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .multiple)
+        case .keyValue(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .keyValue)
+        }
+    }
+}
+
+
+extension Container: Sendable where T: Sendable {}
 
 /// Event system enum
-public enum Event {
+public enum Event: Sendable {
     case user(EventUserData)
     case system(EventSystemData)
     case error(EventErrorData)
 }
-public struct EventUserData: Codable {
+public struct EventUserData: Codable, Sendable {
     public let userId: UInt32
     public let action: String
     public let timestamp: String
@@ -121,13 +225,13 @@ public struct EventUserData: Codable {
     }
 }
 
-public struct EventSystemData: Codable {
+public struct EventSystemData: Codable, Sendable {
     public let component: String
     public let level: String
     public let message: String
 }
 
-public struct EventErrorData: Codable {
+public struct EventErrorData: Codable, Sendable {
     public let code: UInt32
     public let message: String
     public let stackTrace: String?
@@ -171,14 +275,15 @@ extension Event: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .user(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .user)
         case .system(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .system)
         case .error(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .error)
         }
     }
@@ -186,16 +291,16 @@ extension Event: Codable {
 
 
 /// String enum (will be converted to Swift String enum with Codable)
-public enum JobStatus: Codable {
-    case queued
-    case running
-    case paused
-    case completed
-    case failed
-    case cancelled
+public enum JobStatus: String, Codable, Sendable {
+    case queued = "Queued"
+    case running = "Running"
+    case paused = "Paused"
+    case completed = "Completed"
+    case failed = "Failed"
+    case cancelled = "Cancelled"
 }
 
-public struct LineStyle: Codable {
+public struct LineStyle: Codable, Sendable {
     public let dashPattern: [Double]?
     public let capStyle: String
     public let joinStyle: String
@@ -205,15 +310,35 @@ public struct LineStyle: Codable {
         case capStyle = "cap_style"
         case joinStyle = "join_style"
     }
+
+    public init(dashPattern: [Double]?, capStyle: String, joinStyle: String) {
+        self.dashPattern = dashPattern
+        self.capStyle = capStyle
+        self.joinStyle = joinStyle
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.dashPattern = try container.decodeIfPresent([Double].self, forKey: .dashPattern)
+        self.capStyle = try container.decode(String.self, forKey: .capStyle)
+        self.joinStyle = try container.decode(String.self, forKey: .joinStyle)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(dashPattern, forKey: .dashPattern)
+        try container.encode(capStyle, forKey: .capStyle)
+        try container.encode(joinStyle, forKey: .joinStyle)
+    }
 }
 
 /// Mixed enum with both string-like and data variants
-public enum MixedEnum {
+public enum MixedEnum: Sendable {
     case simple(String)
     case withFields(MixedEnumWithFieldsData)
     case empty
 }
-public struct MixedEnumWithFieldsData: Codable {
+public struct MixedEnumWithFieldsData: Codable, Sendable {
     public let id: UInt32
     public let name: String
     public let metadata: [(String, String)]?
@@ -228,6 +353,16 @@ extension MixedEnum: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Empty":
+                self = .empty
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -239,8 +374,8 @@ extension MixedEnum: Codable {
         let key = container.allKeys.first!
         switch key {
         case .simple:
-            // TODO: Implement tuple variant decoding for simple
-            fatalError("Tuple variant decoding not implemented")
+            let data = try container.decode(String.self, forKey: .simple)
+            self = .simple(data)
         case .withFields:
             let data = try container.decode(MixedEnumWithFieldsData.self, forKey: .withFields)
             self = .withFields(data)
@@ -250,28 +385,50 @@ extension MixedEnum: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
-        case .simple:
-            // TODO: Implement tuple variant encoding for simple
-            fatalError("Tuple variant encoding not implemented")
+        case .simple(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .simple)
         case .withFields(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .withFields)
         case .empty:
-            try container.encodeNil(forKey: .empty)
+            var container = encoder.singleValueContainer()
+            try container.encode("Empty")
         }
     }
 }
 
 
 /// Supporting structs for the Shape enum
-public struct Point: Codable {
+public struct Point: Codable, Sendable {
     public let x: Double
     public let y: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case x = "x"
+        case y = "y"
+    }
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.x = try container.decode(Double.self, forKey: .x)
+        self.y = try container.decode(Double.self, forKey: .y)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(x, forKey: .x)
+        try container.encode(y, forKey: .y)
+    }
 }
 
-public struct Rectangle: Codable {
+public struct Rectangle: Codable, Sendable {
     public let topLeft: Point
     public let bottomRight: Point
 
@@ -279,10 +436,27 @@ public struct Rectangle: Codable {
         case topLeft = "top_left"
         case bottomRight = "bottom_right"
     }
+
+    public init(topLeft: Point, bottomRight: Point) {
+        self.topLeft = topLeft
+        self.bottomRight = bottomRight
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.topLeft = try container.decode(Point.self, forKey: .topLeft)
+        self.bottomRight = try container.decode(Point.self, forKey: .bottomRight)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(topLeft, forKey: .topLeft)
+        try container.encode(bottomRight, forKey: .bottomRight)
+    }
 }
 
 /// Enum demonstrating different field patterns
-public enum Shape {
+public enum Shape: Sendable {
     case none
     case point(Double, Double)
     case circle(ShapeCircleData)
@@ -290,18 +464,18 @@ public enum Shape {
     case line(ShapeLineData)
     case complex(ShapeComplexData)
 }
-public struct ShapeCircleData: Codable {
+public struct ShapeCircleData: Codable, Sendable {
     public let center: Point
     public let radius: Double
 }
 
-public struct ShapeLineData: Codable {
+public struct ShapeLineData: Codable, Sendable {
     public let start: Point
     public let end: Point
     public let style: LineStyle
 }
 
-public struct ShapeComplexData: Codable {
+public struct ShapeComplexData: Codable, Sendable {
     public let vertices: [Point]
     public let fillColor: Color
     public let strokeColor: Color?
@@ -329,6 +503,16 @@ extension Shape: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "None":
+                self = .none
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -342,14 +526,16 @@ extension Shape: Codable {
         case .none:
             self = .none
         case .point:
-            // TODO: Implement tuple variant decoding for point
-            fatalError("Tuple variant decoding not implemented")
+            var nested = try container.nestedUnkeyedContainer(forKey: .point)
+            let value0 = try nested.decode(Double.self)
+            let value1 = try nested.decode(Double.self)
+            self = .point(value0, value1)
         case .circle:
             let data = try container.decode(ShapeCircleData.self, forKey: .circle)
             self = .circle(data)
         case .rectangle:
-            // TODO: Implement tuple variant decoding for rectangle
-            fatalError("Tuple variant decoding not implemented")
+            let data = try container.decode(Rectangle.self, forKey: .rectangle)
+            self = .rectangle(data)
         case .line:
             let data = try container.decode(ShapeLineData.self, forKey: .line)
             self = .line(data)
@@ -360,22 +546,26 @@ extension Shape: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .none:
-            try container.encodeNil(forKey: .none)
-        case .point:
-            // TODO: Implement tuple variant encoding for point
-            fatalError("Tuple variant encoding not implemented")
+            var container = encoder.singleValueContainer()
+            try container.encode("None")
+        case .point(let value0, let value1):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            var nested = container.nestedUnkeyedContainer(forKey: .point)
+            try nested.encode(value0)
+            try nested.encode(value1)
         case .circle(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .circle)
-        case .rectangle:
-            // TODO: Implement tuple variant encoding for rectangle
-            fatalError("Tuple variant encoding not implemented")
+        case .rectangle(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .rectangle)
         case .line(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .line)
         case .complex(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .complex)
         }
     }
@@ -383,16 +573,18 @@ extension Shape: Codable {
 
 
 /// Enum with recursive references
-public enum Tree<T> {
+public enum Tree<T: Codable> {
     case leaf(T)
-    case branch(TreeBranchData)
+    case branch(TreeBranchData<T>)
 }
-public struct TreeBranchData: Codable {
+public struct TreeBranchData<T: Codable>: Codable {
     public let left: Tree<T>
     public let right: Tree<T>
     public let value: T
 }
 
+
+extension TreeBranchData: Sendable where T: Sendable {}
 // MARK: - Tree Codable Implementation
 extension Tree: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -412,25 +604,26 @@ extension Tree: Codable {
         let key = container.allKeys.first!
         switch key {
         case .leaf:
-            // TODO: Implement tuple variant decoding for leaf
-            fatalError("Tuple variant decoding not implemented")
+            let data = try container.decode(T.self, forKey: .leaf)
+            self = .leaf(data)
         case .branch:
-            let data = try container.decode(TreeBranchData.self, forKey: .branch)
+            let data = try container.decode(TreeBranchData<T>.self, forKey: .branch)
             self = .branch(data)
         }
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
-        case .leaf:
-            // TODO: Implement tuple variant encoding for leaf
-            fatalError("Tuple variant encoding not implemented")
+        case .leaf(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .leaf)
         case .branch(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .branch)
         }
     }
 }
 
+
+extension Tree: Sendable where T: Sendable {}
 
