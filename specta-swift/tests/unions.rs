@@ -153,8 +153,9 @@ fn test_swift_union_syntax() {
 
     println!("UserType Swift code:\n{}", output);
 
-    // Verify proper Swift enum syntax (no redundant Codable in declaration)
-    assert!(output.contains("enum UserType {"));
+    // The custom `Codable` lives in an extension, so the declaration carries
+    // only `Sendable`.
+    assert!(output.contains("enum UserType: Sendable {"));
 
     // Unit variant
     assert!(output.contains("case anonymous"));

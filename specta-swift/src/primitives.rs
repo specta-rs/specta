@@ -3,8 +3,8 @@
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Enum, Field, Fields, Generic, NamedFields, NamedReferenceType, Primitive,
-        Reference, Struct, Variant,
+        DataType, Enum, Field, Fields, Generic, GenericDefinition, NamedFields, NamedReferenceType,
+        Primitive, Reference, Struct, Variant,
     },
     markers::{
         ENUM_REPR_REWRITTEN_MARKER, NULLABLE_MARKER, SERDE_CONTAINER_DEFAULT, SERDE_FIELD_DEFAULT,
@@ -704,23 +704,24 @@ pub fn export_type(
         .map(|generic| generic.reference())
         .collect::<Vec<_>>();
 
+    let name = swift.naming.convert(&ndt.name);
+    let generics = if ndt.generics.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<{}>",
+            ndt.generics
+                .iter()
+                .map(|g| g.name.as_ref().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    let sendable = sendable_conformance(&ndt.generics);
+
     // Format based on type
     match ndt_ty.expect("checked above") {
         DataType::Struct(s) => {
-            let name = swift.naming.convert(&ndt.name);
-            let generics = if ndt.generics.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "<{}>",
-                    ndt.generics
-                        .iter()
-                        .map(|g| g.name.as_ref().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            };
-
             // serde only key-encodes named fields; a newtype writes its bare
             // value and a tuple struct writes an array, so those shapes need a
             // custom `Codable` rather than the synthesised keyed one.
@@ -743,7 +744,14 @@ pub fn export_type(
                 )?,
             };
 
-            result.push_str(&format!("public struct {}{}: Codable {{\n", name, generics));
+            let mut protocols = vec!["Codable"];
+            protocols.extend(sendable);
+            result.push_str(&format!(
+                "public struct {}{}: {} {{\n",
+                name,
+                generics,
+                protocols.join(", ")
+            ));
             result.push_str(&body);
             result.push('}');
         }
@@ -757,20 +765,6 @@ pub fn export_type(
                 .as_ref()
                 .filter(|e| resolved_string_enum(e).is_some())
                 .unwrap_or(e);
-
-            let name = swift.naming.convert(&ndt.name);
-            let generics = if ndt.generics.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "<{}>",
-                    ndt.generics
-                        .iter()
-                        .map(|g| g.name.as_ref().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            };
 
             // Internal and adjacent tagging put the discriminant in a field, so
             // a synthesised `Codable` would read the wrong shape entirely.
@@ -787,22 +781,23 @@ pub fn export_type(
             let needs_custom_codable = enum_needs_custom_codable(format, e);
 
             // Determine protocols based on whether we'll generate custom Codable
-            let protocols = if is_string_enum_val {
-                if needs_custom_codable {
-                    "String" // Custom Codable will be generated
-                } else {
-                    "String, Codable"
+            let mut protocols = Vec::new();
+            if is_string_enum_val {
+                // A custom `Codable` is generated as an extension, so listing it
+                // here would declare the conformance twice.
+                protocols.push("String");
+                if !needs_custom_codable {
+                    protocols.push("Codable");
                 }
-            } else if needs_custom_codable {
-                "" // Custom Codable will be generated
-            } else {
-                "Codable"
-            };
+            } else if !needs_custom_codable {
+                protocols.push("Codable");
+            }
+            protocols.extend(sendable);
 
             let protocol_part = if protocols.is_empty() {
                 String::new()
             } else {
-                format!(": {}", protocols)
+                format!(": {}", protocols.join(", "))
             };
 
             result.push_str(&format!(
@@ -846,7 +841,40 @@ pub fn export_type(
         }
     }
 
+    // A generic type cannot declare `Sendable` directly, because its stored
+    // values are the generic parameters, so the conformance is conditional.
+    result.push_str(&sendable_conditional_conformance(&name, &ndt.generics));
+
     Ok(result)
+}
+
+/// The `Sendable` conformance a generated type declaration should carry.
+///
+/// Everything the exporter emits is a value type built from `Sendable` parts, so
+/// the conformance is checked by the compiler rather than written as
+/// `@unchecked Sendable`. A generic type leaves this out and gets a conditional
+/// conformance instead (see [`sendable_conditional_conformance`]).
+fn sendable_conformance(generics: &[GenericDefinition]) -> Option<&'static str> {
+    generics.is_empty().then_some("Sendable")
+}
+
+/// The conditional `Sendable` conformance a generic type needs.
+///
+/// A generic type is only `Sendable` when each of its parameters is, and a
+/// declaration cannot express that, so the conformance goes in an extension:
+/// `extension Response: Sendable where T: Sendable`.
+fn sendable_conditional_conformance(name: &str, generics: &[GenericDefinition]) -> String {
+    if generics.is_empty() {
+        return String::new();
+    }
+
+    let constraints = generics
+        .iter()
+        .map(|generic| format!("{}: Sendable", generic.name))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("\n\nextension {name}: Sendable where {constraints} {{}}")
 }
 
 /// Convert a DataType to Swift syntax.
@@ -1930,7 +1958,10 @@ fn generate_enum_structs(
         let struct_name = variant_wrapper_name(enum_name, original_variant_name);
 
         // Generate struct definition with custom CodingKeys for field name mapping
-        result.push_str(&format!("\npublic struct {}: Codable {{\n", struct_name));
+        result.push_str(&format!(
+            "\npublic struct {}: Codable, Sendable {{\n",
+            struct_name
+        ));
 
         // Generate struct fields
         let mut field_mappings = Vec::new();

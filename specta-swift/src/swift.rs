@@ -458,7 +458,7 @@ fn generate_json_value_helper() -> String {
     r#"// MARK: - JSONValue Helper
 /// A dynamically typed JSON value, used to carry the payload of an enum
 /// variant this build does not know about.
-public enum JSONValue: Codable, Equatable {
+public enum JSONValue: Codable, Equatable, Sendable {
     case null
     case bool(Bool)
     case number(Decimal)
@@ -512,7 +512,7 @@ public enum JSONValue: Codable, Equatable {
 fn generate_duration_helper() -> String {
     "// MARK: - Duration Helper\n".to_string()
         + "/// Helper struct to decode Rust Duration format {\"secs\": u64, \"nanos\": u32}\n"
-        + "public struct RustDuration: Codable {\n"
+        + "public struct RustDuration: Codable, Sendable {\n"
         + "    public let secs: UInt64\n"
         + "    public let nanos: UInt32\n"
         + "    \n"
