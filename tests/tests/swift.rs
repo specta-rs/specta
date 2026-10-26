@@ -7,7 +7,7 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Enum, Field, NamedDataType, Struct},
 };
-use specta_swift::Swift;
+use specta_swift::{GenericStyle, Swift};
 use tempfile::TempDir;
 
 struct IdentityFormat;
@@ -1510,12 +1510,28 @@ enum SwiftGenericExternal<T> {
     Nothing,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "t", content = "c")]
+enum SwiftGenericAdjacent<T> {
+    Data { value: T },
+    Unit,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericNewtype<T>(T);
+
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericTuple<T>(T, String);
+
 #[test]
 fn swift_generic_types_round_trip() {
     let types = Types::default()
         .register::<SwiftGenericBox<String>>()
         .register::<SwiftGenericTagged<u32>>()
-        .register::<SwiftGenericExternal<String>>();
+        .register::<SwiftGenericExternal<String>>()
+        .register::<SwiftGenericAdjacent<u32>>()
+        .register::<SwiftGenericNewtype<u32>>()
+        .register::<SwiftGenericTuple<u32>>();
     let exported = Swift::default()
         .export(&types, specta_serde::Format)
         .expect("generic types should export");
@@ -1535,6 +1551,10 @@ fn swift_generic_types_round_trip() {
     assert!(
         exported.contains("case data(SwiftGenericTaggedDataData<T>)"),
         "a case payload must pass the parameters through:\n{exported}"
+    );
+    assert!(
+        exported.contains("case data(SwiftGenericAdjacentDataData<T>)"),
+        "an adjacent content payload passes them through too:\n{exported}"
     );
     assert!(
         exported.contains("extension SwiftGenericBox: Sendable where T: Sendable {}"),
@@ -1578,6 +1598,89 @@ let wrapped = try decoder.decode(
 )
 guard case .wrapped(let value) = wrapped else { preconditionFailure("wrapped payload") }
 precondition(value == "wrapped")
+
+let adjacent = try decoder.decode(
+    SwiftGenericAdjacent<UInt32>.self,
+    from: Data("{\"t\":\"Data\",\"c\":{\"value\":9}}".utf8)
+)
+guard case .data(let adjacentPayload) = adjacent else {
+    preconditionFailure("adjacent payload")
+}
+precondition(adjacentPayload.value == 9)
+
+let newtype = try decoder.decode(
+    SwiftGenericNewtype<UInt32>.self,
+    from: Data("5".utf8)
+)
+precondition(newtype.value == 5)
+
+let tuple = try decoder.decode(
+    SwiftGenericTuple<UInt32>.self,
+    from: Data("[6,\"six\"]".utf8)
+)
+precondition(tuple.field0 == 6 && tuple.field1 == "six")
+
+print("SWIFT-OK")
+"#;
+    run_swift(&exported, harness);
+}
+
+/// The `where`-style generic bound and the configured protocols produce
+/// declarations that compile and behave, including through `JSONValue`.
+#[test]
+fn swift_typealias_generics_and_protocols_round_trip() {
+    let types = Types::default()
+        .register::<SwiftGenericBox<String>>()
+        .register::<SwiftGenericTagged<u32>>();
+    let exported = Swift::default()
+        .generics(GenericStyle::Typealias)
+        .add_protocol("Equatable")
+        .add_protocol("Hashable")
+        .unknown_variants(true)
+        .export(&types, specta_serde::Format)
+        .expect("generic types should export");
+
+    assert!(
+        exported.contains(
+            "public struct SwiftGenericBox<T>: Codable, Equatable, Hashable \
+             where T: Codable & Equatable & Hashable {"
+        ),
+        "{exported}"
+    );
+    assert!(
+        exported.contains(
+            "public enum SwiftGenericTagged<T>: Equatable, Hashable \
+             where T: Codable & Equatable & Hashable {"
+        ),
+        "{exported}"
+    );
+    assert!(
+        exported.contains("public enum JSONValue: Codable, Equatable, Sendable, Hashable {"),
+        "the helper keeps `Equatable` once and gains the configured protocol:\n{exported}"
+    );
+
+    let harness = r#"
+import Foundation
+
+let decoder = JSONDecoder()
+
+let first = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+let second = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+precondition(first == second)
+precondition(first.hashValue == second.hashValue)
+
+let unknown = try decoder.decode(
+    SwiftGenericTagged<UInt32>.self,
+    from: Data("{\"type\":\"Future\",\"value\":1}".utf8)
+)
+guard case .unknown(let tag, _) = unknown else { preconditionFailure("unknown variant") }
+precondition(tag == "Future")
 
 print("SWIFT-OK")
 "#;

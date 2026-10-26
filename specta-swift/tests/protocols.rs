@@ -85,8 +85,13 @@ fn test_add_protocol_applies_to_every_generated_type() {
         .collect::<Vec<_>>();
     assert!(!declarations.is_empty());
     for declaration in declarations {
+        let conformances = declaration
+            .split_once(": ")
+            .expect("a generated declaration lists conformances")
+            .1
+            .trim_end_matches(" {");
         assert!(
-            declaration.contains(", Equatable") && declaration.ends_with("Hashable {"),
+            conformances.contains("Equatable") && conformances.contains("Hashable"),
             "configured protocols are missing: {declaration}"
         );
     }
@@ -111,6 +116,19 @@ fn test_add_import_emits_an_import() {
         !output.contains(", MyModule"),
         "an import is not a conformance: {output}"
     );
+}
+
+#[test]
+fn test_add_import_deduplicates() {
+    let output = export(
+        &Swift::default()
+            .add_import("Foundation")
+            .add_import("MyModule")
+            .add_import("MyModule"),
+    );
+
+    assert_eq!(output.matches("import Foundation\n").count(), 1, "{output}");
+    assert_eq!(output.matches("import MyModule\n").count(), 1, "{output}");
 }
 
 #[test]

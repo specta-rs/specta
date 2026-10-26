@@ -784,10 +784,11 @@ pub fn export_type(
             }
             protocols.extend(sendable);
 
+            let protocols = swift.conformance_list(&protocols);
             let protocol_part = if protocols.is_empty() {
                 String::new()
             } else {
-                format!(": {}", swift.conformance_list(&protocols))
+                format!(": {protocols}")
             };
 
             result.push_str(&format!(

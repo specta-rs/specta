@@ -179,15 +179,24 @@ impl Swift {
     /// Add a protocol that all generated types should conform to.
     ///
     /// The protocol is appended to each type declaration's conformance list,
-    /// after the `Codable` and `Sendable` the exporter emits itself. Protocols
-    /// the compiler cannot synthesise (`CustomStringConvertible`, say) still
-    /// need their members written by hand.
+    /// after the `Codable` and `Sendable` the exporter emits. `Codable` and
+    /// `Sendable` are ignored here because the exporter already emits them
+    /// (conditionally, for a generic type's `Sendable`).
+    ///
+    /// Every generic parameter is constrained by the protocol too, so the
+    /// declaration's conformance can hold; a parameter type that cannot satisfy
+    /// it makes the export fail to compile. Protocols the compiler cannot
+    /// synthesise (`CustomStringConvertible`, say) still need their members
+    /// written by hand.
     pub fn add_protocol(mut self, protocol: impl Into<Cow<'static, str>>) -> Self {
         self.protocols.push(protocol.into());
         self
     }
 
     /// Add a module import to the generated file.
+    ///
+    /// `add_protocol` used to emit an import instead of a conformance; use this
+    /// for a module.
     pub fn add_import(mut self, module: impl Into<Cow<'static, str>>) -> Self {
         self.imports.push(module.into());
         self
@@ -220,10 +229,17 @@ impl Swift {
             result.push('\n');
         }
 
-        // Add imports
-        result.push_str("import Foundation\n");
+        // Add imports. `Foundation` is always imported, and a module is only
+        // listed once.
+        let mut imports = vec!["Foundation"];
         for module in &exporter.imports {
-            result.push_str(&format!("import {}\n", module));
+            let module = module.as_ref();
+            if !imports.contains(&module) {
+                imports.push(module);
+            }
+        }
+        for module in imports {
+            result.push_str(&format!("import {module}\n"));
         }
         result.push('\n');
 
@@ -501,17 +517,16 @@ fn needs_duration_helper(types: &Types) -> bool {
 /// retry delay, a timestamp) re-encodes without losing precision.
 fn generate_json_value_helper(swift: &Swift) -> String {
     let protocols = swift.conformance_list(&["Codable", "Equatable", "Sendable"]);
-    JSON_VALUE_HELPER.replacen(JSON_VALUE_PROTOCOLS, &protocols, 1)
+    JSON_VALUE_HELPER.replace(JSON_VALUE_PROTOCOLS, &protocols)
 }
 
-/// The default conformance list in [`JSON_VALUE_HELPER`], which is replaced by
-/// the configured protocols.
-const JSON_VALUE_PROTOCOLS: &str = "Codable, Equatable, Sendable";
+/// Placeholder in [`JSON_VALUE_HELPER`] for the declaration's conformance list.
+const JSON_VALUE_PROTOCOLS: &str = "__PROTOCOLS__";
 
 const JSON_VALUE_HELPER: &str = r#"// MARK: - JSONValue Helper
 /// A dynamically typed JSON value, used to carry the payload of an enum
 /// variant this build does not know about.
-public enum JSONValue: Codable, Equatable, Sendable {
+public enum JSONValue: __PROTOCOLS__ {
     case null
     case bool(Bool)
     case number(Decimal)

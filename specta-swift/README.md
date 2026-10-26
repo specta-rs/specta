@@ -259,9 +259,10 @@ let swift = Swift::new()
 
 ### Additional Protocols
 
-`add_protocol` appends a protocol to every generated type declaration, after the
-`Codable` and `Sendable` the exporter emits itself. The `JSONValue` and
-`RustDuration` helpers get it too.
+`add_protocol` appends a protocol to every generated type declaration: after
+`Codable`, and after `Sendable` where the conformance is unconditional. The
+`JSONValue` and `RustDuration` helpers get it too. Generic parameters are
+constrained by it as well, so the declaration's conformance holds.
 
 ```rust
 let swift = Swift::new()
@@ -271,6 +272,8 @@ let swift = Swift::new()
 
 A protocol whose requirements the compiler cannot synthesise, such as
 `CustomStringConvertible`, still needs its members written by hand.
+
+`add_protocol` used to emit `import <protocol>`; use `add_import` for a module.
 
 ### Additional Imports
 
@@ -282,10 +285,13 @@ let swift = Swift::new().add_import("MyModule");
 
 ### Serde Integration
 
-```rust
-let swift = Swift::new();
+Pass `specta_serde::Format` to bake serde's wire shape — renames, tagging and
+skip attributes — into the generated types, as in the Quick Start above.
 
-let output = swift.export(&types, specta_serde::Format).unwrap();
+```rust
+let output = Swift::new()
+    .export(&types, specta_serde::Format)
+    .unwrap();
 ```
 
 ## Type Mapping
