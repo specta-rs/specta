@@ -127,9 +127,9 @@ fn test_enum_with_nested_structs() {
     // Test named field variants (should be struct-like)
     assert!(output.contains("case admin(UserTypeAdminData)"));
     assert!(output.contains("case guest(UserTypeGuestData)"));
-    assert!(output.contains("case success(ApiResultSuccessData)"));
-    assert!(output.contains("case error(ApiResultErrorData)"));
-    assert!(output.contains("case loading(ApiResultLoadingData)"));
+    assert!(output.contains("case success(ApiResultSuccessData<T, E>)"));
+    assert!(output.contains("case error(ApiResultErrorData<T, E>)"));
+    assert!(output.contains("case loading(ApiResultLoadingData<T, E>)"));
     assert!(output.contains("case namedFields(ComplexUnionNamedFieldsData)"));
     assert!(output.contains("case complex(ComplexUnionComplexData)"));
 

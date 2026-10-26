@@ -1486,6 +1486,104 @@ fn swift_newtype_and_tuple_structs_round_trip() {
     run_swift(&exported, &harness);
 }
 
+/// A generic type used to be emitted with unconstrained parameters and its
+/// variant wrapper structs referred to `T` without declaring it, so nothing in
+/// the generic path compiled. Generic parameters now carry the `Codable` bound
+/// their declaration needs, and the wrappers repeat them.
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericBox<T> {
+    value: T,
+    label: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum SwiftGenericTagged<T> {
+    Data { value: T },
+    Unit,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum SwiftGenericExternal<T> {
+    Wrapped(T),
+    Named { value: T },
+    Nothing,
+}
+
+#[test]
+fn swift_generic_types_round_trip() {
+    let types = Types::default()
+        .register::<SwiftGenericBox<String>>()
+        .register::<SwiftGenericTagged<u32>>()
+        .register::<SwiftGenericExternal<String>>();
+    let exported = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect("generic types should export");
+
+    assert!(
+        exported.contains("public struct SwiftGenericBox<T: Codable>: Codable {"),
+        "a generic struct needs a `Codable` bound on its parameter:\n{exported}"
+    );
+    assert!(
+        exported.contains("public enum SwiftGenericTagged<T: Codable> {"),
+        "{exported}"
+    );
+    assert!(
+        exported.contains("public struct SwiftGenericTaggedDataData<T: Codable>: Codable {"),
+        "a variant wrapper struct must declare the enum's parameters:\n{exported}"
+    );
+    assert!(
+        exported.contains("case data(SwiftGenericTaggedDataData<T>)"),
+        "a case payload must pass the parameters through:\n{exported}"
+    );
+    assert!(
+        exported.contains("extension SwiftGenericBox: Sendable where T: Sendable {}"),
+        "the conformance stays conditional so a non-Sendable payload still decodes:\n{exported}"
+    );
+
+    let harness = r#"
+import Foundation
+
+let decoder = JSONDecoder()
+let encoder = JSONEncoder()
+
+let box = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+precondition(box.value == "hi" && box.label == "box")
+let roundTripped = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: try encoder.encode(box)
+)
+precondition(roundTripped.value == "hi")
+
+let tagged = try decoder.decode(
+    SwiftGenericTagged<UInt32>.self,
+    from: Data("{\"type\":\"Data\",\"value\":7}".utf8)
+)
+guard case .data(let payload) = tagged else { preconditionFailure("tagged payload") }
+precondition(payload.value == 7)
+
+let external = try decoder.decode(
+    SwiftGenericExternal<String>.self,
+    from: Data("{\"Named\":{\"value\":\"named\"}}".utf8)
+)
+guard case .named(let named) = external else { preconditionFailure("named payload") }
+precondition(named.value == "named")
+
+let wrapped = try decoder.decode(
+    SwiftGenericExternal<String>.self,
+    from: Data("{\"Wrapped\":\"wrapped\"}".utf8)
+)
+guard case .wrapped(let value) = wrapped else { preconditionFailure("wrapped payload") }
+precondition(value == "wrapped")
+
+print("SWIFT-OK")
+"#;
+    run_swift(&exported, harness);
+}
+
 /// `PhasesFormat` splits a struct whose serialize and deserialize shapes differ
 /// into `*Serialize`/`*Deserialize` types. Both halves are wire types in their
 /// own right, so both must carry the correct sequence codec.

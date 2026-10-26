@@ -220,8 +220,7 @@ fn main() {
     println!("{}", "-".repeat(40));
     let with_protocols = Swift::new()
         .add_protocol("Equatable")
-        .add_protocol("Hashable")
-        .add_protocol("CustomStringConvertible");
+        .add_protocol("Hashable");
     let protocols_output = with_protocols.export(&types, specta_serde::Format).unwrap();
     println!("With additional protocols:\n{}", protocols_output);
     with_protocols

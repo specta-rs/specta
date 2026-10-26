@@ -13,7 +13,7 @@ use specta::{
 };
 
 use crate::error::Error;
-use crate::swift::Swift;
+use crate::swift::{GenericStyle, Swift};
 
 fn string_literal_raw_value(dt: &DataType) -> Option<&str> {
     let DataType::Enum(literal_enum) = dt else {
@@ -705,18 +705,7 @@ pub fn export_type(
         .collect::<Vec<_>>();
 
     let name = swift.naming.convert(&ndt.name);
-    let generics = if ndt.generics.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "<{}>",
-            ndt.generics
-                .iter()
-                .map(|g| g.name.as_ref().to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    };
+    let (generics, generic_where) = generic_parameters(swift, &ndt.generics);
     let sendable = sendable_conformance(&ndt.generics);
 
     // Format based on type
@@ -747,10 +736,11 @@ pub fn export_type(
             let mut protocols = vec!["Codable"];
             protocols.extend(sendable);
             result.push_str(&format!(
-                "public struct {}{}: {} {{\n",
+                "public struct {}{}: {}{} {{\n",
                 name,
                 generics,
-                protocols.join(", ")
+                swift.conformance_list(&protocols),
+                generic_where
             ));
             result.push_str(&body);
             result.push('}');
@@ -797,12 +787,12 @@ pub fn export_type(
             let protocol_part = if protocols.is_empty() {
                 String::new()
             } else {
-                format!(": {}", protocols.join(", "))
+                format!(": {}", swift.conformance_list(&protocols))
             };
 
             result.push_str(&format!(
-                "public enum {}{}{} {{\n",
-                name, generics, protocol_part
+                "public enum {}{}{}{} {{\n",
+                name, generics, protocol_part, generic_where
             ));
             let mut enum_body =
                 enum_to_swift(swift, format, types, e, generic_scope.clone(), Some(&name))?;
@@ -819,8 +809,15 @@ pub fn export_type(
             result.push('}');
 
             // Generate struct definitions for named field variants
-            let struct_definitions =
-                generate_enum_structs(swift, format, types, e, generic_scope.clone(), &name)?;
+            let struct_definitions = generate_enum_structs(
+                swift,
+                format,
+                types,
+                e,
+                generic_scope.clone(),
+                &ndt.generics,
+                &name,
+            )?;
             result.push_str(&struct_definitions);
 
             // Generate custom Codable implementation for enums with struct variants
@@ -856,6 +853,66 @@ pub fn export_type(
 /// conformance instead (see [`sendable_conditional_conformance`]).
 fn sendable_conformance(generics: &[GenericDefinition]) -> Option<&'static str> {
     generics.is_empty().then_some("Sendable")
+}
+
+/// Render the generic parameters of a generated declaration, plus the `where`
+/// clause some styles put the bound in.
+///
+/// The declaration conforms to `Codable` itself, so each parameter has to
+/// conform too: Swift rejects that conformance when a stored value is an
+/// unconstrained generic parameter. The configured protocols are part of the
+/// bound for the same reason.
+fn generic_parameters(swift: &Swift, generics: &[GenericDefinition]) -> (String, String) {
+    if generics.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    let bound = swift.generic_bound();
+    let names = generics
+        .iter()
+        .map(|generic| generic.name.to_string())
+        .collect::<Vec<_>>();
+
+    match swift.generics {
+        GenericStyle::Protocol => (
+            format!(
+                "<{}>",
+                names
+                    .iter()
+                    .map(|name| format!("{name}: {bound}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            String::new(),
+        ),
+        GenericStyle::Typealias => (
+            format!("<{}>", names.join(", ")),
+            format!(
+                " where {}",
+                names
+                    .iter()
+                    .map(|name| format!("{name}: {bound}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        ),
+    }
+}
+
+/// The generic arguments a use site passes for a set of parameters (`<T, E>`).
+fn generic_arguments(generics: &[Generic]) -> String {
+    if generics.is_empty() {
+        return String::new();
+    }
+
+    format!(
+        "<{}>",
+        generics
+            .iter()
+            .map(|generic| generic.name().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 /// The conditional `Sendable` conformance a generic type needs.
@@ -1833,6 +1890,13 @@ fn enum_to_swift(
 
     let mut result = String::new();
 
+    // A named enum's variant wrapper structs repeat the enum's generic
+    // parameters, so a case payload has to pass them through.
+    let wrapper_arguments = match enum_name {
+        Some(_) => generic_arguments(&generic_scope),
+        None => String::new(),
+    };
+
     // Check if this is a string enum
     let is_string_enum = resolved_string_enum(e).is_some();
 
@@ -1898,7 +1962,10 @@ fn enum_to_swift(
                     } else {
                         let struct_name =
                             variant_wrapper_name(enum_name.unwrap_or(""), original_variant_name);
-                        result.push_str(&format!("    case {}({})\n", variant_name, struct_name));
+                        result.push_str(&format!(
+                            "    case {}({struct_name}{wrapper_arguments})\n",
+                            variant_name
+                        ));
                     }
                 } else if fields.fields.is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
@@ -1926,7 +1993,10 @@ fn enum_to_swift(
                         variant_wrapper_name(enum_name.unwrap_or(""), original_variant_name);
 
                     // Generate enum case that references the struct
-                    result.push_str(&format!("    case {}({})\n", variant_name, struct_name));
+                    result.push_str(&format!(
+                        "    case {}({struct_name}{wrapper_arguments})\n",
+                        variant_name
+                    ));
                 }
             }
         }
@@ -1942,6 +2012,7 @@ fn generate_enum_structs(
     types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<Generic>,
+    generics: &[GenericDefinition],
     enum_name: &str,
 ) -> Result<String, Error> {
     let mut result = String::new();
@@ -1958,9 +2029,15 @@ fn generate_enum_structs(
         let struct_name = variant_wrapper_name(enum_name, original_variant_name);
 
         // Generate struct definition with custom CodingKeys for field name mapping
+        let mut protocols = vec!["Codable"];
+        protocols.extend(sendable_conformance(generics));
+        let (parameters, generic_where) = generic_parameters(swift, generics);
         result.push_str(&format!(
-            "\npublic struct {}: Codable, Sendable {{\n",
-            struct_name
+            "\npublic struct {}{}: {}{} {{\n",
+            struct_name,
+            parameters,
+            swift.conformance_list(&protocols),
+            generic_where
         ));
 
         // Generate struct fields
@@ -2009,6 +2086,7 @@ fn generate_enum_structs(
         }
 
         result.push_str("}\n");
+        result.push_str(&sendable_conditional_conformance(&struct_name, generics));
     }
 
     Ok(result)
@@ -2198,6 +2276,10 @@ fn generate_tagged_enum_codable(
 ) -> Result<String, Error> {
     let mut result = String::new();
 
+    // The variant wrapper structs repeat the enum's generic parameters, so a
+    // reference to one has to pass them through.
+    let wrapper_arguments = generic_arguments(&generic_scope);
+
     result.push_str(&format!(
         "\n// MARK: - {} Codable Implementation\n",
         enum_name
@@ -2245,8 +2327,7 @@ fn generate_tagged_enum_codable(
         if let Some(content_key) = payload.content_key {
             let struct_name = variant_wrapper_name(enum_name, original_variant_name);
             result.push_str(&format!(
-                "            let data = try container.decode({}.self, forKey: CodingKeys({}))\n",
-                struct_name,
+                "            let data = try container.decode({struct_name}{wrapper_arguments}.self, forKey: CodingKeys({}))\n",
                 swift_string_literal(content_key)
             ));
             result.push_str(&format!("            self = .{}(data)\n", case_name));
@@ -2299,9 +2380,8 @@ fn generate_tagged_enum_codable(
             ));
         }
         result.push_str(&format!(
-            "            self = .{}({}({}))\n",
+            "            self = .{}({struct_name}{wrapper_arguments}({}))\n",
             case_name,
-            struct_name,
             arguments.join(", ")
         ));
     }
@@ -2450,6 +2530,10 @@ fn generate_external_enum_codable(
     enum_name: &str,
 ) -> Result<String, Error> {
     let mut result = String::new();
+
+    // The variant wrapper structs repeat the enum's generic parameters, so a
+    // reference to one has to pass them through.
+    let wrapper_arguments = generic_arguments(&generic_scope);
 
     result.push_str(&format!(
         "\n// MARK: - {} Codable Implementation\n",
@@ -2640,8 +2724,8 @@ fn generate_external_enum_codable(
 
                     result.push_str(&format!("        case .{}:\n", swift_case_name));
                     result.push_str(&format!(
-                        "            let data = try container.decode({}.self, forKey: .{})\n",
-                        struct_name, swift_case_name
+                        "            let data = try container.decode({struct_name}{wrapper_arguments}.self, forKey: .{})\n",
+                        swift_case_name
                     ));
                     result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
                 } else {

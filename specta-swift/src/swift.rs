@@ -23,8 +23,10 @@ pub struct Swift {
     pub generics: GenericStyle,
     /// Optional type style.
     pub optionals: OptionalStyle,
-    /// Additional protocols to conform to.
+    /// Additional protocols every generated type conforms to.
     pub protocols: Vec<Cow<'static, str>>,
+    /// Additional modules to import in the generated file.
+    pub imports: Vec<Cow<'static, str>>,
     /// Generate a catch-all `unknown` case for tagged enums, so a variant this
     /// build does not know about decodes (keeping its tag and JSON payload)
     /// instead of throwing.
@@ -40,6 +42,7 @@ impl fmt::Debug for Swift {
             .field("generics", &self.generics)
             .field("optionals", &self.optionals)
             .field("protocols", &self.protocols)
+            .field("imports", &self.imports)
             .field("unknown_variants", &self.unknown_variants)
             .finish()
     }
@@ -101,6 +104,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
+            imports: vec![],
             unknown_variants: false,
         }
     }
@@ -110,6 +114,36 @@ impl Swift {
     /// Create a new Swift exporter with default configuration.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The conformance list a generated declaration should carry: `base` plus
+    /// every configured protocol, without duplicates.
+    ///
+    /// `Codable` and `Sendable` are ignored when configured because the
+    /// exporter emits them itself, in the declaration or in an extension when
+    /// they are conditional.
+    pub(crate) fn conformance_list(&self, base: &[&str]) -> String {
+        self.protocols_from(base.iter().copied()).join(", ")
+    }
+
+    /// The bound a generic parameter needs for the declaration's conformances
+    /// to hold: `Codable` plus every configured protocol.
+    pub(crate) fn generic_bound(&self) -> String {
+        self.protocols_from(["Codable"]).join(" & ")
+    }
+
+    fn protocols_from<'a>(&'a self, initial: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
+        let mut protocols = initial.into_iter().collect::<Vec<_>>();
+        for protocol in &self.protocols {
+            let protocol = protocol.as_ref();
+            if matches!(protocol, "Codable" | "Sendable") {
+                continue;
+            }
+            if !protocols.contains(&protocol) {
+                protocols.push(protocol);
+            }
+        }
+        protocols
     }
 
     /// Set the header comment for generated files.
@@ -142,9 +176,20 @@ impl Swift {
         self
     }
 
-    /// Add a protocol that all types should conform to.
+    /// Add a protocol that all generated types should conform to.
+    ///
+    /// The protocol is appended to each type declaration's conformance list,
+    /// after the `Codable` and `Sendable` the exporter emits itself. Protocols
+    /// the compiler cannot synthesise (`CustomStringConvertible`, say) still
+    /// need their members written by hand.
     pub fn add_protocol(mut self, protocol: impl Into<Cow<'static, str>>) -> Self {
         self.protocols.push(protocol.into());
+        self
+    }
+
+    /// Add a module import to the generated file.
+    pub fn add_import(mut self, module: impl Into<Cow<'static, str>>) -> Self {
+        self.imports.push(module.into());
         self
     }
 
@@ -177,20 +222,20 @@ impl Swift {
 
         // Add imports
         result.push_str("import Foundation\n");
-        for protocol in &exporter.protocols {
-            result.push_str(&format!("import {}\n", protocol));
+        for module in &exporter.imports {
+            result.push_str(&format!("import {}\n", module));
         }
         result.push('\n');
 
         // Check if we need to inject Duration helper
         if needs_duration_helper(raw_types) {
-            result.push_str(&generate_duration_helper());
+            result.push_str(&generate_duration_helper(&exporter));
         }
 
         // An `unknown` variant case carries an arbitrary JSON payload, so the
         // `JSONValue` type it refers to has to be injected once up front.
         if needs_json_value(&exporter, Some(&format), raw_types) {
-            result.push_str(&generate_json_value_helper());
+            result.push_str(&generate_json_value_helper(&exporter));
         }
 
         // Export types
@@ -454,8 +499,16 @@ fn needs_duration_helper(types: &Types) -> bool {
 /// this build does not know, so a general JSON value type is needed to hold it.
 /// Numbers use `Decimal` rather than `Double` so an integer tag payload (a
 /// retry delay, a timestamp) re-encodes without losing precision.
-fn generate_json_value_helper() -> String {
-    r#"// MARK: - JSONValue Helper
+fn generate_json_value_helper(swift: &Swift) -> String {
+    let protocols = swift.conformance_list(&["Codable", "Equatable", "Sendable"]);
+    JSON_VALUE_HELPER.replacen(JSON_VALUE_PROTOCOLS, &protocols, 1)
+}
+
+/// The default conformance list in [`JSON_VALUE_HELPER`], which is replaced by
+/// the configured protocols.
+const JSON_VALUE_PROTOCOLS: &str = "Codable, Equatable, Sendable";
+
+const JSON_VALUE_HELPER: &str = r#"// MARK: - JSONValue Helper
 /// A dynamically typed JSON value, used to carry the payload of an enum
 /// variant this build does not know about.
 public enum JSONValue: Codable, Equatable, Sendable {
@@ -504,21 +557,23 @@ public enum JSONValue: Codable, Equatable, Sendable {
     }
 }
 
-"#
-        .to_string()
-}
+"#;
 
 /// Generate the Duration helper struct
-fn generate_duration_helper() -> String {
-    "// MARK: - Duration Helper\n".to_string()
-        + "/// Helper struct to decode Rust Duration format {\"secs\": u64, \"nanos\": u32}\n"
-        + "public struct RustDuration: Codable, Sendable {\n"
-        + "    public let secs: UInt64\n"
-        + "    public let nanos: UInt32\n"
-        + "    \n"
-        + "    public var timeInterval: TimeInterval {\n"
-        + "        return Double(secs) + Double(nanos) / 1_000_000_000.0\n"
-        + "    }\n"
-        + "}\n\n"
-        + "// MARK: - Generated Types\n\n"
+fn generate_duration_helper(swift: &Swift) -> String {
+    let protocols = swift.conformance_list(&["Codable", "Sendable"]);
+    [
+        "// MARK: - Duration Helper\n",
+        "/// Helper struct to decode Rust Duration format {\"secs\": u64, \"nanos\": u32}\n",
+        &format!("public struct RustDuration: {protocols} {{\n"),
+        "    public let secs: UInt64\n",
+        "    public let nanos: UInt32\n",
+        "    \n",
+        "    public var timeInterval: TimeInterval {\n",
+        "        return Double(secs) + Double(nanos) / 1_000_000_000.0\n",
+        "    }\n",
+        "}\n\n",
+        "// MARK: - Generated Types\n\n",
+    ]
+    .concat()
 }

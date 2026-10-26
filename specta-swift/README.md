@@ -74,7 +74,7 @@ fn main() {
 
     let swift = Swift::default();
     swift
-        .export_to("./Types.swift", &types, specta_serde::format)
+        .export_to("./Types.swift", &types, specta_serde::Format)
         .unwrap();
 }
 ```
@@ -233,6 +233,22 @@ let swift = Swift::new().indent(IndentStyle::Spaces(2));
 let swift = Swift::new().indent(IndentStyle::Tabs);
 ```
 
+### Generic Styles
+
+A generic type constrains its parameters with `Codable` (plus any protocol added
+with `add_protocol`) so that its own conformance holds. `GenericStyle` picks
+where the bound goes:
+
+```rust
+use specta_swift::{Swift, GenericStyle};
+
+// <T: Codable> (default)
+let swift = Swift::default();
+
+// <T> where T: Codable
+let swift = Swift::new().generics(GenericStyle::Typealias);
+```
+
 ### Custom Headers
 
 ```rust
@@ -243,20 +259,33 @@ let swift = Swift::new()
 
 ### Additional Protocols
 
+`add_protocol` appends a protocol to every generated type declaration, after the
+`Codable` and `Sendable` the exporter emits itself. The `JSONValue` and
+`RustDuration` helpers get it too.
+
 ```rust
 let swift = Swift::new()
     .add_protocol("Equatable")
-    .add_protocol("Hashable")
-    .add_protocol("CustomStringConvertible");
+    .add_protocol("Hashable");
+```
+
+A protocol whose requirements the compiler cannot synthesise, such as
+`CustomStringConvertible`, still needs its members written by hand.
+
+### Additional Imports
+
+`add_import` adds a module import to the generated file.
+
+```rust
+let swift = Swift::new().add_import("MyModule");
 ```
 
 ### Serde Integration
 
 ```rust
-let swift = Swift::new()
-    .add_protocol("CustomDebugStringConvertible");
+let swift = Swift::new();
 
-let output = swift.export(&types, specta_serde::format).unwrap();
+let output = swift.export(&types, specta_serde::Format).unwrap();
 ```
 
 ## Type Mapping
