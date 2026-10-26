@@ -2,7 +2,7 @@
 import Foundation
 
 /// Generic struct demonstrating type parameters
-public struct ApiResponse<T, E>: Codable {
+public struct ApiResponse<T: Codable, E: Codable>: Codable {
     public let data: T?
     public let error: E?
     public let statusCode: UInt16
@@ -14,14 +14,40 @@ public struct ApiResponse<T, E>: Codable {
         case statusCode = "status_code"
         case headers = "headers"
     }
+
+    public init(data: T?, error: E?, statusCode: UInt16, headers: [(String, String)]) {
+        self.data = data
+        self.error = error
+        self.statusCode = statusCode
+        self.headers = headers
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.data = try container.decodeIfPresent(T.self, forKey: .data)
+        self.error = try container.decodeIfPresent(E.self, forKey: .error)
+        self.statusCode = try container.decode(UInt16.self, forKey: .statusCode)
+        self.headers = try container.decode([(String, String)].self, forKey: .headers)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(data, forKey: .data)
+        try container.encode(error, forKey: .error)
+        try container.encode(statusCode, forKey: .statusCode)
+        try container.encode(headers, forKey: .headers)
+    }
 }
+
+extension ApiResponse: Sendable where T: Sendable, E: Sendable {}
 
 /// Comprehensive example showcasing basic Rust types and their Swift equivalents
 /// 
 /// This example demonstrates how specta-swift handles fundamental Rust types
 /// and converts them to appropriate Swift types.
+/// 
 /// Basic primitive types
-public struct Primitives: Codable {
+public struct Primitives: Codable, Sendable {
     public let smallInt: Int8
     public let unsignedSmall: UInt8
     public let shortInt: Int16
@@ -63,16 +89,84 @@ public struct Primitives: Codable {
         case matrix = "matrix"
         case stringPairs = "string_pairs"
     }
+
+    public init(smallInt: Int8, unsignedSmall: UInt8, shortInt: Int16, unsignedShort: UInt16, regularInt: Int32, unsignedInt: UInt32, longInt: Int64, unsignedLong: UInt64, singlePrecision: Float, doublePrecision: Double, isActive: Bool, singleChar: Character, name: String, optionalName: String?, tags: [String], scores: [Double], userIds: [UInt32], matrix: [[Double]], stringPairs: [(String, String)]) {
+        self.smallInt = smallInt
+        self.unsignedSmall = unsignedSmall
+        self.shortInt = shortInt
+        self.unsignedShort = unsignedShort
+        self.regularInt = regularInt
+        self.unsignedInt = unsignedInt
+        self.longInt = longInt
+        self.unsignedLong = unsignedLong
+        self.singlePrecision = singlePrecision
+        self.doublePrecision = doublePrecision
+        self.isActive = isActive
+        self.singleChar = singleChar
+        self.name = name
+        self.optionalName = optionalName
+        self.tags = tags
+        self.scores = scores
+        self.userIds = userIds
+        self.matrix = matrix
+        self.stringPairs = stringPairs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.smallInt = try container.decode(Int8.self, forKey: .smallInt)
+        self.unsignedSmall = try container.decode(UInt8.self, forKey: .unsignedSmall)
+        self.shortInt = try container.decode(Int16.self, forKey: .shortInt)
+        self.unsignedShort = try container.decode(UInt16.self, forKey: .unsignedShort)
+        self.regularInt = try container.decode(Int32.self, forKey: .regularInt)
+        self.unsignedInt = try container.decode(UInt32.self, forKey: .unsignedInt)
+        self.longInt = try container.decode(Int64.self, forKey: .longInt)
+        self.unsignedLong = try container.decode(UInt64.self, forKey: .unsignedLong)
+        self.singlePrecision = try container.decode(Float.self, forKey: .singlePrecision)
+        self.doublePrecision = try container.decode(Double.self, forKey: .doublePrecision)
+        self.isActive = try container.decode(Bool.self, forKey: .isActive)
+        self.singleChar = try container.decode(Character.self, forKey: .singleChar)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.optionalName = try container.decodeIfPresent(String.self, forKey: .optionalName)
+        self.tags = try container.decode([String].self, forKey: .tags)
+        self.scores = try container.decode([Double].self, forKey: .scores)
+        self.userIds = try container.decode([UInt32].self, forKey: .userIds)
+        self.matrix = try container.decode([[Double]].self, forKey: .matrix)
+        self.stringPairs = try container.decode([(String, String)].self, forKey: .stringPairs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(smallInt, forKey: .smallInt)
+        try container.encode(unsignedSmall, forKey: .unsignedSmall)
+        try container.encode(shortInt, forKey: .shortInt)
+        try container.encode(unsignedShort, forKey: .unsignedShort)
+        try container.encode(regularInt, forKey: .regularInt)
+        try container.encode(unsignedInt, forKey: .unsignedInt)
+        try container.encode(longInt, forKey: .longInt)
+        try container.encode(unsignedLong, forKey: .unsignedLong)
+        try container.encode(singlePrecision, forKey: .singlePrecision)
+        try container.encode(doublePrecision, forKey: .doublePrecision)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encode(singleChar, forKey: .singleChar)
+        try container.encode(name, forKey: .name)
+        try container.encode(optionalName, forKey: .optionalName)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(scores, forKey: .scores)
+        try container.encode(userIds, forKey: .userIds)
+        try container.encode(matrix, forKey: .matrix)
+        try container.encode(stringPairs, forKey: .stringPairs)
+    }
 }
 
 /// Enum with different variant types
-public enum Status {
+public enum Status: Sendable {
     case active
     case pending(String)
     case error(String, UInt32)
     case loading(StatusLoadingData)
 }
-public struct StatusLoadingData: Codable {
+public struct StatusLoadingData: Codable, Sendable {
     public let progress: Float
     public let message: String?
 }
@@ -87,6 +181,16 @@ extension Status: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Active":
+                self = .active
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -100,11 +204,13 @@ extension Status: Codable {
         case .active:
             self = .active
         case .pending:
-            // TODO: Implement tuple variant decoding for pending
-            fatalError("Tuple variant decoding not implemented")
+            let data = try container.decode(String.self, forKey: .pending)
+            self = .pending(data)
         case .error:
-            // TODO: Implement tuple variant decoding for error
-            fatalError("Tuple variant decoding not implemented")
+            var nested = try container.nestedUnkeyedContainer(forKey: .error)
+            let value0 = try nested.decode(String.self)
+            let value1 = try nested.decode(UInt32.self)
+            self = .error(value0, value1)
         case .loading:
             let data = try container.decode(StatusLoadingData.self, forKey: .loading)
             self = .loading(data)
@@ -112,18 +218,20 @@ extension Status: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .active:
-            try container.encodeNil(forKey: .active)
-        case .pending:
-            // TODO: Implement tuple variant encoding for pending
-            fatalError("Tuple variant encoding not implemented")
-        case .error:
-            // TODO: Implement tuple variant encoding for error
-            fatalError("Tuple variant encoding not implemented")
+            var container = encoder.singleValueContainer()
+            try container.encode("Active")
+        case .pending(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .pending)
+        case .error(let value0, let value1):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            var nested = container.nestedUnkeyedContainer(forKey: .error)
+            try nested.encode(value0)
+            try nested.encode(value1)
         case .loading(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .loading)
         }
     }
@@ -131,7 +239,7 @@ extension Status: Codable {
 
 
 /// Nested struct demonstrating complex relationships
-public struct User: Codable {
+public struct User: Codable, Sendable {
     public let id: UInt32
     public let username: String
     public let email: String
@@ -139,9 +247,51 @@ public struct User: Codable {
     public let preferences: UserPreferences
     public let status: Status
     public let metadata: UserMetadata?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case username = "username"
+        case email = "email"
+        case profile = "profile"
+        case preferences = "preferences"
+        case status = "status"
+        case metadata = "metadata"
+    }
+
+    public init(id: UInt32, username: String, email: String, profile: UserProfile, preferences: UserPreferences, status: Status, metadata: UserMetadata?) {
+        self.id = id
+        self.username = username
+        self.email = email
+        self.profile = profile
+        self.preferences = preferences
+        self.status = status
+        self.metadata = metadata
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.username = try container.decode(String.self, forKey: .username)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.profile = try container.decode(UserProfile.self, forKey: .profile)
+        self.preferences = try container.decode(UserPreferences.self, forKey: .preferences)
+        self.status = try container.decode(Status.self, forKey: .status)
+        self.metadata = try container.decodeIfPresent(UserMetadata.self, forKey: .metadata)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(username, forKey: .username)
+        try container.encode(email, forKey: .email)
+        try container.encode(profile, forKey: .profile)
+        try container.encode(preferences, forKey: .preferences)
+        try container.encode(status, forKey: .status)
+        try container.encode(metadata, forKey: .metadata)
+    }
 }
 
-public struct UserMetadata: Codable {
+public struct UserMetadata: Codable, Sendable {
     public let createdAt: String
     public let lastLogin: String?
     public let loginCount: UInt32
@@ -153,9 +303,32 @@ public struct UserMetadata: Codable {
         case loginCount = "login_count"
         case isVerified = "is_verified"
     }
+
+    public init(createdAt: String, lastLogin: String?, loginCount: UInt32, isVerified: Bool) {
+        self.createdAt = createdAt
+        self.lastLogin = lastLogin
+        self.loginCount = loginCount
+        self.isVerified = isVerified
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.lastLogin = try container.decodeIfPresent(String.self, forKey: .lastLogin)
+        self.loginCount = try container.decode(UInt32.self, forKey: .loginCount)
+        self.isVerified = try container.decode(Bool.self, forKey: .isVerified)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(lastLogin, forKey: .lastLogin)
+        try container.encode(loginCount, forKey: .loginCount)
+        try container.encode(isVerified, forKey: .isVerified)
+    }
 }
 
-public struct UserPreferences: Codable {
+public struct UserPreferences: Codable, Sendable {
     public let theme: String
     public let language: String
     public let notificationsEnabled: Bool
@@ -167,9 +340,32 @@ public struct UserPreferences: Codable {
         case notificationsEnabled = "notifications_enabled"
         case privacyLevel = "privacy_level"
     }
+
+    public init(theme: String, language: String, notificationsEnabled: Bool, privacyLevel: UInt8) {
+        self.theme = theme
+        self.language = language
+        self.notificationsEnabled = notificationsEnabled
+        self.privacyLevel = privacyLevel
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.theme = try container.decode(String.self, forKey: .theme)
+        self.language = try container.decode(String.self, forKey: .language)
+        self.notificationsEnabled = try container.decode(Bool.self, forKey: .notificationsEnabled)
+        self.privacyLevel = try container.decode(UInt8.self, forKey: .privacyLevel)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(language, forKey: .language)
+        try container.encode(notificationsEnabled, forKey: .notificationsEnabled)
+        try container.encode(privacyLevel, forKey: .privacyLevel)
+    }
 }
 
-public struct UserProfile: Codable {
+public struct UserProfile: Codable, Sendable {
     public let firstName: String
     public let lastName: String
     public let bio: String?
@@ -182,6 +378,32 @@ public struct UserProfile: Codable {
         case bio = "bio"
         case avatarUrl = "avatar_url"
         case birthDate = "birth_date"
+    }
+
+    public init(firstName: String, lastName: String, bio: String?, avatarUrl: String?, birthDate: String?) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.bio = bio
+        self.avatarUrl = avatarUrl
+        self.birthDate = birthDate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.firstName = try container.decode(String.self, forKey: .firstName)
+        self.lastName = try container.decode(String.self, forKey: .lastName)
+        self.bio = try container.decodeIfPresent(String.self, forKey: .bio)
+        self.avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
+        self.birthDate = try container.decodeIfPresent(String.self, forKey: .birthDate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(firstName, forKey: .firstName)
+        try container.encode(lastName, forKey: .lastName)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(avatarUrl, forKey: .avatarUrl)
+        try container.encode(birthDate, forKey: .birthDate)
     }
 }
 

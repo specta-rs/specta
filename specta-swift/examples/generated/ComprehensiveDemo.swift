@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - Duration Helper
 /// Helper struct to decode Rust Duration format {"secs": u64, "nanos": u32}
-public struct RustDuration: Codable {
+public struct RustDuration: Codable, Sendable {
     public let secs: UInt64
     public let nanos: UInt32
     
@@ -15,23 +15,55 @@ public struct RustDuration: Codable {
 // MARK: - Generated Types
 
 /// Admin level enum
-public enum AdminLevel: Codable {
-    case junior
-    case senior
-    case lead
-    case director
+public enum AdminLevel: String, Codable, Sendable {
+    case junior = "Junior"
+    case senior = "Senior"
+    case lead = "Lead"
+    case director = "Director"
 }
 
 /// API response wrapper
-public struct ApiResponse<T, E>: Codable {
+public struct ApiResponse<T: Codable, E: Codable>: Codable {
     public let data: T?
     public let error: E?
     public let status: ResponseStatus
     public let metadata: ResponseMetadata
+
+    private enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case error = "error"
+        case status = "status"
+        case metadata = "metadata"
+    }
+
+    public init(data: T?, error: E?, status: ResponseStatus, metadata: ResponseMetadata) {
+        self.data = data
+        self.error = error
+        self.status = status
+        self.metadata = metadata
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.data = try container.decodeIfPresent(T.self, forKey: .data)
+        self.error = try container.decodeIfPresent(E.self, forKey: .error)
+        self.status = try container.decode(ResponseStatus.self, forKey: .status)
+        self.metadata = try container.decode(ResponseMetadata.self, forKey: .metadata)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(data, forKey: .data)
+        try container.encode(error, forKey: .error)
+        try container.encode(status, forKey: .status)
+        try container.encode(metadata, forKey: .metadata)
+    }
 }
 
+extension ApiResponse: Sendable where T: Sendable, E: Sendable {}
+
 /// File attachment
-public struct Attachment: Codable {
+public struct Attachment: Codable, Sendable {
     public let id: String
     public let filename: String
     public let size: UInt64
@@ -47,10 +79,39 @@ public struct Attachment: Codable {
         case uploadedAt = "uploaded_at"
         case uploadedBy = "uploaded_by"
     }
+
+    public init(id: String, filename: String, size: UInt64, mimeType: String, uploadedAt: String, uploadedBy: UInt32) {
+        self.id = id
+        self.filename = filename
+        self.size = size
+        self.mimeType = mimeType
+        self.uploadedAt = uploadedAt
+        self.uploadedBy = uploadedBy
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.filename = try container.decode(String.self, forKey: .filename)
+        self.size = try container.decode(UInt64.self, forKey: .size)
+        self.mimeType = try container.decode(String.self, forKey: .mimeType)
+        self.uploadedAt = try container.decode(String.self, forKey: .uploadedAt)
+        self.uploadedBy = try container.decode(UInt32.self, forKey: .uploadedBy)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(filename, forKey: .filename)
+        try container.encode(size, forKey: .size)
+        try container.encode(mimeType, forKey: .mimeType)
+        try container.encode(uploadedAt, forKey: .uploadedAt)
+        try container.encode(uploadedBy, forKey: .uploadedBy)
+    }
 }
 
 /// Data sharing settings
-public struct DataSharing: Codable {
+public struct DataSharing: Codable, Sendable {
     public let analytics: Bool
     public let marketing: Bool
     public let thirdParty: Bool
@@ -62,10 +123,33 @@ public struct DataSharing: Codable {
         case thirdParty = "third_party"
         case research = "research"
     }
+
+    public init(analytics: Bool, marketing: Bool, thirdParty: Bool, research: Bool) {
+        self.analytics = analytics
+        self.marketing = marketing
+        self.thirdParty = thirdParty
+        self.research = research
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.analytics = try container.decode(Bool.self, forKey: .analytics)
+        self.marketing = try container.decode(Bool.self, forKey: .marketing)
+        self.thirdParty = try container.decode(Bool.self, forKey: .thirdParty)
+        self.research = try container.decode(Bool.self, forKey: .research)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(analytics, forKey: .analytics)
+        try container.encode(marketing, forKey: .marketing)
+        try container.encode(thirdParty, forKey: .thirdParty)
+        try container.encode(research, forKey: .research)
+    }
 }
 
 /// Display settings
-public struct DisplaySettings: Codable {
+public struct DisplaySettings: Codable, Sendable {
     public let itemsPerPage: UInt32
     public let dateFormat: String
     public let timeFormat: String
@@ -79,27 +163,80 @@ public struct DisplaySettings: Codable {
         case currency = "currency"
         case compactMode = "compact_mode"
     }
+
+    public init(itemsPerPage: UInt32, dateFormat: String, timeFormat: String, currency: String, compactMode: Bool) {
+        self.itemsPerPage = itemsPerPage
+        self.dateFormat = dateFormat
+        self.timeFormat = timeFormat
+        self.currency = currency
+        self.compactMode = compactMode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.itemsPerPage = try container.decode(UInt32.self, forKey: .itemsPerPage)
+        self.dateFormat = try container.decode(String.self, forKey: .dateFormat)
+        self.timeFormat = try container.decode(String.self, forKey: .timeFormat)
+        self.currency = try container.decode(String.self, forKey: .currency)
+        self.compactMode = try container.decode(Bool.self, forKey: .compactMode)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(itemsPerPage, forKey: .itemsPerPage)
+        try container.encode(dateFormat, forKey: .dateFormat)
+        try container.encode(timeFormat, forKey: .timeFormat)
+        try container.encode(currency, forKey: .currency)
+        try container.encode(compactMode, forKey: .compactMode)
+    }
+}
+
+public struct Duration: Codable, Sendable {
+    public let secs: UInt64
+    public let nanos: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case secs = "secs"
+        case nanos = "nanos"
+    }
+
+    public init(secs: UInt64, nanos: UInt32) {
+        self.secs = secs
+        self.nanos = nanos
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.secs = try container.decode(UInt64.self, forKey: .secs)
+        self.nanos = try container.decode(UInt32.self, forKey: .nanos)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(secs, forKey: .secs)
+        try container.encode(nanos, forKey: .nanos)
+    }
 }
 
 /// Health status enum
-public enum HealthStatus: Codable {
-    case healthy
-    case degraded
-    case unhealthy
-    case unknown
+public enum HealthStatus: String, Codable, Sendable {
+    case healthy = "Healthy"
+    case degraded = "Degraded"
+    case unhealthy = "Unhealthy"
+    case unknown = "Unknown"
 }
 
 /// Notification frequency enum
-public enum NotificationFrequency: Codable {
-    case immediate
-    case hourly
-    case daily
-    case weekly
-    case never
+public enum NotificationFrequency: String, Codable, Sendable {
+    case immediate = "Immediate"
+    case hourly = "Hourly"
+    case daily = "Daily"
+    case weekly = "Weekly"
+    case never = "Never"
 }
 
 /// Notification settings
-public struct NotificationSettings: Codable {
+public struct NotificationSettings: Codable, Sendable {
     public let emailEnabled: Bool
     public let pushEnabled: Bool
     public let smsEnabled: Bool
@@ -113,10 +250,36 @@ public struct NotificationSettings: Codable {
         case desktopEnabled = "desktop_enabled"
         case frequency = "frequency"
     }
+
+    public init(emailEnabled: Bool, pushEnabled: Bool, smsEnabled: Bool, desktopEnabled: Bool, frequency: NotificationFrequency) {
+        self.emailEnabled = emailEnabled
+        self.pushEnabled = pushEnabled
+        self.smsEnabled = smsEnabled
+        self.desktopEnabled = desktopEnabled
+        self.frequency = frequency
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.emailEnabled = try container.decode(Bool.self, forKey: .emailEnabled)
+        self.pushEnabled = try container.decode(Bool.self, forKey: .pushEnabled)
+        self.smsEnabled = try container.decode(Bool.self, forKey: .smsEnabled)
+        self.desktopEnabled = try container.decode(Bool.self, forKey: .desktopEnabled)
+        self.frequency = try container.decode(NotificationFrequency.self, forKey: .frequency)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(emailEnabled, forKey: .emailEnabled)
+        try container.encode(pushEnabled, forKey: .pushEnabled)
+        try container.encode(smsEnabled, forKey: .smsEnabled)
+        try container.encode(desktopEnabled, forKey: .desktopEnabled)
+        try container.encode(frequency, forKey: .frequency)
+    }
 }
 
 /// Pagination information
-public struct PaginationInfo: Codable {
+public struct PaginationInfo: Codable, Sendable {
     public let page: UInt32
     public let perPage: UInt32
     public let totalPages: UInt32
@@ -132,19 +295,48 @@ public struct PaginationInfo: Codable {
         case hasNext = "has_next"
         case hasPrev = "has_prev"
     }
+
+    public init(page: UInt32, perPage: UInt32, totalPages: UInt32, totalItems: UInt64, hasNext: Bool, hasPrev: Bool) {
+        self.page = page
+        self.perPage = perPage
+        self.totalPages = totalPages
+        self.totalItems = totalItems
+        self.hasNext = hasNext
+        self.hasPrev = hasPrev
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.page = try container.decode(UInt32.self, forKey: .page)
+        self.perPage = try container.decode(UInt32.self, forKey: .perPage)
+        self.totalPages = try container.decode(UInt32.self, forKey: .totalPages)
+        self.totalItems = try container.decode(UInt64.self, forKey: .totalItems)
+        self.hasNext = try container.decode(Bool.self, forKey: .hasNext)
+        self.hasPrev = try container.decode(Bool.self, forKey: .hasPrev)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(page, forKey: .page)
+        try container.encode(perPage, forKey: .perPage)
+        try container.encode(totalPages, forKey: .totalPages)
+        try container.encode(totalItems, forKey: .totalItems)
+        try container.encode(hasNext, forKey: .hasNext)
+        try container.encode(hasPrev, forKey: .hasPrev)
+    }
 }
 
 /// Priority enum (string enum)
-public enum Priority: Codable {
-    case low
-    case medium
-    case high
-    case critical
-    case emergency
+public enum Priority: String, Codable, Sendable {
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+    case critical = "Critical"
+    case emergency = "Emergency"
 }
 
 /// Privacy settings
-public struct PrivacySettings: Codable {
+public struct PrivacySettings: Codable, Sendable {
     public let profileVisibility: Visibility
     public let activityVisibility: Visibility
     public let dataSharing: DataSharing
@@ -154,13 +346,33 @@ public struct PrivacySettings: Codable {
         case activityVisibility = "activity_visibility"
         case dataSharing = "data_sharing"
     }
+
+    public init(profileVisibility: Visibility, activityVisibility: Visibility, dataSharing: DataSharing) {
+        self.profileVisibility = profileVisibility
+        self.activityVisibility = activityVisibility
+        self.dataSharing = dataSharing
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.profileVisibility = try container.decode(Visibility.self, forKey: .profileVisibility)
+        self.activityVisibility = try container.decode(Visibility.self, forKey: .activityVisibility)
+        self.dataSharing = try container.decode(DataSharing.self, forKey: .dataSharing)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(profileVisibility, forKey: .profileVisibility)
+        try container.encode(activityVisibility, forKey: .activityVisibility)
+        try container.encode(dataSharing, forKey: .dataSharing)
+    }
 }
 
 /// Response metadata
-public struct ResponseMetadata: Codable {
+public struct ResponseMetadata: Codable, Sendable {
     public let requestId: String
     public let timestamp: String
-    public let processingTime: RustDuration
+    public let processingTime: Duration
     public let version: String
     public let pagination: PaginationInfo?
 
@@ -171,22 +383,48 @@ public struct ResponseMetadata: Codable {
         case version = "version"
         case pagination = "pagination"
     }
+
+    public init(requestId: String, timestamp: String, processingTime: Duration, version: String, pagination: PaginationInfo?) {
+        self.requestId = requestId
+        self.timestamp = timestamp
+        self.processingTime = processingTime
+        self.version = version
+        self.pagination = pagination
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.requestId = try container.decode(String.self, forKey: .requestId)
+        self.timestamp = try container.decode(String.self, forKey: .timestamp)
+        self.processingTime = try container.decode(Duration.self, forKey: .processingTime)
+        self.version = try container.decode(String.self, forKey: .version)
+        self.pagination = try container.decodeIfPresent(PaginationInfo.self, forKey: .pagination)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(requestId, forKey: .requestId)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(processingTime, forKey: .processingTime)
+        try container.encode(version, forKey: .version)
+        try container.encode(pagination, forKey: .pagination)
+    }
 }
 
 /// Response status enum
-public enum ResponseStatus: Codable {
-    case success
-    case partialSuccess
-    case error
-    case validationError
-    case authenticationError
-    case authorizationError
-    case notFound
-    case rateLimited
+public enum ResponseStatus: String, Codable, Sendable {
+    case success = "Success"
+    case partialSuccess = "PartialSuccess"
+    case error = "Error"
+    case validationError = "ValidationError"
+    case authenticationError = "AuthenticationError"
+    case authorizationError = "AuthorizationError"
+    case notFound = "NotFound"
+    case rateLimited = "RateLimited"
 }
 
 /// Review comment
-public struct ReviewComment: Codable {
+public struct ReviewComment: Codable, Sendable {
     public let id: UInt32
     public let author: UInt32
     public let content: String
@@ -206,13 +444,48 @@ public struct ReviewComment: Codable {
         case parentComment = "parent_comment"
         case attachments = "attachments"
     }
+
+    public init(id: UInt32, author: UInt32, content: String, createdAt: String, updatedAt: String, isResolved: Bool, parentComment: UInt32?, attachments: [Attachment]) {
+        self.id = id
+        self.author = author
+        self.content = content
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.isResolved = isResolved
+        self.parentComment = parentComment
+        self.attachments = attachments
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.author = try container.decode(UInt32.self, forKey: .author)
+        self.content = try container.decode(String.self, forKey: .content)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        self.isResolved = try container.decode(Bool.self, forKey: .isResolved)
+        self.parentComment = try container.decodeIfPresent(UInt32.self, forKey: .parentComment)
+        self.attachments = try container.decode([Attachment].self, forKey: .attachments)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(author, forKey: .author)
+        try container.encode(content, forKey: .content)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(isResolved, forKey: .isResolved)
+        try container.encode(parentComment, forKey: .parentComment)
+        try container.encode(attachments, forKey: .attachments)
+    }
 }
 
 /// Service status
-public struct ServiceStatus: Codable {
+public struct ServiceStatus: Codable, Sendable {
     public let name: String
     public let status: HealthStatus
-    public let responseTime: RustDuration
+    public let responseTime: Duration
     public let lastCheck: String
     public let errorCount: UInt32
 
@@ -223,16 +496,42 @@ public struct ServiceStatus: Codable {
         case lastCheck = "last_check"
         case errorCount = "error_count"
     }
+
+    public init(name: String, status: HealthStatus, responseTime: Duration, lastCheck: String, errorCount: UInt32) {
+        self.name = name
+        self.status = status
+        self.responseTime = responseTime
+        self.lastCheck = lastCheck
+        self.errorCount = errorCount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.status = try container.decode(HealthStatus.self, forKey: .status)
+        self.responseTime = try container.decode(Duration.self, forKey: .responseTime)
+        self.lastCheck = try container.decode(String.self, forKey: .lastCheck)
+        self.errorCount = try container.decode(UInt32.self, forKey: .errorCount)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(status, forKey: .status)
+        try container.encode(responseTime, forKey: .responseTime)
+        try container.encode(lastCheck, forKey: .lastCheck)
+        try container.encode(errorCount, forKey: .errorCount)
+    }
 }
 
 /// Subtask with timing information
-public struct SubTask: Codable {
+public struct SubTask: Codable, Sendable {
     public let id: UInt32
     public let title: String
     public let description: String?
     public let status: SubTaskStatus
-    public let estimatedDuration: RustDuration
-    public let actualDuration: RustDuration?
+    public let estimatedDuration: Duration
+    public let actualDuration: Duration?
     public let assignee: UInt32?
     public let createdAt: String
     public let completedAt: String?
@@ -248,20 +547,58 @@ public struct SubTask: Codable {
         case createdAt = "created_at"
         case completedAt = "completed_at"
     }
+
+    public init(id: UInt32, title: String, description: String?, status: SubTaskStatus, estimatedDuration: Duration, actualDuration: Duration?, assignee: UInt32?, createdAt: String, completedAt: String?) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.status = status
+        self.estimatedDuration = estimatedDuration
+        self.actualDuration = actualDuration
+        self.assignee = assignee
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.status = try container.decode(SubTaskStatus.self, forKey: .status)
+        self.estimatedDuration = try container.decode(Duration.self, forKey: .estimatedDuration)
+        self.actualDuration = try container.decodeIfPresent(Duration.self, forKey: .actualDuration)
+        self.assignee = try container.decodeIfPresent(UInt32.self, forKey: .assignee)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(description, forKey: .description)
+        try container.encode(status, forKey: .status)
+        try container.encode(estimatedDuration, forKey: .estimatedDuration)
+        try container.encode(actualDuration, forKey: .actualDuration)
+        try container.encode(assignee, forKey: .assignee)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(completedAt, forKey: .completedAt)
+    }
 }
 
 /// Subtask status (simple enum)
-public enum SubTaskStatus: Codable {
-    case pending
-    case inProgress
-    case completed
-    case skipped
+public enum SubTaskStatus: String, Codable, Sendable {
+    case pending = "Pending"
+    case inProgress = "InProgress"
+    case completed = "Completed"
+    case skipped = "Skipped"
 }
 
 /// System health information
-public struct SystemHealth: Codable {
+public struct SystemHealth: Codable, Sendable {
     public let status: HealthStatus
-    public let uptime: RustDuration
+    public let uptime: Duration
     public let lastCheck: String
     public let services: [ServiceStatus]
     public let metrics: SystemMetrics
@@ -273,10 +610,36 @@ public struct SystemHealth: Codable {
         case services = "services"
         case metrics = "metrics"
     }
+
+    public init(status: HealthStatus, uptime: Duration, lastCheck: String, services: [ServiceStatus], metrics: SystemMetrics) {
+        self.status = status
+        self.uptime = uptime
+        self.lastCheck = lastCheck
+        self.services = services
+        self.metrics = metrics
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.status = try container.decode(HealthStatus.self, forKey: .status)
+        self.uptime = try container.decode(Duration.self, forKey: .uptime)
+        self.lastCheck = try container.decode(String.self, forKey: .lastCheck)
+        self.services = try container.decode([ServiceStatus].self, forKey: .services)
+        self.metrics = try container.decode(SystemMetrics.self, forKey: .metrics)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(status, forKey: .status)
+        try container.encode(uptime, forKey: .uptime)
+        try container.encode(lastCheck, forKey: .lastCheck)
+        try container.encode(services, forKey: .services)
+        try container.encode(metrics, forKey: .metrics)
+    }
 }
 
 /// System metrics
-public struct SystemMetrics: Codable {
+public struct SystemMetrics: Codable, Sendable {
     public let cpuUsage: Double
     public let memoryUsage: Double
     public let diskUsage: Double
@@ -294,6 +657,38 @@ public struct SystemMetrics: Codable {
         case totalRequests = "total_requests"
         case errorRate = "error_rate"
     }
+
+    public init(cpuUsage: Double, memoryUsage: Double, diskUsage: Double, networkUsage: Double, activeUsers: UInt32, totalRequests: UInt64, errorRate: Double) {
+        self.cpuUsage = cpuUsage
+        self.memoryUsage = memoryUsage
+        self.diskUsage = diskUsage
+        self.networkUsage = networkUsage
+        self.activeUsers = activeUsers
+        self.totalRequests = totalRequests
+        self.errorRate = errorRate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.cpuUsage = try container.decode(Double.self, forKey: .cpuUsage)
+        self.memoryUsage = try container.decode(Double.self, forKey: .memoryUsage)
+        self.diskUsage = try container.decode(Double.self, forKey: .diskUsage)
+        self.networkUsage = try container.decode(Double.self, forKey: .networkUsage)
+        self.activeUsers = try container.decode(UInt32.self, forKey: .activeUsers)
+        self.totalRequests = try container.decode(UInt64.self, forKey: .totalRequests)
+        self.errorRate = try container.decode(Double.self, forKey: .errorRate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(cpuUsage, forKey: .cpuUsage)
+        try container.encode(memoryUsage, forKey: .memoryUsage)
+        try container.encode(diskUsage, forKey: .diskUsage)
+        try container.encode(networkUsage, forKey: .networkUsage)
+        try container.encode(activeUsers, forKey: .activeUsers)
+        try container.encode(totalRequests, forKey: .totalRequests)
+        try container.encode(errorRate, forKey: .errorRate)
+    }
 }
 
 /// Comprehensive demonstration of ALL specta-swift functionality
@@ -301,8 +696,9 @@ public struct SystemMetrics: Codable {
 /// This example showcases every feature and capability of specta-swift in a single,
 /// realistic application scenario. It demonstrates complex type relationships,
 /// various enum patterns, special types, and advanced features.
+/// 
 /// Main application types for a task management system
-public struct Task: Codable {
+public struct Task: Codable, Sendable {
     public let id: UInt32
     public let title: String
     public let description: String?
@@ -312,7 +708,7 @@ public struct Task: Codable {
     public let createdAt: String
     public let updatedAt: String
     public let dueDate: String?
-    public let duration: RustDuration?
+    public let duration: Duration?
     public let tags: [String]
     public let metadata: TaskMetadata
     public let subtasks: [SubTask]
@@ -332,10 +728,60 @@ public struct Task: Codable {
         case metadata = "metadata"
         case subtasks = "subtasks"
     }
+
+    public init(id: UInt32, title: String, description: String?, status: TaskStatus, priority: Priority, assignee: User?, createdAt: String, updatedAt: String, dueDate: String?, duration: Duration?, tags: [String], metadata: TaskMetadata, subtasks: [SubTask]) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.status = status
+        self.priority = priority
+        self.assignee = assignee
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.dueDate = dueDate
+        self.duration = duration
+        self.tags = tags
+        self.metadata = metadata
+        self.subtasks = subtasks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.status = try container.decode(TaskStatus.self, forKey: .status)
+        self.priority = try container.decode(Priority.self, forKey: .priority)
+        self.assignee = try container.decodeIfPresent(User.self, forKey: .assignee)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+        self.updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+        self.duration = try container.decodeIfPresent(Duration.self, forKey: .duration)
+        self.tags = try container.decode([String].self, forKey: .tags)
+        self.metadata = try container.decode(TaskMetadata.self, forKey: .metadata)
+        self.subtasks = try container.decode([SubTask].self, forKey: .subtasks)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(description, forKey: .description)
+        try container.encode(status, forKey: .status)
+        try container.encode(priority, forKey: .priority)
+        try container.encode(assignee, forKey: .assignee)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(dueDate, forKey: .dueDate)
+        try container.encode(duration, forKey: .duration)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(metadata, forKey: .metadata)
+        try container.encode(subtasks, forKey: .subtasks)
+    }
 }
 
 /// Task metadata
-public struct TaskMetadata: Codable {
+public struct TaskMetadata: Codable, Sendable {
     public let createdBy: UInt32
     public let lastModifiedBy: UInt32
     public let version: UInt32
@@ -353,10 +799,42 @@ public struct TaskMetadata: Codable {
         case watchers = "watchers"
         case dependencies = "dependencies"
     }
+
+    public init(createdBy: UInt32, lastModifiedBy: UInt32, version: UInt32, customFields: [(String, String)], attachments: [Attachment], watchers: [UInt32], dependencies: [UInt32]) {
+        self.createdBy = createdBy
+        self.lastModifiedBy = lastModifiedBy
+        self.version = version
+        self.customFields = customFields
+        self.attachments = attachments
+        self.watchers = watchers
+        self.dependencies = dependencies
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.createdBy = try container.decode(UInt32.self, forKey: .createdBy)
+        self.lastModifiedBy = try container.decode(UInt32.self, forKey: .lastModifiedBy)
+        self.version = try container.decode(UInt32.self, forKey: .version)
+        self.customFields = try container.decode([(String, String)].self, forKey: .customFields)
+        self.attachments = try container.decode([Attachment].self, forKey: .attachments)
+        self.watchers = try container.decode([UInt32].self, forKey: .watchers)
+        self.dependencies = try container.decode([UInt32].self, forKey: .dependencies)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(createdBy, forKey: .createdBy)
+        try container.encode(lastModifiedBy, forKey: .lastModifiedBy)
+        try container.encode(version, forKey: .version)
+        try container.encode(customFields, forKey: .customFields)
+        try container.encode(attachments, forKey: .attachments)
+        try container.encode(watchers, forKey: .watchers)
+        try container.encode(dependencies, forKey: .dependencies)
+    }
 }
 
 /// Task status enum with mixed variants
-public enum TaskStatus {
+public enum TaskStatus: Sendable {
     case todo
     case inProgress(TaskStatusInProgressData)
     case blocked(TaskStatusBlockedData)
@@ -364,7 +842,7 @@ public enum TaskStatus {
     case completed(TaskStatusCompletedData)
     case cancelled(TaskStatusCancelledData)
 }
-public struct TaskStatusInProgressData: Codable {
+public struct TaskStatusInProgressData: Codable, Sendable {
     public let startedAt: String
     public let estimatedCompletion: String?
     public let progress: Float
@@ -376,7 +854,7 @@ public struct TaskStatusInProgressData: Codable {
     }
 }
 
-public struct TaskStatusBlockedData: Codable {
+public struct TaskStatusBlockedData: Codable, Sendable {
     public let reason: String
     public let blockedBy: [UInt32]
     public let estimatedUnblock: String?
@@ -388,7 +866,7 @@ public struct TaskStatusBlockedData: Codable {
     }
 }
 
-public struct TaskStatusReviewData: Codable {
+public struct TaskStatusReviewData: Codable, Sendable {
     public let reviewer: String
     public let reviewStartedAt: String
     public let comments: [ReviewComment]
@@ -400,9 +878,9 @@ public struct TaskStatusReviewData: Codable {
     }
 }
 
-public struct TaskStatusCompletedData: Codable {
+public struct TaskStatusCompletedData: Codable, Sendable {
     public let completedAt: String
-    public let completionTime: RustDuration
+    public let completionTime: Duration
     public let finalNotes: String?
 
     private enum CodingKeys: String, CodingKey {
@@ -412,7 +890,7 @@ public struct TaskStatusCompletedData: Codable {
     }
 }
 
-public struct TaskStatusCancelledData: Codable {
+public struct TaskStatusCancelledData: Codable, Sendable {
     public let reason: String
     public let cancelledAt: String
 
@@ -434,6 +912,16 @@ extension TaskStatus: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Todo":
+                self = .todo
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -465,20 +953,24 @@ extension TaskStatus: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .todo:
-            try container.encodeNil(forKey: .todo)
+            var container = encoder.singleValueContainer()
+            try container.encode("Todo")
         case .inProgress(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .inProgress)
         case .blocked(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .blocked)
         case .review(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .review)
         case .completed(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .completed)
         case .cancelled(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .cancelled)
         }
     }
@@ -486,15 +978,15 @@ extension TaskStatus: Codable {
 
 
 /// Theme enum (string enum)
-public enum Theme: Codable {
-    case light
-    case dark
-    case auto
-    case custom
+public enum Theme: String, Codable, Sendable {
+    case light = "Light"
+    case dark = "Dark"
+    case auto = "Auto"
+    case custom = "Custom"
 }
 
 /// User information
-public struct User: Codable {
+public struct User: Codable, Sendable {
     public let id: UInt32
     public let username: String
     public let email: String
@@ -516,18 +1008,86 @@ public struct User: Codable {
         case lastLogin = "last_login"
         case createdAt = "created_at"
     }
+
+    public init(id: UInt32, username: String, email: String, profile: UserProfile, preferences: UserPreferences, role: UserRole, isActive: Bool, lastLogin: String?, createdAt: String) {
+        self.id = id
+        self.username = username
+        self.email = email
+        self.profile = profile
+        self.preferences = preferences
+        self.role = role
+        self.isActive = isActive
+        self.lastLogin = lastLogin
+        self.createdAt = createdAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UInt32.self, forKey: .id)
+        self.username = try container.decode(String.self, forKey: .username)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.profile = try container.decode(UserProfile.self, forKey: .profile)
+        self.preferences = try container.decode(UserPreferences.self, forKey: .preferences)
+        self.role = try container.decode(UserRole.self, forKey: .role)
+        self.isActive = try container.decode(Bool.self, forKey: .isActive)
+        self.lastLogin = try container.decodeIfPresent(String.self, forKey: .lastLogin)
+        self.createdAt = try container.decode(String.self, forKey: .createdAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(username, forKey: .username)
+        try container.encode(email, forKey: .email)
+        try container.encode(profile, forKey: .profile)
+        try container.encode(preferences, forKey: .preferences)
+        try container.encode(role, forKey: .role)
+        try container.encode(isActive, forKey: .isActive)
+        try container.encode(lastLogin, forKey: .lastLogin)
+        try container.encode(createdAt, forKey: .createdAt)
+    }
 }
 
 /// User preferences
-public struct UserPreferences: Codable {
+public struct UserPreferences: Codable, Sendable {
     public let theme: Theme
     public let notifications: NotificationSettings
     public let privacy: PrivacySettings
     public let display: DisplaySettings
+
+    private enum CodingKeys: String, CodingKey {
+        case theme = "theme"
+        case notifications = "notifications"
+        case privacy = "privacy"
+        case display = "display"
+    }
+
+    public init(theme: Theme, notifications: NotificationSettings, privacy: PrivacySettings, display: DisplaySettings) {
+        self.theme = theme
+        self.notifications = notifications
+        self.privacy = privacy
+        self.display = display
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.theme = try container.decode(Theme.self, forKey: .theme)
+        self.notifications = try container.decode(NotificationSettings.self, forKey: .notifications)
+        self.privacy = try container.decode(PrivacySettings.self, forKey: .privacy)
+        self.display = try container.decode(DisplaySettings.self, forKey: .display)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(notifications, forKey: .notifications)
+        try container.encode(privacy, forKey: .privacy)
+        try container.encode(display, forKey: .display)
+    }
 }
 
 /// User profile with nested data
-public struct UserProfile: Codable {
+public struct UserProfile: Codable, Sendable {
     public let firstName: String
     public let lastName: String
     public let bio: String?
@@ -543,21 +1103,50 @@ public struct UserProfile: Codable {
         case timezone = "timezone"
         case language = "language"
     }
+
+    public init(firstName: String, lastName: String, bio: String?, avatarUrl: String?, timezone: String, language: String) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.bio = bio
+        self.avatarUrl = avatarUrl
+        self.timezone = timezone
+        self.language = language
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.firstName = try container.decode(String.self, forKey: .firstName)
+        self.lastName = try container.decode(String.self, forKey: .lastName)
+        self.bio = try container.decodeIfPresent(String.self, forKey: .bio)
+        self.avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
+        self.timezone = try container.decode(String.self, forKey: .timezone)
+        self.language = try container.decode(String.self, forKey: .language)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(firstName, forKey: .firstName)
+        try container.encode(lastName, forKey: .lastName)
+        try container.encode(bio, forKey: .bio)
+        try container.encode(avatarUrl, forKey: .avatarUrl)
+        try container.encode(timezone, forKey: .timezone)
+        try container.encode(language, forKey: .language)
+    }
 }
 
 /// User role with permissions
-public enum UserRole {
+public enum UserRole: Sendable {
     case user
     case moderator(UserRoleModeratorData)
     case admin(UserRoleAdminData)
     case superAdmin(UserRoleSuperAdminData)
 }
-public struct UserRoleModeratorData: Codable {
+public struct UserRoleModeratorData: Codable, Sendable {
     public let permissions: [String]
     public let department: String
 }
 
-public struct UserRoleAdminData: Codable {
+public struct UserRoleAdminData: Codable, Sendable {
     public let level: AdminLevel
     public let departments: [String]
     public let specialAccess: [String]
@@ -569,7 +1158,7 @@ public struct UserRoleAdminData: Codable {
     }
 }
 
-public struct UserRoleSuperAdminData: Codable {
+public struct UserRoleSuperAdminData: Codable, Sendable {
     public let systemAccess: Bool
     public let auditLogs: Bool
 
@@ -589,6 +1178,16 @@ extension UserRole: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "User":
+                self = .user
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -614,16 +1213,18 @@ extension UserRole: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .user:
-            try container.encodeNil(forKey: .user)
+            var container = encoder.singleValueContainer()
+            try container.encode("User")
         case .moderator(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .moderator)
         case .admin(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .admin)
         case .superAdmin(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .superAdmin)
         }
     }
@@ -631,10 +1232,10 @@ extension UserRole: Codable {
 
 
 /// Visibility enum
-public enum Visibility: Codable {
-    case public
-    case friends
-    case private
-    case hidden
+public enum Visibility: String, Codable, Sendable {
+    case `public` = "Public"
+    case friends = "Friends"
+    case `private` = "Private"
+    case hidden = "Hidden"
 }
 

@@ -7,7 +7,7 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Enum, Field, NamedDataType, Struct},
 };
-use specta_swift::Swift;
+use specta_swift::{GenericStyle, Swift};
 use tempfile::TempDir;
 
 struct IdentityFormat;
@@ -309,7 +309,7 @@ fn swift_adjacent_empty_struct_variant() {
         "{rendered}"
     );
     assert!(
-        rendered.contains("public struct AdjacentEmptyEmptystructData: Codable {"),
+        rendered.contains("public struct AdjacentEmptyEmptystructData: Codable, Sendable {"),
         "{rendered}"
     );
 }
@@ -665,7 +665,7 @@ fn swift_tagged_unit_enum_has_no_raw_type() {
         .unwrap();
 
     assert!(
-        rendered.contains("public enum TaggedUnitEnum {"),
+        rendered.contains("public enum TaggedUnitEnum: Sendable {"),
         "{rendered}"
     );
     assert!(
@@ -701,7 +701,7 @@ fn swift_unknown_variants_round_trip() {
         "{exported}"
     );
     assert!(
-        exported.contains("public enum JSONValue: Codable, Equatable {"),
+        exported.contains("public enum JSONValue: Codable, Equatable, Sendable {"),
         "{exported}"
     );
 
@@ -1463,7 +1463,7 @@ fn swift_newtype_and_tuple_structs_round_trip() {
         .expect("newtype and tuple structs should export");
 
     assert!(
-        exported.contains("public struct SwiftNewtype: Codable {"),
+        exported.contains("public struct SwiftNewtype: Codable, Sendable {"),
         "{exported}"
     );
     assert!(
@@ -1484,6 +1484,207 @@ fn swift_newtype_and_tuple_structs_round_trip() {
     );
     let harness = format!("{}\n{SWIFT_ROUND_TRIP_HARNESS}", swift_fixtures());
     run_swift(&exported, &harness);
+}
+
+/// A generic type used to be emitted with unconstrained parameters and its
+/// variant wrapper structs referred to `T` without declaring it, so nothing in
+/// the generic path compiled. Generic parameters now carry the `Codable` bound
+/// their declaration needs, and the wrappers repeat them.
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericBox<T> {
+    value: T,
+    label: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum SwiftGenericTagged<T> {
+    Data { value: T },
+    Unit,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+enum SwiftGenericExternal<T> {
+    Wrapped(T),
+    Named { value: T },
+    Nothing,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "t", content = "c")]
+enum SwiftGenericAdjacent<T> {
+    Data { value: T },
+    Unit,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericNewtype<T>(T);
+
+#[derive(Type, Serialize, Deserialize)]
+struct SwiftGenericTuple<T>(T, String);
+
+#[test]
+fn swift_generic_types_round_trip() {
+    let types = Types::default()
+        .register::<SwiftGenericBox<String>>()
+        .register::<SwiftGenericTagged<u32>>()
+        .register::<SwiftGenericExternal<String>>()
+        .register::<SwiftGenericAdjacent<u32>>()
+        .register::<SwiftGenericNewtype<u32>>()
+        .register::<SwiftGenericTuple<u32>>();
+    let exported = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect("generic types should export");
+
+    assert!(
+        exported.contains("public struct SwiftGenericBox<T: Codable>: Codable {"),
+        "a generic struct needs a `Codable` bound on its parameter:\n{exported}"
+    );
+    assert!(
+        exported.contains("public enum SwiftGenericTagged<T: Codable> {"),
+        "{exported}"
+    );
+    assert!(
+        exported.contains("public struct SwiftGenericTaggedDataData<T: Codable>: Codable {"),
+        "a variant wrapper struct must declare the enum's parameters:\n{exported}"
+    );
+    assert!(
+        exported.contains("case data(SwiftGenericTaggedDataData<T>)"),
+        "a case payload must pass the parameters through:\n{exported}"
+    );
+    assert!(
+        exported.contains("case data(SwiftGenericAdjacentDataData<T>)"),
+        "an adjacent content payload passes them through too:\n{exported}"
+    );
+    assert!(
+        exported.contains("extension SwiftGenericBox: Sendable where T: Sendable {}"),
+        "the conformance stays conditional so a non-Sendable payload still decodes:\n{exported}"
+    );
+
+    let harness = r#"
+import Foundation
+
+let decoder = JSONDecoder()
+let encoder = JSONEncoder()
+
+let box = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+precondition(box.value == "hi" && box.label == "box")
+let roundTripped = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: try encoder.encode(box)
+)
+precondition(roundTripped.value == "hi")
+
+let tagged = try decoder.decode(
+    SwiftGenericTagged<UInt32>.self,
+    from: Data("{\"type\":\"Data\",\"value\":7}".utf8)
+)
+guard case .data(let payload) = tagged else { preconditionFailure("tagged payload") }
+precondition(payload.value == 7)
+
+let external = try decoder.decode(
+    SwiftGenericExternal<String>.self,
+    from: Data("{\"Named\":{\"value\":\"named\"}}".utf8)
+)
+guard case .named(let named) = external else { preconditionFailure("named payload") }
+precondition(named.value == "named")
+
+let wrapped = try decoder.decode(
+    SwiftGenericExternal<String>.self,
+    from: Data("{\"Wrapped\":\"wrapped\"}".utf8)
+)
+guard case .wrapped(let value) = wrapped else { preconditionFailure("wrapped payload") }
+precondition(value == "wrapped")
+
+let adjacent = try decoder.decode(
+    SwiftGenericAdjacent<UInt32>.self,
+    from: Data("{\"t\":\"Data\",\"c\":{\"value\":9}}".utf8)
+)
+guard case .data(let adjacentPayload) = adjacent else {
+    preconditionFailure("adjacent payload")
+}
+precondition(adjacentPayload.value == 9)
+
+let newtype = try decoder.decode(
+    SwiftGenericNewtype<UInt32>.self,
+    from: Data("5".utf8)
+)
+precondition(newtype.value == 5)
+
+let tuple = try decoder.decode(
+    SwiftGenericTuple<UInt32>.self,
+    from: Data("[6,\"six\"]".utf8)
+)
+precondition(tuple.field0 == 6 && tuple.field1 == "six")
+
+print("SWIFT-OK")
+"#;
+    run_swift(&exported, harness);
+}
+
+/// The `where`-style generic bound and the configured protocols produce
+/// declarations that compile and behave, including through `JSONValue`.
+#[test]
+fn swift_typealias_generics_and_protocols_round_trip() {
+    let types = Types::default()
+        .register::<SwiftGenericBox<String>>()
+        .register::<SwiftGenericTagged<u32>>();
+    let exported = Swift::default()
+        .generics(GenericStyle::Typealias)
+        .add_protocol("Equatable")
+        .add_protocol("Hashable")
+        .unknown_variants(true)
+        .export(&types, specta_serde::Format)
+        .expect("generic types should export");
+
+    assert!(
+        exported.contains(
+            "public struct SwiftGenericBox<T>: Codable, Equatable, Hashable \
+             where T: Codable & Equatable & Hashable {"
+        ),
+        "{exported}"
+    );
+    assert!(
+        exported.contains(
+            "public enum SwiftGenericTagged<T>: Equatable, Hashable \
+             where T: Codable & Equatable & Hashable {"
+        ),
+        "{exported}"
+    );
+    assert!(
+        exported.contains("public enum JSONValue: Codable, Equatable, Sendable, Hashable {"),
+        "the helper keeps `Equatable` once and gains the configured protocol:\n{exported}"
+    );
+
+    let harness = r#"
+import Foundation
+
+let decoder = JSONDecoder()
+
+let first = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+let second = try decoder.decode(
+    SwiftGenericBox<String>.self,
+    from: Data("{\"value\":\"hi\",\"label\":\"box\"}".utf8)
+)
+precondition(first == second)
+precondition(first.hashValue == second.hashValue)
+
+let unknown = try decoder.decode(
+    SwiftGenericTagged<UInt32>.self,
+    from: Data("{\"type\":\"Future\",\"value\":1}".utf8)
+)
+guard case .unknown(let tag, _) = unknown else { preconditionFailure("unknown variant") }
+precondition(tag == "Future")
+
+print("SWIFT-OK")
+"#;
+    run_swift(&exported, harness);
 }
 
 /// `PhasesFormat` splits a struct whose serialize and deserialize shapes differ
@@ -1517,7 +1718,7 @@ fn swift_phase_split_structs_round_trip() {
         "SwiftNewtypeOptDeserialize",
     ] {
         assert!(
-            exported.contains(&format!("public struct {name}: Codable {{")),
+            exported.contains(&format!("public struct {name}: Codable, Sendable {{")),
             "expected the split phase type `{name}`:\n{exported}"
         );
     }
@@ -1846,7 +2047,7 @@ fn swift_named_struct_phase_split_round_trip() {
         "SwiftNamedNestedOptionalDeserialize",
     ] {
         assert!(
-            exported.contains(&format!("public struct {name}: Codable {{")),
+            exported.contains(&format!("public struct {name}: Codable, Sendable {{")),
             "expected the split phase type `{name}`:\n{exported}"
         );
     }
@@ -2068,7 +2269,7 @@ fn swift_named_override_nullable_matches_serde() {
         .export(&types, specta_serde::PhasesFormat)
         .expect("phase-split named structs should export");
     assert!(
-        phases.contains("public struct SwiftNamedOverrideNullableDeserialize: Codable {"),
+        phases.contains("public struct SwiftNamedOverrideNullableDeserialize: Codable, Sendable {"),
         "{phases}"
     );
     assert!(

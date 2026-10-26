@@ -2,13 +2,13 @@
 import Foundation
 
 /// Mixed enum with both string-like and data variants
-public enum ApiResult {
+public enum ApiResult: Sendable {
     case success
     case successWithData(ApiResultSuccessWithDataData)
     case error(ApiResultErrorData)
     case loading
 }
-public struct ApiResultSuccessWithDataData: Codable {
+public struct ApiResultSuccessWithDataData: Codable, Sendable {
     public let data: String
     public let statusCode: UInt16
 
@@ -18,7 +18,7 @@ public struct ApiResultSuccessWithDataData: Codable {
     }
 }
 
-public struct ApiResultErrorData: Codable {
+public struct ApiResultErrorData: Codable, Sendable {
     public let message: String
     public let code: UInt32
 }
@@ -33,6 +33,19 @@ extension ApiResult: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Success":
+                self = .success
+                return
+            case "Loading":
+                self = .loading
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -57,38 +70,40 @@ extension ApiResult: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .success:
-            try container.encodeNil(forKey: .success)
+            var container = encoder.singleValueContainer()
+            try container.encode("Success")
         case .successWithData(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .successWithData)
         case .error(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .error)
         case .loading:
-            try container.encodeNil(forKey: .loading)
+            var container = encoder.singleValueContainer()
+            try container.encode("Loading")
         }
     }
 }
 
 
 /// String enum with more complex values
-public enum Environment: Codable {
-    case development
-    case staging
-    case production
-    case testing
+public enum Environment: String, Codable, Sendable {
+    case development = "Development"
+    case staging = "Staging"
+    case production = "Production"
+    case testing = "Testing"
 }
 
 /// Complex enum with multiple data variants
-public enum EventType {
+public enum EventType: Sendable {
     case userCreated
     case userUpdated(EventTypeUserUpdatedData)
     case userDeleted(EventTypeUserDeletedData)
     case systemEvent(EventTypeSystemEventData)
 }
-public struct EventTypeUserUpdatedData: Codable {
+public struct EventTypeUserUpdatedData: Codable, Sendable {
     public let userId: UInt32
     public let changes: [(String, String)]
 
@@ -98,7 +113,7 @@ public struct EventTypeUserUpdatedData: Codable {
     }
 }
 
-public struct EventTypeUserDeletedData: Codable {
+public struct EventTypeUserDeletedData: Codable, Sendable {
     public let userId: UInt32
     public let reason: String
 
@@ -108,7 +123,7 @@ public struct EventTypeUserDeletedData: Codable {
     }
 }
 
-public struct EventTypeSystemEventData: Codable {
+public struct EventTypeSystemEventData: Codable, Sendable {
     public let component: String
     public let level: String
     public let message: String
@@ -124,6 +139,16 @@ extension EventType: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "UserCreated":
+                self = .userCreated
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -149,16 +174,18 @@ extension EventType: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .userCreated:
-            try container.encodeNil(forKey: .userCreated)
+            var container = encoder.singleValueContainer()
+            try container.encode("UserCreated")
         case .userUpdated(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .userUpdated)
         case .userDeleted(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .userDeleted)
         case .systemEvent(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .systemEvent)
         }
     }
@@ -166,50 +193,51 @@ extension EventType: Codable {
 
 
 /// String enum for file types
-public enum FileType: Codable {
-    case image
-    case video
-    case audio
-    case document
-    case archive
-    case unknown
+public enum FileType: String, Codable, Sendable {
+    case image = "Image"
+    case video = "Video"
+    case audio = "Audio"
+    case document = "Document"
+    case archive = "Archive"
+    case unknown = "Unknown"
 }
 
 /// Comprehensive example showcasing string enums and custom Codable implementations
 /// 
 /// This example demonstrates how specta-swift handles string enums, mixed enums,
 /// and generates appropriate Codable implementations for different enum patterns.
+/// 
 /// Simple string enum (will be converted to Swift String enum with Codable)
-public enum HttpStatus: Codable {
-    case ok
-    case created
-    case accepted
-    case noContent
-    case badRequest
-    case unauthorized
-    case notFound
-    case internalServerError
+public enum HttpStatus: String, Codable, Sendable {
+    case ok = "Ok"
+    case created = "Created"
+    case accepted = "Accepted"
+    case noContent = "NoContent"
+    case badRequest = "BadRequest"
+    case unauthorized = "Unauthorized"
+    case notFound = "NotFound"
+    case internalServerError = "InternalServerError"
 }
 
 /// String enum for job states
-public enum JobState: Codable {
-    case queued
-    case running
-    case paused
-    case completed
-    case failed
-    case cancelled
+public enum JobState: String, Codable, Sendable {
+    case queued = "Queued"
+    case running = "Running"
+    case paused = "Paused"
+    case completed = "Completed"
+    case failed = "Failed"
+    case cancelled = "Cancelled"
 }
 
 /// Mixed enum with complex variants
-public enum NotificationType {
+public enum NotificationType: Sendable {
     case email
     case push
     case sms
     case webhook(NotificationTypeWebhookData)
     case inApp(NotificationTypeInAppData)
 }
-public struct NotificationTypeWebhookData: Codable {
+public struct NotificationTypeWebhookData: Codable, Sendable {
     public let url: String
     public let headers: [(String, String)]
     public let retryCount: UInt32
@@ -221,7 +249,7 @@ public struct NotificationTypeWebhookData: Codable {
     }
 }
 
-public struct NotificationTypeInAppData: Codable {
+public struct NotificationTypeInAppData: Codable, Sendable {
     public let title: String
     public let message: String
     public let priority: String
@@ -238,6 +266,22 @@ extension NotificationType: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Email":
+                self = .email
+                return
+            case "Push":
+                self = .push
+                return
+            case "Sms":
+                self = .sms
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -264,18 +308,21 @@ extension NotificationType: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .email:
-            try container.encodeNil(forKey: .email)
+            var container = encoder.singleValueContainer()
+            try container.encode("Email")
         case .push:
-            try container.encodeNil(forKey: .push)
+            var container = encoder.singleValueContainer()
+            try container.encode("Push")
         case .sms:
-            try container.encodeNil(forKey: .sms)
+            var container = encoder.singleValueContainer()
+            try container.encode("Sms")
         case .webhook(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .webhook)
         case .inApp(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .inApp)
         }
     }
@@ -283,20 +330,61 @@ extension NotificationType: Codable {
 
 
 /// Enum with generic type parameter
-public enum Result<T, E>: Codable {
+public enum Result<T: Codable, E: Codable> {
     case ok(T)
     case err(E)
 }
+// MARK: - Result Codable Implementation
+extension Result: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case ok = "Ok"
+        case err = "Err"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if container.allKeys.count != 1 {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
+            )
+        }
+
+        let key = container.allKeys.first!
+        switch key {
+        case .ok:
+            let data = try container.decode(T.self, forKey: .ok)
+            self = .ok(data)
+        case .err:
+            let data = try container.decode(E.self, forKey: .err)
+            self = .err(data)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .ok(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .ok)
+        case .err(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(data, forKey: .err)
+        }
+    }
+}
+
+
+extension Result: Sendable where T: Sendable, E: Sendable {}
 
 /// Complex mixed enum
-public enum UserAction {
+public enum UserAction: Sendable {
     case login
     case logout
     case updateProfile(UserActionUpdateProfileData)
     case changePassword(UserActionChangePasswordData)
     case deleteAccount
 }
-public struct UserActionUpdateProfileData: Codable {
+public struct UserActionUpdateProfileData: Codable, Sendable {
     public let name: String
     public let email: String
     public let avatarUrl: String?
@@ -308,7 +396,7 @@ public struct UserActionUpdateProfileData: Codable {
     }
 }
 
-public struct UserActionChangePasswordData: Codable {
+public struct UserActionChangePasswordData: Codable, Sendable {
     public let oldPassword: String
     public let newPassword: String
 
@@ -329,6 +417,22 @@ extension UserAction: Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        if let value = try? decoder.singleValueContainer().decode(String.self) {
+            switch value {
+            case "Login":
+                self = .login
+                return
+            case "Logout":
+                self = .logout
+                return
+            case "DeleteAccount":
+                self = .deleteAccount
+                return
+            default:
+                break
+            }
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         if container.allKeys.count != 1 {
@@ -355,19 +459,22 @@ extension UserAction: Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .login:
-            try container.encodeNil(forKey: .login)
+            var container = encoder.singleValueContainer()
+            try container.encode("Login")
         case .logout:
-            try container.encodeNil(forKey: .logout)
+            var container = encoder.singleValueContainer()
+            try container.encode("Logout")
         case .updateProfile(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .updateProfile)
         case .changePassword(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .changePassword)
         case .deleteAccount:
-            try container.encodeNil(forKey: .deleteAccount)
+            var container = encoder.singleValueContainer()
+            try container.encode("DeleteAccount")
         }
     }
 }

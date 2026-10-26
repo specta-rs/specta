@@ -3,12 +3,12 @@
 // DO NOT EDIT MANUALLY
 import Foundation
 
-public enum ApiResponse<T> {
-    case success(ApiResponseSuccessData)
-    case error(ApiResponseErrorData)
-    case loading(ApiResponseLoadingData)
+public enum ApiResponse<T: Codable> {
+    case success(ApiResponseSuccessData<T>)
+    case error(ApiResponseErrorData<T>)
+    case loading(ApiResponseLoadingData<T>)
 }
-public struct ApiResponseSuccessData: Codable {
+public struct ApiResponseSuccessData<T: Codable>: Codable {
     public let data: T
     public let statusCode: UInt16
 
@@ -18,7 +18,9 @@ public struct ApiResponseSuccessData: Codable {
     }
 }
 
-public struct ApiResponseErrorData: Codable {
+
+extension ApiResponseSuccessData: Sendable where T: Sendable {}
+public struct ApiResponseErrorData<T: Codable>: Codable {
     public let message: String
     public let errorCode: UInt32
 
@@ -28,10 +30,14 @@ public struct ApiResponseErrorData: Codable {
     }
 }
 
-public struct ApiResponseLoadingData: Codable {
+
+extension ApiResponseErrorData: Sendable where T: Sendable {}
+public struct ApiResponseLoadingData<T: Codable>: Codable {
     public let progress: Float
 }
 
+
+extension ApiResponseLoadingData: Sendable where T: Sendable {}
 // MARK: - ApiResponse Codable Implementation
 extension ApiResponse: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -52,44 +58,76 @@ extension ApiResponse: Codable {
         let key = container.allKeys.first!
         switch key {
         case .success:
-            let data = try container.decode(ApiResponseSuccessData.self, forKey: .success)
+            let data = try container.decode(ApiResponseSuccessData<T>.self, forKey: .success)
             self = .success(data)
         case .error:
-            let data = try container.decode(ApiResponseErrorData.self, forKey: .error)
+            let data = try container.decode(ApiResponseErrorData<T>.self, forKey: .error)
             self = .error(data)
         case .loading:
-            let data = try container.decode(ApiResponseLoadingData.self, forKey: .loading)
+            let data = try container.decode(ApiResponseLoadingData<T>.self, forKey: .loading)
             self = .loading(data)
         }
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
         switch self {
         case .success(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .success)
         case .error(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .error)
         case .loading(let data):
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .loading)
         }
     }
 }
 
 
-public struct GenericContainer<T, U>: Codable {
+extension ApiResponse: Sendable where T: Sendable {}
+
+public struct GenericContainer<T: Codable, U: Codable>: Codable {
     public let primary: T
     public let secondary: U
     public let metadata: [(String, String)]?
+
+    private enum CodingKeys: String, CodingKey {
+        case primary = "primary"
+        case secondary = "secondary"
+        case metadata = "metadata"
+    }
+
+    public init(primary: T, secondary: U, metadata: [(String, String)]?) {
+        self.primary = primary
+        self.secondary = secondary
+        self.metadata = metadata
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.primary = try container.decode(T.self, forKey: .primary)
+        self.secondary = try container.decode(U.self, forKey: .secondary)
+        self.metadata = try container.decodeIfPresent([(String, String)].self, forKey: .metadata)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(primary, forKey: .primary)
+        try container.encode(secondary, forKey: .secondary)
+        try container.encode(metadata, forKey: .metadata)
+    }
 }
+
+extension GenericContainer: Sendable where T: Sendable, U: Sendable {}
 
 /// Comprehensive example showcasing ALL configuration options for specta-swift
 /// 
 /// This example demonstrates every configuration option available in the Swift exporter,
 /// showing how different settings affect the generated Swift code.
+/// 
 /// Sample types for demonstration
-public struct User: Codable {
+public struct User: Codable, Sendable {
     public let userId: UInt32
     public let fullName: String
     public let emailAddress: String?
@@ -100,6 +138,29 @@ public struct User: Codable {
         case fullName = "full_name"
         case emailAddress = "email_address"
         case isVerified = "is_verified"
+    }
+
+    public init(userId: UInt32, fullName: String, emailAddress: String?, isVerified: Bool) {
+        self.userId = userId
+        self.fullName = fullName
+        self.emailAddress = emailAddress
+        self.isVerified = isVerified
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.userId = try container.decode(UInt32.self, forKey: .userId)
+        self.fullName = try container.decode(String.self, forKey: .fullName)
+        self.emailAddress = try container.decodeIfPresent(String.self, forKey: .emailAddress)
+        self.isVerified = try container.decode(Bool.self, forKey: .isVerified)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(userId, forKey: .userId)
+        try container.encode(fullName, forKey: .fullName)
+        try container.encode(emailAddress, forKey: .emailAddress)
+        try container.encode(isVerified, forKey: .isVerified)
     }
 }
 

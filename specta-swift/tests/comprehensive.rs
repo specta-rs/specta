@@ -94,8 +94,8 @@ fn test_comprehensive_export() {
     assert!(output.contains("case custom"));
 
     // Test generic types (they appear as generic definitions, not concrete instantiations)
-    assert!(output.contains("enum ApiResponse<T>"));
-    assert!(output.contains("struct ApiResult<T, E>"));
+    assert!(output.contains("enum ApiResponse<T: Codable>"));
+    assert!(output.contains("struct ApiResult<T: Codable, E: Codable>"));
 
     // Test optional types
     assert!(output.contains("let email: String?"));
