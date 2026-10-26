@@ -8,7 +8,7 @@ import Foundation
 /// A trailing `#[serde(default)]` tuple element is optional on deserialize
 /// (serde accepts `[1]`) — the deserialize half must mark it optional
 /// instead of requiring every element.
-public enum SwiftTupleDefault: Codable {
+public enum SwiftTupleDefault: Codable, Sendable {
     case serialize(SwiftTupleDefaultSerialize)
     case deserialize(SwiftTupleDefaultDeserialize)
 }
@@ -16,7 +16,7 @@ public enum SwiftTupleDefault: Codable {
 /// A trailing `#[serde(default)]` tuple element is optional on deserialize
 /// (serde accepts `[1]`) — the deserialize half must mark it optional
 /// instead of requiring every element.
-public struct SwiftTupleDefaultDeserialize: Codable {
+public struct SwiftTupleDefaultDeserialize: Codable, Sendable {
     public let field0: UInt8
     public let field1: UInt8?
 
@@ -49,7 +49,7 @@ public struct SwiftTupleDefaultDeserialize: Codable {
 /// A trailing `#[serde(default)]` tuple element is optional on deserialize
 /// (serde accepts `[1]`) — the deserialize half must mark it optional
 /// instead of requiring every element.
-public struct SwiftTupleDefaultSerialize: Codable {
+public struct SwiftTupleDefaultSerialize: Codable, Sendable {
     public let field0: UInt8
     public let field1: UInt8
 

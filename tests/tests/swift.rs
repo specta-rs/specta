@@ -309,7 +309,7 @@ fn swift_adjacent_empty_struct_variant() {
         "{rendered}"
     );
     assert!(
-        rendered.contains("public struct AdjacentEmptyEmptystructData: Codable {"),
+        rendered.contains("public struct AdjacentEmptyEmptystructData: Codable, Sendable {"),
         "{rendered}"
     );
 }
@@ -665,7 +665,7 @@ fn swift_tagged_unit_enum_has_no_raw_type() {
         .unwrap();
 
     assert!(
-        rendered.contains("public enum TaggedUnitEnum {"),
+        rendered.contains("public enum TaggedUnitEnum: Sendable {"),
         "{rendered}"
     );
     assert!(
@@ -701,7 +701,7 @@ fn swift_unknown_variants_round_trip() {
         "{exported}"
     );
     assert!(
-        exported.contains("public enum JSONValue: Codable, Equatable {"),
+        exported.contains("public enum JSONValue: Codable, Equatable, Sendable {"),
         "{exported}"
     );
 
@@ -1463,7 +1463,7 @@ fn swift_newtype_and_tuple_structs_round_trip() {
         .expect("newtype and tuple structs should export");
 
     assert!(
-        exported.contains("public struct SwiftNewtype: Codable {"),
+        exported.contains("public struct SwiftNewtype: Codable, Sendable {"),
         "{exported}"
     );
     assert!(
@@ -1517,7 +1517,7 @@ fn swift_phase_split_structs_round_trip() {
         "SwiftNewtypeOptDeserialize",
     ] {
         assert!(
-            exported.contains(&format!("public struct {name}: Codable {{")),
+            exported.contains(&format!("public struct {name}: Codable, Sendable {{")),
             "expected the split phase type `{name}`:\n{exported}"
         );
     }
@@ -1846,7 +1846,7 @@ fn swift_named_struct_phase_split_round_trip() {
         "SwiftNamedNestedOptionalDeserialize",
     ] {
         assert!(
-            exported.contains(&format!("public struct {name}: Codable {{")),
+            exported.contains(&format!("public struct {name}: Codable, Sendable {{")),
             "expected the split phase type `{name}`:\n{exported}"
         );
     }
@@ -2068,7 +2068,7 @@ fn swift_named_override_nullable_matches_serde() {
         .export(&types, specta_serde::PhasesFormat)
         .expect("phase-split named structs should export");
     assert!(
-        phases.contains("public struct SwiftNamedOverrideNullableDeserialize: Codable {"),
+        phases.contains("public struct SwiftNamedOverrideNullableDeserialize: Codable, Sendable {"),
         "{phases}"
     );
     assert!(

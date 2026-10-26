@@ -8,15 +8,15 @@ import Foundation
 /// The tag key may equal the variant's own serialized name; the tag must still
 /// be recovered (a naive "the field is not named after the variant" heuristic
 /// gets this wrong).
-public enum TagIsVariantName {
+public enum TagIsVariantName: Sendable {
     case type(TagIsVariantNameTypeData)
     case other(TagIsVariantNameOtherData)
 }
-public struct TagIsVariantNameTypeData: Codable {
+public struct TagIsVariantNameTypeData: Codable, Sendable {
     public let x: UInt32
 }
 
-public struct TagIsVariantNameOtherData: Codable {
+public struct TagIsVariantNameOtherData: Codable, Sendable {
     public let y: UInt32
 }
 
@@ -61,11 +61,11 @@ extension TagIsVariantName: Codable {
 
 /// Payload fields that collide with Swift keywords, and optional/defaulted
 /// payload fields.
-public enum TaggedFieldEdgeCases {
+public enum TaggedFieldEdgeCases: Sendable {
     case keywords(TaggedFieldEdgeCasesKeywordsData)
     case optional(TaggedFieldEdgeCasesOptionalData)
 }
-public struct TaggedFieldEdgeCasesKeywordsData: Codable {
+public struct TaggedFieldEdgeCasesKeywordsData: Codable, Sendable {
     public let `default`: Bool
     public let `private`: UInt32
 
@@ -75,7 +75,7 @@ public struct TaggedFieldEdgeCasesKeywordsData: Codable {
     }
 }
 
-public struct TaggedFieldEdgeCasesOptionalData: Codable {
+public struct TaggedFieldEdgeCasesOptionalData: Codable, Sendable {
     public let opt: UInt32?
     public let defaulted: UInt32?
 }

@@ -8,7 +8,7 @@ import Foundation
 // MARK: - JSONValue Helper
 /// A dynamically typed JSON value, used to carry the payload of an enum
 /// variant this build does not know about.
-public enum JSONValue: Codable, Equatable {
+public enum JSONValue: Codable, Equatable, Sendable {
     case null
     case bool(Bool)
     case number(Decimal)
@@ -54,11 +54,11 @@ public enum JSONValue: Codable, Equatable {
     }
 }
 
-public enum AdjacentError {
+public enum AdjacentError: Sendable {
     case system(AdjacentErrorSystemData)
     case unknown(tag: String, content: JSONValue?)
 }
-public struct AdjacentErrorSystemData: Codable {
+public struct AdjacentErrorSystemData: Codable, Sendable {
     public let data: AdjacentReason
 }
 
@@ -106,12 +106,12 @@ extension AdjacentError: Codable {
 }
 
 
-public enum AdjacentReason {
+public enum AdjacentReason: Sendable {
     case unavailable(AdjacentReasonUnavailableData)
     case `internal`
     case unknown(tag: String, content: JSONValue?)
 }
-public struct AdjacentReasonUnavailableData: Codable {
+public struct AdjacentReasonUnavailableData: Codable, Sendable {
     public let retryAfter: UInt32
 
     private enum CodingKeys: String, CodingKey {
@@ -162,7 +162,7 @@ extension AdjacentReason: Codable {
 }
 
 
-public enum ExternalError {
+public enum ExternalError: Sendable {
     case auth(ExternalReason)
     case validation([String])
     case unknown(tag: String, content: JSONValue?)
@@ -229,12 +229,12 @@ extension ExternalError: Codable {
 }
 
 
-public enum ExternalReason {
+public enum ExternalReason: Sendable {
     case credentialsInvalid
     case quotaExhausted(ExternalReasonQuotaexhaustedData)
     case unknown(tag: String, content: JSONValue?)
 }
-public struct ExternalReasonQuotaexhaustedData: Codable {
+public struct ExternalReasonQuotaexhaustedData: Codable, Sendable {
     public let retryAfter: UInt32
 
     private enum CodingKeys: String, CodingKey {
@@ -314,12 +314,12 @@ extension ExternalReason: Codable {
 }
 
 
-public enum InternalReason {
+public enum InternalReason: Sendable {
     case credentialsInvalid
     case quotaExhausted(InternalReasonQuotaexhaustedData)
     case unknown(tag: String, content: JSONValue?)
 }
-public struct InternalReasonQuotaexhaustedData: Codable {
+public struct InternalReasonQuotaexhaustedData: Codable, Sendable {
     public let retryAfter: UInt32
 
     private enum CodingKeys: String, CodingKey {
