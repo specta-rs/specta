@@ -26,13 +26,30 @@ pub enum OptionalStyle {
     Optional,
 }
 
+/// Controls the Java language level the generated source targets.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JavaVersion {
+    /// Java 11: structs become final classes with a canonical constructor,
+    /// accessors, `equals`, `hashCode`, and `toString`; data-carrying enums
+    /// become abstract classes with a private constructor and one nested final
+    /// subclass per variant.
+    Java11,
+    /// Java 17: structs become records and data-carrying enums become sealed
+    /// interfaces.
+    #[default]
+    Java17,
+}
+
 impl fmt::Display for Layout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
     }
 }
 
-/// Java 17 language exporter.
+/// Java language exporter.
+///
+/// Output targets Java 17 unless [`Java::java_version`] says otherwise.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Java {
@@ -44,6 +61,7 @@ pub struct Java {
     pub(crate) class_name: Cow<'static, str>,
     pub(crate) raw: Vec<Cow<'static, str>>,
     pub(crate) optionals: OptionalStyle,
+    pub(crate) java_version: JavaVersion,
 }
 
 impl Default for Java {
@@ -57,6 +75,7 @@ impl Default for Java {
             class_name: Cow::Borrowed("Bindings"),
             raw: Vec::new(),
             optionals: OptionalStyle::Nullable,
+            java_version: JavaVersion::Java17,
         }
     }
 }
@@ -94,6 +113,13 @@ impl Java {
     /// Configure how nullable datatypes are represented.
     pub fn optionals(mut self, style: OptionalStyle) -> Self {
         self.optionals = style;
+        self
+    }
+
+    /// Configure the Java language level of the generated source.
+    /// Output targets Java 17 unless told otherwise; see [`JavaVersion`].
+    pub fn java_version(mut self, java_version: JavaVersion) -> Self {
+        self.java_version = java_version;
         self
     }
 

@@ -1,6 +1,6 @@
 # specta-java
 
-Export [Specta](https://github.com/specta-rs/specta) type collections as Java 17 records, enums, and sealed interfaces.
+Export [Specta](https://github.com/specta-rs/specta) type collections as Java 17 records, enums, and sealed interfaces, or as Java 11 classes.
 
 ```rust
 use specta::{Type, Types};
@@ -24,6 +24,11 @@ The default flat-file layout nests generated types in a `Bindings` class. Use
 `Layout::Files` with `export_to` to generate one public Java source file per type.
 Flat-file output must be written to a file matching the configured class name
 (for example, `Bindings.java`).
+
+`JavaVersion::Java11` targets projects that cannot use records or sealed types yet:
+structs become final classes with a canonical constructor, accessors, `equals`,
+`hashCode`, and `toString`, and data-carrying enums become abstract classes with a
+private constructor and one nested final subclass per variant.
 
 The crate generates Java data models, not serialization adapters. Legal formatted
 field names are preserved, string enums expose their wire value through `value()`,
