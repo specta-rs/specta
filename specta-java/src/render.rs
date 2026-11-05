@@ -13,7 +13,7 @@ use specta::{
     markers::ENUM_REPR_REWRITTEN_MARKER,
 };
 
-use crate::{Error, Java, Layout, OptionalStyle, reserved_names::is_keyword};
+use crate::{Error, Java, JavaVersion, Layout, OptionalStyle, reserved_names::is_keyword};
 
 pub(crate) fn flat_file(java: &Java, types: &Types) -> Result<String, Error> {
     validate_package(java.package.as_deref())?;
@@ -213,7 +213,7 @@ fn declaration(
     java: &Java,
     types: &Types,
     ndt: &NamedDataType,
-    _nested: bool,
+    nested: bool,
     qualified_references: bool,
 ) -> Result<String, Error> {
     let name = rendered_type_name(java, ndt)?;
@@ -239,25 +239,45 @@ fn declaration(
         .as_ref()
         .expect("callers filter types without definitions")
     {
-        DataType::Struct(value) => {
-            render_record(&mut out, &ctx, visibility, &name, &generics, value, &name)?
-        }
+        DataType::Struct(value) => render_record(
+            &mut out, &ctx, visibility, nested, &name, &generics, value, &name,
+        )?,
         DataType::Enum(value)
             if ndt.generics.is_empty()
                 && (is_unit_enum(value) || resolved_string_enum(value).is_some()) =>
         {
             render_unit_enum(&mut out, visibility, &name, value, &name)?
         }
-        DataType::Enum(value) => {
-            render_tagged_enum(&mut out, &ctx, visibility, &name, &generics, value, &name)?
-        }
+        DataType::Enum(value) => render_tagged_enum(
+            &mut out, &ctx, visibility, nested, &name, &generics, value, &name,
+        )?,
         ty => {
             let rendered = datatype(&ctx, ty, &name)?;
-            write!(
-                out,
-                "{visibility}record {name}{generics}({rendered} value) {{}}"
-            )
-            .expect("writing to String cannot fail");
+            match java.java_version {
+                JavaVersion::Java17 => write!(
+                    out,
+                    "{visibility}record {name}{generics}({rendered} value) {{}}"
+                )
+                .expect("writing to String cannot fail"),
+                JavaVersion::Java11 => {
+                    let field = RenderedField {
+                        name: "value".to_string(),
+                        ty: rendered,
+                        docs: "",
+                        deprecated: None,
+                        nested: None,
+                    };
+                    render_class(
+                        &mut out,
+                        visibility,
+                        nested,
+                        &name,
+                        &generics,
+                        &[field],
+                        None,
+                    );
+                }
+            }
         }
     }
     Ok(out)
@@ -267,6 +287,7 @@ fn render_record(
     out: &mut String,
     ctx: &Context<'_>,
     visibility: &str,
+    nested: bool,
     name: &str,
     generics: &str,
     value: &Struct,
@@ -274,6 +295,10 @@ fn render_record(
 ) -> Result<(), Error> {
     let fields = fields(ctx, &value.fields, path)?;
     validate_nested_declarations(&fields, name, path)?;
+    if ctx.java.java_version == JavaVersion::Java11 {
+        render_class(out, visibility, nested, name, generics, &fields, None);
+        return Ok(());
+    }
     if fields.is_empty() {
         write!(out, "{visibility}record {name}{generics}() {{}}")
             .expect("writing to String cannot fail");
@@ -367,6 +392,7 @@ fn render_tagged_enum(
     out: &mut String,
     ctx: &Context<'_>,
     visibility: &str,
+    nested: bool,
     name: &str,
     generics: &str,
     value: &Enum,
@@ -380,7 +406,7 @@ fn render_tagged_enum(
     if variants.is_empty() {
         return Err(Error::unsupported(
             path,
-            "Java sealed interfaces require at least one non-skipped enum variant",
+            "data-carrying enums need at least one non-skipped variant to export",
         ));
     }
     validate_names(
@@ -406,15 +432,28 @@ fn render_tagged_enum(
         .map(|variant| format!("{name}.{variant}"))
         .collect::<Vec<_>>()
         .join(", ");
-    write!(out, "{visibility}sealed interface {name}{generics}")
-        .expect("writing to String cannot fail");
-    if !permits.is_empty() {
-        write!(out, " permits {permits}").expect("writing to String cannot fail");
+    match ctx.java.java_version {
+        JavaVersion::Java17 => {
+            write!(out, "{visibility}sealed interface {name}{generics}")
+                .expect("writing to String cannot fail");
+            if !permits.is_empty() {
+                write!(out, " permits {permits}").expect("writing to String cannot fail");
+            }
+            out.push_str(" {\n");
+        }
+        JavaVersion::Java11 => {
+            let modifier = if nested { "static " } else { "" };
+            writeln!(
+                out,
+                "{visibility}abstract {modifier}class {name}{generics} {{"
+            )
+            .expect("writing to String cannot fail");
+            writeln!(out, "    private {name}() {{}}").expect("writing to String cannot fail");
+        }
     }
-    out.push_str(" {\n");
 
     for (index, (variant_name, variant)) in variants.iter().enumerate() {
-        if index != 0 {
+        if index != 0 || ctx.java.java_version == JavaVersion::Java11 {
             out.push('\n');
         }
         javadoc(out, &variant.docs, variant.deprecated.as_ref(), 1);
@@ -429,6 +468,21 @@ fn render_tagged_enum(
             &format!("{path}.{variant_name}"),
         )?;
         validate_nested_declarations(&fields, &java_name, path)?;
+        if ctx.java.java_version == JavaVersion::Java11 {
+            let mut class = String::new();
+            render_class(
+                &mut class,
+                "public ",
+                true,
+                &java_name,
+                generics,
+                &fields,
+                Some(&format!("{name}{generics}")),
+            );
+            out.push_str(&indent(&class, 1));
+            out.push('\n');
+            continue;
+        }
         if fields.is_empty() {
             write!(
                 out,
@@ -483,6 +537,159 @@ fn render_record_body(out: &mut String, fields: &[RenderedField<'_>], level: usi
     }
     out.push_str(&"    ".repeat(level));
     out.push('}');
+}
+
+/// Render the [`JavaVersion::Java11`] stand-in for a record: a final class with a
+/// canonical constructor, accessors, and the value semantics a record would derive.
+///
+/// Method bodies deliberately avoid qualified names such as `java.util.Objects`:
+/// a field named `java` would obscure the package (JLS 6.4.2), while the type
+/// positions used here cannot be obscured by a field.
+fn render_class(
+    out: &mut String,
+    visibility: &str,
+    nested: bool,
+    name: &str,
+    generics: &str,
+    fields: &[RenderedField<'_>],
+    extends: Option<&str>,
+) {
+    let modifier = if nested { "static " } else { "" };
+    write!(out, "{visibility}{modifier}final class {name}{generics}")
+        .expect("writing to String cannot fail");
+    if let Some(extends) = extends {
+        write!(out, " extends {extends}").expect("writing to String cannot fail");
+    }
+    out.push_str(" {\n");
+    for field in fields {
+        writeln!(out, "    private final {} {};", field.ty, field.name)
+            .expect("writing to String cannot fail");
+    }
+
+    if fields.is_empty() {
+        writeln!(out, "    public {name}() {{}}").expect("writing to String cannot fail");
+    } else {
+        writeln!(out, "\n    public {name}(").expect("writing to String cannot fail");
+        for (index, field) in fields.iter().enumerate() {
+            write!(out, "        {} {}", field.ty, field.name)
+                .expect("writing to String cannot fail");
+            if index + 1 != fields.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        writeln!(out, "    ) {{").expect("writing to String cannot fail");
+        for field in fields {
+            let field_name = &field.name;
+            writeln!(out, "        this.{field_name} = {field_name};")
+                .expect("writing to String cannot fail");
+        }
+        writeln!(out, "    }}").expect("writing to String cannot fail");
+    }
+
+    for field in fields {
+        let field_name = &field.name;
+        out.push('\n');
+        javadoc(out, field.docs, field.deprecated, 1);
+        writeln!(
+            out,
+            "    public {} {field_name}() {{\n        return this.{field_name};\n    }}",
+            field.ty
+        )
+        .expect("writing to String cannot fail");
+    }
+
+    writeln!(
+        out,
+        "\n    @java.lang.Override\n    public boolean equals(java.lang.Object other) {{"
+    )
+    .expect("writing to String cannot fail");
+    if fields.is_empty() {
+        writeln!(out, "        return other instanceof {name};")
+            .expect("writing to String cannot fail");
+    } else {
+        let wildcards = wildcard_generics(generics);
+        writeln!(
+            out,
+            "        if (this == other) {{\n            return true;\n        }}\n        if (!(other instanceof {name})) {{\n            return false;\n        }}\n        {name}{wildcards} that = ({name}{wildcards}) other;"
+        )
+        .expect("writing to String cannot fail");
+        for (index, field) in fields.iter().enumerate() {
+            let field_name = &field.name;
+            let prefix = if index == 0 {
+                "        return "
+            } else {
+                "            && "
+            };
+            let suffix = if index + 1 == fields.len() { ";" } else { "" };
+            writeln!(
+                out,
+                "{prefix}(this.{field_name} == null ? that.{field_name} == null : this.{field_name}.equals(that.{field_name})){suffix}"
+            )
+            .expect("writing to String cannot fail");
+        }
+    }
+    writeln!(out, "    }}").expect("writing to String cannot fail");
+
+    writeln!(
+        out,
+        "\n    @java.lang.Override\n    public int hashCode() {{"
+    )
+    .expect("writing to String cannot fail");
+    if fields.is_empty() {
+        writeln!(out, "        return 0;").expect("writing to String cannot fail");
+    } else {
+        writeln!(out, "        int result = 0;").expect("writing to String cannot fail");
+        for field in fields {
+            let field_name = &field.name;
+            writeln!(
+                out,
+                "        result = 31 * result + (this.{field_name} == null ? 0 : this.{field_name}.hashCode());"
+            )
+            .expect("writing to String cannot fail");
+        }
+        writeln!(out, "        return result;").expect("writing to String cannot fail");
+    }
+    writeln!(out, "    }}").expect("writing to String cannot fail");
+
+    writeln!(
+        out,
+        "\n    @java.lang.Override\n    public java.lang.String toString() {{"
+    )
+    .expect("writing to String cannot fail");
+    if fields.is_empty() {
+        writeln!(out, "        return \"{name}[]\";").expect("writing to String cannot fail");
+    } else {
+        writeln!(out, "        return \"{name}[\"").expect("writing to String cannot fail");
+        for (index, field) in fields.iter().enumerate() {
+            let field_name = &field.name;
+            let separator = if index == 0 { "" } else { ", " };
+            writeln!(
+                out,
+                "            + \"{separator}{field_name}=\" + this.{field_name}"
+            )
+            .expect("writing to String cannot fail");
+        }
+        writeln!(out, "            + \"]\";").expect("writing to String cannot fail");
+    }
+    out.push_str("    }");
+
+    for declaration in fields.iter().filter_map(|field| field.nested.as_deref()) {
+        out.push_str("\n\n");
+        out.push_str(&indent(declaration, 1));
+    }
+    out.push_str("\n}");
+}
+
+/// `<T, U>` becomes `<?, ?>`, for the wildcard cast inside a generic class's `equals`.
+fn wildcard_generics(generics: &str) -> String {
+    if generics.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<{}>",
+        vec!["?"; generics.matches(',').count() + 1].join(", ")
+    )
 }
 
 fn fields<'a>(
@@ -632,24 +839,37 @@ fn field_datatype(
                     nested,
                 });
             }
-            writeln!(nested, "public record {type_name}{generics}(")
-                .expect("writing to String cannot fail");
-            for (index, field) in tuple_fields.iter().enumerate() {
-                write!(nested, "    {} {}", field.ty, field.name)
+            if ctx.java.java_version == JavaVersion::Java11 {
+                render_class(
+                    &mut nested,
+                    "public ",
+                    true,
+                    &type_name,
+                    &generics,
+                    &tuple_fields,
+                    None,
+                );
+            } else {
+                writeln!(nested, "public record {type_name}{generics}(")
                     .expect("writing to String cannot fail");
-                if index + 1 != tuple_fields.len() {
-                    nested.push(',');
+                for (index, field) in tuple_fields.iter().enumerate() {
+                    write!(nested, "    {} {}", field.ty, field.name)
+                        .expect("writing to String cannot fail");
+                    if index + 1 != tuple_fields.len() {
+                        nested.push(',');
+                    }
+                    nested.push('\n');
                 }
-                nested.push('\n');
+                nested.push(')');
+                render_record_body(&mut nested, &tuple_fields, 0);
             }
-            nested.push(')');
-            render_record_body(&mut nested, &tuple_fields, 0);
         }
         DataType::Struct(value) => {
             render_record(
                 &mut nested,
                 &nested_ctx,
                 "public ",
+                true,
                 &type_name,
                 &generics,
                 value,
@@ -665,6 +885,7 @@ fn field_datatype(
                 &mut nested,
                 &nested_ctx,
                 "public ",
+                true,
                 &type_name,
                 &generics,
                 value,
@@ -913,10 +1134,16 @@ fn validate_nested_declarations(
     seen.insert(enclosing_name.to_string(), ());
     for source in fields.iter().filter_map(|field| field.nested.as_deref()) {
         for line in source.lines() {
-            let name = ["public record ", "public enum ", "public sealed interface "]
-                .into_iter()
-                .find_map(|prefix| line.strip_prefix(prefix))
-                .and_then(|rest| rest.split(['<', '(', ' ', '{']).next());
+            let name = [
+                "public record ",
+                "public enum ",
+                "public sealed interface ",
+                "public static final class ",
+                "public abstract static class ",
+            ]
+            .into_iter()
+            .find_map(|prefix| line.strip_prefix(prefix))
+            .and_then(|rest| rest.split(['<', '(', ' ', '{']).next());
             if let Some(name) = name
                 && seen.insert(name.to_string(), ()).is_some()
             {

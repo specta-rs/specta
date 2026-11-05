@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path, process::Command};
 
 use serde::{Deserialize, Serialize};
 use specta::{Format, Type, Types};
-use specta_java::{Java, Layout, OptionalStyle};
+use specta_java::{Java, JavaVersion, Layout, OptionalStyle};
 use tempfile::TempDir;
 
 struct IdentityFormat;
@@ -83,9 +83,13 @@ fn temp_dir() -> TempDir {
 }
 
 fn compile_java(root: &Path, files: &[&Path]) {
+    compile_java_release(root, files, 17);
+}
+
+fn compile_java_release(root: &Path, files: &[&Path], release: u8) {
     let output = Command::new("javac")
         .arg("--release")
-        .arg("17")
+        .arg(release.to_string())
         .arg("-d")
         .arg(root.join("classes"))
         .args(files)
@@ -102,6 +106,22 @@ fn compile_java(root: &Path, files: &[&Path]) {
             .collect::<Vec<_>>()
             .join("\n"),
     );
+}
+
+fn java_files(root: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(root).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            files.extend(java_files(&path));
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "java")
+        {
+            files.push(path);
+        }
+    }
+    files
 }
 
 #[test]
@@ -173,21 +193,7 @@ fn files_layout_writes_public_types_that_compile_together() {
         .export_to(temp.path(), &types(), specta_serde::Format)
         .unwrap();
 
-    let mut files = Vec::new();
-    fn collect(path: &Path, files: &mut Vec<std::path::PathBuf>) {
-        for entry in std::fs::read_dir(path).unwrap() {
-            let path = entry.unwrap().path();
-            if path.is_dir() {
-                collect(&path, files);
-            } else if path
-                .extension()
-                .is_some_and(|extension| extension == "java")
-            {
-                files.push(path);
-            }
-        }
-    }
-    collect(temp.path(), &mut files);
+    let files = java_files(temp.path());
     assert_eq!(files.len(), 4);
     let refs = files
         .iter()
@@ -879,4 +885,121 @@ fn non_java_identifiers_are_safely_escaped() {
         )
         .unwrap();
     assert!(source.contains("record InvalidName"));
+}
+
+fn java_11() -> Java {
+    Java::default().java_version(JavaVersion::Java11)
+}
+
+#[test]
+fn java_11_export_raw_and_serde() {
+    insta::assert_snapshot!(
+        "java-11-export-raw",
+        java_11().export(&types(), IdentityFormat).unwrap()
+    );
+    insta::assert_snapshot!(
+        "java-11-export-serde",
+        java_11().export(&types(), specta_serde::Format).unwrap()
+    );
+}
+
+#[test]
+fn java_11_flat_file_compiles_without_records_or_sealed_types() {
+    let mut types = types()
+        .register::<TaggedUnitStatus>()
+        .register::<RecordMethodNames>()
+        .register::<ExplicitOptionalField>()
+        .register::<ExplicitOptionalTupleVariant>()
+        .register::<UnderscoreGeneric<String>>();
+    specta::datatype::NamedDataType::new("Labels", &mut types, |_, datatype| {
+        datatype.ty =
+            Some(specta::datatype::List::new(specta::datatype::Primitive::str.into()).into());
+    });
+
+    let temp = temp_dir();
+    let path = temp.path().join("Bindings.java");
+    java_11()
+        .optionals(OptionalStyle::Optional)
+        .export_to(&path, &types, specta_serde::Format)
+        .unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source.contains("public static final class Model {"));
+    assert!(source.contains("public abstract static class Event<T> {"));
+    assert!(source.contains("private Event() {}"));
+    assert!(source.contains("public static final class Finished<T> extends Event<T> {"));
+    assert!(source.contains("public static final class Payload<T> {"));
+    assert!(source.contains("public java.util.Optional<java.lang.Long> optional_count() {"));
+    assert!(source.contains("public java.lang.String hashCode_() {"));
+    assert!(source.contains("public java.util.List<java.lang.String> value() {"));
+    assert!(!source.contains("record "));
+    assert!(!source.contains("sealed "));
+    compile_java_release(temp.path(), &[&path], 11);
+}
+
+#[test]
+fn java_11_files_layout_writes_top_level_classes_that_compile_together() {
+    let temp = temp_dir();
+    java_11()
+        .package("dev.specta.generated")
+        .layout(Layout::Files)
+        .export_to(temp.path(), &types(), specta_serde::Format)
+        .unwrap();
+
+    let files = java_files(temp.path());
+    assert_eq!(files.len(), 4);
+    let source = |name: &str| {
+        let path = files.iter().find(|path| path.ends_with(name)).unwrap();
+        std::fs::read_to_string(path).unwrap()
+    };
+    assert!(source("Model.java").contains("public final class Model {"));
+    assert!(source("Event.java").contains("public abstract class Event<T> {"));
+    let refs = files
+        .iter()
+        .map(std::path::PathBuf::as_path)
+        .collect::<Vec<_>>();
+    compile_java_release(temp.path(), &refs, 11);
+}
+
+#[test]
+fn java_11_classes_behave_like_records() {
+    let temp = temp_dir();
+    let bindings = temp.path().join("Bindings.java");
+    java_11()
+        .export_to(&bindings, &types(), specta_serde::Format)
+        .unwrap();
+    let check = temp.path().join("Check.java");
+    std::fs::write(
+        &check,
+        r#"public final class Check {
+    public static void main(String[] args) {
+        Bindings.Response<String> a = new Bindings.Response<>("v", 1L, java.util.List.of("x"));
+        Bindings.Response<String> b = new Bindings.Response<>("v", 1L, java.util.List.of("x"));
+        Bindings.Response<String> c = new Bindings.Response<>("v", null, java.util.List.of("x"));
+        if (!a.equals(b) || a.hashCode() != b.hashCode()) throw new AssertionError("equal values");
+        if (a.equals(c) || c.equals(a)) throw new AssertionError("unequal values");
+        if (!a.value().equals("v") || a.optional_count() != 1L) throw new AssertionError("accessors");
+        if (!a.toString().equals("Response[value=v, optional_count=1, labels=[x]]")) throw new AssertionError(a.toString());
+        Bindings.Event<String> event = new Bindings.Event.Progress<>("Progress", (short) 2);
+        if (!(event instanceof Bindings.Event.Progress)) throw new AssertionError("variant");
+        if (!event.equals(new Bindings.Event.Progress<String>("Progress", (short) 2))) throw new AssertionError("variant equality");
+        if (event.equals(new Bindings.Event.Started<String>("Started"))) throw new AssertionError("variant inequality");
+        if (!new Bindings.Event.Started<String>("Started").toString().equals("Started[kind=Started]")) throw new AssertionError("variant toString");
+    }
+}
+"#,
+    )
+    .unwrap();
+    compile_java_release(temp.path(), &[&bindings, &check], 11);
+    let output = Command::new("java")
+        .arg("-cp")
+        .arg(temp.path().join("classes"))
+        .arg("Check")
+        .output()
+        .expect("java must be installed to run generated Java");
+    assert!(
+        output.status.success(),
+        "generated Java classes misbehaved:\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
 }
