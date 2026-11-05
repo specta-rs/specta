@@ -1,7 +1,7 @@
 [package]
 name = "specta-valibot"
 description = "Export your Rust types to Valibot schemas for TypeScript"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -26,11 +26,11 @@ default = []
 serde = ["dep:serde"]
 
 [dependencies]
-specta = { version = "=2.0.0-rc.27", path = "../specta" }
+specta = { version = "=2.0.0-rc.28", path = "../specta" }
 serde = { version = "1", default-features = false, optional = true }
-specta-typescript = { version = "=0.0.14", path = "../specta-typescript" }
+specta-typescript = { version = "=0.0.15", path = "../specta-typescript" }
 
 [dev-dependencies]
-specta = { version = "=2.0.0-rc.27", path = "../specta", features = ["derive", "collect"] }
-specta-serde = { version = "=0.0.14", path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.28", path = "../specta", features = ["derive", "collect"] }
+specta-serde = { version = "=0.0.15", path = "../specta-serde" }
 specta-util = { path = "../specta-util" }

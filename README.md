@@ -257,8 +257,8 @@ turns publishing into an approved action rather than something any tag push does
 2. Tag the merge commit and push the tag:
 
    ```bash
-   git tag v2.0.0-rc.27
-   git push origin v2.0.0-rc.27
+   git tag v2.0.0-rc.28
+   git push origin v2.0.0-rc.28
    ```
 
 The `release` workflow then verifies the release (the tag matches the `specta`

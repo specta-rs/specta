@@ -6,9 +6,9 @@
 //! # Usage
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.27 --features derive
-//! cargo add specta-rescript@0.0.2
-//! cargo add specta-serde@0.0.14
+//! cargo add specta@2.0.0-rc.28 --features derive
+//! cargo add specta-rescript@0.0.3
+//! cargo add specta-serde@0.0.15
 //! ```
 //!
 //! ```rust

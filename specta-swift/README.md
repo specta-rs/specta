@@ -30,8 +30,8 @@ Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
-specta-serde = "0.0.14"
-specta-swift = "0.1"
+specta-serde = "0.0.15"
+specta-swift = "0.0.6"
 ```
 
 Define your Rust types:
