@@ -756,6 +756,28 @@ pub fn export_type(
                 .filter(|e| resolved_string_enum(e).is_some())
                 .unwrap_or(e);
 
+            // A Rust enum with no variants is uninhabited, and Swift rejects the
+            // shape this used to emit for one: an empty case list cannot declare
+            // a raw type or synthesise `Codable`. Mirror it as a struct instead,
+            // which compiles and, unlike an empty Swift enum, causes no
+            // unreachable-code warnings at every use in the consumer's build.
+            // See <https://github.com/specta-rs/specta/issues/625>.
+            if e.variants.iter().all(|(_, variant)| variant.skip) {
+                let mut protocols = vec!["Codable"];
+                protocols.extend(sendable);
+                result.push_str(&format!(
+                    "public struct {}{}: {}{} {{\n",
+                    name,
+                    generics,
+                    swift.conformance_list(&protocols),
+                    generic_where
+                ));
+                result.push_str(&uninhabited_enum_body(&name));
+                result.push('}');
+                result.push_str(&sendable_conditional_conformance(&name, &ndt.generics));
+                return Ok(result);
+            }
+
             // Internal and adjacent tagging put the discriminant in a field, so
             // a synthesised `Codable` would read the wrong shape entirely.
             let has_tagged_variants = e
@@ -1680,6 +1702,33 @@ fn unit_struct_body(struct_name: &str) -> String {
         "            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: \"Expected null for unit struct {struct_name}\"))\n"
     ));
     body.push_str("        }\n");
+    body.push_str("    }\n\n");
+    body.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    body.push_str("        var container = encoder.singleValueContainer()\n");
+    body.push_str("        try container.encodeNil()\n");
+    body.push_str("    }\n");
+    body
+}
+
+/// Render the body of the struct that stands in for a Rust enum with no
+/// variants.
+///
+/// Nothing outside the generated file can construct one, and decoding any value
+/// throws, which matches the uninhabited Rust type. An empty Swift enum would
+/// say the same thing more directly, but Swift then knows the type is
+/// uninhabited and warns that any code after decoding one can never run, which
+/// breaks consumers building with `-warnings-as-errors`.
+fn uninhabited_enum_body(type_name: &str) -> String {
+    let mut body = String::new();
+    body.push_str("    private init() {}\n\n");
+    body.push_str("    public init(from decoder: Decoder) throws {\n");
+    body.push_str("        let container = try decoder.singleValueContainer()\n");
+    body.push_str("        throw DecodingError.dataCorruptedError(\n");
+    body.push_str("            in: container,\n");
+    body.push_str(&format!(
+        "            debugDescription: \"{type_name} has no cases, so no value decodes as one\"\n"
+    ));
+    body.push_str("        )\n");
     body.push_str("    }\n\n");
     body.push_str("    public func encode(to encoder: Encoder) throws {\n");
     body.push_str("        var container = encoder.singleValueContainer()\n");
