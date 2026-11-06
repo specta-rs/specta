@@ -758,22 +758,31 @@ pub fn export_type(
 
             // A Rust enum with no variants is uninhabited, and Swift rejects the
             // shape this used to emit for one: an empty case list cannot declare
-            // a raw type or synthesise `Codable`. Mirror it as a struct instead,
-            // which compiles and, unlike an empty Swift enum, causes no
-            // unreachable-code warnings at every use in the consumer's build.
+            // a raw type or synthesise `Codable`. An empty enum is still the
+            // faithful shape - it is what makes the compiler treat the type as
+            // uninhabited - so declare it plainly and write the `Codable`
+            // conformance by hand.
+            //
+            // Swift then knows no value can exist, so it reports generated code
+            // that runs after one as "will never be executed". That diagnostic is
+            // correct, and intended: the type genuinely has no values.
             // See <https://github.com/specta-rs/specta/issues/625>.
             if e.variants.iter().all(|(_, variant)| variant.skip) {
-                let mut protocols = vec!["Codable"];
+                let mut protocols = Vec::new();
                 protocols.extend(sendable);
                 result.push_str(&format!(
-                    "public struct {}{}: {}{} {{\n",
+                    "public enum {}{}{}{} {{\n",
                     name,
                     generics,
-                    swift.conformance_list(&protocols),
+                    if protocols.is_empty() {
+                        String::new()
+                    } else {
+                        format!(": {}", swift.conformance_list(&protocols))
+                    },
                     generic_where
                 ));
-                result.push_str(&uninhabited_enum_body(&name));
                 result.push('}');
+                result.push_str(&uninhabited_enum_codable(&name));
                 result.push_str(&sendable_conditional_conformance(&name, &ndt.generics));
                 return Ok(result);
             }
@@ -1710,31 +1719,30 @@ fn unit_struct_body(struct_name: &str) -> String {
     body
 }
 
-/// Render the body of the struct that stands in for a Rust enum with no
-/// variants.
+/// Render the `Codable` conformance for an enum with no variants.
 ///
-/// Nothing outside the generated file can construct one, and decoding any value
-/// throws, which matches the uninhabited Rust type. An empty Swift enum would
-/// say the same thing more directly, but Swift then knows the type is
-/// uninhabited and warns that any code after decoding one can never run, which
-/// breaks consumers building with `-warnings-as-errors`.
-fn uninhabited_enum_body(type_name: &str) -> String {
-    let mut body = String::new();
-    body.push_str("    private init() {}\n\n");
-    body.push_str("    public init(from decoder: Decoder) throws {\n");
-    body.push_str("        let container = try decoder.singleValueContainer()\n");
-    body.push_str("        throw DecodingError.dataCorruptedError(\n");
-    body.push_str("            in: container,\n");
-    body.push_str(&format!(
+/// Swift cannot synthesise `Codable` for an empty case list, so both
+/// requirements are written out. Decoding always throws, and `switch self {}`
+/// is exhaustive because no case can match. The extension carries no generic
+/// parameters: the conformance holds whatever they are, since the type has no
+/// values to encode.
+fn uninhabited_enum_codable(type_name: &str) -> String {
+    let mut extension = String::new();
+    extension.push_str(&format!("\nextension {type_name}: Codable {{\n"));
+    extension.push_str("    public init(from decoder: Decoder) throws {\n");
+    extension.push_str("        let container = try decoder.singleValueContainer()\n");
+    extension.push_str("        throw DecodingError.dataCorruptedError(\n");
+    extension.push_str("            in: container,\n");
+    extension.push_str(&format!(
         "            debugDescription: \"{type_name} has no cases, so no value decodes as one\"\n"
     ));
-    body.push_str("        )\n");
-    body.push_str("    }\n\n");
-    body.push_str("    public func encode(to encoder: Encoder) throws {\n");
-    body.push_str("        var container = encoder.singleValueContainer()\n");
-    body.push_str("        try container.encodeNil()\n");
-    body.push_str("    }\n");
-    body
+    extension.push_str("        )\n");
+    extension.push_str("    }\n\n");
+    extension.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    extension.push_str("        switch self {}\n");
+    extension.push_str("    }\n");
+    extension.push_str("}\n");
+    extension
 }
 
 /// Render a genuine newtype struct's body: serde delegates straight to the inner
