@@ -7,10 +7,10 @@ const path = require("path");
 const START_MARKER = "[//]: # (FEATURE_FLAGS_START)";
 const END_MARKER = "[//]: # (FEATURE_FLAGS_END)";
 
-const docsPath = path.join(__dirname, "..", "src", "docs.md");
+const docsPath = path.join(__dirname, "..", "specta", "src", "docs.md");
 
 const cargoToml = fs.readFileSync(
-  path.join(__dirname, "..", "Cargo.toml"),
+  path.join(__dirname, "..", "specta", "Cargo.toml"),
   "utf8"
 );
 const docs = fs.readFileSync(docsPath, "utf8");

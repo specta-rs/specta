@@ -12,8 +12,8 @@ impl Type for String {
     }
 }
 
-#[cfg(feature = "indexmap")]
-#[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
+#[cfg(feature = "indexmap2")]
+#[cfg_attr(docsrs, doc(cfg(feature = "indexmap2")))]
 const _: () = {
     impl_ndt!(
         indexmap::IndexSet<T> as PrimitiveSet<T> = passthrough;
@@ -50,16 +50,16 @@ const _: () = {
     );
 };
 
-#[cfg(feature = "semver")]
-#[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
+#[cfg(feature = "semver1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "semver1")))]
 impl_ndt!(
      semver::Version as str = inline;
      semver::VersionReq  as str = inline;
      semver::Comparator  as str = inline;
 );
 
-#[cfg(feature = "smol_str")]
-#[cfg_attr(docsrs, doc(cfg(feature = "smol_str")))]
+#[cfg(feature = "smol_str03")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smol_str03")))]
 impl_ndt!(smol_str::SmolStr as str = inline);
 
 #[cfg(feature = "arrayvec")]
@@ -69,8 +69,8 @@ impl_ndt!(
     arrayvec::ArrayVec<T> <T, const N: usize> as [T] = passthrough;
 );
 
-#[cfg(feature = "smallvec")]
-#[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
+#[cfg(feature = "smallvec1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smallvec1")))]
 impl<T> Type for smallvec::SmallVec<T>
 where
     T: smallvec::Array,
@@ -81,15 +81,15 @@ where
     }
 }
 
-#[cfg(feature = "bytes")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
+#[cfg(feature = "bytes1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytes1")))]
 impl_ndt!(
     bytes::Bytes as [u8] = inline;
     bytes::BytesMut as [u8] = inline;
 );
 
-#[cfg(feature = "bit-vec")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bit-vec")))]
+#[cfg(feature = "bit-vec010")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bit-vec010")))]
 const _: () = {
     // `bit_vec::BitVec` derives `Serialize` from its private layout, so the wire
     // shape is `{ storage: [B], nbits: usize }`, not a sequence of booleans.
@@ -107,8 +107,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "serde_json")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde_json")))]
+#[cfg(feature = "serde_json1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_json1")))]
 const _: () = {
     use serde_json::{Map, Number, Value};
 
@@ -201,8 +201,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "serde_yaml")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
+#[cfg(feature = "serde_yaml09")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml09")))]
 const _: () = {
     use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
 
@@ -301,8 +301,8 @@ const _: () = {
         }
     }
 };
-#[cfg(feature = "toml")]
-#[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
+#[cfg(feature = "toml1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "toml1")))]
 const _: () = {
     use toml::{Value, value};
 
@@ -388,12 +388,12 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "ulid")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ulid")))]
+#[cfg(feature = "ulid3")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ulid3")))]
 impl_ndt!(ulid::Ulid as str = inline);
 
-#[cfg(feature = "uuid")]
-#[cfg_attr(docsrs, doc(cfg(feature = "uuid")))]
+#[cfg(feature = "uuid1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uuid1")))]
 impl_ndt!(
     uuid::Uuid as str = inline;
     uuid::fmt::Braced as str = inline;
@@ -402,8 +402,8 @@ impl_ndt!(
     uuid::fmt::Urn as str = inline;
 );
 
-#[cfg(feature = "chrono")]
-#[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+#[cfg(feature = "chrono04")]
+#[cfg_attr(docsrs, doc(cfg(feature = "chrono04")))]
 #[allow(deprecated)]
 const _: () = {
     impl_ndt!(
@@ -421,8 +421,8 @@ const _: () = {
     );
 };
 
-#[cfg(feature = "time")]
-#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+#[cfg(feature = "time03")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time03")))]
 impl_ndt!(
     time::PrimitiveDateTime as str = inline;
     time::OffsetDateTime as str = inline;
@@ -435,8 +435,8 @@ impl_ndt!(
     time::Month as str = inline;
 );
 
-#[cfg(feature = "jiff")]
-#[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
+#[cfg(feature = "jiff02")]
+#[cfg_attr(docsrs, doc(cfg(feature = "jiff02")))]
 impl_ndt!(
     jiff::Timestamp as str = inline;
     jiff::Zoned as str = inline;
@@ -448,29 +448,29 @@ impl_ndt!(
     jiff::tz::TimeZone as str = inline;
 );
 
-#[cfg(feature = "bigdecimal")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bigdecimal")))]
+#[cfg(feature = "bigdecimal04")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bigdecimal04")))]
 impl_ndt!(bigdecimal::BigDecimal as str = inline);
 
 // This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
-#[cfg(feature = "rust_decimal")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rust_decimal")))]
+#[cfg(feature = "rust_decimal1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rust_decimal1")))]
 impl_ndt!(rust_decimal::Decimal as str = inline);
 
-#[cfg(feature = "ipnetwork")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ipnetwork")))]
+#[cfg(feature = "ipnetwork021")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ipnetwork021")))]
 impl_ndt!(
     ipnetwork::IpNetwork as str = inline;
     ipnetwork::Ipv4Network as str = inline;
     ipnetwork::Ipv6Network as str = inline;
 );
 
-#[cfg(feature = "mac_address")]
-#[cfg_attr(docsrs, doc(cfg(feature = "mac_address")))]
+#[cfg(feature = "mac_address1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mac_address1")))]
 impl_ndt!(mac_address::MacAddress as str = inline);
 
-#[cfg(feature = "bson")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
+#[cfg(feature = "bson3")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bson3")))]
 const _: () = {
     impl_ndt!(
         bson::oid::ObjectId as BsonObjectId = named;
@@ -749,12 +749,12 @@ const _: () = {
 
 // Technically this can be u64 for formats not marked as human readable in Serde.
 // but we have no way of inspecting that as it's runtime. This is the most common output.
-#[cfg(feature = "bytesize")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
+#[cfg(feature = "bytesize2")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytesize2")))]
 impl_ndt!(bytesize::ByteSize as String = inline);
 
-#[cfg(feature = "uhlc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
+#[cfg(feature = "uhlc09")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uhlc09")))]
 const _: () = {
     impl_ndt!(
         uhlc::NTP64 as u64 = inline;
@@ -805,8 +805,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "glam")]
-#[cfg_attr(docsrs, doc(cfg(feature = "glam")))]
+#[cfg(feature = "glam034")]
+#[cfg_attr(docsrs, doc(cfg(feature = "glam034")))]
 impl_ndt!(
     // Affines
     glam::Affine2 as [f32; 6] = inline;
@@ -898,8 +898,8 @@ impl_ndt!(
     glam::ISizeVec4 as [isize; 4] = inline;
 );
 
-#[cfg(feature = "url")]
-#[cfg_attr(docsrs, doc(cfg(feature = "url")))]
+#[cfg(feature = "url2")]
+#[cfg_attr(docsrs, doc(cfg(feature = "url2")))]
 const _: () = {
     impl_ndt!(
         url::Url as str = inline;
@@ -936,8 +936,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "either")]
-#[cfg_attr(docsrs, doc(cfg(feature = "either")))]
+#[cfg(feature = "either1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "either1")))]
 const _: () = {
     impl_ndt!(either::Either<L, R> as Either<L, R> = named);
 
@@ -965,8 +965,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "error-stack")]
-#[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
+#[cfg(feature = "error-stack08")]
+#[cfg_attr(docsrs, doc(cfg(feature = "error-stack08")))]
 const _: () = {
     impl_ndt!(
         "error_stack" ErrorStackContext as ErrorStackContextInner = named;
@@ -1003,8 +1003,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "bevy_ecs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
+#[cfg(feature = "bevy_ecs020")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs020")))]
 impl_ndt!(
     bevy_ecs::entity::Entity as u64 = named;
     bevy_ecs::name::Name as str = named;
@@ -1015,8 +1015,8 @@ impl_ndt!(
     bevy_ecs::entity::EntityIndexSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
 );
 
-#[cfg(feature = "bevy_input")]
-#[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
+#[cfg(feature = "bevy_input020")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_input020")))]
 const _: () = {
     impl_ndt!(
         bevy_input::ButtonState as BevyButtonState = named;
@@ -1548,15 +1548,15 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "camino")]
-#[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
+#[cfg(feature = "camino1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "camino1")))]
 impl_ndt!(
     camino::Utf8Path as str = inline;
     camino::Utf8PathBuf as str = inline;
 );
 
-#[cfg(feature = "geojson")]
-#[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
+#[cfg(feature = "geojson1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "geojson1")))]
 const _: () = {
     impl_ndt!(
         geojson::Position as [f64] = inline;

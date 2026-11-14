@@ -76,51 +76,90 @@ these types.
 
 ## Feature flags
 
-[//]: # (FEATURE_FLAGS_START)
+Features for third-party crates carry that crate's major version in their name (`uuid1`, `chrono04`, `bevy_ecs020`), so support for a new major of a crate can arrive as a new feature in a minor release of Specta rather than a major one. The unversioned names remain as aliases of the current versioned feature.
 
-- `function` - Support for exporting the types of Rust functions.
+[//]: # (FEATURE_FLAGS_START)
+Core Features
+
+- `std` - Enable support for the Rust standard library. Enabled by default.
+- `derive` - Derive macros
 - `collect` - Support for collecting up a global type map
 
-Languages
+Features
 
-- `typescript` - Support for [TypeScript](https://www.typescriptlang.org) language exporting
-- `js_doc` - Support for [JSDoc](https://jsdoc.app) exporting helpers. Also requires `typescript` feature to be enabled.
+- `function` - Support for exporting the types of Rust functions.
 
 Compatibility
 
-- `serde` - Support for [serde](https://serde.rs)
-- `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
-- `serde_yaml` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
-- `toml` - Support for [toml](https://github.com/toml-rs/toml)
-- `tauri` - Support for [Tauri](https://tauri.app). This is required when using the `#[specta]` attribute with Tauri Commands.
+- `serde_json1` - Support for [serde-json](https://github.com/serde-rs/json) 1.x
+- `serde_yaml09` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml) 0.9.x
+- `toml1` - Support for [toml](https://github.com/toml-rs/toml) 1.x
 
 External types
 
-- `ulid` - [ulid](https://docs.rs/ulid) crate
-- `uuid` - [uuid](https://docs.rs/uuid) crate
-- `chrono` - [chrono](https://docs.rs/chrono) crate
-- `time` - [time](https://docs.rs/time) crate
-- `jiff` - [jiff](https://docs.rs/jiff) crate
-- `bigdecimal` - [bigdecimal](https://docs.rs/bigdecimal) crate
-- `rust_decimal` - [rust_decimal](https://docs.rs/rust_decimal) crate
-- `indexmap` - [indexmap](https://docs.rs/indexmap) crate
-- `ordered-float` - [ordered-float](https://docs.rs/ordered-float) crate
-- `heapless` - [heapless](https://docs.rs/heapless) crate
-- `semver` - [semver](https://docs.rs/semver) crate
-- `smol_str` - [smol_str](https://docs.rs/smol_str) crate
-- `arrayvec` - [arrayvec](https://docs.rs/arrayvec) crate
-- `smallvec` - [smallvec](https://docs.rs/smallvec) crate
-- `ipnetwork` - [ipnetwork](https://docs.rs/ipnetwork) crate
-- `mac_address` - [mac_address](https://docs.rs/mac_address) crate
-- `bit-vec` - [bit-vec](https://docs.rs/bit-vec) crate
-- `bson` - [bson](https://docs.rs/bson) crate
-- `uhlc` - [uhlc](https://docs.rs/uhlc) crate
-- `bytesize` - [bytesize](https://docs.rs/bytesize) crate
-- `glam` - [glam](https://docs.rs/glam) crate
-- `tokio` - [tokio](https://docs.rs/tokio) crate
-- `url` - [url](https://docs.rs/url) crate
-- `either` - [either](https://docs.rs/either) crate
-- `bevy_ecs` - [bevy_ecs](https://docs.rs/bevy_ecs) crate
+- `uuid1` - [uuid](https://docs.rs/uuid) 1.x
+- `ulid3` - [ulid](https://docs.rs/ulid) 3.x
+- `chrono04` - [chrono](https://docs.rs/chrono) 0.4.x
+- `time03` - [time](https://docs.rs/time) 0.3.x
+- `jiff02` - [jiff](https://docs.rs/jiff) 0.2.x
+- `bigdecimal04` - [bigdecimal](https://docs.rs/bigdecimal) 0.4.x
+- `rust_decimal1` - [rust_decimal](https://docs.rs/rust_decimal) 1.x
+- `indexmap2` - [indexmap](https://docs.rs/indexmap) 2.x
+- `ordered-float` - [ordered-float](https://docs.rs/ordered-float) 3.x through 5.x. The version range is the policy for this crate, so the feature name carries no major.
+- `heapless` - [heapless](https://docs.rs/heapless) 0.7.x through 0.9.x. The version range is the policy for this crate, so the feature name carries no major.
+- `semver1` - [semver](https://docs.rs/semver) 1.x
+- `smol_str03` - [smol_str](https://docs.rs/smol_str) 0.3.x
+- `arrayvec` - [arrayvec](https://docs.rs/arrayvec) 0.6.x and 0.7.x. The version range is the policy for this crate, so the feature name carries no major.
+- `smallvec1` - [smallvec](https://docs.rs/smallvec) 1.x
+- `ipnetwork021` - [ipnetwork](https://docs.rs/ipnetwork) 0.21.x
+- `mac_address1` - [mac_address](https://docs.rs/mac_address) 1.x
+- `bit-vec010` - [bit-vec](https://docs.rs/bit-vec) 0.10.x
+- `bson3` - [bson](https://docs.rs/bson) 3.x
+- `bytes1` - [bytes](https://docs.rs/bytes) 1.x
+- `uhlc09` - [uhlc](https://docs.rs/uhlc) 0.9.x
+- `bytesize2` - [bytesize](https://docs.rs/bytesize) 2.x
+- `glam034` - [glam](https://docs.rs/glam) 0.34.x
+- `tokio1` - [tokio](https://docs.rs/tokio) 1.x
+- `url2` - [url](https://docs.rs/url) 2.x
+- `either1` - [either](https://docs.rs/either) 1.x
+- `error-stack08` - [error-stack](https://docs.rs/error-stack) 0.8.x
+- `bevy_ecs020` - [bevy_ecs](https://docs.rs/bevy_ecs) 0.20.x
+- `bevy_input020` - [bevy_input](https://docs.rs/bevy_input) 0.20.x
+- `camino1` - [camino](https://docs.rs/camino) 1.x
+- `geojson1` - [geojson](https://docs.rs/geojson) 1.x
+
+Unversioned aliases. These are the pre-2.0 names; each enables the versioned feature it is named after. New manifests should use the versioned name.
+
+- `serde_json` - Alias of `serde_json1`.
+- `serde_yaml` - Alias of `serde_yaml09`.
+- `toml` - Alias of `toml1`.
+- `uuid` - Alias of `uuid1`.
+- `ulid` - Alias of `ulid3`.
+- `chrono` - Alias of `chrono04`.
+- `time` - Alias of `time03`.
+- `jiff` - Alias of `jiff02`.
+- `bigdecimal` - Alias of `bigdecimal04`.
+- `rust_decimal` - Alias of `rust_decimal1`.
+- `indexmap` - Alias of `indexmap2`.
+- `semver` - Alias of `semver1`.
+- `smol_str` - Alias of `smol_str03`.
+- `smallvec` - Alias of `smallvec1`.
+- `ipnetwork` - Alias of `ipnetwork021`.
+- `mac_address` - Alias of `mac_address1`.
+- `bit-vec` - Alias of `bit-vec010`.
+- `bson` - Alias of `bson3`.
+- `bytes` - Alias of `bytes1`.
+- `uhlc` - Alias of `uhlc09`.
+- `bytesize` - Alias of `bytesize2`.
+- `glam` - Alias of `glam034`.
+- `tokio` - Alias of `tokio1`.
+- `url` - Alias of `url2`.
+- `either` - Alias of `either1`.
+- `error-stack` - Alias of `error-stack08`.
+- `bevy_ecs` - Alias of `bevy_ecs020`.
+- `bevy_input` - Alias of `bevy_input020`.
+- `camino` - Alias of `camino1`.
+- `geojson` - Alias of `geojson1`.
 
 [//]: # (FEATURE_FLAGS_END)
 ## Alternatives
