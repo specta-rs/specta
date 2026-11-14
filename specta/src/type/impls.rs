@@ -275,8 +275,8 @@ const _: () = {
     }
 };
 
-#[cfg(feature = "tokio")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+#[cfg(feature = "tokio1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio1")))]
 impl_ndt!(
     tokio::sync::Mutex<T> where { T: Type + ?Sized } as T = passthrough;
     tokio::sync::RwLock<T> where { T: Type + ?Sized } as T = passthrough;

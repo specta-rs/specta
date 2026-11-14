@@ -35,74 +35,136 @@ collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
 
 #! Compatibility
-## Support for [serde-json](https://github.com/serde-rs/json)
-serde_json = ["dep:serde_json"]
-## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
-serde_yaml = ["dep:serde_yaml"]
-## Support for [toml](https://github.com/toml-rs/toml)
-toml = ["dep:toml", "std"]
+## Support for [serde-json](https://github.com/serde-rs/json) 1.x
+serde_json1 = ["dep:serde_json"]
+## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml) 0.9.x
+serde_yaml09 = ["dep:serde_yaml"]
+## Support for [toml](https://github.com/toml-rs/toml) 1.x
+toml1 = ["dep:toml", "std"]
 
 #! External types
-## [uuid](https://docs.rs/uuid) crate
-uuid = ["dep:uuid"]
-## [uuid](https://docs.rs/ulid) crate
-ulid = ["dep:ulid"]
-## [chrono](https://docs.rs/chrono) crate
-chrono = ["dep:chrono"]
-## [time](https://docs.rs/time) crate
-time = ["dep:time"]
-# [jiff](https://docs.rs/jiff) crate
-jiff = ["dep:jiff"]
-## [bigdecimal](https://docs.rs/bigdecimal) crate
-bigdecimal = ["dep:bigdecimal"]
-## [rust_decimal](https://docs.rs/rust_decimal) crate
-rust_decimal = ["dep:rust_decimal"]
-## [indexmap](https://docs.rs/indexmap) crate
-indexmap = ["dep:indexmap"]
-## [ordered-float](https://docs.rs/ordered-float) crate
+## [uuid](https://docs.rs/uuid) 1.x
+uuid1 = ["dep:uuid"]
+## [ulid](https://docs.rs/ulid) 3.x
+ulid3 = ["dep:ulid"]
+## [chrono](https://docs.rs/chrono) 0.4.x
+chrono04 = ["dep:chrono"]
+## [time](https://docs.rs/time) 0.3.x
+time03 = ["dep:time"]
+## [jiff](https://docs.rs/jiff) 0.2.x
+jiff02 = ["dep:jiff"]
+## [bigdecimal](https://docs.rs/bigdecimal) 0.4.x
+bigdecimal04 = ["dep:bigdecimal"]
+## [rust_decimal](https://docs.rs/rust_decimal) 1.x
+rust_decimal1 = ["dep:rust_decimal"]
+## [indexmap](https://docs.rs/indexmap) 2.x
+indexmap2 = ["dep:indexmap"]
+## [ordered-float](https://docs.rs/ordered-float) 3.x through 5.x. The version range is the policy for this crate, so the feature name carries no major.
 ordered-float = ["dep:ordered-float"]
-## [heapless](https://docs.rs/heapless) crate
+## [heapless](https://docs.rs/heapless) 0.7.x through 0.9.x. The version range is the policy for this crate, so the feature name carries no major.
 heapless = ["dep:heapless"]
-## [semver](https://docs.rs/semver) crate
-semver = ["dep:semver"]
-## [smol_str](https://docs.rs/smol_str) crate
-smol_str = ["dep:smol_str"]
-## [arrayvec](https://docs.rs/arrayvec) crate
+## [semver](https://docs.rs/semver) 1.x
+semver1 = ["dep:semver"]
+## [smol_str](https://docs.rs/smol_str) 0.3.x
+smol_str03 = ["dep:smol_str"]
+## [arrayvec](https://docs.rs/arrayvec) 0.6.x and 0.7.x. The version range is the policy for this crate, so the feature name carries no major.
 arrayvec = ["dep:arrayvec"]
-## [smallvec](https://docs.rs/smallvec) crate
-smallvec = ["dep:smallvec"]
-## [ipnetwork](https://docs.rs/ipnetwork) crate
-ipnetwork = ["dep:ipnetwork"]
-## [mac_address](https://docs.rs/mac_address) crate
-mac_address = ["dep:mac_address"]
-## [bit-vec](https://docs.rs/bit-vec) crate
-bit-vec = ["dep:bit-vec"]
-## [bson](https://docs.rs/bson) crate
-bson = ["dep:bson"]
-## [bytes](https://docs.rs/bytes) crate
-bytes = ["dep:bytes"]
-## [uhlc](https://docs.rs/uhlc) crate
-uhlc = ["dep:uhlc"]
-## [bytesize](https://docs.rs/bytesize) crate
-bytesize = ["dep:bytesize"]
-## [glam](https://docs.rs/glam) crate
-glam = ["dep:glam"]
-## [tokio](https://docs.rs/tokio) crate
-tokio = ["dep:tokio"]
-## [url](https://docs.rs/url) crate
-url = ["dep:url"]
-## [either](https://docs.rs/either) crate
-either = ["dep:either"]
-## [error-stack](https://docs.rs/error-stack) crate
-error-stack = ["dep:error-stack"]
-# [bevy_ecs](https://docs.rs/bevy_ecs) crate
-bevy_ecs = ["dep:bevy_ecs"]
-# [bevy_input](https://docs.rs/bevy_input) crate
-bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam", "smol_str"]
-# [camino](https://docs.rs/camino) crate
-camino = ["dep:camino"]
-## [geojson](https://docs.rs/geojson) crate
-geojson = ["dep:geojson", "serde_json"]
+## [smallvec](https://docs.rs/smallvec) 1.x
+smallvec1 = ["dep:smallvec"]
+## [ipnetwork](https://docs.rs/ipnetwork) 0.21.x
+ipnetwork021 = ["dep:ipnetwork"]
+## [mac_address](https://docs.rs/mac_address) 1.x
+mac_address1 = ["dep:mac_address"]
+## [bit-vec](https://docs.rs/bit-vec) 0.10.x
+bit-vec010 = ["dep:bit-vec"]
+## [bson](https://docs.rs/bson) 3.x
+bson3 = ["dep:bson"]
+## [bytes](https://docs.rs/bytes) 1.x
+bytes1 = ["dep:bytes"]
+## [uhlc](https://docs.rs/uhlc) 0.9.x
+uhlc09 = ["dep:uhlc"]
+## [bytesize](https://docs.rs/bytesize) 2.x
+bytesize2 = ["dep:bytesize"]
+## [glam](https://docs.rs/glam) 0.34.x
+glam034 = ["dep:glam"]
+## [tokio](https://docs.rs/tokio) 1.x
+tokio1 = ["dep:tokio"]
+## [url](https://docs.rs/url) 2.x
+url2 = ["dep:url"]
+## [either](https://docs.rs/either) 1.x
+either1 = ["dep:either"]
+## [error-stack](https://docs.rs/error-stack) 0.8.x
+error-stack08 = ["dep:error-stack"]
+## [bevy_ecs](https://docs.rs/bevy_ecs) 0.20.x
+bevy_ecs020 = ["dep:bevy_ecs"]
+## [bevy_input](https://docs.rs/bevy_input) 0.20.x
+bevy_input020 = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam", "smol_str03"]
+## [camino](https://docs.rs/camino) 1.x
+camino1 = ["dep:camino"]
+## [geojson](https://docs.rs/geojson) 1.x
+geojson1 = ["dep:geojson", "serde_json1"]
+
+#! Unversioned aliases. These are the pre-2.0 names; each enables the versioned feature it is named after. New manifests should use the versioned name.
+## Alias of `serde_json1`.
+serde_json = ["serde_json1"]
+## Alias of `serde_yaml09`.
+serde_yaml = ["serde_yaml09"]
+## Alias of `toml1`.
+toml = ["toml1"]
+## Alias of `uuid1`.
+uuid = ["uuid1"]
+## Alias of `ulid3`.
+ulid = ["ulid3"]
+## Alias of `chrono04`.
+chrono = ["chrono04"]
+## Alias of `time03`.
+time = ["time03"]
+## Alias of `jiff02`.
+jiff = ["jiff02"]
+## Alias of `bigdecimal04`.
+bigdecimal = ["bigdecimal04"]
+## Alias of `rust_decimal1`.
+rust_decimal = ["rust_decimal1"]
+## Alias of `indexmap2`.
+indexmap = ["indexmap2"]
+## Alias of `semver1`.
+semver = ["semver1"]
+## Alias of `smol_str03`.
+smol_str = ["smol_str03"]
+## Alias of `smallvec1`.
+smallvec = ["smallvec1"]
+## Alias of `ipnetwork021`.
+ipnetwork = ["ipnetwork021"]
+## Alias of `mac_address1`.
+mac_address = ["mac_address1"]
+## Alias of `bit-vec010`.
+bit-vec = ["bit-vec010"]
+## Alias of `bson3`.
+bson = ["bson3"]
+## Alias of `bytes1`.
+bytes = ["bytes1"]
+## Alias of `uhlc09`.
+uhlc = ["uhlc09"]
+## Alias of `bytesize2`.
+bytesize = ["bytesize2"]
+## Alias of `glam034`.
+glam = ["glam034"]
+## Alias of `tokio1`.
+tokio = ["tokio1"]
+## Alias of `url2`.
+url = ["url2"]
+## Alias of `either1`.
+either = ["either1"]
+## Alias of `error-stack08`.
+error-stack = ["error-stack08"]
+## Alias of `bevy_ecs020`.
+bevy_ecs = ["bevy_ecs020"]
+## Alias of `bevy_input020`.
+bevy_input = ["bevy_input020"]
+## Alias of `camino1`.
+camino = ["camino1"]
+## Alias of `geojson1`.
+geojson = ["geojson1"]
 
 [lints]
 workspace = true

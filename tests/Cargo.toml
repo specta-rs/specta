@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson", "uhlc", "uuid", "url", "jiff", "bit-vec"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json1", "serde_yaml09", "toml1", "chrono04", "either1", "error-stack08", "ulid3", "glam034", "ordered-float", "heapless", "semver1", "smol_str03", "arrayvec", "smallvec1", "geojson1", "bson3", "uhlc09", "uuid1", "url2", "jiff02", "bit-vec010"] }
 specta-go = { path = "../specta-go" }
 specta-jsonschema = { path = "../specta-jsonschema" }
 specta-java = { path = "../specta-java" }
