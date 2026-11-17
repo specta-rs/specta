@@ -36,7 +36,7 @@ pub(crate) fn render_file(
     }
     if kotlin.serialization == Serialization::Kotlinx {
         out.push_str(
-            "@file:kotlin.OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\n",
+            "@file:kotlin.OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, kotlinx.serialization.InternalSerializationApi::class)\n\n",
         );
     }
     if let Some(package) = &kotlin.package {
@@ -412,6 +412,7 @@ fn render_struct(
                     field,
                     &format!("{path}.{field_name}"),
                     1,
+                    None,
                 )?;
                 if index + 1 != fields.len() {
                     out.push(',');
@@ -443,6 +444,7 @@ fn render_struct(
                     field,
                     &format!("{path}.{index}"),
                     true,
+                    None,
                 )?);
                 if field.optional {
                     out.push_str(" = null");
@@ -469,6 +471,7 @@ fn render_struct(
                         field,
                         &format!("{path}.{index}"),
                         1,
+                        None,
                     )?;
                     if position + 1 != fields.len() {
                         out.push(',');
@@ -480,6 +483,287 @@ fn render_struct(
         }
     }
     Ok(())
+}
+
+/// How Serde represents an enum on the wire.
+enum EnumRepr<'a> {
+    /// A plain externally tagged enum: `"Variant"` or `{"Variant": payload}`.
+    External,
+    /// `specta-serde` lowered the tag into every variant, covering Serde's internal and
+    /// adjacent representations.
+    Tagged { tag_key: Cow<'a, str> },
+    /// `#[serde(untagged)]`: the payload is the value with no discriminator.
+    Untagged,
+    /// A rewritten representation with no uniform tag (per-variant `#[serde(untagged)]`, a
+    /// `#[serde(other)]` catch-all, ...).
+    Custom,
+}
+
+/// One variant after its Serde representation has been resolved.
+struct VariantShape<'a> {
+    /// Rust variant name.
+    name: &'a str,
+    /// Wire tag for the variant, already carrying `serde`'s renames.
+    wire: Cow<'a, str>,
+    /// Payload fields, with any lowered tag field removed.
+    fields: Fields,
+}
+
+struct EnumShape<'a> {
+    repr: EnumRepr<'a>,
+    variants: Vec<VariantShape<'a>>,
+}
+
+struct TaggedVariant<'a> {
+    tag_key: Cow<'a, str>,
+    wire: Cow<'a, str>,
+    payload: Fields,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PayloadShape {
+    Unit,
+    Newtype,
+    Struct,
+    Tuple,
+}
+
+fn enum_shape<'a>(
+    format: Option<&dyn Format>,
+    types: &Types,
+    enm: &'a Enum,
+    variants: &[(&'a Cow<'a, str>, &'a Variant)],
+    path: &str,
+) -> Result<EnumShape<'a>, Error> {
+    let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+    let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+
+    if untagged {
+        return Ok(EnumShape {
+            repr: EnumRepr::Untagged,
+            variants: variants
+                .iter()
+                .copied()
+                .map(|(name, variant)| VariantShape {
+                    name,
+                    wire: Cow::Borrowed(name.as_ref()),
+                    fields: normalized_variant_fields(name, &variant.fields, rewritten, true),
+                })
+                .collect(),
+        });
+    }
+
+    if rewritten {
+        let mut tag_key: Option<Cow<'a, str>> = None;
+        let mut shapes = Vec::with_capacity(variants.len());
+        let mut uniform = true;
+        let mut tagged_any = false;
+        for (name, variant) in variants.iter().copied() {
+            let Some(tagged) = tagged_variant(variant, types, format, path)? else {
+                uniform = false;
+                continue;
+            };
+            tagged_any = true;
+            match &tag_key {
+                Some(key) if *key != tagged.tag_key => {
+                    uniform = false;
+                }
+                Some(_) => {}
+                None => tag_key = Some(tagged.tag_key.clone()),
+            }
+            shapes.push(VariantShape {
+                name: name.as_ref(),
+                wire: tagged.wire,
+                fields: tagged.payload,
+            });
+        }
+        if uniform && let Some(tag_key) = tag_key {
+            return Ok(EnumShape {
+                repr: EnumRepr::Tagged { tag_key },
+                variants: shapes,
+            });
+        }
+        // `specta-serde` also marks a plain external enum it only renamed, so an absent tag
+        // means there is nothing to lower rather than an unmodelled representation.
+        let repr = if tagged_any {
+            EnumRepr::Custom
+        } else {
+            EnumRepr::External
+        };
+        return Ok(EnumShape {
+            repr,
+            variants: variants
+                .iter()
+                .copied()
+                .map(|(name, variant)| VariantShape {
+                    name,
+                    wire: Cow::Borrowed(name.as_ref()),
+                    fields: normalized_variant_fields(name, &variant.fields, rewritten, untagged),
+                })
+                .collect(),
+        });
+    }
+
+    Ok(EnumShape {
+        repr: EnumRepr::External,
+        variants: variants
+            .iter()
+            .copied()
+            .map(|(name, variant)| VariantShape {
+                name,
+                wire: Cow::Borrowed(name.as_ref()),
+                fields: normalized_variant_fields(name, &variant.fields, false, false),
+            })
+            .collect(),
+    })
+}
+
+/// Recover the tag `specta-serde` lowered into an internally or adjacently tagged variant.
+///
+/// Both representations end up as a named tag field holding a single-variant unit enum (a
+/// string literal) followed by the payload fields. Internal tagging flattens a struct
+/// payload into those fields while adjacent tagging nests it under the `content` key, but
+/// flattening the remaining fields is the correct wire shape for both: the field already
+/// carries the content key.
+fn tagged_variant<'a>(
+    variant: &'a Variant,
+    types: &Types,
+    format: Option<&dyn Format>,
+    path: &str,
+) -> Result<Option<TaggedVariant<'a>>, Error> {
+    match &variant.fields {
+        Fields::Named(fields) => {
+            let Some((tag_key, wire)) = fields.fields.iter().find_map(|(name, field)| {
+                literal_tag(field).map(|wire| (name.clone(), Cow::Borrowed(wire)))
+            }) else {
+                return Ok(None);
+            };
+            Ok(Some(TaggedVariant {
+                tag_key: tag_key.clone(),
+                wire,
+                payload: named_fields(
+                    fields
+                        .fields
+                        .iter()
+                        .filter(|(name, _)| name != &tag_key)
+                        .cloned(),
+                ),
+            }))
+        }
+        // An internally tagged newtype variant is lowered to the tag struct intersected
+        // with the payload. Hoisting the payload's fields reproduces Serde's flattening.
+        Fields::Unnamed(fields) => {
+            let [field] = fields.fields.as_slice() else {
+                return Ok(None);
+            };
+            let Some(DataType::Intersection(parts)) = &field.ty else {
+                return Ok(None);
+            };
+            let mut tag_key = None;
+            let mut wire = None;
+            let mut payload = Vec::new();
+            for part in parts {
+                let Some(fields) = resolved_named_fields(types, format, part, path, 0)? else {
+                    return Ok(None);
+                };
+                for (name, field) in fields {
+                    if let Some(value) = literal_tag(&field) {
+                        if tag_key.is_some() {
+                            return Ok(None);
+                        }
+                        wire = Some(Cow::Owned(value.to_owned()));
+                        tag_key = Some(name);
+                    } else {
+                        payload.push((name, field));
+                    }
+                }
+            }
+            let (Some(tag_key), Some(wire)) = (tag_key, wire) else {
+                return Ok(None);
+            };
+            Ok(Some(TaggedVariant {
+                tag_key,
+                wire,
+                payload: named_fields(payload),
+            }))
+        }
+        Fields::Unit => Ok(None),
+    }
+}
+
+/// A field whose type is a single-variant unit enum carries the Serde tag as a literal.
+fn literal_tag(field: &Field) -> Option<&str> {
+    let DataType::Enum(enm) = field.ty.as_ref()? else {
+        return None;
+    };
+    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
+        return None;
+    }
+    let [(name, variant)] = enm.variants.as_slice() else {
+        return None;
+    };
+    is_unit_fields(&variant.fields).then_some(name.as_ref())
+}
+
+/// Resolve a datatype that structurally contributes named fields, following inline and
+/// named references and substituting generic arguments.
+fn resolved_named_fields(
+    types: &Types,
+    format: Option<&dyn Format>,
+    dt: &DataType,
+    path: &str,
+    depth: usize,
+) -> Result<Option<Vec<(Cow<'static, str>, Field)>>, Error> {
+    if depth > 16 {
+        return Ok(None);
+    }
+    let dt = map_datatype(format, types, dt)?;
+    match &dt {
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Named(fields) => Ok(Some(fields.fields.clone())),
+            _ => Ok(None),
+        },
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt, .. } => {
+                resolved_named_fields(types, format, dt, path, depth + 1)
+            }
+            NamedReferenceType::Reference { generics, .. } => {
+                let ndt = types
+                    .get(reference)
+                    .ok_or_else(|| Error::DanglingReference {
+                        path: path.to_owned(),
+                    })?;
+                let Some(original) = &ndt.ty else {
+                    return Ok(None);
+                };
+                let mut ty = map_datatype(format, types, original)?;
+                let resolved = resolved_reference_generics(ndt, generics, ndt.name.as_ref())?;
+                if !resolved.is_empty() {
+                    let substitutions = ndt
+                        .generics
+                        .iter()
+                        .map(|generic| generic.reference())
+                        .zip(resolved)
+                        .collect::<Vec<_>>();
+                    substitute_generics(&mut ty, &substitutions);
+                }
+                resolved_named_fields(types, format, &ty, path, depth + 1)
+            }
+            NamedReferenceType::Recursive(_) => Ok(None),
+        },
+        _ => Ok(None),
+    }
+}
+
+fn named_fields(fields: impl IntoIterator<Item = (Cow<'static, str>, Field)>) -> Fields {
+    let mut builder = Struct::named();
+    for (name, field) in fields {
+        builder = builder.field(name, field);
+    }
+    let DataType::Struct(strct) = builder.build() else {
+        unreachable!("StructBuilder always creates a struct")
+    };
+    strct.fields
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -498,9 +782,9 @@ fn render_enum(
         .variants
         .iter()
         .filter(|(_, variant)| !variant.skip)
+        .map(|(name, variant)| (name, variant))
         .collect::<Vec<_>>();
-    let serde_rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
-    let serde_untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+    let shape = enum_shape(format, types, enm, &variants, path)?;
     let mut used_names = std::iter::once(name.to_owned())
         .chain(generics.iter().cloned())
         .map(|name| semantic_identifier(&name).to_owned())
@@ -533,53 +817,86 @@ fn render_enum(
             Ok(resolved)
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let unit_only = generics.is_empty()
-        && variants.iter().all(|(name, variant)| {
-            is_unit_fields(&normalized_variant_fields(
-                name,
-                &variant.fields,
-                serde_rewritten,
-                serde_untagged,
-            ))
-        });
+    // Generated helpers and serializers share the file with every other declaration, so
+    // avoid names that would shadow one of them.
+    used_names.extend(
+        types
+            .into_sorted_iter()
+            .filter(|ndt| ndt.ty.is_some())
+            .map(|ndt| named_type_identifier(kotlin, ndt, &ndt.name))
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .map(|name| semantic_identifier(name).to_owned()),
+    );
+    let kotlinx = kotlin.serialization == Serialization::Kotlinx;
 
-    if kotlin.serialization == Serialization::Kotlinx {
-        return Err(Error::UnsupportedType {
-            path: path.into(),
-            reason: "standard Kotlinx enum and polymorphic encodings cannot preserve every Serde enum representation",
-        });
-    }
-
-    annotation(out, "", kotlin, "Serializable", None);
-    if unit_only {
-        out.push_str("public enum class ");
-        out.push_str(name);
-        out.push_str(" {\n");
-        for (index, ((variant_name, variant), converted)) in
-            variants.iter().zip(&variant_names).enumerate()
-        {
-            let indent = kotlin.indentation(1);
-            render_kdoc(out, &indent, &variant.docs);
-            render_deprecated(out, &indent, variant.deprecated.as_ref());
-            if converted != variant_name.as_ref() {
-                annotation(out, &indent, kotlin, "SerialName", Some(variant_name));
+    if kotlinx {
+        match &shape.repr {
+            EnumRepr::Untagged => {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "Kotlinx cannot tell untagged enum variants apart by shape",
+                });
             }
-            out.push_str(&indent);
-            out.push_str(&identifier(converted, &format!("{path}.{variant_name}"))?);
-            if index + 1 != variants.len() {
-                out.push(',');
+            EnumRepr::Custom => {
+                return Err(Error::UnsupportedType {
+                    path: path.into(),
+                    reason: "this Serde enum representation has no generated Kotlinx serializer",
+                });
             }
-            out.push('\n');
+            EnumRepr::External | EnumRepr::Tagged { .. } => {}
         }
-        out.push('}');
-        return Ok(());
+        // A custom serializer would have to be parameterised by every instantiation's
+        // serializers, which standard Kotlinx annotations cannot express.
+        if !generics.is_empty() {
+            return Err(Error::UnsupportedType {
+                path: path.into(),
+                reason: "generic enums need a per-instantiation Kotlinx serializer",
+            });
+        }
     }
 
+    let unit_only = generics.is_empty()
+        && shape
+            .variants
+            .iter()
+            .all(|variant| is_unit_fields(&variant.fields));
+
+    // Without unknown variants an all-unit enum encodes exactly like a Kotlinx string enum.
+    if unit_only && !(kotlinx && kotlin.unknown_variants) {
+        return render_enum_class(out, kotlin, &shape, &variants, &variant_names, name, path);
+    }
+
+    let serializer_name = if kotlinx {
+        Some(unique_name(
+            &mut used_names,
+            &format!("{name}Serializer"),
+            path,
+        )?)
+    } else {
+        None
+    };
+    let unknown_name = if kotlinx && kotlin.unknown_variants {
+        Some(unique_name(&mut used_names, "Unknown", path)?)
+    } else {
+        None
+    };
+
+    if let Some(serializer_name) = &serializer_name {
+        annotation_raw(
+            out,
+            "",
+            &format!("@kotlinx.serialization.Serializable(with = {serializer_name}::class)"),
+        );
+    }
     out.push_str("public sealed interface ");
     out.push_str(name);
     out.push_str(&generic_declaration(generics));
     out.push_str(" {\n");
-    for ((variant_name, variant), converted) in variants.into_iter().zip(&variant_names) {
+    let mut helpers = Vec::new();
+    for ((shape_variant, converted), (_, variant)) in
+        shape.variants.iter().zip(&variant_names).zip(&variants)
+    {
         render_variant(
             out,
             kotlin,
@@ -588,17 +905,114 @@ fn render_enum(
             name,
             generics,
             generic_scope,
-            variant_name,
-            converted,
+            shape_variant,
             variant,
+            converted,
+            &shape.repr,
             path,
-            serde_rewritten,
-            serde_untagged,
+            &mut helpers,
+            &mut used_names,
         )?;
+        out.push('\n');
+    }
+    if let Some(unknown_name) = &unknown_name {
+        render_unknown_variant(out, kotlin, name, unknown_name);
+        out.push('\n');
+    }
+    out.push('}');
+    for helper in helpers {
+        out.push_str("\n\n");
+        out.push_str(&helper);
+    }
+    if let Some(serializer_name) = &serializer_name {
+        out.push_str("\n\n");
+        return render_serializer(
+            out,
+            kotlin,
+            name,
+            serializer_name,
+            unknown_name.as_deref(),
+            &shape.repr,
+            &shape.variants,
+            &variant_names,
+            path,
+        );
+    }
+    Ok(())
+}
+
+fn render_enum_class(
+    out: &mut String,
+    kotlin: &Kotlin,
+    shape: &EnumShape<'_>,
+    variants: &[(&Cow<'_, str>, &Variant)],
+    variant_names: &[String],
+    name: &str,
+    path: &str,
+) -> Result<(), Error> {
+    let kotlinx = kotlin.serialization == Serialization::Kotlinx;
+    // Plain declarations have no serialization framework to read `@SerialName`, so record
+    // the wire spelling on the enum itself.
+    let record_wire = kotlin.serialization == Serialization::None
+        && !matches!(shape.repr, EnumRepr::Untagged)
+        && shape
+            .variants
+            .iter()
+            .zip(variant_names)
+            .any(|(variant, converted)| semantic_identifier(converted) != variant.wire);
+    annotation(out, "", kotlin, "Serializable", None);
+    out.push_str("public enum class ");
+    out.push_str(name);
+    if record_wire {
+        out.push_str("(public val wireValue: kotlin.String)");
+    }
+    out.push_str(" {\n");
+    for (index, (variant, converted)) in variants.iter().zip(variant_names).enumerate() {
+        let shape_variant = &shape.variants[index];
+        let indent = kotlin.indentation(1);
+        render_kdoc(out, &indent, &variant.1.docs);
+        render_deprecated(out, &indent, variant.1.deprecated.as_ref());
+        let converted_identifier =
+            identifier(converted, &format!("{path}.{}", shape_variant.name))?;
+        if kotlinx && semantic_identifier(&converted_identifier) != shape_variant.wire {
+            annotation(
+                out,
+                &indent,
+                kotlin,
+                "SerialName",
+                Some(&shape_variant.wire),
+            );
+        }
+        out.push_str(&indent);
+        out.push_str(&converted_identifier);
+        if record_wire {
+            out.push_str("(\"");
+            out.push_str(&escape_string(&shape_variant.wire));
+            out.push_str("\")");
+        }
+        if index + 1 != variants.len() {
+            out.push(',');
+        }
         out.push('\n');
     }
     out.push('}');
     Ok(())
+}
+
+fn render_unknown_variant(out: &mut String, kotlin: &Kotlin, parent: &str, name: &str) {
+    let indent = kotlin.indentation(1);
+    annotation(out, &indent, kotlin, "Serializable", None);
+    out.push_str(&indent);
+    out.push_str("public data class ");
+    out.push_str(name);
+    out.push_str("(\n");
+    out.push_str(&kotlin.indentation(2));
+    out.push_str("public val tag: kotlin.String,\n");
+    out.push_str(&kotlin.indentation(2));
+    out.push_str("public val content: kotlinx.serialization.json.JsonElement? = null,\n");
+    out.push_str(&indent);
+    out.push_str(") : ");
+    out.push_str(parent);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -610,31 +1024,30 @@ fn render_variant(
     parent: &str,
     generics: &[String],
     generic_scope: &[Generic],
-    original_name: &str,
-    converted: &str,
+    shape: &VariantShape<'_>,
     variant: &Variant,
+    converted: &str,
+    repr: &EnumRepr<'_>,
     path: &str,
-    serde_rewritten: bool,
-    serde_untagged: bool,
+    helpers: &mut Vec<String>,
+    used_names: &mut BTreeSet<String>,
 ) -> Result<(), Error> {
-    let fields = normalized_variant_fields(
-        original_name,
-        &variant.fields,
-        serde_rewritten,
-        serde_untagged,
-    );
     let indent = kotlin.indentation(1);
     render_kdoc(out, &indent, &variant.docs);
     render_deprecated(out, &indent, variant.deprecated.as_ref());
     annotation(out, &indent, kotlin, "Serializable", None);
-    if converted != original_name {
-        annotation(out, &indent, kotlin, "SerialName", Some(original_name));
+    let serial_name = match repr {
+        EnumRepr::Tagged { .. } => shape.wire.as_ref(),
+        _ => shape.name,
+    };
+    if converted != serial_name {
+        annotation(out, &indent, kotlin, "SerialName", Some(serial_name));
     }
-    let variant_name = identifier(converted, &format!("{path}.{original_name}"))?;
+    let variant_name = identifier(converted, &format!("{path}.{}", shape.name))?;
     out.push_str(&indent);
     let parent_type = format!("{parent}{}", generic_usage(generics));
 
-    match &fields {
+    match &shape.fields {
         Fields::Unit => {
             if generics.is_empty() {
                 out.push_str("public data object ");
@@ -672,6 +1085,35 @@ fn render_variant(
                 out.push_str(&variant_name);
                 out.push_str(&generic_declaration(generics));
                 out.push_str("(\n");
+                let mut overrides = Vec::with_capacity(fields.len());
+                for (index, field) in &fields {
+                    let property = if fields.len() == 1 {
+                        "value".to_owned()
+                    } else {
+                        format!("field{index}")
+                    };
+                    let hint = if fields.len() == 1 {
+                        format!("{parent}{}Data", pascal_case(shape.name))
+                    } else {
+                        format!(
+                            "{parent}{}{}Data",
+                            pascal_case(shape.name),
+                            pascal_case(&property)
+                        )
+                    };
+                    overrides.push(hoist_inline_struct(
+                        helpers,
+                        kotlin,
+                        format,
+                        types,
+                        generics,
+                        generic_scope,
+                        &hint,
+                        field,
+                        path,
+                        used_names,
+                    )?);
+                }
                 for (position, (index, field)) in fields.iter().enumerate() {
                     let property = if fields.len() == 1 {
                         "value".to_owned()
@@ -686,8 +1128,9 @@ fn render_variant(
                         generic_scope,
                         &property,
                         field,
-                        &format!("{path}.{original_name}.{index}"),
+                        &format!("{path}.{}.{index}", shape.name),
                         2,
+                        overrides[position].as_deref(),
                     )?;
                     if position + 1 != fields.len() {
                         out.push(',');
@@ -701,7 +1144,7 @@ fn render_variant(
         }
         Fields::Named(fields) => {
             ensure_unique(
-                &format!("{path}.{original_name}"),
+                &format!("{path}.{}", shape.name),
                 fields
                     .fields
                     .iter()
@@ -733,6 +1176,30 @@ fn render_variant(
                 out.push_str(&variant_name);
                 out.push_str(&generic_declaration(generics));
                 out.push_str("(\n");
+                let mut overrides = Vec::with_capacity(fields.len());
+                for (field_name, field) in &fields {
+                    let hint = if fields.len() == 1 {
+                        format!("{parent}{}Data", pascal_case(shape.name))
+                    } else {
+                        format!(
+                            "{parent}{}{}Data",
+                            pascal_case(shape.name),
+                            pascal_case(field_name)
+                        )
+                    };
+                    overrides.push(hoist_inline_struct(
+                        helpers,
+                        kotlin,
+                        format,
+                        types,
+                        generics,
+                        generic_scope,
+                        &hint,
+                        field,
+                        path,
+                        used_names,
+                    )?);
+                }
                 for (position, (field_name, field)) in fields.iter().enumerate() {
                     render_property(
                         out,
@@ -742,8 +1209,9 @@ fn render_variant(
                         generic_scope,
                         field_name,
                         field,
-                        &format!("{path}.{original_name}.{field_name}"),
+                        &format!("{path}.{}.{field_name}", shape.name),
                         2,
+                        overrides[position].as_deref(),
                     )?;
                     if position + 1 != fields.len() {
                         out.push(',');
@@ -759,6 +1227,545 @@ fn render_variant(
     Ok(())
 }
 
+/// Hoist an inline anonymous struct into a named data class, since Kotlin has no structural
+/// types and `Map<String, Any?>` would lose the payload's types.
+#[allow(clippy::too_many_arguments)]
+fn hoist_inline_struct(
+    helpers: &mut Vec<String>,
+    kotlin: &Kotlin,
+    format: Option<&dyn Format>,
+    types: &Types,
+    generics: &[String],
+    generic_scope: &[Generic],
+    hint: &str,
+    field: &Field,
+    path: &str,
+    used_names: &mut BTreeSet<String>,
+) -> Result<Option<String>, Error> {
+    let Some(ty) = &field.ty else {
+        return Ok(None);
+    };
+    let (strct, nullable) = match ty {
+        DataType::Struct(strct) => (strct, false),
+        DataType::Nullable(inner) => match inner.as_ref() {
+            DataType::Struct(strct) => (strct, true),
+            _ => return Ok(None),
+        },
+        _ => return Ok(None),
+    };
+    let Fields::Named(fields) = &strct.fields else {
+        return Ok(None);
+    };
+    if fields.fields.iter().all(|(_, field)| field.ty.is_none()) {
+        return Ok(None);
+    }
+
+    let name = unique_name(used_names, hint, path)?;
+    let mut helper = String::new();
+    render_inline_data_class(
+        &mut helper,
+        helpers,
+        kotlin,
+        format,
+        types,
+        &name,
+        generics,
+        generic_scope,
+        fields,
+        path,
+        used_names,
+    )?;
+    helpers.push(helper);
+    Ok(Some(if nullable { nullable_type(name) } else { name }))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_inline_data_class(
+    out: &mut String,
+    helpers: &mut Vec<String>,
+    kotlin: &Kotlin,
+    format: Option<&dyn Format>,
+    types: &Types,
+    name: &str,
+    generics: &[String],
+    generic_scope: &[Generic],
+    fields: &specta::datatype::NamedFields,
+    path: &str,
+    used_names: &mut BTreeSet<String>,
+) -> Result<(), Error> {
+    let fields = fields
+        .fields
+        .iter()
+        .filter(|(_, field)| field.ty.is_some())
+        .collect::<Vec<_>>();
+    ensure_unique(
+        path,
+        fields.iter().map(|(name, _)| {
+            safe_member_name(
+                &convert_name(kotlin.naming, name, NameKind::Property),
+                "field",
+            )
+        }),
+    )?;
+    annotation(out, "", kotlin, "Serializable", None);
+    out.push_str("public data class ");
+    out.push_str(name);
+    out.push_str(&generic_declaration(generics));
+    out.push_str("(\n");
+    let mut overrides = Vec::with_capacity(fields.len());
+    for (field_name, field) in &fields {
+        let hint = format!("{name}{}Data", pascal_case(field_name));
+        overrides.push(hoist_inline_struct(
+            helpers,
+            kotlin,
+            format,
+            types,
+            generics,
+            generic_scope,
+            &hint,
+            field,
+            path,
+            used_names,
+        )?);
+    }
+    for (position, (field_name, field)) in fields.iter().enumerate() {
+        render_property(
+            out,
+            kotlin,
+            format,
+            types,
+            generic_scope,
+            field_name,
+            field,
+            &format!("{path}.{field_name}"),
+            1,
+            overrides[position].as_deref(),
+        )?;
+        if position + 1 != fields.len() {
+            out.push(',');
+        }
+        out.push('\n');
+    }
+    out.push(')');
+    Ok(())
+}
+
+fn payload_shape(fields: &Fields, repr: &EnumRepr<'_>) -> PayloadShape {
+    let live = match fields {
+        Fields::Unit => 0,
+        Fields::Unnamed(fields) => fields
+            .fields
+            .iter()
+            .filter(|field| field.ty.is_some())
+            .count(),
+        Fields::Named(fields) => fields
+            .fields
+            .iter()
+            .filter(|(_, field)| field.ty.is_some())
+            .count(),
+    };
+    match repr {
+        EnumRepr::Tagged { .. } => {
+            if live == 0 {
+                PayloadShape::Unit
+            } else {
+                PayloadShape::Struct
+            }
+        }
+        _ => match fields {
+            Fields::Unnamed(_) if live > 1 => PayloadShape::Tuple,
+            Fields::Unnamed(_) if live == 1 => PayloadShape::Newtype,
+            Fields::Unit => PayloadShape::Unit,
+            _ => PayloadShape::Struct,
+        },
+    }
+}
+
+/// Generate the custom `KSerializer` that reproduces Serde's enum encoding.
+///
+/// It works on JSON trees rather than keys so the same routine covers external, internal and
+/// adjacent tagging: everything but the tag is encoded by the variant class's own generated
+/// serializer, which keeps field renames, defaults and nested custom serializers correct.
+#[allow(clippy::too_many_arguments)]
+fn render_serializer(
+    out: &mut String,
+    kotlin: &Kotlin,
+    name: &str,
+    serializer_name: &str,
+    unknown_name: Option<&str>,
+    repr: &EnumRepr<'_>,
+    variants: &[VariantShape<'_>],
+    variant_names: &[String],
+    path: &str,
+) -> Result<(), Error> {
+    let mut shapes = Vec::with_capacity(variants.len());
+    for (variant, converted) in variants.iter().zip(variant_names) {
+        let payload = payload_shape(&variant.fields, repr);
+        if payload == PayloadShape::Tuple {
+            return Err(Error::UnsupportedType {
+                path: format!("{path}.{}", variant.name),
+                reason: "Kotlinx custom enum serializers do not support tuple variants",
+            });
+        }
+        let class = format!(
+            "{name}.{}",
+            identifier(converted, &format!("{path}.{}", variant.name))?
+        );
+        shapes.push((variant, class, payload));
+    }
+    let has_units = shapes
+        .iter()
+        .any(|(_, _, payload)| *payload == PayloadShape::Unit);
+    let needs_format = shapes
+        .iter()
+        .any(|(_, _, payload)| *payload != PayloadShape::Unit);
+    let unknown_class = unknown_name.map(|unknown| format!("{name}.{unknown}"));
+    let tagged = match repr {
+        EnumRepr::Tagged { tag_key } => Some(escape_string(tag_key)),
+        _ => None,
+    };
+
+    let mut line = |depth: usize, text: &str| {
+        out.push_str(&kotlin.indentation(depth));
+        out.push_str(text);
+        out.push('\n');
+    };
+
+    line(
+        0,
+        &format!("public object {serializer_name} : kotlinx.serialization.KSerializer<{name}> {{"),
+    );
+    line(
+        1,
+        "override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =",
+    );
+    line(
+        2,
+        "kotlinx.serialization.descriptors.buildSerialDescriptor(",
+    );
+    line(3, &format!("\"{}\",", escape_string(name)));
+    line(
+        3,
+        "kotlinx.serialization.descriptors.SerialKind.CONTEXTUAL,",
+    );
+    line(2, ")");
+    line(0, "");
+
+    // serialize
+    line(1, "override fun serialize(");
+    line(2, "encoder: kotlinx.serialization.encoding.Encoder,");
+    line(2, &format!("value: {name},"));
+    line(1, ") {");
+    line(
+        2,
+        "val json = encoder as? kotlinx.serialization.json.JsonEncoder",
+    );
+    line(
+        3,
+        &format!(
+            "?: throw kotlinx.serialization.SerializationException(\"{name} can only be serialized as JSON\")"
+        ),
+    );
+    if needs_format {
+        line(2, "val format = json.json");
+    }
+    line(2, "json.encodeJsonElement(");
+    line(3, "when (value) {");
+    for (variant, class, payload) in &shapes {
+        let tag = escape_string(&variant.wire);
+        match (tagged.as_deref(), payload) {
+            (Some(tag_key), PayloadShape::Unit) => {
+                line(
+                    4,
+                    &format!("is {class} -> kotlinx.serialization.json.buildJsonObject {{"),
+                );
+                line(
+                    5,
+                    &format!(
+                        "put(\"{tag_key}\", kotlinx.serialization.json.JsonPrimitive(\"{tag}\"))"
+                    ),
+                );
+                line(4, "}");
+            }
+            (Some(tag_key), _) => {
+                line(
+                    4,
+                    &format!("is {class} -> kotlinx.serialization.json.buildJsonObject {{"),
+                );
+                line(
+                    5,
+                    &format!(
+                        "put(\"{tag_key}\", kotlinx.serialization.json.JsonPrimitive(\"{tag}\"))"
+                    ),
+                );
+                line(
+                    5,
+                    &format!(
+                        "val payload = format.encodeToJsonElement({class}.serializer(), value) as kotlinx.serialization.json.JsonObject"
+                    ),
+                );
+                line(5, "payload.forEach { (key, element) -> put(key, element) }");
+                line(4, "}");
+            }
+            (None, PayloadShape::Unit) => {
+                line(
+                    4,
+                    &format!("is {class} -> kotlinx.serialization.json.JsonPrimitive(\"{tag}\")"),
+                );
+            }
+            (None, PayloadShape::Newtype) => {
+                line(
+                    4,
+                    &format!("is {class} -> kotlinx.serialization.json.buildJsonObject {{"),
+                );
+                line(
+                    5,
+                    &format!(
+                        "put(\"{tag}\", (format.encodeToJsonElement({class}.serializer(), value) as kotlinx.serialization.json.JsonObject)[\"value\"] ?: kotlinx.serialization.json.JsonNull)"
+                    ),
+                );
+                line(4, "}");
+            }
+            (None, _) => {
+                line(
+                    4,
+                    &format!("is {class} -> kotlinx.serialization.json.buildJsonObject {{"),
+                );
+                line(
+                    5,
+                    &format!(
+                        "put(\"{tag}\", format.encodeToJsonElement({class}.serializer(), value))"
+                    ),
+                );
+                line(4, "}");
+            }
+        }
+    }
+    if let Some(unknown_class) = &unknown_class {
+        match &tagged {
+            Some(tag_key) => {
+                line(
+                    4,
+                    &format!("is {unknown_class} -> kotlinx.serialization.json.buildJsonObject {{"),
+                );
+                line(
+                    5,
+                    &format!(
+                        "put(\"{tag_key}\", kotlinx.serialization.json.JsonPrimitive(value.tag))"
+                    ),
+                );
+                line(
+                    5,
+                    "(value.content as? kotlinx.serialization.json.JsonObject)?.forEach { (key, element) -> put(key, element) }",
+                );
+                line(4, "}");
+            }
+            None => {
+                line(
+                    4,
+                    &format!("is {unknown_class} -> if (value.content != null) {{"),
+                );
+                line(
+                    5,
+                    "kotlinx.serialization.json.buildJsonObject { put(value.tag, value.content) }",
+                );
+                line(4, "} else {");
+                line(5, "kotlinx.serialization.json.JsonPrimitive(value.tag)");
+                line(4, "}");
+            }
+        }
+    }
+    if shapes.is_empty() {
+        line(
+            4,
+            &format!(
+                "else -> throw kotlinx.serialization.SerializationException(\"Unsupported {name} variant\")"
+            ),
+        );
+    }
+    line(3, "}");
+    line(2, ")");
+    line(1, "}");
+    line(0, "");
+
+    // deserialize
+    line(
+        1,
+        &format!(
+            "override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): {name} {{"
+        ),
+    );
+    line(
+        2,
+        "val json = decoder as? kotlinx.serialization.json.JsonDecoder",
+    );
+    line(
+        3,
+        &format!(
+            "?: throw kotlinx.serialization.SerializationException(\"{name} can only be deserialized from JSON\")"
+        ),
+    );
+    if needs_format {
+        line(2, "val format = json.json");
+    }
+    if let Some(tag_key) = &tagged {
+        line(2, "val element = json.decodeJsonElement()");
+        line(
+            2,
+            "if (element !is kotlinx.serialization.json.JsonObject) {",
+        );
+        line(
+            3,
+            &format!(
+                "throw kotlinx.serialization.SerializationException(\"{name} must be encoded as a JSON object\")"
+            ),
+        );
+        line(2, "}");
+        line(
+            2,
+            &format!(
+                "val tag = (element[\"{tag_key}\"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf {{ it.isString }}?.content"
+            ),
+        );
+        line(
+            3,
+            &format!(
+                "?: throw kotlinx.serialization.SerializationException(\"{name} is missing its string tag field \\\"{tag_key}\\\"\")"
+            ),
+        );
+        line(
+            2,
+            &format!(
+                "val payload = kotlinx.serialization.json.JsonObject(element - \"{tag_key}\")"
+            ),
+        );
+        line(2, "return when (tag) {");
+        for (variant, class, payload) in &shapes {
+            let wire = escape_string(&variant.wire);
+            match payload {
+                PayloadShape::Unit => line(3, &format!("\"{wire}\" -> {class}")),
+                _ => line(
+                    3,
+                    &format!(
+                        "\"{wire}\" -> format.decodeFromJsonElement({class}.serializer(), payload)"
+                    ),
+                ),
+            }
+        }
+        line(
+            3,
+            &match &unknown_class {
+                Some(unknown_class) => format!(
+                    "else -> {unknown_class}(tag, if (payload.isEmpty()) null else payload)"
+                ),
+                None => format!(
+                    "else -> throw kotlinx.serialization.SerializationException(\"Unknown {name} tag: \" + tag)"
+                ),
+            },
+        );
+        line(2, "}");
+    } else {
+        line(2, "val element = json.decodeJsonElement()");
+        if has_units {
+            line(
+                2,
+                "val primitive = element as? kotlinx.serialization.json.JsonPrimitive",
+            );
+            line(2, "if (primitive != null && primitive.isString) {");
+            line(3, "return when (primitive.content) {");
+            for (variant, class, payload) in &shapes {
+                if *payload == PayloadShape::Unit {
+                    line(
+                        4,
+                        &format!("\"{}\" -> {class}", escape_string(&variant.wire)),
+                    );
+                }
+            }
+            line(
+                4,
+                &match &unknown_class {
+                    Some(unknown_class) => {
+                        format!("else -> {unknown_class}(primitive.content, null)")
+                    }
+                    None => format!(
+                        "else -> throw kotlinx.serialization.SerializationException(\"Unknown {name} tag: \" + primitive.content)"
+                    ),
+                },
+            );
+            line(3, "}");
+            line(2, "}");
+        }
+        line(
+            2,
+            "if (element !is kotlinx.serialization.json.JsonObject) {",
+        );
+        line(
+            3,
+            &format!(
+                "throw kotlinx.serialization.SerializationException(\"{name} must be encoded as a JSON object or string\")"
+            ),
+        );
+        line(2, "}");
+        line(2, "val entry = element.entries.singleOrNull()");
+        line(
+            3,
+            &format!(
+                "?: throw kotlinx.serialization.SerializationException(\"{name} must be encoded as an object with exactly one key\")"
+            ),
+        );
+        let unknown = match &unknown_class {
+            Some(unknown_class) => format!("{unknown_class}(entry.key, entry.value)"),
+            None => format!(
+                "throw kotlinx.serialization.SerializationException(\"Unknown {name} tag: \" + entry.key)"
+            ),
+        };
+        if shapes
+            .iter()
+            .all(|(_, _, payload)| *payload == PayloadShape::Unit)
+        {
+            line(2, &format!("return {unknown}"));
+        } else {
+            line(2, "return when (entry.key) {");
+            for (variant, class, payload) in &shapes {
+                let wire = escape_string(&variant.wire);
+                match payload {
+                    PayloadShape::Unit => {}
+                    PayloadShape::Newtype => line(
+                        3,
+                        &format!(
+                            "\"{wire}\" -> format.decodeFromJsonElement({class}.serializer(), kotlinx.serialization.json.JsonObject(mapOf(\"value\" to entry.value)))"
+                        ),
+                    ),
+                    _ => line(
+                        3,
+                        &format!(
+                            "\"{wire}\" -> format.decodeFromJsonElement({class}.serializer(), entry.value)"
+                        ),
+                    ),
+                }
+            }
+            line(3, &format!("else -> {unknown}"));
+            line(2, "}");
+        }
+    }
+    line(1, "}");
+    out.push('}');
+    Ok(())
+}
+
+fn unique_name(used: &mut BTreeSet<String>, hint: &str, path: &str) -> Result<String, Error> {
+    let mut candidate = hint.to_owned();
+    let mut index = 1;
+    loop {
+        let name = identifier(&candidate, path)?;
+        if used.insert(semantic_identifier(&name).to_owned()) {
+            return Ok(name);
+        }
+        candidate = format!("{hint}{index}");
+        index += 1;
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_property(
     out: &mut String,
@@ -770,9 +1777,19 @@ fn render_property(
     field: &Field,
     path: &str,
     depth: usize,
+    override_ty: Option<&str>,
 ) -> Result<(), Error> {
     let indent = kotlin.indentation(depth);
-    let rendered = field_datatype(kotlin, format, types, generic_scope, field, path, false)?;
+    let rendered = field_datatype(
+        kotlin,
+        format,
+        types,
+        generic_scope,
+        field,
+        path,
+        false,
+        override_ty,
+    )?;
     let nullable = field
         .ty
         .as_ref()
@@ -812,12 +1829,16 @@ fn field_datatype(
     field: &Field,
     path: &str,
     allow_generic: bool,
+    override_ty: Option<&str>,
 ) -> Result<String, Error> {
     let ty = field.ty.as_ref().ok_or_else(|| Error::UnsupportedType {
         path: path.to_owned(),
         reason: "skipped field cannot be rendered",
     })?;
-    let mut rendered = datatype(kotlin, format, types, ty, generic_scope, path)?;
+    let mut rendered = match override_ty {
+        Some(rendered) => rendered.to_owned(),
+        None => datatype(kotlin, format, types, ty, generic_scope, path)?,
+    };
     let nullability = datatype_nullability(format, types, ty, path, &mut Vec::new())?;
     if kotlin.serialization == Serialization::Kotlinx
         && nullability == Nullability::Generic
@@ -1358,6 +2379,12 @@ fn annotation(
         out.push_str(&escape_string(argument));
         out.push_str("\")");
     }
+    out.push('\n');
+}
+
+fn annotation_raw(out: &mut String, indent: &str, annotation: &str) {
+    out.push_str(indent);
+    out.push_str(annotation);
     out.push('\n');
 }
 

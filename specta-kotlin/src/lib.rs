@@ -5,10 +5,12 @@
 //!
 //! Generated source targets Kotlin 1.9 or newer (`data object` is used for unit declarations).
 //! Kotlinx annotations are opt-in through [`Serialization::Kotlinx`] and require the Kotlin
-//! serialization compiler plugin plus `kotlinx-serialization-core`. Shapes for which standard
-//! Kotlinx serialization would disagree with Rust/Serde (including tuples and enums) are
-//! rejected instead of generating a wire-incompatible codec. Plain declaration export remains
-//! available for every shape that can be usefully approximated in Kotlin's nominal type system.
+//! serialization compiler plugin plus `kotlinx-serialization-core` and
+//! `kotlinx-serialization-json`. Serde's external, internal and adjacent enum representations
+//! are reproduced by a generated `KSerializer`; shapes that standard Kotlinx serialization
+//! would silently encode differently (tuples, untagged enums and generic enums) are rejected
+//! instead. Plain declaration export remains available for every shape that can be usefully
+//! approximated in Kotlin's nominal type system.
 //!
 //! # Usage
 //!

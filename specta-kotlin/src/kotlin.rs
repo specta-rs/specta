@@ -9,7 +9,9 @@ use crate::{Error, render};
 pub enum Serialization {
     /// Add standard `@Serializable` and `@SerialName` annotations.
     ///
-    /// Shapes whose standard Kotlinx encoding would differ from Serde are rejected.
+    /// Serde's external, internal and adjacent enum representations are reproduced by a
+    /// generated `KSerializer`. Shapes whose wire encoding cannot be expressed this way are
+    /// rejected instead of generating a codec that silently disagrees with Rust.
     Kotlinx,
     /// Generate plain Kotlin declarations without serialization annotations.
     #[default]
@@ -83,6 +85,8 @@ pub struct Kotlin {
     pub naming: NamingConvention,
     /// Serialization integration.
     pub serialization: Serialization,
+    /// Whether Kotlinx enums gain a fallback variant for tags they do not know.
+    pub unknown_variants: bool,
     /// Whether generated constructor properties use `var` instead of `val`.
     pub mutable_properties: bool,
     /// Policy for unknown exporter-specific opaque types.
@@ -101,6 +105,7 @@ impl Default for Kotlin {
             indent: IndentStyle::default(),
             naming: NamingConvention::default(),
             serialization: Serialization::None,
+            unknown_variants: false,
             mutable_properties: false,
             unknown_types: UnknownType::Error,
             raw: Vec::new(),
@@ -159,6 +164,17 @@ impl Kotlin {
     /// Controls whether constructor properties are mutable.
     pub fn mutable_properties(mut self, mutable: bool) -> Self {
         self.mutable_properties = mutable;
+        self
+    }
+
+    /// Whether Kotlinx enums gain an `Unknown` variant for tags the exporter does not know.
+    ///
+    /// Without this, decoding an enum variant a newer producer added fails the whole value.
+    /// Enabling it turns every enum into a sealed interface with a `Unknown(tag, content)`
+    /// fallback so newer wire values survive a round trip. It has no effect unless
+    /// [`Serialization::Kotlinx`] is selected.
+    pub fn unknown_variants(mut self, enabled: bool) -> Self {
+        self.unknown_variants = enabled;
         self
     }
 

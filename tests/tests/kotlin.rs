@@ -196,6 +196,61 @@ struct InnerPayload {
     value: String,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "context", content = "data", rename_all = "camelCase")]
+enum ApiError {
+    Auth(AuthApiError),
+    RateLimited,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "reason", content = "params", rename_all = "camelCase")]
+enum AuthApiError {
+    CredentialsInvalid,
+    SignInRemoved { cause: SignInRemovalCause },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "snake_case")]
+enum SignInRemovalCause {
+    Remote,
+    AccountDeleted,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "camelCase")]
+enum RouteSessionType {
+    Anonymous,
+    SignupOnboarding,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum InternallyTagged {
+    Empty,
+    Named { cause: SignInRemovalCause },
+    NewType(InternalPayload),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct InternalPayload {
+    value: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedPayload {
+    Unit,
+    Text(String),
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 enum SelfNamedRawVariant {
@@ -635,6 +690,132 @@ fn kotlin_export_serde() {
     );
 }
 
+/// The reporter's shapes from specta-rs/specta#630: adjacently tagged enums with unit and
+/// struct variants, serde renames and an internally tagged enum whose newtype variant must be
+/// flattened. `unknown_variants` adds the fallback a newer producer needs.
+#[test]
+fn kotlin_export_kotlinx_tagged_enums() {
+    insta::assert_snapshot!(
+        "kotlin-export-kotlinx-tagged-enums",
+        Kotlin::default()
+            .package("dev.specta.generated")
+            .serialization(Serialization::Kotlinx)
+            .unknown_variants(true)
+            .export(
+                &Types::default()
+                    .register::<ApiError>()
+                    .register::<AuthApiError>()
+                    .register::<SignInRemovalCause>()
+                    .register::<RouteSessionType>()
+                    .register::<InternallyTagged>()
+                    .register::<InternalPayload>(),
+                specta_serde::Format
+            )
+            .expect("tagged enums should export with a generated Kotlinx serializer")
+    );
+}
+
+#[test]
+fn kotlin_unknown_variants_are_opt_in() {
+    let types = Types::default().register::<ApiError>();
+
+    let plain = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(&types, specta_serde::Format)
+        .expect("a tagged enum exports without unknown variants");
+    assert!(!plain.contains("data class Unknown"), "{plain}");
+    assert!(
+        plain.contains(
+            "throw kotlinx.serialization.SerializationException(\"Unknown ApiError tag: \" + tag)"
+        ),
+        "{plain}"
+    );
+
+    let fallback = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .unknown_variants(true)
+        .export(&types, specta_serde::Format)
+        .expect("a tagged enum exports with unknown variants");
+    assert!(
+        fallback.contains("public data class Unknown(\n        public val tag: kotlin.String,\n        public val content: kotlinx.serialization.json.JsonElement? = null,"),
+        "{fallback}"
+    );
+    assert!(
+        fallback
+            .contains("else -> ApiError.Unknown(tag, if (payload.isEmpty()) null else payload)"),
+        "{fallback}"
+    );
+}
+
+#[test]
+fn kotlin_none_hoists_inline_payloads_and_drops_the_tag() {
+    let output = Kotlin::default()
+        .export(
+            &Types::default()
+                .register::<ApiError>()
+                .register::<AuthApiError>()
+                .register::<SignInRemovalCause>()
+                .register::<RouteSessionType>(),
+            specta_serde::Format,
+        )
+        .expect("plain declarations should model every payload field");
+
+    // An adjacent struct payload is a named class instead of `Map<String, Any?>`.
+    assert!(
+        output.contains(
+            "public data class AuthApiErrorSignInRemovedData(\n    public val cause: SignInRemovalCause\n)"
+        ),
+        "{output}"
+    );
+    assert!(
+        output.contains("public val params: AuthApiErrorSignInRemovedData"),
+        "{output}"
+    );
+    assert!(
+        !output.contains("Map<kotlin.String, kotlin.Any?>"),
+        "{output}"
+    );
+
+    // The variant name already carries the tag, so it is not repeated as a field.
+    assert!(!output.contains("public val reason:"), "{output}");
+    assert!(!output.contains("public val context:"), "{output}");
+
+    // Serde's wire spelling is recorded for plain enums.
+    assert!(
+        output.contains(
+            "public enum class SignInRemovalCause(public val wireValue: kotlin.String) {\n    Remote(\"remote\"),\n    AccountDeleted(\"account_deleted\")\n}"
+        ),
+        "{output}"
+    );
+    assert!(
+        output.contains(
+            "public enum class RouteSessionType(public val wireValue: kotlin.String) {\n    Anonymous(\"anonymous\"),\n    SignupOnboarding(\"signupOnboarding\")\n}"
+        ),
+        "{output}"
+    );
+}
+
+#[test]
+fn kotlin_kotlinx_rejects_representations_without_a_discriminator() {
+    let untagged = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<UntaggedPayload>(),
+            specta_serde::Format,
+        )
+        .expect_err("untagged enums have no tag to dispatch on");
+    assert!(untagged.to_string().contains("untagged"), "{untagged}");
+
+    let generic = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<Event<String>>(),
+            specta_serde::Format,
+        )
+        .expect_err("a generic enum needs a per-instantiation serializer");
+    assert!(generic.to_string().contains("generic enums"), "{generic}");
+}
+
 #[test]
 fn kotlin_configuration() {
     let output = Kotlin::new()
@@ -734,17 +915,40 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         .expect("deprecation annotations should be namespace-safe");
     assert!(supported.contains("@kotlin.Deprecated"));
 
-    let error = Kotlin::default()
+    let supported = Kotlin::default()
         .serialization(Serialization::Kotlinx)
         .export(
-            &Types::default().register::<Event<String>>(),
+            &Types::default().register::<KeywordEnum>(),
             specta_serde::Format,
         )
-        .expect_err("payload enums require a representation-aware custom serializer");
+        .expect("unit-only enums encode exactly like a Kotlinx string enum");
     assert!(
-        error
-            .to_string()
-            .contains("cannot preserve every Serde enum representation")
+        supported.contains("public enum class KeywordEnum"),
+        "{supported}"
+    );
+    assert!(
+        supported.contains("@kotlinx.serialization.SerialName(\"when\")"),
+        "{supported}"
+    );
+
+    let supported = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default()
+                .register::<SelfNamedRawVariant>()
+                .register::<InnerPayload>(),
+            specta_serde::Format,
+        )
+        .expect("payload enums require and receive a representation-aware custom serializer");
+    assert!(
+        supported.contains(
+            "@kotlinx.serialization.Serializable(with = SelfNamedRawVariantSerializer::class)"
+        ),
+        "{supported}"
+    );
+    assert!(
+        supported.contains("public object SelfNamedRawVariantSerializer"),
+        "{supported}"
     );
 
     let mutable_newtype = Kotlin::default()
