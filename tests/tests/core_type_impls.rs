@@ -221,54 +221,6 @@ struct IterA;
 #[specta(collect = false)]
 struct IterB;
 
-/// The never type is uninhabited, which Specta models as an enum with no variants.
-/// Rust stabilised `!` in 1.100.0.
-/// See <https://github.com/rust-lang/rust/pull/155499>.
-#[rustversion::since(1.100)]
-#[test]
-fn never_type_is_the_bottom_type() {
-    use specta::datatype::Enum;
-
-    let mut types = Types::default();
-    assert_eq!(
-        <! as Type>::definition(&mut types),
-        DataType::Enum(Enum::default())
-    );
-}
-
-#[rustversion::since(1.100)]
-#[derive(Type)]
-#[specta(collect = false)]
-struct NeverInTypePositions {
-    fallible: Result<u32, !>,
-    values: Vec<!>,
-}
-
-#[rustversion::since(1.100)]
-#[test]
-fn derive_accepts_the_never_type() {
-    use specta::datatype::Enum;
-
-    let DataType::Struct(model) = named_data_type::<NeverInTypePositions>("NeverInTypePositions")
-    else {
-        panic!("expected a struct");
-    };
-    let Fields::Named(fields) = model.fields else {
-        panic!("expected named fields");
-    };
-    let values = fields
-        .fields
-        .iter()
-        .find_map(|(name, field)| (name == "values").then_some(field.ty.as_ref()))
-        .flatten()
-        .expect("the model should contain a values field");
-    let DataType::List(list) = inline_data_type(values) else {
-        panic!("values should be a list, got {values:#?}");
-    };
-
-    assert_eq!(list.ty.as_ref(), &DataType::Enum(Enum::default()));
-}
-
 #[test]
 fn unsorted_iterator_len_tracks_consumption() {
     let types = Types::default().register::<IterA>().register::<IterB>();

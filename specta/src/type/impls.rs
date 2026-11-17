@@ -30,19 +30,6 @@ impl Type for f128 {
     }
 }
 
-/// The never type is uninhabited, so it has the same shape as
-/// `std::convert::Infallible`: an enum with no variants.
-///
-/// Rust 1.100.0 stabilised `!` and made `std::convert::Infallible` an alias for
-/// it; older compilers use the `Infallible` fallback in the `std` impl block.
-/// See <https://github.com/rust-lang/rust/pull/155499>.
-#[cfg(has_never_type)]
-impl Type for ! {
-    fn definition(_: &mut Types) -> DataType {
-        DataType::Enum(datatype::Enum::default())
-    }
-}
-
 // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 
@@ -212,18 +199,17 @@ const _: () = {
         std::time::SystemTime as BaseSystemTime = named;
         std::time::Duration as BaseDuration = named;
 
+        std::convert::Infallible as BaseInfallible = inline;
         std::marker::PhantomData<T> as () = inline;
         std::borrow::Cow<'a, T> where { T: Type + ?Sized + ToOwned + 'a } as T = inline;
 
         std::result::Result<T, E> as BaseResult<T, E> = named;
     );
 
-    // Before Rust 1.100, `Infallible` is a distinct empty enum rather than an
-    // alias for `!`, so it needs its own impl. Both paths produce the same
-    // bottom-type datatype.
-    #[cfg(not(has_never_type))]
-    impl Type for std::convert::Infallible {
+    struct BaseInfallible;
+    impl Type for BaseInfallible {
         fn definition(_: &mut Types) -> DataType {
+            // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
             DataType::Enum(Enum::default())
         }
     }
