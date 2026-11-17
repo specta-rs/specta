@@ -2021,9 +2021,13 @@ fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool
             }
             relaxed
         }
-        DataType::Intersection(elements) => elements.iter_mut().fold(false, |relaxed, element| {
-            relax_alias_exclusions_inner(element, keys) || relaxed
-        }),
+        DataType::Intersection(elements) => {
+            let mut relaxed = false;
+            for element in elements {
+                relaxed |= relax_alias_exclusions_inner(element, keys);
+            }
+            relaxed
+        }
         DataType::Nullable(inner) => relax_alias_exclusions_inner(inner, keys),
         _ => false,
     }
