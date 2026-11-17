@@ -251,6 +251,52 @@ enum UntaggedPayload {
     Text(String),
 }
 
+/// An all-unit enum with an internal tag still encodes as `{"kind": "..."}`, not a bare
+/// string, so it needs the generated serializer rather than a Kotlinx string enum.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum AllUnitInternal {
+    Empty,
+    Second,
+}
+
+/// Serde writes nullable payloads as `null` even when it also tolerates them being absent.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", content = "data")]
+enum AdjacentOptional {
+    Value(Option<String>),
+    Named { maybe: Option<String> },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum DefaultedFields {
+    Named {
+        #[serde(default)]
+        defaulted: Option<u8>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        omitted: Option<u8>,
+    },
+}
+
+/// A Kotlin keyword as a type name must still be able to own generated helper declarations.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind", content = "data")]
+enum Package {
+    A { value: i32 },
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(rename = "object", tag = "kind", content = "data")]
+enum ReservedNameAdjacent {
+    A { value: i32 },
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 enum SelfNamedRawVariant {
@@ -793,6 +839,116 @@ fn kotlin_none_hoists_inline_payloads_and_drops_the_tag() {
         ),
         "{output}"
     );
+}
+
+#[test]
+fn kotlin_kotlinx_tagged_unit_enums_keep_their_object_envelope() {
+    let output = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<AllUnitInternal>(),
+            specta_serde::Format,
+        )
+        .expect("an all-unit internally tagged enum still encodes as an object");
+
+    // A Kotlinx string enum would write `"empty"`, while Serde writes `{"kind":"empty"}`.
+    assert!(
+        output.contains(
+            "@kotlinx.serialization.Serializable(with = AllUnitInternalSerializer::class)"
+        ),
+        "{output}"
+    );
+    assert!(
+        output.contains("public object AllUnitInternalSerializer"),
+        "{output}"
+    );
+    assert!(
+        output.contains("put(\"kind\", kotlinx.serialization.json.JsonPrimitive(\"empty\"))"),
+        "{output}"
+    );
+    assert!(
+        !output.contains("public enum class AllUnitInternal"),
+        "{output}"
+    );
+
+    // Externally tagged all-unit enums are bare strings, so they stay Kotlinx string enums.
+    let external = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<SignInRemovalCause>(),
+            specta_serde::Format,
+        )
+        .expect("an externally tagged all-unit enum is a string enum");
+    assert!(
+        external.contains("public enum class SignInRemovalCause"),
+        "{external}"
+    );
+}
+
+#[test]
+fn kotlin_kotlinx_keeps_defaulted_optionals_on_the_wire() {
+    let output = Kotlin::default()
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default()
+                .register::<AdjacentOptional>()
+                .register::<DefaultedFields>(),
+            specta_serde::Format,
+        )
+        .expect("optional nullable payloads must stay encodable");
+
+    // Serde writes a nil `Option` as `null`, even where it also accepts a missing key: a
+    // nullable adjacent payload and a `#[serde(default)]` field both need `@EncodeDefault`.
+    for property in [
+        "@kotlinx.serialization.EncodeDefault\n        public val data: kotlin.String? = null",
+        "@kotlinx.serialization.EncodeDefault\n    public val maybe: kotlin.String? = null",
+        "@kotlinx.serialization.EncodeDefault\n        public val defaulted: kotlin.UByte? = null",
+    ] {
+        assert!(output.contains(property), "{output}");
+    }
+
+    // `skip_serializing_if` really may omit the key, so it keeps the Kotlin default.
+    assert!(
+        output.contains("\n        public val omitted: kotlin.UByte? = null"),
+        "{output}"
+    );
+    assert!(
+        !output.contains("@kotlinx.serialization.EncodeDefault\n        public val omitted"),
+        "{output}"
+    );
+}
+
+#[test]
+fn kotlin_backticked_names_do_not_break_generated_declarations() {
+    let kotlinx = Kotlin::default()
+        .naming(NamingConvention::SnakeCase)
+        .serialization(Serialization::Kotlinx)
+        .export(
+            &Types::default().register::<Package>(),
+            specta_serde::Format,
+        )
+        .expect("a keyword type name must still be able to own a serializer");
+    assert!(
+        kotlinx.contains("public sealed interface `package`"),
+        "{kotlinx}"
+    );
+    assert!(
+        kotlinx.contains("public object packageSerializer"),
+        "{kotlinx}"
+    );
+    assert!(kotlinx.contains("packageAData"), "{kotlinx}");
+
+    let plain = Kotlin::default()
+        .export(
+            &Types::default().register::<ReservedNameAdjacent>(),
+            specta_serde::Format,
+        )
+        .expect("a keyword type name must still be able to own a hoisted payload");
+    assert!(
+        plain.contains("public sealed interface `object`"),
+        "{plain}"
+    );
+    assert!(plain.contains("public data class objectAData("), "{plain}");
 }
 
 #[test]

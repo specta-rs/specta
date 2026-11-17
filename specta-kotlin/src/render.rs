@@ -9,7 +9,7 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, NamedDataType, NamedReferenceType, Primitive,
         Reference, Struct, Variant,
     },
-    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED},
+    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED, SERIALIZE_OMISSION_MARKER},
 };
 
 use crate::{
@@ -862,15 +862,18 @@ fn render_enum(
             .iter()
             .all(|variant| is_unit_fields(&variant.fields));
 
-    // Without unknown variants an all-unit enum encodes exactly like a Kotlinx string enum.
-    if unit_only && !(kotlinx && kotlin.unknown_variants) {
+    // A plain externally tagged all-unit enum encodes exactly like a Kotlinx string enum.
+    // Internal and adjacent tagging still wrap the tag in an object, so those need the
+    // serializer even though every variant carries no payload.
+    let string_enum = unit_only && (!kotlinx || matches!(shape.repr, EnumRepr::External));
+    if string_enum && !(kotlinx && kotlin.unknown_variants) {
         return render_enum_class(out, kotlin, &shape, &variants, &variant_names, name, path);
     }
 
     let serializer_name = if kotlinx {
         Some(unique_name(
             &mut used_names,
-            &format!("{name}Serializer"),
+            &format!("{}Serializer", semantic_identifier(name)),
             path,
         )?)
     } else {
@@ -1093,10 +1096,15 @@ fn render_variant(
                         format!("field{index}")
                     };
                     let hint = if fields.len() == 1 {
-                        format!("{parent}{}Data", pascal_case(shape.name))
+                        format!(
+                            "{}{}Data",
+                            semantic_identifier(parent),
+                            pascal_case(shape.name)
+                        )
                     } else {
                         format!(
-                            "{parent}{}{}Data",
+                            "{}{}{}Data",
+                            semantic_identifier(parent),
                             pascal_case(shape.name),
                             pascal_case(&property)
                         )
@@ -1179,10 +1187,15 @@ fn render_variant(
                 let mut overrides = Vec::with_capacity(fields.len());
                 for (field_name, field) in &fields {
                     let hint = if fields.len() == 1 {
-                        format!("{parent}{}Data", pascal_case(shape.name))
+                        format!(
+                            "{}{}Data",
+                            semantic_identifier(parent),
+                            pascal_case(shape.name)
+                        )
                     } else {
                         format!(
-                            "{parent}{}{}Data",
+                            "{}{}{}Data",
+                            semantic_identifier(parent),
                             pascal_case(shape.name),
                             pascal_case(field_name)
                         )
@@ -1314,7 +1327,11 @@ fn render_inline_data_class(
     out.push_str("(\n");
     let mut overrides = Vec::with_capacity(fields.len());
     for (field_name, field) in &fields {
-        let hint = format!("{name}{}Data", pascal_case(field_name));
+        let hint = format!(
+            "{}{}Data",
+            semantic_identifier(name),
+            pascal_case(field_name)
+        );
         overrides.push(hoist_inline_struct(
             helpers,
             kotlin,
@@ -1805,7 +1822,13 @@ fn render_property(
     if converted != original_name {
         annotation(out, &indent, kotlin, "SerialName", Some(original_name));
     }
-    if kotlin.serialization == Serialization::Kotlinx && nullable && !field.optional {
+    if kotlin.serialization == Serialization::Kotlinx
+        && nullable
+        && !field.attributes.contains_key(SERIALIZE_OMISSION_MARKER)
+    {
+        // `Field::optional` also covers fields Serde only accepts as missing (`#[serde(default)]`
+        // or a nullable adjacent payload). Serde still writes those as `null`, so only a
+        // `skip_serializing_if` omission may fall back to the Kotlin default.
         annotation(out, &indent, kotlin, "EncodeDefault", None);
     }
     out.push_str(&indent);
