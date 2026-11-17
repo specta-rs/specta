@@ -36,7 +36,7 @@ pub(crate) fn render_file(
     }
     if kotlin.serialization == Serialization::Kotlinx {
         out.push_str(
-            "@file:kotlin.OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, kotlinx.serialization.InternalSerializationApi::class)\n\n",
+            "@file:kotlin.OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\n",
         );
     }
     if let Some(package) = &kotlin.package {
@@ -1458,14 +1458,11 @@ fn render_serializer(
     );
     line(
         2,
-        "kotlinx.serialization.descriptors.buildSerialDescriptor(",
+        &format!(
+            "kotlinx.serialization.descriptors.buildClassSerialDescriptor(\"{}\")",
+            escape_string(name)
+        ),
     );
-    line(3, &format!("\"{}\",", escape_string(name)));
-    line(
-        3,
-        "kotlinx.serialization.descriptors.SerialKind.CONTEXTUAL,",
-    );
-    line(2, ")");
     line(0, "");
 
     // serialize

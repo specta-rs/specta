@@ -10,8 +10,11 @@ pub enum Serialization {
     /// Add standard `@Serializable` and `@SerialName` annotations.
     ///
     /// Serde's external, internal and adjacent enum representations are reproduced by a
-    /// generated `KSerializer`. Shapes whose wire encoding cannot be expressed this way are
-    /// rejected instead of generating a codec that silently disagrees with Rust.
+    /// generated `KSerializer`. That serializer works on JSON trees, so generated enums only
+    /// support `kotlinx-serialization-json` and require it alongside
+    /// `kotlinx-serialization-core`; other Kotlinx formats such as CBOR or ProtoBuf are not
+    /// supported. Shapes whose wire encoding cannot be expressed this way are rejected
+    /// instead of generating a codec that silently disagrees with Rust.
     Kotlinx,
     /// Generate plain Kotlin declarations without serialization annotations.
     #[default]

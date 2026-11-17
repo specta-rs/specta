@@ -1057,6 +1057,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
         )
         .expect("generated names must not shadow fully qualified Kotlinx annotations");
     assert!(!supported.contains("import kotlinx.serialization"));
+    assert!(!supported.contains("InternalSerializationApi"));
     assert!(supported.contains("@file:kotlin.OptIn"));
     assert!(supported.contains("@kotlinx.serialization.Serializable"));
     assert!(supported.contains("@kotlinx.serialization.EncodeDefault"));
