@@ -1718,3 +1718,31 @@ fn map_key_helper_names_are_reserved() {
         "the generic map key must still reference the built-in `PropertyKey`:\n{output}"
     );
 }
+
+/// Rust stabilised `!` in 1.100.0, so it is a first-class Specta type rather than
+/// only being reachable through `std::convert::Infallible`.
+/// See <https://github.com/rust-lang/rust/pull/155499>.
+#[rustversion::since(1.100)]
+#[derive(Type)]
+#[specta(collect = false)]
+struct NeverFields {
+    values: Vec<!>,
+    fallible: Result<u32, !>,
+}
+
+#[rustversion::since(1.100)]
+#[test]
+fn never_type_exports_as_never() {
+    let output = Typescript::default()
+        .export(
+            &Types::default().register::<NeverFields>(),
+            specta_serde::Format,
+        )
+        .expect("the never type should export");
+
+    assert!(output.contains("values: never[]"), "{output}");
+    assert!(
+        output.contains("fallible: Result<number, never>"),
+        "{output}"
+    );
+}

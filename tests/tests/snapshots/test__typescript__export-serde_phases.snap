@@ -54,7 +54,6 @@ Result<String, i32>: export type Result<T, E> = ({ Ok: T }) & { Err?: never } | 
 Vec<Option<Cow<'static, i32>>>: 
 PhantomData<()>: 
 PhantomData<String>: 
-Infallible: 
 Unit1: export type Unit1 = null;
 
 Unit2: export type Unit2 = Record<string, never>;

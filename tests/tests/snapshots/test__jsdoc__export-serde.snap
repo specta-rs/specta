@@ -41,7 +41,6 @@ Result<String, i32>: /**
 Vec<Option<Cow<'static, i32>>>: 
 PhantomData<()>: 
 PhantomData<String>: 
-Infallible: 
 Unit1: /**
 	* @typedef {null} Unit1
 	*/

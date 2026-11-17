@@ -70,7 +70,7 @@
 //!   `ty!` type is decided statically. Bind the array and interpolate it — a Rust
 //!   `[T; N]` keeps its fixed length that way.
 //! * An empty array is a list of Specta's bottom type: an enum with no variants, the
-//!   same datatype `std::convert::Infallible` produces. TypeScript, Zod, Valibot,
+//!   same datatype `std::convert::Infallible` and `!` produce. TypeScript, Zod, Valibot,
 //!   Python, Kotlin, Swift, Rust and JSON Schema each render it as their own bottom
 //!   type — `never[]`, `z.never()`, `v.never()`, `Never`, `kotlin.Never`, `Never`,
 //!   `std::convert::Infallible` and `false`. A target that has none, such as ReScript,

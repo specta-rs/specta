@@ -28,6 +28,7 @@ specta-valibot = { path = "../specta-valibot", features = ["serde"] }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 
 serde = { version = "1.0.228", features = ["std", "derive"] }
+rustversion = "1.0"
 trybuild = "1.0.117"
 wasm-bindgen = "0.2.126"
 serde_json = "1.0.150"

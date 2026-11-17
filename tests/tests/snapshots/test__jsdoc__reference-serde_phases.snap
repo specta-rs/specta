@@ -32,7 +32,6 @@ Result<String, i32>: Result<string, number>
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 PhantomData<()>: null
 PhantomData<String>: null
-Infallible: never
 Unit1: Unit1
 Unit2: Unit2
 Unit3: Unit3
