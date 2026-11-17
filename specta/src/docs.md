@@ -7,7 +7,6 @@ Specta provides a system for type introspection and a set of language exporters 
 ## Features
 
 - Export structs and enums to [Typescript](https://www.typescriptlang.org)
-- Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`.
  
@@ -78,7 +77,6 @@ these types.
 
 [//]: # (FEATURE_FLAGS_START)
 
-- `function` - Support for exporting the types of Rust functions.
 - `collect` - Support for collecting up a global type map
 
 Languages
@@ -92,7 +90,6 @@ Compatibility
 - `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
 - `serde_yaml` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 - `toml` - Support for [toml](https://github.com/toml-rs/toml)
-- `tauri` - Support for [Tauri](https://tauri.app). This is required when using the `#[specta]` attribute with Tauri Commands.
 
 External types
 

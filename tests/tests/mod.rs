@@ -18,7 +18,6 @@ mod builtin_wire_mappings;
 mod core_type_impls;
 mod csharp;
 mod errors;
-mod functions;
 mod go;
 mod java;
 mod jsdoc;

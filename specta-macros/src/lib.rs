@@ -8,8 +8,6 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-#[cfg(feature = "DO_NOT_USE_function")]
-mod specta;
 mod r#type;
 mod utils;
 
@@ -221,23 +219,4 @@ pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenS
             .to_compile_error()
             .into(),
     }
-}
-
-/// Prepares a function to have its types extracted using `specta::function::fn_datatype!`
-///
-/// ## Example
-///
-/// ```ignore
-/// #[specta::specta]
-/// fn my_function(arg1: i32, arg2: bool) -> &'static str {
-///     "Hello World"
-/// }
-/// ```
-#[proc_macro_attribute]
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn specta(
-    attr: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    specta::attribute(attr, item).unwrap_or_else(|err| err.into_compile_error().into())
 }

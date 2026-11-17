@@ -30,10 +30,6 @@ derive = ["dep:specta-macros"]
 ## Support for collecting up a global type map
 collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
 
-#! Features
-## Support for exporting the types of Rust functions.
-function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
-
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json)
 serde_json = ["dep:serde_json"]
@@ -109,7 +105,6 @@ workspace = true
 
 [dependencies]
 specta-macros = { version = "=2.0.0-rc.28", optional = true, path = "../specta-macros" }
-paste = { version = "1", optional = true }
 
 small_ctor = { version = "0.1.2", optional = true }
 

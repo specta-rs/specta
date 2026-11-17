@@ -13,11 +13,6 @@
 pub mod collect;
 pub mod datatype;
 mod format;
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
-pub mod function;
-#[doc(hidden)]
-pub mod internal;
 #[doc(hidden)]
 pub mod markers;
 mod r#type;
@@ -47,11 +42,6 @@ pub use specta_macros::Type;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use specta_macros::parse_type_from_lit;
-
-#[doc(inline)]
-#[cfg(all(feature = "derive", feature = "function"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
-pub use specta_macros::specta;
 
 // TODO(v3): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
 #[doc(hidden)]

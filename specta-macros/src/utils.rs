@@ -372,11 +372,6 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
     }
 }
 
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn format_fn_wrapper(function: &Ident) -> Ident {
-    quote::format_ident!("__specta__fn__{}", function)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

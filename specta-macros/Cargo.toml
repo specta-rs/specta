@@ -20,7 +20,6 @@ default = []
 serde = []
 # These will be enabled by `specta` or `specta-util` automatically as required. They depend on certain exports of it so enabling them manually is not useful.
 DO_NOT_USE_collect = []
-DO_NOT_USE_function = ["syn/full"]
 
 [lints]
 workspace = true
@@ -31,6 +30,7 @@ quote = "1"
 syn = { version = "2", default-features = false, features = [
   "clone-impls",
   "derive",
+  "full",
   "parsing",
   "printing",
   "proc-macro",

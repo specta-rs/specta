@@ -8,10 +8,9 @@ that protect generated output.
 ## Workspace Map
 
 - `specta/` is the core library. It owns the format-agnostic type model,
-  `Type`, `Types`, `DataType`, formatter hooks, and optional collection/function
+  `Type`, `Types`, `DataType`, formatter hooks, and optional collection
   support.
-- `specta-macros/` implements the derive and function macros re-exported by
-  `specta`. Keep this crate focused on parsing Rust attributes and producing
+- `specta-macros/` implements the derive macros re-exported by `specta`. Keep this crate focused on parsing Rust attributes and producing
   Specta type metadata.
 - `specta-serde/` applies Serde semantics to Specta type graphs. Serde-specific
   behavior should usually live here, not in `specta` or `specta-macros`.
