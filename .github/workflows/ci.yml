@@ -41,6 +41,12 @@ jobs:
         run: cargo test --all-features
       - name: Build without default features
         run: cargo build --all --no-default-features
+      - name: Check individually-enabled third-party features
+        shell: bash
+        run: |
+          for feature in bevy_input020 geojson1; do
+            cargo check -p specta --no-default-features --features "std,$feature"
+          done
 
   clippy:
     runs-on: ubuntu-latest

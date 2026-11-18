@@ -5,7 +5,7 @@
 //
 // `cargo tree` provides the graph instead of `cargo metadata` because metadata
 // lists optional dependencies that no enabled feature activates. `--target all`
-// keeps platform-specific edges, such as chrono -> wasm-bindgen on wasm32.
+// keeps platform-specific edges, such as the wasm32 paths to wasm-bindgen.
 
 const { execFileSync } = require("child_process");
 const path = require("path");
@@ -21,13 +21,17 @@ const run = (args) =>
 
 // Keyed by `links` value, not crate name: Cargo enforces uniqueness per links
 // value, and differently named crates can declare the same one. `wasm_bindgen`
-// is unavoidable while chrono's wasm32 bindings are supported: chrono enables
-// wasm-bindgen, whose shared crate declares the link. Coexisting chrono majors
-// remain possible as long as they resolve the same wasm-bindgen line.
+// is tolerated because wasm-bindgen-shared declares the link and the all-target
+// graph reaches it through three independent roots: uuid (via js-sys), bson
+// (via getrandom/ahash and rand), and chrono (via iana-time-zone). Chrono is too
+// large to drop just to remove the exception, so it is reported as a note
+// instead of failing. If a second major of one of those crates ever needs a
+// different wasm-bindgen line, the exception becomes a real conflict and this
+// entry must be revisited.
 const allowed = new Map([
   [
     "wasm_bindgen",
-    "reached through chrono's wasm32 support (wasm-bindgen-shared)",
+    "reached on wasm targets through uuid, bson and chrono (wasm-bindgen-shared)",
   ],
 ]);
 
@@ -44,7 +48,6 @@ const tree = run([
   "none",
   "--format",
   "{p}",
-  "--no-dedupe",
 ]);
 
 const metadata = JSON.parse(run(["metadata", "--format-version", "1"]));
@@ -71,6 +74,18 @@ for (const { id, link } of found.filter(({ link }) => allowed.has(link))) {
   console.warn(
     `note: ${id} declares links = "${link}" (${allowed.get(link)})`
   );
+}
+
+// Guard against a `cargo tree` format change silently parsing nothing and
+// reporting success.
+const hasRoot = [...checked].some((id) => id.startsWith("specta "));
+if (!hasRoot || checked.size < 100) {
+  console.error(
+    `error: parsed ${checked.size} packages from cargo tree (specta root ${
+      hasRoot ? "found" : "missing"
+    }); the output format may have changed.`
+  );
+  process.exit(1);
 }
 
 if (unexpected.length) {
