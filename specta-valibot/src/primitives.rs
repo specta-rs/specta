@@ -8,7 +8,6 @@ use specta::{
         DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
-    markers::{OPTIONAL_FLATTEN_UNION_MARKER, STRICT_OBJECT_MARKER},
 };
 use specta_typescript::{Layout as TypescriptLayout, Typescript};
 
@@ -2084,7 +2083,9 @@ fn enum_dt(
     allowed_object_keys: &[&str],
     flattened_excluded_keys: &[&str],
 ) -> Result<(), Error> {
-    let optional_flatten_union = e.attributes.contains_key(OPTIONAL_FLATTEN_UNION_MARKER);
+    let optional_flatten_union = e
+        .attributes
+        .contains_key("specta_serde:optional_flatten_union");
     let entries = e
         .variants
         .iter()
@@ -2105,7 +2106,7 @@ fn enum_dt(
     let variants = entries
         .into_iter()
         .map(|(name, variant, keys)| -> Result<Option<String>, Error> {
-            let strict_object = variant.attributes.contains_key(STRICT_OBJECT_MARKER);
+            let strict_object = variant.attributes.contains_key("specta:strict_object");
             let rendered = enum_variant_dt(
                 exporter,
                 types,

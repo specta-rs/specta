@@ -128,7 +128,7 @@ const _: () = {
     impl Type for SerdeValue {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -177,8 +177,8 @@ const _: () = {
         /// the nullability of arbitrary `f64` values.
         fn definition(_: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
-            attributes.insert(crate::markers::FINITE_NUMBER_MARKER, true);
+            attributes.insert("serde:container:untagged", true);
+            attributes.insert("specta:finite_number", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -228,7 +228,7 @@ const _: () = {
     impl Type for SerdeYamlValue {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -279,7 +279,7 @@ const _: () = {
     impl Type for SerdeYamlNumber {
         fn definition(_: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -339,7 +339,7 @@ const _: () = {
     impl Type for TomlValue {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -605,7 +605,7 @@ const _: () = {
     impl Type for Bson {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -1578,7 +1578,7 @@ const _: () = {
     impl Type for GeoJson {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -1610,10 +1610,7 @@ const _: () = {
     impl Type for GeoJsonGeometryValue {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(
-                crate::markers::SERDE_CONTAINER_TAG,
-                std::string::String::from("type"),
-            );
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -1690,14 +1687,12 @@ const _: () = {
     impl Type for GeoJsonGeometry {
         fn definition(types: &mut Types) -> DataType {
             let mut value = Field::new(geojson::GeometryValue::definition(types));
-            value
-                .attributes
-                .insert(crate::markers::SERDE_FIELD_FLATTEN, true);
+            value.attributes.insert("serde:field:flatten", true);
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
             foreign_members
                 .attributes
-                .insert(crate::markers::SERDE_FIELD_FLATTEN, true);
+                .insert("serde:field:flatten", true);
 
             Struct::named()
                 .field(
@@ -1714,15 +1709,12 @@ const _: () = {
     impl Type for GeoJsonFeature {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(
-                crate::markers::SERDE_CONTAINER_TAG,
-                std::string::String::from("type"),
-            );
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
             foreign_members
                 .attributes
-                .insert(crate::markers::SERDE_FIELD_FLATTEN, true);
+                .insert("serde:field:flatten", true);
 
             DataType::Struct(Struct {
                 fields: Fields::Named(NamedFields {
@@ -1755,15 +1747,12 @@ const _: () = {
     impl Type for GeoJsonFeatureCollection {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(
-                crate::markers::SERDE_CONTAINER_TAG,
-                std::string::String::from("type"),
-            );
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
             foreign_members
                 .attributes
-                .insert(crate::markers::SERDE_FIELD_FLATTEN, true);
+                .insert("serde:field:flatten", true);
 
             DataType::Struct(Struct {
                 fields: Fields::Named(NamedFields {
@@ -1788,7 +1777,7 @@ const _: () = {
     impl Type for GeoJsonFeatureId {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = Attributes::default();
-            attributes.insert(crate::markers::SERDE_CONTAINER_UNTAGGED, true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![

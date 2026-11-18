@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use specta::{
     Types,
     datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
-    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED, SERDE_VARIANT_UNTAGGED},
 };
 
 use crate::{Error, opaque};
@@ -29,14 +28,16 @@ fn validate_map_key_inner(
             invalid_primitive_reason(primitive.clone()),
         )),
         DataType::Enum(enm) => {
-            let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-            let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+            let untagged = enm.attributes.contains_key("serde:container:untagged");
+            let rewritten = enm
+                .attributes
+                .contains_key("specta_serde:enum_repr_rewritten");
             for (variant_name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip)
             {
                 match &variant.fields {
                     Fields::Unit
                         if !untagged
-                            && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) => {}
+                            && !variant.attributes.contains_key("serde:variant:untagged") => {}
                     Fields::Unit => {
                         return Err(Error::invalid_map_key(
                             &path,
@@ -48,7 +49,7 @@ fn validate_map_key_inner(
                     Fields::Unnamed(fields) => {
                         if !untagged
                             && !rewritten
-                            && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                            && !variant.attributes.contains_key("serde:variant:untagged")
                         {
                             return Err(Error::invalid_map_key(
                                 &path,

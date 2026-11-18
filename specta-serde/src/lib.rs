@@ -110,15 +110,6 @@ use specta::{
         DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
     },
-    markers::{
-        ALIAS_EXCLUSION_MARKER, ALIAS_UNION_MARKER, CONDITIONAL_OMISSION_MARKER,
-        DEFERRED_ALIAS_UNION_MARKER, ENUM_OTHER_VARIANT_MARKER, ENUM_REPR_REWRITTEN_MARKER,
-        FLATTENED_PAYLOAD_MARKER, HIDDEN_EXTERNAL_PAYLOAD_MARKER, NULLABLE_MARKER,
-        OPTIONAL_FLATTEN_UNION_MARKER, PRESERVED_ARITY_PAYLOAD_MARKER,
-        SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, SERDE_CONTAINER_FROM_RESOLVED,
-        SERDE_CONTAINER_INTO_RESOLVED, SERDE_CONTAINER_TRY_FROM_RESOLVED,
-        SERDE_NEWTYPE_SKIP_IGNORED_MARKER, SERIALIZE_OMISSION_MARKER, STRICT_OBJECT_MARKER,
-    },
 };
 
 mod error;
@@ -947,8 +938,9 @@ fn rewrite_datatype_for_phase_inner(
                 container_default,
                 // Generated arity-preserving payloads keep their skipped
                 // `ty: None` slots across later passes; see
-                // `PRESERVED_ARITY_PAYLOAD_MARKER`.
-                s.attributes.contains_key(PRESERVED_ARITY_PAYLOAD_MARKER),
+                // `specta_serde:preserved_arity_payload`.
+                s.attributes
+                    .contains_key("specta_serde:preserved_arity_payload"),
                 conditional_omission_applies,
             )?;
 
@@ -1299,7 +1291,11 @@ fn lower_flattened_struct_inner(
                 if matches!(mode, PhaseRewrite::Unified) {
                     relax_alias_exclusions(&mut ty, &surrounding_keys);
                 }
-                if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER) || was_nullable {
+                if field
+                    .attributes
+                    .contains_key("specta_serde:conditional_omission")
+                    || was_nullable
+                {
                     optional.push(ty);
                 } else {
                     mandatory.push(ty);
@@ -1397,10 +1393,13 @@ fn flattened_payload_datatype_inner(
     }
     match &mut payload {
         DataType::Struct(strct) => {
-            strct.attributes.insert(FLATTENED_PAYLOAD_MARKER, true);
+            strct
+                .attributes
+                .insert("specta_serde:flattened_payload", true);
         }
         DataType::Enum(enm) => {
-            enm.attributes.insert(FLATTENED_PAYLOAD_MARKER, true);
+            enm.attributes
+                .insert("specta_serde:flattened_payload", true);
         }
         _ => return Ok(ty),
     }
@@ -1705,14 +1704,18 @@ fn flatten_intersection_with_optionals(
     let mut union = Enum::default();
     union.variants = variants;
     // This synthetic present/absent union is already in its final exported
-    // shape; see `ENUM_REPR_REWRITTEN_MARKER`. Without this, a later rewrite
+    // shape; see `specta_serde:enum_repr_rewritten`. Without this, a later rewrite
     // pass (e.g. `PhasesFormat`'s second pass over split generated types, or
     // simply walking into this enum while it's nested inside another
     // variant's payload) would treat this union as an unrewritten
     // user-authored enum and externally tag it, double-wrapping (or, for
     // unnamed/empty variant names as here, erroring on export).
-    union.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
-    union.attributes.insert(OPTIONAL_FLATTEN_UNION_MARKER, true);
+    union
+        .attributes
+        .insert("specta_serde:enum_repr_rewritten", true);
+    union
+        .attributes
+        .insert("specta_serde:optional_flatten_union", true);
     DataType::Enum(union)
 }
 
@@ -1794,9 +1797,11 @@ fn collect_flattened_keys(
             let container_attrs = SerdeContainerAttrs::from_attributes(&enm.attributes)
                 .ok()
                 .flatten();
-            match (!enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER))
-                .then(|| EnumRepr::from_attrs(&enm.attributes).ok())
-                .flatten()
+            match (!enm
+                .attributes
+                .contains_key("specta_serde:enum_repr_rewritten"))
+            .then(|| EnumRepr::from_attrs(&enm.attributes).ok())
+            .flatten()
             {
                 Some(EnumRepr::External) => {
                     for (name, variant) in &enm.variants {
@@ -1985,7 +1990,7 @@ fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool
                 let previous_len = named.fields.len();
                 named.fields.retain(|(name, field)| {
                     !(keys.contains(name.as_ref())
-                        && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
+                        && field.attributes.contains_key("specta_serde:alias_exclusion")
                         && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                 });
                 previous_len != named.fields.len()
@@ -2001,7 +2006,7 @@ fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool
                         let previous_len = fields.fields.len();
                         fields.fields.retain(|(name, field)| {
                             !(keys.contains(name.as_ref())
-                                && field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
+                                && field.attributes.contains_key("specta_serde:alias_exclusion")
                                 && matches!(field.ty.as_ref(), Some(DataType::Enum(enm)) if enm.variants.is_empty()))
                         });
                         relaxed |= previous_len != fields.fields.len();
@@ -2017,7 +2022,7 @@ fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool
                 }
             }
             if relaxed {
-                enm.attributes.remove(DEFERRED_ALIAS_UNION_MARKER);
+                enm.attributes.remove("specta_serde:deferred_alias_union");
             }
             relaxed
         }
@@ -2035,7 +2040,7 @@ fn relax_alias_exclusions_inner(ty: &mut DataType, keys: &FlattenedKeys) -> bool
 
 fn suppress_alias_branches_for_reserved_keys(ty: &mut DataType, keys: &FlattenedKeys) {
     match ty {
-        DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER) => {
+        DataType::Enum(enm) if enm.attributes.contains_key("specta_serde:alias_union") => {
             enm.variants.retain(|(_, variant)| {
                 let Fields::Unnamed(fields) = &variant.fields else {
                     return true;
@@ -2051,7 +2056,9 @@ fn suppress_alias_branches_for_reserved_keys(ty: &mut DataType, keys: &Flattened
                 };
                 !fields.fields.iter().any(|(name, field)| {
                     keys.contains(name.as_ref())
-                        && !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER)
+                        && !field
+                            .attributes
+                            .contains_key("specta_serde:alias_exclusion")
                 })
             });
         }
@@ -2149,16 +2156,17 @@ fn lower_field_aliases_for_phase_with_relaxed_names(
     let alias_union_count = parts
         .iter()
         .filter(|part| {
-            matches!(part, DataType::Enum(enm) if enm.attributes.contains_key(ALIAS_UNION_MARKER))
+            matches!(part, DataType::Enum(enm) if enm.attributes.contains_key("specta_serde:alias_union"))
         })
         .count();
     if alias_union_count > 1 {
         for part in &mut parts {
             if let DataType::Enum(enm) = part
-                && enm.attributes.contains_key(ALIAS_UNION_MARKER)
+                && enm.attributes.contains_key("specta_serde:alias_union")
                 && alias_union_is_fully_exclusive(enm)
             {
-                enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
+                enm.attributes
+                    .insert("specta_serde:deferred_alias_union", true);
             }
         }
     }
@@ -2187,7 +2195,11 @@ fn alias_union_is_fully_exclusive(enm: &Enum) -> bool {
                 && fields
                     .fields
                     .iter()
-                    .filter(|(_, field)| field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+                    .filter(|(_, field)| {
+                        field
+                            .attributes
+                            .contains_key("specta_serde:alias_exclusion")
+                    })
                     .count()
                     == spelling_count - 1
         })
@@ -2235,11 +2247,12 @@ fn defer_fully_optional_alias_unions(ty: &mut DataType) {
                 }
             }
 
-            if enm.attributes.contains_key(ALIAS_UNION_MARKER)
+            if enm.attributes.contains_key("specta_serde:alias_union")
                 && alias_union_is_fully_optional(enm)
                 && (alias_union_is_fully_exclusive(enm) || alias_union_has_no_exclusions(enm))
             {
-                enm.attributes.insert(DEFERRED_ALIAS_UNION_MARKER, true);
+                enm.attributes
+                    .insert("specta_serde:deferred_alias_union", true);
             }
         }
         DataType::Tuple(tuple) => {
@@ -2288,13 +2301,16 @@ fn alias_union_is_fully_optional(enm: &Enum) -> bool {
                 return false;
             };
 
-            fields
-                .fields
-                .iter()
-                .any(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
-                && fields.fields.iter().all(|(_, field)| {
-                    field.attributes.contains_key(ALIAS_EXCLUSION_MARKER) || field.optional
-                })
+            fields.fields.iter().any(|(_, field)| {
+                !field
+                    .attributes
+                    .contains_key("specta_serde:alias_exclusion")
+            }) && fields.fields.iter().all(|(_, field)| {
+                field
+                    .attributes
+                    .contains_key("specta_serde:alias_exclusion")
+                    || field.optional
+            })
         })
 }
 
@@ -2313,10 +2329,11 @@ fn alias_union_has_no_exclusions(enm: &Enum) -> bool {
             return false;
         };
 
-        fields
-            .fields
-            .iter()
-            .all(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER))
+        fields.fields.iter().all(|(_, field)| {
+            !field
+                .attributes
+                .contains_key("specta_serde:alias_exclusion")
+        })
     })
 }
 
@@ -2338,7 +2355,7 @@ fn alias_field_union(
 
     for name in &names {
         let mut field = field.clone();
-        field.attributes.remove(parser::SERDE_FIELD_ALIASES);
+        field.attributes.remove("serde:field:aliases");
 
         let mut fields = vec![(name.clone(), field)];
         if exclude_other_names {
@@ -2352,7 +2369,9 @@ fn alias_field_union(
                     .map(|other| {
                         let mut excluded = Field::new(never_datatype());
                         excluded.optional = true;
-                        excluded.attributes.insert(ALIAS_EXCLUSION_MARKER, true);
+                        excluded
+                            .attributes
+                            .insert("specta_serde:alias_exclusion", true);
                         (other.clone(), excluded)
                     }),
             );
@@ -2368,16 +2387,20 @@ fn alias_field_union(
     }
 
     // This synthetic union is already in its final exported shape; see
-    // `ENUM_REPR_REWRITTEN_MARKER`.
-    aliases.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
-    aliases.attributes.insert(ALIAS_UNION_MARKER, true);
+    // `specta_serde:enum_repr_rewritten`.
+    aliases
+        .attributes
+        .insert("specta_serde:enum_repr_rewritten", true);
+    aliases.attributes.insert("specta_serde:alias_union", true);
 
     DataType::Enum(aliases)
 }
 
 fn never_datatype() -> DataType {
     let mut never = Enum::default();
-    never.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    never
+        .attributes
+        .insert("specta_serde:enum_repr_rewritten", true);
     DataType::Enum(never)
 }
 
@@ -2460,7 +2483,7 @@ fn rewrite_fields_for_phase(
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
                 if mode == PhaseRewrite::Deserialize
-                    && field.attributes.contains_key(NULLABLE_MARKER)
+                    && field.attributes.contains_key("specta:nullable")
                     && !serde_attrs
                         .as_ref()
                         .is_some_and(|attrs| attrs.has_deserialize_with || attrs.has_with)
@@ -2537,9 +2560,13 @@ fn rewrite_field_for_phase(
             // stripped just below, but exporters still need to tell a
             // `skip_serializing_if` omission apart from a `#[serde(default)]`
             // element, which serde keeps writing.
-            field.attributes.insert(SERIALIZE_OMISSION_MARKER, true);
+            field
+                .attributes
+                .insert("specta_serde:serialize_omission", true);
             if attrs.flatten {
-                field.attributes.insert(CONDITIONAL_OMISSION_MARKER, true);
+                field
+                    .attributes
+                    .insert("specta_serde:conditional_omission", true);
             }
 
             if mode == PhaseRewrite::Serialize
@@ -2556,9 +2583,7 @@ fn rewrite_field_for_phase(
         // already-split variant — a footgun for downstream callers (e.g.
         // tauri-specta's `validate_exported_command`) that run unified
         // validation on the post-`apply_phases` graph.
-        field
-            .attributes
-            .remove(parser::SERDE_FIELD_SKIP_SERIALIZING_IF);
+        field.attributes.remove("serde:field:skip_serializing_if");
     }
 
     if mode != PhaseRewrite::Unified {
@@ -2569,10 +2594,10 @@ fn rewrite_field_for_phase(
         // above: unified-mode validation now rejects one-sided renames/skips,
         // and it must keep accepting the already-split shapes.
         for key in [
-            parser::SERDE_FIELD_RENAME_SERIALIZE,
-            parser::SERDE_FIELD_RENAME_DESERIALIZE,
-            parser::SERDE_FIELD_SKIP_SERIALIZING,
-            parser::SERDE_FIELD_SKIP_DESERIALIZING,
+            "serde:field:rename_serialize",
+            "serde:field:rename_deserialize",
+            "serde:field:skip_serializing",
+            "serde:field:skip_deserializing",
         ] {
             field.attributes.remove(key);
         }
@@ -2610,10 +2635,10 @@ fn normalize_container_attrs_for_phase(
     // `rename_all` / `rename_all_fields` have already been applied to the
     // field names by `rewrite_fields_for_phase`.
     for key in [
-        parser::SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
-        parser::SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
-        parser::SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
-        parser::SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+        "serde:container:rename_all_serialize",
+        "serde:container:rename_all_deserialize",
+        "serde:container:rename_all_fields_serialize",
+        "serde:container:rename_all_fields_deserialize",
     ] {
         attrs.remove(key);
     }
@@ -2628,11 +2653,11 @@ fn normalize_container_attrs_for_phase(
         PhaseRewrite::Deserialize => parsed.rename_deserialize,
         PhaseRewrite::Unified => unreachable!("handled above"),
     };
-    attrs.remove(parser::SERDE_CONTAINER_RENAME_SERIALIZE);
-    attrs.remove(parser::SERDE_CONTAINER_RENAME_DESERIALIZE);
+    attrs.remove("serde:container:rename_serialize");
+    attrs.remove("serde:container:rename_deserialize");
     if let Some(rename) = rename {
-        attrs.insert(parser::SERDE_CONTAINER_RENAME_SERIALIZE, rename.clone());
-        attrs.insert(parser::SERDE_CONTAINER_RENAME_DESERIALIZE, rename);
+        attrs.insert("serde:container:rename_serialize", rename.clone());
+        attrs.insert("serde:container:rename_deserialize", rename);
     }
 
     Ok(())
@@ -2659,12 +2684,12 @@ fn normalize_enum_attrs_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<()
         // and variants skipped in this phase were already dropped by
         // `filter_enum_variants_for_phase`.
         for key in [
-            parser::SERDE_VARIANT_RENAME_SERIALIZE,
-            parser::SERDE_VARIANT_RENAME_DESERIALIZE,
-            parser::SERDE_VARIANT_RENAME_ALL_SERIALIZE,
-            parser::SERDE_VARIANT_RENAME_ALL_DESERIALIZE,
-            parser::SERDE_VARIANT_SKIP_SERIALIZING,
-            parser::SERDE_VARIANT_SKIP_DESERIALIZING,
+            "serde:variant:rename_serialize",
+            "serde:variant:rename_deserialize",
+            "serde:variant:rename_all_serialize",
+            "serde:variant:rename_all_deserialize",
+            "serde:variant:skip_serializing",
+            "serde:variant:skip_deserializing",
         ] {
             variant.attributes.remove(key);
         }
@@ -2740,7 +2765,7 @@ fn rewrite_struct_repr_for_phase(
 fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool, Error> {
     if field
         .attributes
-        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+        .contains_key("specta:serde_newtype_skip_ignored")
     {
         return Ok(false);
     }
@@ -2830,7 +2855,9 @@ fn rewrite_enum_repr_for_phase(
     mode: PhaseRewrite,
     original_types: &Types,
 ) -> Result<(), Error> {
-    if e.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
+    if e.attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
+    {
         return Ok(());
     }
 
@@ -2845,7 +2872,8 @@ fn rewrite_enum_repr_for_phase(
         // attribute must stay visible to later consumers (e.g.
         // `internal_tag_payload_compatibility` unions an untagged payload's
         // variants instead of rejecting it).
-        e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+        e.attributes
+            .insert("specta_serde:enum_repr_rewritten", true);
         return Ok(());
     }
 
@@ -2883,7 +2911,7 @@ fn rewrite_enum_repr_for_phase(
             if hidden_external_payload {
                 transformed_variant
                     .attributes
-                    .insert(HIDDEN_EXTERNAL_PAYLOAD_MARKER, true);
+                    .insert("specta_serde:hidden_external_payload", true);
             }
             transformed.push((Cow::Owned(variant_name.into_owned()), transformed_variant));
             continue;
@@ -2941,19 +2969,19 @@ fn rewrite_enum_repr_for_phase(
             if hidden_external_payload {
                 transformed_variant
                     .attributes
-                    .insert(HIDDEN_EXTERNAL_PAYLOAD_MARKER, true);
+                    .insert("specta_serde:hidden_external_payload", true);
             }
             if widen_tag {
                 transformed_variant
                     .attributes
-                    .insert(ENUM_OTHER_VARIANT_MARKER, true);
+                    .insert("specta_serde:variant_other", true);
             }
             if matches!(repr, EnumRepr::External)
                 && matches!(transformed_variant.fields, Fields::Named(_))
             {
                 transformed_variant
                     .attributes
-                    .insert(STRICT_OBJECT_MARKER, true);
+                    .insert("specta:strict_object", true);
             }
             transformed.push((Cow::Owned(serialized_name), transformed_variant));
         }
@@ -2961,10 +2989,11 @@ fn rewrite_enum_repr_for_phase(
 
     e.variants = transformed;
     e.attributes = Default::default();
-    e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    e.attributes
+        .insert("specta_serde:enum_repr_rewritten", true);
     if deny_unknown_fields {
         e.attributes
-            .insert(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, true);
+            .insert("serde:container:deny_unknown_fields", true);
     }
 
     Ok(())
@@ -3045,8 +3074,9 @@ fn rewrite_identifier_enum_for_phase(
 
     e.attributes = Default::default();
     // This synthetic identifier union is already in its final exported
-    // shape; see `ENUM_REPR_REWRITTEN_MARKER`.
-    e.attributes.insert(ENUM_REPR_REWRITTEN_MARKER, true);
+    // shape; see `specta_serde:enum_repr_rewritten`.
+    e.attributes
+        .insert("specta_serde:enum_repr_rewritten", true);
     e.variants = variants;
     Ok(true)
 }
@@ -3138,7 +3168,7 @@ fn transform_untagged_variant(variant: &Variant) -> Result<Variant, Error> {
 ///
 /// A second pass (e.g. `PhasesFormat`'s cross-reference resolution pass)
 /// never reaches this rewrite again: the caller sets
-/// `ENUM_REPR_REWRITTEN_MARKER` after applying it. (It also happens to be
+/// `specta_serde:enum_repr_rewritten` after applying it. (It also happens to be
 /// shape-idempotent - a transformed unit variant becomes `Fields::Unnamed`,
 /// which no longer matches `Fields::Unit` - but the marker is the invariant
 /// idempotency relies on.)
@@ -3376,7 +3406,7 @@ fn close_named_payload(field: &mut Field) {
     {
         strct
             .attributes
-            .insert(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, true);
+            .insert("serde:container:deny_unknown_fields", true);
     }
 }
 
@@ -3569,7 +3599,9 @@ fn transform_internal_variant(
                                 &HashMap::new(),
                                 &HashSet::new(),
                             )?;
-                            if field.attributes.contains_key(CONDITIONAL_OMISSION_MARKER)
+                            if field
+                                .attributes
+                                .contains_key("specta_serde:conditional_omission")
                                 || was_nullable
                             {
                                 optional_parts.push(ty);
@@ -3753,10 +3785,10 @@ fn string_literal_datatype(value: String) -> DataType {
         .variants
         .push((Cow::Owned(value), Variant::unit()));
     // This synthetic single-variant literal (e.g. a tag field's type) is
-    // already in its final exported shape; see `ENUM_REPR_REWRITTEN_MARKER`.
+    // already in its final exported shape; see `specta_serde:enum_repr_rewritten`.
     value_enum
         .attributes
-        .insert(ENUM_REPR_REWRITTEN_MARKER, true);
+        .insert("specta_serde:enum_repr_rewritten", true);
     DataType::Enum(value_enum)
 }
 
@@ -3859,13 +3891,13 @@ fn sole_field_is_serde_skipped(variant: &Variant, mode: PhaseRewrite) -> Result<
 }
 
 /// Whether a newtype variant's *live* sole payload was declared as
-/// `Option<T>` (see [`NULLABLE_MARKER`]). Declared arity must be 1: a
+/// `Option<T>` (recorded as `specta:nullable`). Declared arity must be 1: a
 /// multi-field tuple variant deserializes as a sequence, so serde's
 /// `missing_field` `Option` special case never applies to it.
 fn sole_live_field_is_nullable(variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unnamed(unnamed) => match unnamed.fields.as_slice() {
-            [field] => field.ty.is_some() && field.attributes.contains_key(NULLABLE_MARKER),
+            [field] => field.ty.is_some() && field.attributes.contains_key("specta:nullable"),
             _ => false,
         },
         Fields::Unit | Fields::Named(_) => false,
@@ -3873,14 +3905,14 @@ fn sole_live_field_is_nullable(variant: &Variant) -> bool {
 }
 
 /// Whether a collapsed newtype variant's skipped sole field was declared as
-/// `Option<T>` (see [`NULLABLE_MARKER`]; the attribute survives on the
+/// `Option<T>` (recorded as `specta:nullable`; the attribute survives on the
 /// `ty: None` placeholder produced by [`skipped_field_marker`]).
 fn skipped_sole_field_is_nullable(variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unnamed(unnamed) => unnamed
             .fields
             .first()
-            .is_some_and(|field| field.attributes.contains_key(NULLABLE_MARKER)),
+            .is_some_and(|field| field.attributes.contains_key("specta:nullable")),
         Fields::Unit | Fields::Named(_) => false,
     }
 }
@@ -3933,7 +3965,7 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
                     if let DataType::Struct(strct) = &mut built {
                         strct
                             .attributes
-                            .insert(PRESERVED_ARITY_PAYLOAD_MARKER, true);
+                            .insert("specta_serde:preserved_arity_payload", true);
                     }
                     Some(Field::new(built))
                 }
@@ -4162,7 +4194,9 @@ fn internal_tag_payload_compatibility(
             Ok(compatible)
         }
         DataType::Enum(enm)
-            if enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+            if enm
+                .attributes
+                .contains_key("specta_serde:enum_repr_rewritten")
                 && !matches!(
                     EnumRepr::from_attrs(&enm.attributes),
                     Ok(EnumRepr::Untagged)
@@ -4652,7 +4686,7 @@ fn contextualize_rewritten_external_units(
     for (name, variant) in &mut rewritten.variants {
         if variant
             .attributes
-            .contains_key(HIDDEN_EXTERNAL_PAYLOAD_MARKER)
+            .contains_key("specta_serde:hidden_external_payload")
         {
             return Err(Error::invalid_internally_tagged_variant(
                 name.clone(),
@@ -4909,7 +4943,7 @@ fn external_enum_tagged_payload_datatype(
             transformed_variant.attributes = Default::default();
             transformed_variant
                 .attributes
-                .insert(STRICT_OBJECT_MARKER, true);
+                .insert("specta:strict_object", true);
             transformed
                 .variants
                 .push((Cow::Owned(name), transformed_variant));
@@ -4918,7 +4952,7 @@ fn external_enum_tagged_payload_datatype(
 
     transformed
         .attributes
-        .insert(ENUM_REPR_REWRITTEN_MARKER, true);
+        .insert("specta_serde:enum_repr_rewritten", true);
     Ok(DataType::Enum(transformed))
 }
 
@@ -4973,9 +5007,9 @@ fn substitute_container_attribute_generics(
     generics: &[(specta::datatype::Generic, DataType)],
 ) {
     for key in [
-        SERDE_CONTAINER_INTO_RESOLVED,
-        SERDE_CONTAINER_FROM_RESOLVED,
-        SERDE_CONTAINER_TRY_FROM_RESOLVED,
+        "serde:container:into_resolved",
+        "serde:container:from_resolved",
+        "serde:container:try_from_resolved",
     ] {
         let Some(mut ty) = attributes.get_named_as::<DataType>(key).cloned() else {
             continue;
@@ -5240,8 +5274,8 @@ fn adjacent_content_is_phase_asymmetric(variant: &Variant) -> Result<bool, Error
     // `missing_field` helper deserializes a missing `content` key as `None`,
     // so the unified `content?: null` shape is exact for both phases and no
     // split is needed. `Option`-ness is read only from the marker the derive
-    // records from the real field syntax; see [`NULLABLE_MARKER`].
-    if field.attributes.contains_key(NULLABLE_MARKER) {
+    // records from the real field syntax; see `specta:nullable`.
+    if field.attributes.contains_key("specta:nullable") {
         return Ok(false);
     }
 
@@ -5303,7 +5337,7 @@ fn unnamed_trailing_default_run(unnamed: &UnnamedFields) -> Result<usize, Error>
 fn field_is_dead_in_both_phases(field: &Field) -> Result<bool, Error> {
     if field
         .attributes
-        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+        .contains_key("specta:serde_newtype_skip_ignored")
     {
         return Ok(false);
     }
@@ -5328,10 +5362,10 @@ fn variant_is_dead_in_both_phases(variant: &Variant) -> Result<bool, Error> {
 fn field_has_local_difference(field: &Field, default_is_inert: bool) -> Result<bool, Error> {
     let ignored_skip = field
         .attributes
-        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER);
+        .contains_key("specta:serde_newtype_skip_ignored");
     let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
     let declared_option_is_deserialize_optional = field.ty.is_some()
-        && field.attributes.contains_key(NULLABLE_MARKER)
+        && field.attributes.contains_key("specta:nullable")
         && !attrs
             .as_ref()
             .is_some_and(|attrs| attrs.flatten || attrs.has_deserialize_with || attrs.has_with);
@@ -5662,7 +5696,7 @@ fn apply_field_attrs(
 ) -> Result<(), Error> {
     if field
         .attributes
-        .contains_key(SERDE_NEWTYPE_SKIP_IGNORED_MARKER)
+        .contains_key("specta:serde_newtype_skip_ignored")
     {
         return Ok(());
     }
@@ -5701,7 +5735,7 @@ mod tests {
     use specta::{Format as _, Type, Types, datatype::DataType};
 
     use super::{
-        Phase, Phased, PhasesFormat, parser, select_phase_datatype,
+        Phase, Phased, PhasesFormat, select_phase_datatype,
         validate::{ApplyMode, validate_datatype_for_mode},
     };
 
@@ -6016,7 +6050,7 @@ mod tests {
             .map(|(_, field)| {
                 field
                     .attributes
-                    .contains_key(parser::SERDE_FIELD_SKIP_SERIALIZING_IF)
+                    .contains_key("serde:field:skip_serializing_if")
             })
             .expect("field should exist")
     }

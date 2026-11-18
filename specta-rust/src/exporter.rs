@@ -12,12 +12,6 @@ use specta::{
         Attributes, DataType, Deprecated, Field, Fields, Generic, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference,
     },
-    markers::{
-        ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_CONTENT,
-        SERDE_CONTAINER_RENAME_ALL_DESERIALIZE, SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
-        SERDE_CONTAINER_RENAME_DESERIALIZE, SERDE_CONTAINER_RENAME_SERIALIZE, SERDE_CONTAINER_TAG,
-        SERDE_CONTAINER_UNTAGGED,
-    },
 };
 
 use crate::Error;
@@ -424,7 +418,9 @@ fn render_enum(
         match &variant.fields {
             Fields::Unit => line(out, depth + 1, &format!("{variant_name},")),
             Fields::Unnamed(fields)
-                if enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+                if enm
+                    .attributes
+                    .contains_key("specta_serde:enum_repr_rewritten")
                     && is_singleton_unit_enum_field(fields) =>
             {
                 line(out, depth + 1, &format!("{variant_name},"));
@@ -474,7 +470,8 @@ fn render_enum(
 /// singleton-literal form is collapsed straight back to a unit variant when
 /// rendering. Anything carrying a payload is a different shape once lowered.
 fn lowering_changed_the_wire(enm: &specta::datatype::Enum) -> bool {
-    enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+    enm.attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
         && !enm
             .variants
             .iter()
@@ -991,27 +988,27 @@ fn render_serde_container(
         &mut args,
         attributes,
         "rename",
-        SERDE_CONTAINER_RENAME_SERIALIZE,
-        SERDE_CONTAINER_RENAME_DESERIALIZE,
+        "serde:container:rename_serialize",
+        "serde:container:rename_deserialize",
     );
     push_serde_rename(
         &mut args,
         attributes,
         "rename_all",
-        SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
-        SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
+        "serde:container:rename_all_serialize",
+        "serde:container:rename_all_deserialize",
     );
     if attributes
-        .get_named_as::<bool>(SERDE_CONTAINER_UNTAGGED)
+        .get_named_as::<bool>("serde:container:untagged")
         .copied()
         .unwrap_or(false)
     {
         args.push("untagged".to_string());
     }
-    if let Some(tag) = attributes.get_named_as::<String>(SERDE_CONTAINER_TAG) {
+    if let Some(tag) = attributes.get_named_as::<String>("serde:container:tag") {
         args.push(format!("tag = {}", string_literal(tag)));
     }
-    if let Some(content) = attributes.get_named_as::<String>(SERDE_CONTAINER_CONTENT) {
+    if let Some(content) = attributes.get_named_as::<String>("serde:container:content") {
         args.push(format!("content = {}", string_literal(content)));
     }
 

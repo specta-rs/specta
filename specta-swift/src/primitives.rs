@@ -6,10 +6,6 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, GenericDefinition, NamedFields, NamedReferenceType,
         Primitive, Reference, Struct, Variant,
     },
-    markers::{
-        ENUM_REPR_REWRITTEN_MARKER, NULLABLE_MARKER, SERDE_CONTAINER_DEFAULT, SERDE_FIELD_DEFAULT,
-        SERDE_FIELD_FLATTEN, SERIALIZE_OMISSION_MARKER,
-    },
 };
 
 use crate::error::Error;
@@ -139,7 +135,10 @@ fn tag_literal_value(dt: &DataType) -> Option<&str> {
         return None;
     };
 
-    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
+    if !enm
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
+    {
         return None;
     }
 
@@ -296,7 +295,7 @@ fn field_is_nullable_datatype(field: &Field) -> bool {
 /// it survives a `#[specta(type = ...)]` override that hides the optionality
 /// from the exported datatype.
 fn field_rust_nullable(field: &Field) -> bool {
-    field.attributes.contains_key(NULLABLE_MARKER)
+    field.attributes.contains_key("specta:nullable")
 }
 
 /// Whether serde treats the field as an `Option`, from either the exported
@@ -308,7 +307,7 @@ fn field_nullable(field: &Field) -> bool {
 /// Whether serde tolerates an absent key for the field on its own: it carries
 /// `#[serde(default)]`, or its container does.
 fn field_defaulted(field: &Field, container_default: bool) -> bool {
-    container_default || field.attributes.contains_key(SERDE_FIELD_DEFAULT)
+    container_default || field.attributes.contains_key("serde:field:default")
 }
 
 /// Whether the generated property is optional, which every codec branch that
@@ -325,7 +324,9 @@ fn field_property_optional(field: &Field) -> bool {
 /// `Option` (including one hidden behind a `#[specta(type = ...)]` override) is
 /// *not* omittable -- serde writes it as `null`.
 fn field_may_be_absent(field: &Field) -> bool {
-    field.attributes.contains_key(SERIALIZE_OMISSION_MARKER)
+    field
+        .attributes
+        .contains_key("specta_serde:serialize_omission")
         || (field.optional && !field_nullable(field))
 }
 
@@ -1358,7 +1359,7 @@ fn struct_to_swift(
             }
         }
         specta::datatype::Fields::Named(fields) => {
-            let container_default = s.attributes.contains_key(SERDE_CONTAINER_DEFAULT);
+            let container_default = s.attributes.contains_key("serde:container:default");
             let live = keyed_fields(
                 swift,
                 format,
@@ -1529,7 +1530,7 @@ fn keyed_fields<'a>(
         let Some(original) = field.ty.as_ref() else {
             continue;
         };
-        let rust_nullable = field.attributes.contains_key(NULLABLE_MARKER);
+        let rust_nullable = field.attributes.contains_key("specta:nullable");
         let property_type = format!(
             "{}{}",
             datatype_to_swift(swift, format, types, original, generic_scope.to_vec())?,
@@ -1548,7 +1549,7 @@ fn keyed_fields<'a>(
             field,
             property_type,
             decode_type,
-            defaulted: container_default || field.attributes.contains_key(SERDE_FIELD_DEFAULT),
+            defaulted: container_default || field.attributes.contains_key("serde:field:default"),
         });
     }
     Ok(out)
@@ -1655,7 +1656,9 @@ fn wire_elements<'a>(
             field,
             ty,
             nullable: matches!(field.ty.as_ref(), Some(DataType::Nullable(_))),
-            omittable: field.attributes.contains_key(SERIALIZE_OMISSION_MARKER),
+            omittable: field
+                .attributes
+                .contains_key("specta_serde:serialize_omission"),
         });
     }
     Ok(elements)
@@ -2102,7 +2105,7 @@ fn generate_enum_structs(
         let mut field_mappings = Vec::new();
         for (original_field_name, field) in &wrapper {
             if let Some(ty) = field.ty.as_ref() {
-                if field.attributes.contains_key(SERDE_FIELD_FLATTEN) {
+                if field.attributes.contains_key("serde:field:flatten") {
                     return Err(Error::UnsupportedType(format!(
                         "variant `{original_variant_name}` flattens field `{original_field_name}` \
                          into the variant, which the Swift exporter cannot express"

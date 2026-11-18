@@ -9,7 +9,6 @@ use specta::{
         DataType, Enum, Field, Fields, Generic, NamedDataType, NamedReferenceType, Primitive,
         Reference, Struct, Variant,
     },
-    markers::{ENUM_REPR_REWRITTEN_MARKER, SERDE_CONTAINER_UNTAGGED, SERIALIZE_OMISSION_MARKER},
 };
 
 use crate::{
@@ -535,8 +534,10 @@ fn enum_shape<'a>(
     variants: &[(&'a Cow<'a, str>, &'a Variant)],
     path: &str,
 ) -> Result<EnumShape<'a>, Error> {
-    let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
-    let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
+    let rewritten = enm
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten");
+    let untagged = enm.attributes.contains_key("serde:container:untagged");
 
     if untagged {
         return Ok(EnumShape {
@@ -696,7 +697,10 @@ fn literal_tag(field: &Field) -> Option<&str> {
     let DataType::Enum(enm) = field.ty.as_ref()? else {
         return None;
     };
-    if !enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER) {
+    if !enm
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
+    {
         return None;
     }
     let [(name, variant)] = enm.variants.as_slice() else {
@@ -1821,7 +1825,9 @@ fn render_property(
     }
     if kotlin.serialization == Serialization::Kotlinx
         && nullable
-        && !field.attributes.contains_key(SERIALIZE_OMISSION_MARKER)
+        && !field
+            .attributes
+            .contains_key("specta_serde:serialize_omission")
     {
         // `Field::optional` also covers fields Serde only accepts as missing (`#[serde(default)]`
         // or a nullable adjacent payload). Serde still writes those as `null`, so only a

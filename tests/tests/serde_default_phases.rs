@@ -1064,9 +1064,7 @@ fn non_trailing_hand_built_tuple_default_does_not_split() {
     NamedDataType::new("HandBuilt", &mut types, |_, ndt| {
         let mut s = Struct::unnamed();
         let mut first = Field::new(DataType::Primitive(Primitive::u8));
-        first
-            .attributes
-            .insert(specta::markers::SERDE_FIELD_DEFAULT, true);
+        first.attributes.insert("serde:field:default", true);
         s.field_mut(first);
         s.field_mut(Field::new(DataType::Primitive(Primitive::u8)));
         ndt.ty = Some(s.build());
@@ -1192,7 +1190,7 @@ fn hand_built_skip_variant_with_default_payload_does_not_split() {
         let mut hidden_payload = Field::new(DataType::Primitive(Primitive::u8));
         hidden_payload
             .attributes
-            .insert(specta::markers::SERDE_FIELD_DEFAULT, true);
+            .insert("serde:field:default", true);
         let hidden = Variant::named().skip().field("x", hidden_payload).build();
         let visible = Variant::named()
             .field("y", Field::new(DataType::Primitive(Primitive::u8)))
