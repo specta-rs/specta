@@ -107,8 +107,7 @@ macro_rules! selection {
                     pub use super::super::__specta_deps::{serde, specta};
                 }
 
-                $crate::selection!(@nested_modules { $($fields)+ });
-                $crate::selection!(@struct $name [] [] { $($fields)+ });
+                $crate::selection!(@declare $name [] [] [] { $($fields)+ });
             }
         }
     };
@@ -121,39 +120,17 @@ macro_rules! selection {
                 pub use super::super::__specta_deps::{serde, specta};
             }
 
-            $crate::selection!(@nested_modules { $($fields)+ });
-            $crate::selection!(@struct Selection [] [] { $($fields)+ });
+            $crate::selection!(@declare Selection [] [] [] { $($fields)+ });
         }
     };
 
-    // Emit a module per nested field, skipping fields which don't nest.
-    ( @nested_modules { } ) => {};
-    ( @nested_modules { $field:ident: { $($fields:tt)+ }, $($rest:tt)* } ) => {
-        $crate::selection!(@module $field { $($fields)+ });
-        $crate::selection!(@nested_modules { $($rest)* });
-    };
-    ( @nested_modules { $field:ident: { $($fields:tt)+ } } ) => {
-        $crate::selection!(@module $field { $($fields)+ });
-    };
-    ( @nested_modules { $field:ident: [{ $($fields:tt)+ }], $($rest:tt)* } ) => {
-        $crate::selection!(@module $field { $($fields)+ });
-        $crate::selection!(@nested_modules { $($rest)* });
-    };
-    ( @nested_modules { $field:ident: [{ $($fields:tt)+ }] } ) => {
-        $crate::selection!(@module $field { $($fields)+ });
-    };
-    ( @nested_modules { $field:ident: $value:expr, $($rest:tt)* } ) => {
-        $crate::selection!(@nested_modules { $($rest)* });
-    };
-    ( @nested_modules { $field:ident: $value:expr } ) => {};
-    ( @nested_modules { $field:ident, $($rest:tt)* } ) => {
-        $crate::selection!(@nested_modules { $($rest)* });
-    };
-    ( @nested_modules { $field:ident } ) => {};
+    // Walk the fields once, emitting a module for each nested field and
+    // accumulating the struct declaration. Every field becomes a type
+    // parameter so its type is inferred from the value (or the original
+    // struct) at the call site.
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*] { } ) => {
+        $($items)*
 
-    // Build the definition. Every field becomes a type parameter so its type is
-    // inferred from the value (or the original struct) at the call site.
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*] { } ) => {
         #[allow(non_camel_case_types)]
         #[derive(super::__specta_deps::serde::Serialize, super::__specta_deps::specta::Type)]
         #[serde(crate = "super::__specta_deps::serde")]
@@ -162,57 +139,66 @@ macro_rules! selection {
             $($fields)*
         }
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: { $($nested:tt)+ }, $($rest:tt)* } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { $($rest)* });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: { $($nested:tt)+ } } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: [{ $($nested:tt)+ }], $($rest:tt)* } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { $($rest)* });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: [{ $($nested:tt)+ }] } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: $value:expr, $($rest:tt)* } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)*]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { $($rest)* });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident: $value:expr } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)*]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*]
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
         { $field:ident, $($rest:tt)* } ) => {
-        $crate::selection!(@struct $name
+        $crate::selection!(@declare $name
+            [$($items)*]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { $($rest)* });
     };
-    ( @struct $name:ident [$($generics:tt)*] [$($fields:tt)*] { $field:ident } ) => {
-        $crate::selection!(@struct $name
+    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
+        { $field:ident } ) => {
+        $crate::selection!(@declare $name
+            [$($items)*]
             [$($generics)* $field,]
             [$($fields)* pub $field: $field,]
             { });
