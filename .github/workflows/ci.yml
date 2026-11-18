@@ -63,6 +63,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
 
+  features-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the generated feature list is current
+        run: |
+          node .github/features.js
+          git diff --exit-code specta/src/docs.md
+
+  native-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Check for native `links` crates
+        run: node .github/links.js
+
   zod:
     runs-on: ubuntu-latest
     steps:

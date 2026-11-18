@@ -76,7 +76,7 @@ these types.
 
 ## Feature flags
 
-Features for third-party crates carry that crate's major version in their name (`uuid1`, `chrono04`, `bevy_ecs020`), so support for a new major of a crate can arrive as a new feature in a minor release of Specta rather than a major one. The unversioned names remain as aliases of the current versioned feature.
+Features for third-party crates carry the version that bounds the supported range in their name: the major for 1.x and newer (`uuid1`, `tokio1`), and the major and minor for 0.x (`chrono04`, `glam034`, `smol_str03`). Support for a new major of a crate can then arrive as a new feature in a minor release of Specta rather than a major one. The pre-2.0 unversioned names are gone rather than aliased, so a manifest that enabled `uuid` now says `uuid1` and one that enabled `chrono` says `chrono04`; every feature names the version range it applies to.
 
 [//]: # (FEATURE_FLAGS_START)
 Core Features
@@ -127,39 +127,6 @@ External types
 - `bevy_input020` - [bevy_input](https://docs.rs/bevy_input) 0.20.x
 - `camino1` - [camino](https://docs.rs/camino) 1.x
 - `geojson1` - [geojson](https://docs.rs/geojson) 1.x
-
-Unversioned aliases. These are the pre-2.0 names; each enables the versioned feature it is named after. New manifests should use the versioned name.
-
-- `serde_json` - Alias of `serde_json1`.
-- `serde_yaml` - Alias of `serde_yaml09`.
-- `toml` - Alias of `toml1`.
-- `uuid` - Alias of `uuid1`.
-- `ulid` - Alias of `ulid3`.
-- `chrono` - Alias of `chrono04`.
-- `time` - Alias of `time03`.
-- `jiff` - Alias of `jiff02`.
-- `bigdecimal` - Alias of `bigdecimal04`.
-- `rust_decimal` - Alias of `rust_decimal1`.
-- `indexmap` - Alias of `indexmap2`.
-- `semver` - Alias of `semver1`.
-- `smol_str` - Alias of `smol_str03`.
-- `smallvec` - Alias of `smallvec1`.
-- `ipnetwork` - Alias of `ipnetwork021`.
-- `mac_address` - Alias of `mac_address1`.
-- `bit-vec` - Alias of `bit-vec010`.
-- `bson` - Alias of `bson3`.
-- `bytes` - Alias of `bytes1`.
-- `uhlc` - Alias of `uhlc09`.
-- `bytesize` - Alias of `bytesize2`.
-- `glam` - Alias of `glam034`.
-- `tokio` - Alias of `tokio1`.
-- `url` - Alias of `url2`.
-- `either` - Alias of `either1`.
-- `error-stack` - Alias of `error-stack08`.
-- `bevy_ecs` - Alias of `bevy_ecs020`.
-- `bevy_input` - Alias of `bevy_input020`.
-- `camino` - Alias of `camino1`.
-- `geojson` - Alias of `geojson1`.
 
 [//]: # (FEATURE_FLAGS_END)
 ## Alternatives

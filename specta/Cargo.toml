@@ -98,73 +98,11 @@ error-stack08 = ["dep:error-stack"]
 ## [bevy_ecs](https://docs.rs/bevy_ecs) 0.20.x
 bevy_ecs020 = ["dep:bevy_ecs"]
 ## [bevy_input](https://docs.rs/bevy_input) 0.20.x
-bevy_input020 = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam", "smol_str03"]
+bevy_input020 = ["dep:bevy_input", "bevy_ecs020", "smol_str03"]
 ## [camino](https://docs.rs/camino) 1.x
 camino1 = ["dep:camino"]
 ## [geojson](https://docs.rs/geojson) 1.x
 geojson1 = ["dep:geojson", "serde_json1"]
-
-#! Unversioned aliases. These are the pre-2.0 names; each enables the versioned feature it is named after. New manifests should use the versioned name.
-## Alias of `serde_json1`.
-serde_json = ["serde_json1"]
-## Alias of `serde_yaml09`.
-serde_yaml = ["serde_yaml09"]
-## Alias of `toml1`.
-toml = ["toml1"]
-## Alias of `uuid1`.
-uuid = ["uuid1"]
-## Alias of `ulid3`.
-ulid = ["ulid3"]
-## Alias of `chrono04`.
-chrono = ["chrono04"]
-## Alias of `time03`.
-time = ["time03"]
-## Alias of `jiff02`.
-jiff = ["jiff02"]
-## Alias of `bigdecimal04`.
-bigdecimal = ["bigdecimal04"]
-## Alias of `rust_decimal1`.
-rust_decimal = ["rust_decimal1"]
-## Alias of `indexmap2`.
-indexmap = ["indexmap2"]
-## Alias of `semver1`.
-semver = ["semver1"]
-## Alias of `smol_str03`.
-smol_str = ["smol_str03"]
-## Alias of `smallvec1`.
-smallvec = ["smallvec1"]
-## Alias of `ipnetwork021`.
-ipnetwork = ["ipnetwork021"]
-## Alias of `mac_address1`.
-mac_address = ["mac_address1"]
-## Alias of `bit-vec010`.
-bit-vec = ["bit-vec010"]
-## Alias of `bson3`.
-bson = ["bson3"]
-## Alias of `bytes1`.
-bytes = ["bytes1"]
-## Alias of `uhlc09`.
-uhlc = ["uhlc09"]
-## Alias of `bytesize2`.
-bytesize = ["bytesize2"]
-## Alias of `glam034`.
-glam = ["glam034"]
-## Alias of `tokio1`.
-tokio = ["tokio1"]
-## Alias of `url2`.
-url = ["url2"]
-## Alias of `either1`.
-either = ["either1"]
-## Alias of `error-stack08`.
-error-stack = ["error-stack08"]
-## Alias of `bevy_ecs020`.
-bevy_ecs = ["bevy_ecs020"]
-## Alias of `bevy_input020`.
-bevy_input = ["bevy_input020"]
-## Alias of `camino1`.
-camino = ["camino1"]
-## Alias of `geojson1`.
-geojson = ["geojson1"]
 
 [lints]
 workspace = true
