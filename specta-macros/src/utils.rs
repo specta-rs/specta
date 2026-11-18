@@ -309,8 +309,8 @@ pub fn parse_attrs_with_filter(
             .segments
             .last()
             .expect("Attribute path must have at least one segment")
-            .clone()
-            .ident;
+            .ident
+            .clone();
 
         // Skip attributes that are in the skip list. `#[tracing::instrument]`
         // accepts shorthand syntax such as `%value` that is not valid for
@@ -323,12 +323,13 @@ pub fn parse_attrs_with_filter(
 
         result.append(&mut match &attr.meta {
             Meta::Path(_) => vec![Attribute {
-                source: attr_name.clone(),
-                key: ident.clone(),
+                source: attr_name,
+                key: ident,
                 value: None,
             }],
             Meta::List(meta) => {
-                let source = attr_name.clone();
+                let source = attr_name;
+                let span = ident.span();
                 let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
                 if source == "specta"
                     && let Some(span) = parsed.unstructured_argument
@@ -343,17 +344,17 @@ pub fn parse_attrs_with_filter(
                 }
                 vec![Attribute {
                     source,
-                    key: ident.clone(),
+                    key: ident,
                     value: Some(AttributeValue::Attribute {
-                        span: ident.span(),
+                        span,
                         attr: parsed.attrs,
                     }),
                 }]
             }
             Meta::NameValue(meta) => {
                 vec![Attribute {
-                    source: attr_name.clone(),
-                    key: ident.clone(),
+                    source: attr_name,
+                    key: ident,
                     value: Some(attribute_value_from_expr(&meta.value)),
                 }]
             }

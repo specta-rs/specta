@@ -1,6 +1,5 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::collections::HashSet;
 use syn::Type;
 
 use crate::r#type::attr::deprecated_as_tokens;
@@ -11,13 +10,13 @@ use super::{
 };
 
 pub fn construct_field(
-    crate_ref: &TokenStream,
+    crate_ref: &syn::Path,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
     used_generic_types: &[syn::Ident],
-    bounded_params: &HashSet<String>,
+    bounded_params: &[syn::Ident],
 ) -> syn::Result<TokenStream> {
     construct_field_with_variant_skip(
         crate_ref,
@@ -32,13 +31,13 @@ pub fn construct_field(
 }
 
 pub fn construct_field_with_variant_skip(
-    crate_ref: &TokenStream,
+    crate_ref: &syn::Path,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
     used_generic_types: &[syn::Ident],
-    bounded_params: &HashSet<String>,
+    bounded_params: &[syn::Ident],
     variant_skip: bool,
 ) -> syn::Result<TokenStream> {
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
@@ -90,27 +89,51 @@ pub fn construct_field_with_variant_skip(
     let nullable_attribute =
         declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
 
-    // The canonical declaration is built with each generic parameter replaced by
-    // a placeholder type that resolves to `Generic`. Concrete instantiation
-    // (`declaration == false`) resolves the real parameter.
-    let resolve = resolve_ty_expr(
-        crate_ref,
-        &field_ty,
-        used_generic_types,
-        bounded_params,
-        true,
-    );
-
+    // A skipped field never enters the datatype graph, so its type is not
+    // resolved at all.
     let field_ty = if attrs.skip || variant_skip {
-        quote!()
-    } else if attrs.inline {
-        quote!(field.ty = Some(datatype::inline(types, |types| #resolve));)
+        None
     } else {
-        quote!(field.ty = Some(#resolve);)
+        // The canonical declaration is built with each generic parameter
+        // replaced by a placeholder type that resolves to `Generic`. Concrete
+        // instantiation (`declaration == false`) resolves the real parameter.
+        let resolve = resolve_ty_expr(
+            crate_ref,
+            &field_ty,
+            used_generic_types,
+            bounded_params,
+            true,
+        );
+
+        Some(if attrs.inline {
+            quote!(datatype::inline(types, |types| #resolve))
+        } else {
+            resolve
+        })
     };
 
+    // `Field::default()` plus `field.ty = Some(..)` is exactly `Field::new`, so
+    // a field that has a type always starts from the latter; only a skipped
+    // field (which has none) needs the metadata-only constructor.
+    let field = match field_ty {
+        Some(ty) => quote!(datatype::Field::new(#ty)),
+        None => quote!(datatype::Field::default()),
+    };
+
+    let has_metadata = field_optional.is_some()
+        || field_deprecated.is_some()
+        || field_docs.is_some()
+        || runtime_attrs.is_some()
+        || type_overridden_attribute.is_some()
+        || serde_newtype_skip_ignored.is_some()
+        || nullable_attribute.is_some();
+
+    if !has_metadata {
+        return Ok(field);
+    }
+
     Ok(quote!({
-        let mut field = datatype::Field::default();
+        let mut field = #field;
         #field_optional
         #field_deprecated
         #field_docs
@@ -118,7 +141,6 @@ pub fn construct_field_with_variant_skip(
         #type_overridden_attribute
         #serde_newtype_skip_ignored
         #nullable_attribute
-        #field_ty
         field
     }))
 }

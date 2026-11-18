@@ -8,15 +8,14 @@ use super::{
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::collections::HashSet;
 use syn::{DataEnum, Fields, spanned::Spanned};
 
 pub fn parse_enum(
-    crate_ref: &TokenStream,
+    crate_ref: &syn::Path,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
     used_generic_types: &[syn::Ident],
-    bounded_params: &HashSet<String>,
+    bounded_params: &[syn::Ident],
 ) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
@@ -150,21 +149,40 @@ pub fn parse_enum(
                 .as_ref()
                 .map(|_| quote!(v.attributes.insert("specta:type_override", true);));
 
-            Ok(quote!((#variant_name_str.into(), {
-                let mut v = #variant_value;
-                #variant_skip
-                #field_deprecated
-                #variant_docs
-                #runtime_attrs
-                #type_overridden_attribute
-                v
-            })))
+            let variant_metadata = attrs.skip
+                || attrs.r#type.is_some()
+                || !attrs.common.doc.is_empty()
+                || field_deprecated.is_some()
+                || runtime_attrs.is_some();
+
+            if !variant_metadata {
+                Ok(quote!((#variant_name_str.into(), #variant_value)))
+            } else {
+                Ok(quote!((#variant_name_str.into(), {
+                    let mut v = #variant_value;
+                    #variant_skip
+                    #field_deprecated
+                    #variant_docs
+                    #runtime_attrs
+                    #type_overridden_attribute
+                    v
+                })))
+            }
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
+    // `Vec::from([..])` rather than `vec![..]`: the value is identical, but
+    // `vec!` expands to a chunk of box/intrinsic machinery that every derived
+    // enum then has to be type-checked and code-generated again.
+    let variants = if variant_types.is_empty() {
+        quote!(::std::vec::Vec::new())
+    } else {
+        quote!(::std::vec::Vec::from([#(#variant_types),*]))
+    };
+
     Ok(quote!({
         let mut e = datatype::Enum::default();
-        e.variants = vec![#(#variant_types),*];
+        e.variants = #variants;
         e.into()
     }))
 }

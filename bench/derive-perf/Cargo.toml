@@ -1,0 +1,16 @@
+[package]
+name = "derive-perf"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone workspace so the fixture never joins the repository workspace.
+[workspace]
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive"] }
+serde-shim = { path = "../serde-shim" }
+
+[profile.dev]
+debug = false
+incremental = false

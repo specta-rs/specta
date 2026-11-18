@@ -111,10 +111,12 @@ pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> To
         .map(|v| quote!(Some(#v.into())))
         .unwrap_or(quote!(None));
 
-    let note = match note {
-        Some(note) => quote!(Some(#note.into())),
-        None => quote!(None),
-    };
+    // `with_since_note` takes a `Cow`, and the generated impl already imports
+    // `Cow`, so the no-note case stays hygienic without a `.unwrap_or_default()`
+    // chain.
+    let note = note
+        .map(|note| quote!(#note.into()))
+        .unwrap_or(quote!(Cow::default()));
 
-    quote!(Some(datatype::Deprecated::with_since_note(#since, #note.unwrap_or_default())))
+    quote!(Some(datatype::Deprecated::with_since_note(#since, #note)))
 }

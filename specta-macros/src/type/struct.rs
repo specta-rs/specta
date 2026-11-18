@@ -4,7 +4,6 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::collections::HashSet;
 use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
@@ -24,11 +23,11 @@ pub fn decode_field_attrs<'a>(
 }
 
 pub fn parse_struct(
-    crate_ref: &TokenStream,
+    crate_ref: &syn::Path,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
     used_generic_types: &[syn::Ident],
-    bounded_params: &HashSet<String>,
+    bounded_params: &[syn::Ident],
 ) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -100,15 +99,11 @@ pub fn parse_struct(
                         used_generic_types,
                         bounded_params,
                     )?;
-                    Ok(quote!(builder.field_mut(#field_name, #inner);))
+                    Ok(quote!(.field(#field_name, #inner)))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!({
-                let mut builder = datatype::Struct::named();
-                #(#fields)*
-                builder.build()
-            })
+            quote!(datatype::Struct::named() #(#fields)* .build())
         }
         Fields::Unnamed(_) => {
             let is_newtype = data.fields.len() == 1;
@@ -133,15 +128,11 @@ pub fn parse_struct(
                         used_generic_types,
                         bounded_params,
                     )
-                    .map(|inner| quote!(builder.field_mut(#inner);))
+                    .map(|inner| quote!(.field(#inner)))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!({
-                let mut builder = datatype::Struct::unnamed();
-                #(#fields)*
-                builder.build()
-            })
+            quote!(datatype::Struct::unnamed() #(#fields)* .build())
         }
         Fields::Unit => quote!(datatype::Struct::unit().into()),
     };

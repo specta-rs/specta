@@ -10,7 +10,7 @@ use super::RustCAttr;
 #[derive(Default)]
 pub struct ContainerAttr {
     pub r#type: Option<Type>,
-    pub crate_name: Option<TokenStream>,
+    pub crate_name: Option<syn::Path>,
     pub inline: bool,
     pub remote: Option<TokenStream>,
     pub collect: Option<bool>,
@@ -32,7 +32,7 @@ impl ContainerAttr {
         };
 
         if let Some(attr) = attrs.extract("specta", "crate") {
-            result.crate_name = Some(attr.parse_path()?.to_token_stream());
+            result.crate_name = Some(attr.parse_path()?);
         }
 
         if let Some(attr) = attrs.extract("specta", "type") {

@@ -108,10 +108,10 @@ struct FieldAttrs {
     has_with: bool,
 }
 
-pub(super) fn lower_runtime_attributes(
-    crate_ref: &TokenStream,
+pub(super) fn lower_runtime_attributes<'a>(
+    crate_ref: &syn::Path,
     scope: AttributeScope,
-    raw_attrs: &[Attribute],
+    raw_attrs: impl Iterator<Item = &'a Attribute>,
 ) -> Result<Option<TokenStream>> {
     match scope {
         AttributeScope::Container => parse_container_attrs(raw_attrs)
@@ -125,11 +125,13 @@ pub(super) fn lower_runtime_attributes(
     }
 }
 
-fn parse_container_attrs(attrs: &[Attribute]) -> Result<Option<ContainerAttrs>> {
+fn parse_container_attrs<'a>(
+    attrs: impl Iterator<Item = &'a Attribute>,
+) -> Result<Option<ContainerAttrs>> {
     let mut parsed = ContainerAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
@@ -141,11 +143,13 @@ fn parse_container_attrs(attrs: &[Attribute]) -> Result<Option<ContainerAttrs>> 
     Ok(found.then_some(parsed))
 }
 
-fn parse_variant_attrs(attrs: &[Attribute]) -> Result<Option<VariantAttrs>> {
+fn parse_variant_attrs<'a>(
+    attrs: impl Iterator<Item = &'a Attribute>,
+) -> Result<Option<VariantAttrs>> {
     let mut parsed = VariantAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
@@ -157,11 +161,11 @@ fn parse_variant_attrs(attrs: &[Attribute]) -> Result<Option<VariantAttrs>> {
     Ok(found.then_some(parsed))
 }
 
-fn parse_field_attrs(attrs: &[Attribute]) -> Result<Option<FieldAttrs>> {
+fn parse_field_attrs<'a>(attrs: impl Iterator<Item = &'a Attribute>) -> Result<Option<FieldAttrs>> {
     let mut parsed = FieldAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
@@ -392,7 +396,7 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> TokenStream {
+fn lower_container_attrs(crate_ref: &syn::Path, attrs: ContainerAttrs) -> TokenStream {
     let mut inserts = Vec::new();
     push_opt_string(
         &mut inserts,
@@ -582,7 +586,9 @@ fn push_vec_string(inserts: &mut Vec<TokenStream>, key: &str, value: &[String]) 
     let value = value
         .iter()
         .map(|value| quote!(::std::string::String::from(#value)));
-    inserts.push(quote!(attrs.insert(#key, vec![#(#value),*]);));
+    // `Vec::from([..])` instead of `vec![..]` keeps the `vec!` box machinery out
+    // of every lowered attribute.
+    inserts.push(quote!(attrs.insert(#key, ::std::vec::Vec::from([#(#value),*]));));
 }
 
 fn push_bool(inserts: &mut Vec<TokenStream>, key: &str, value: bool) {
@@ -600,7 +606,7 @@ fn push_opt_rename_rule(inserts: &mut Vec<TokenStream>, key: &str, value: Option
 
 fn push_opt_conversion(
     inserts: &mut Vec<TokenStream>,
-    crate_ref: &TokenStream,
+    crate_ref: &syn::Path,
     src_key: &str,
     resolved_key: &str,
     value: &Option<ConversionType>,

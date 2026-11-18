@@ -1,9 +1,8 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use std::collections::HashSet;
 use syn::{
-    ConstParam, Data, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause,
-    parse_quote,
+    ConstParam, Data, GenericParam, Generics, LifetimeParam, Path, Type, TypeParam, WhereClause,
     visit::{self, Visit},
     visit_mut::VisitMut,
 };
@@ -103,17 +102,51 @@ fn strip_lifetime_bounds(predicate: &syn::WherePredicate) -> Option<syn::WherePr
     })
 }
 
+/// `crate_ref::Type`, the bound [`build_where_clause`] adds and
+/// [`generics_with_ident_and_bounds_no_lifetimes`] drops.
+fn type_bound_path(crate_ref: &Path) -> Path {
+    let mut path = crate_ref.clone();
+    path.segments.push(syn::PathSegment::from(syn::Ident::new(
+        "Type",
+        Span::call_site(),
+    )));
+    path
+}
+
 /// Whether `bound` is the `crate_ref::Type` bound that [`build_where_clause`]
 /// re-adds as a `where` predicate.
 ///
 /// The whole path is compared, not just its last segment: a user trait that
 /// happens to be named `Type` (`other::Type`) is a real bound `build` needs.
-fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
+fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &Path) -> bool {
     let syn::TypeParamBound::Trait(bound) = bound else {
         return false;
     };
 
-    quote!(#bound).to_string() == quote!(#crate_ref::Type).to_string()
+    // Anything that would contribute more than a plain path (`for<'a>`, `?` or
+    // a parenthesized bound) is not the bound being looked for.
+    if !matches!(bound.modifier, syn::TraitBoundModifier::None)
+        || bound.lifetimes.is_some()
+        || bound.paren_token.is_some()
+        || bound.path.leading_colon.is_some() != crate_ref.leading_colon.is_some()
+        || bound.path.segments.len() != crate_ref.segments.len() + 1
+    {
+        return false;
+    }
+
+    let mut segments = bound.path.segments.iter().rev();
+    let Some(last) = segments.next() else {
+        return false;
+    };
+
+    last.ident == "Type"
+        && last.arguments.is_none()
+        && segments
+            .rev()
+            .zip(&crate_ref.segments)
+            .all(|(prefix, ours)| {
+                prefix.ident == ours.ident && prefix.arguments.is_none() && ours.arguments.is_none()
+            })
 }
 
 /// The `build` fn parameter list.
@@ -124,7 +157,7 @@ fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
 /// lifetimes, and the latter are re-added to the `where` clause by
 /// [`build_where_clause`].
 pub fn generics_with_ident_and_bounds_no_lifetimes(
-    crate_ref: &TokenStream,
+    crate_ref: &Path,
     generics: &Generics,
 ) -> Option<TokenStream> {
     generics
@@ -161,6 +194,37 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(
         .map(|gs| quote!(<#(#gs),*>))
 }
 
+/// A `where` clause from the given predicates.
+fn where_clause(predicates: impl IntoIterator<Item = syn::WherePredicate>) -> WhereClause {
+    WhereClause {
+        where_token: Default::default(),
+        predicates: predicates.into_iter().collect(),
+    }
+}
+
+/// The `#ident: #bound` predicate.
+fn param_predicate(ident: &syn::Ident, bound: syn::TypeParamBound) -> syn::WherePredicate {
+    syn::WherePredicate::Type(syn::PredicateType {
+        lifetimes: None,
+        bounded_ty: Type::Path(syn::TypePath {
+            qself: None,
+            path: Path::from(ident.clone()),
+        }),
+        colon_token: Default::default(),
+        bounds: std::iter::once(bound).collect(),
+    })
+}
+
+/// The `Type` bound of `crate_ref`.
+fn type_bound(crate_ref: &Path) -> syn::TypeParamBound {
+    syn::TypeParamBound::Trait(syn::TraitBound {
+        paren_token: None,
+        modifier: syn::TraitBoundModifier::None,
+        lifetimes: None,
+        path: type_bound_path(crate_ref),
+    })
+}
+
 /// The `where` clause for the `build` fn.
 ///
 /// It carries the container's declared bounds (so `build`'s body type-checks
@@ -169,7 +233,7 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(
 /// lifetime parameters, and field types use inferred `'_` lifetimes so they are
 /// never required.
 pub fn build_where_clause(
-    crate_ref: &TokenStream,
+    crate_ref: &Path,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
@@ -191,14 +255,18 @@ pub fn build_where_clause(
     let mut seen = HashSet::new();
     predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
 
+    let bound = type_bound(crate_ref);
     for ident in used_generic_types {
-        let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
-        if seen.insert(quote!(#predicate).to_string()) {
-            predicates.push(predicate);
+        let predicate = param_predicate(ident, bound.clone());
+        // Parameters are unique, so the automatic predicates can only collide
+        // with one of the user predicates above.
+        if !seen.is_empty() && !seen.insert(quote!(#predicate).to_string()) {
+            continue;
         }
+        predicates.push(predicate);
     }
 
-    (!predicates.is_empty()).then(|| parse_quote!(where #(#predicates),*))
+    (!predicates.is_empty()).then(|| where_clause(predicates))
 }
 
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
@@ -252,17 +320,7 @@ pub fn used_type_params(
         return Ok(Vec::new());
     }
 
-    let known_generics = all_generic_type_idents
-        .iter()
-        .map(ToString::to_string)
-        .collect::<HashSet<_>>();
-
-    let mut visitor = GenericTypeUseVisitor {
-        known_generics: &known_generics,
-        used_generics: HashSet::new(),
-        conservative: false,
-        unsupported_associated_item: None,
-    };
+    let mut visitor = TypeScan::new(&all_generic_type_idents);
 
     if let Some(container_type) = container_type {
         visitor.visit_type(container_type);
@@ -299,15 +357,9 @@ pub fn used_type_params(
         return Err(err);
     }
 
-    if visitor.conservative {
-        return Ok(all_generic_type_idents);
-    }
-
-    Ok(all_generic_type_idents
-        .iter()
-        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
-        .cloned()
-        .collect())
+    // An opaque type mentions every parameter: the derive can't see what it
+    // expands to, so `mentioned` conservatively returns all of them.
+    Ok(visitor.mentioned())
 }
 
 /// The placeholder type used to stand in for a generic parameter while the
@@ -318,10 +370,12 @@ pub fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
 
 /// Rewrites single-segment paths that name one of `params` to their
 /// placeholder type, so the declaration is built with `Generic` placeholders
-/// instead of the concrete arguments.
-pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
+/// instead of the concrete arguments. Also reports whether any path named one
+/// of `params`.
+pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> (Type, bool) {
     struct Rewrite<'a> {
         params: &'a [syn::Ident],
+        rewritten: bool,
     }
 
     impl VisitMut for Rewrite<'_> {
@@ -333,6 +387,7 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> T
                 let ident = node.path.segments[0].ident.clone();
                 if self.params.contains(&ident) {
                     node.path.segments[0].ident = placeholder_ident(&ident);
+                    self.rewritten = true;
                 }
             }
             syn::visit_mut::visit_type_path_mut(self, node);
@@ -340,8 +395,148 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> T
     }
 
     let mut ty = ty.clone();
-    Rewrite { params }.visit_type_mut(&mut ty);
-    ty
+    let mut visitor = Rewrite {
+        params,
+        rewritten: false,
+    };
+    visitor.visit_type_mut(&mut ty);
+    (ty, visitor.rewritten)
+}
+
+/// Whether `build`'s body already runs inside a single empty substitution scope
+/// shared by all of its fields, so a field needs no scope of its own.
+///
+/// A container with no used type parameters resolves every field concretely, so
+/// `build` wraps its whole body in one `Types::with_generic_substitution(&[], ..)`
+/// instead of paying for a scope per field. A generic container keeps the
+/// per-field scope for the fields that mention no parameter, because its other
+/// fields must still see the enclosing declaration's scope (issue #613).
+pub fn shares_field_isolation(used_generic_types: &[syn::Ident]) -> bool {
+    used_generic_types.is_empty()
+}
+
+/// One walk over a field type, reporting which of the enclosing generic
+/// parameters it mentions and whether it contains a node the derive can't see
+/// into.
+///
+/// [`resolve_ty_expr`] needs both answers, plus what
+/// [`rewrite_generics_with_placeholders`] would find, so they share a single
+/// visit instead of walking the same type three times.
+struct TypeScan<'a> {
+    candidates: &'a [syn::Ident],
+    /// Which of `candidates` were mentioned, parallel to it.
+    mentioned: Vec<bool>,
+    /// The type contains a `macro!`/`Verbatim` node. Whatever it expands to is
+    /// invisible to the derive, so every candidate must be treated as mentioned
+    /// and none of them can be rewritten.
+    opaque: bool,
+    /// A parameter's associated type or constant was used, which Specta can't
+    /// express. Only [`used_type_params`] reports it; the callers that merely
+    /// ask which parameters a type mentions ignore it.
+    unsupported_associated_item: Option<syn::Error>,
+}
+
+impl<'a> TypeScan<'a> {
+    fn new(candidates: &'a [syn::Ident]) -> Self {
+        Self {
+            candidates,
+            mentioned: vec![false; candidates.len()],
+            opaque: false,
+            unsupported_associated_item: None,
+        }
+    }
+
+    fn of(ty: &Type, candidates: &'a [syn::Ident]) -> Self {
+        let mut scan = Self::new(candidates);
+        // Without candidates there is nothing to record, and no field of a
+        // container without used parameters needs the answer.
+        if !candidates.is_empty() {
+            scan.visit_type(ty);
+        }
+        scan
+    }
+
+    /// Whether the type mentions no enclosing parameter at all.
+    fn mentions_nothing(&self) -> bool {
+        !self.opaque && !self.mentioned.iter().any(|mentioned| *mentioned)
+    }
+
+    /// The mentioned parameters in declaration order, or every candidate when
+    /// the type is opaque.
+    fn mentioned(&self) -> Vec<syn::Ident> {
+        self.candidates
+            .iter()
+            .zip(&self.mentioned)
+            .filter(|(_, mentioned)| self.opaque || **mentioned)
+            .map(|(ident, _)| ident.clone())
+            .collect()
+    }
+
+    /// The index of `ident` in [`Self::candidates`], if it names one.
+    fn candidate_index(&self, ident: &syn::Ident) -> Option<usize> {
+        self.candidates
+            .iter()
+            .position(|candidate| candidate == ident)
+    }
+
+    fn reject_unsupported_associated_path(
+        &mut self,
+        path: &syn::Path,
+        qself: &Option<syn::QSelf>,
+        tokens: &impl ToTokens,
+    ) {
+        let direct_associated_item = path
+            .segments
+            .first()
+            .is_some_and(|first| self.candidate_index(&first.ident).is_some())
+            && path.segments.len() > 1;
+
+        let qualified_associated_item = qself
+            .as_ref()
+            .and_then(|qself| match qself.ty.as_ref() {
+                syn::Type::Path(syn::TypePath { qself: None, path }) => path.segments.first(),
+                _ => None,
+            })
+            .is_some_and(|first| self.candidate_index(&first.ident).is_some());
+
+        if direct_associated_item || qualified_associated_item {
+            self.unsupported_associated_item.get_or_insert_with(|| {
+                syn::Error::new_spanned(
+                    tokens,
+                    "specta: associated types or constants on generic parameters are not supported",
+                )
+            });
+        }
+    }
+}
+
+impl Visit<'_> for TypeScan<'_> {
+    fn visit_type_path(&mut self, node: &syn::TypePath) {
+        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
+
+        if node.qself.is_none()
+            && node.path.leading_colon.is_none()
+            && node.path.segments.len() == 1
+            && let Some(index) = self.candidate_index(&node.path.segments[0].ident)
+        {
+            self.mentioned[index] = true;
+        }
+
+        visit::visit_type_path(self, node);
+    }
+
+    fn visit_expr_path(&mut self, node: &syn::ExprPath) {
+        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
+
+        visit::visit_expr_path(self, node);
+    }
+
+    fn visit_type(&mut self, node: &syn::Type) {
+        match node {
+            syn::Type::Macro(_) | syn::Type::Verbatim(_) => self.opaque = true,
+            _ => visit::visit_type(self, node),
+        }
+    }
 }
 
 /// Builds the expression that resolves `ty` to a [`DataType`].
@@ -358,59 +553,60 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> T
 /// declared bounds cannot be required by any field type (the container would not
 /// compile otherwise), so the precise placeholder path is used for them.
 pub fn resolve_ty_expr(
-    crate_ref: &TokenStream,
+    crate_ref: &Path,
     ty: &Type,
     used_generic_types: &[syn::Ident],
-    bounded_params: &HashSet<String>,
+    bounded_params: &[syn::Ident],
     conditional: bool,
 ) -> TokenStream {
-    // A field that mentions no enclosing parameter is resolved at its own use
-    // site. It must not see the enclosing field's substitution scope: its own
-    // concrete element type could otherwise match an enclosing slot and bake
-    // that parameter into a nested declaration (issue #609).
-    let isolated = quote!(types.with_generic_substitution(
-        &[],
-        |types| <#ty as #crate_ref::Type>::definition(types),
-    ));
-    // The concrete half of a conditional resolution instead inherits whatever
-    // scope is active. That scope belongs to an enclosing *declaration* whose
-    // slots describe this field's own arguments, which is what an inlined
-    // generic type needs to rewrite its expansion back to `Generic` (issue
-    // #613 regressed this: an empty scope baked the first instantiation's
-    // concrete arguments into a generic inline declaration).
-    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
+    // One walk answers every question this function asks of the type.
+    let scan = TypeScan::of(ty, used_generic_types);
 
-    let mentioned = type_params_used_in(ty, used_generic_types);
+    // Nothing to rewrite and no parameter to substitute: resolve concretely.
+    // A container with no used type parameters already isolated its entire
+    // `build` body with one shared empty scope (see [`shares_field_isolation`]).
+    if scan.mentions_nothing() {
+        return if shares_field_isolation(used_generic_types) {
+            quote!(<#ty as #crate_ref::Type>::definition(types))
+        } else {
+            // A field that mentions no enclosing parameter is resolved at its
+            // own use site. It must not see the enclosing field's substitution
+            // scope: its own concrete element type could otherwise match an
+            // enclosing slot and bake that parameter into a nested declaration
+            // (issue #609).
+            quote!(types.with_generic_substitution(
+                &[],
+                |types| <#ty as #crate_ref::Type>::definition(types),
+            ))
+        };
+    }
+
+    let mentioned = scan.mentioned();
     let unbounded = mentioned
         .iter()
-        .filter(|ident| !bounded_params.contains(&ident.to_string()))
+        .filter(|ident| !bounded_params.contains(*ident))
         .cloned()
         .collect::<Vec<_>>();
     let bounded = mentioned
         .iter()
-        .filter(|ident| bounded_params.contains(&ident.to_string()))
+        .filter(|ident| bounded_params.contains(*ident))
         .cloned()
         .collect::<Vec<_>>();
 
-    let declaration_ty = rewrite_generics_with_placeholders(ty, &unbounded);
-    let rewritten =
-        declaration_ty.to_token_stream().to_string() != ty.to_token_stream().to_string();
+    // Only clone and rewrite when a parameter can actually be replaced: an
+    // opaque type mentions every parameter but can't be rewritten.
+    let rewritten_ty =
+        (!unbounded.is_empty()).then(|| rewrite_generics_with_placeholders(ty, &unbounded));
+    let (declaration_ty, rewritten) = match &rewritten_ty {
+        Some((ty, rewritten)) => (ty, *rewritten),
+        None => (ty, false),
+    };
 
     // When the placeholder rewrite could not reach a parameter — an opaque
     // `macro!`-typed field, `Type::Verbatim`, ... — substitute every parameter
     // the type might mention by name instead, or the first instantiation's
     // concrete argument would be baked into the shared declaration.
-    let substituted = if rewritten {
-        bounded.clone()
-    } else {
-        mentioned.clone()
-    };
-
-    // Nothing to rewrite and no parameter to substitute: resolve concretely,
-    // isolated from the enclosing scope.
-    if !rewritten && mentioned.is_empty() {
-        return isolated;
-    }
+    let substituted = if rewritten { bounded } else { mentioned };
 
     let mut declaration = quote!(types.define_root::<#declaration_ty>());
 
@@ -419,7 +615,11 @@ pub fn resolve_ty_expr(
         // `Types::define_param` consumes them positionally as the nested type
         // resolves its own parameters, so two parameters instantiated with the
         // same concrete type still map to distinct `Generic` names. See #609.
-        let slots = generic_substitution_slots(crate_ref, &declaration_ty, &substituted);
+        //
+        // The placeholder rewrite only renames idents, so an opaque node in `ty`
+        // is still opaque in `declaration_ty`.
+        let slots =
+            generic_substitution_slots(crate_ref, declaration_ty, &substituted, scan.opaque);
         declaration = quote!(types.with_generic_substitution(
             &[#(#slots),*],
             |types| #declaration,
@@ -430,41 +630,13 @@ pub fn resolve_ty_expr(
         return declaration;
     }
 
-    quote!(if declaration { #declaration } else { #concrete })
-}
-
-/// Returns the subset of `candidates` that appear in `ty`, conservatively
-/// returning every candidate when the type can't be analysed (e.g. a macro).
-///
-/// Used to scope declaration-time generic substitution to the parameters a
-/// given field actually mentions.
-pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ident> {
-    if candidates.is_empty() {
-        return Vec::new();
-    }
-
-    let known_generics = candidates
-        .iter()
-        .map(ToString::to_string)
-        .collect::<HashSet<_>>();
-
-    let mut visitor = GenericTypeUseVisitor {
-        known_generics: &known_generics,
-        used_generics: HashSet::new(),
-        conservative: false,
-        unsupported_associated_item: None,
-    };
-    visitor.visit_type(ty);
-
-    if visitor.conservative {
-        return candidates.to_vec();
-    }
-
-    candidates
-        .iter()
-        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
-        .cloned()
-        .collect()
+    // The concrete half of a conditional resolution instead inherits whatever
+    // scope is active. That scope belongs to an enclosing *declaration* whose
+    // slots describe this field's own arguments, which is what an inlined
+    // generic type needs to rewrite its expansion back to `Generic` (issue
+    // #613 regressed this: an empty scope baked the first instantiation's
+    // concrete arguments into a generic inline declaration).
+    quote!(if declaration { #declaration } else { <#ty as #crate_ref::Type>::definition(types) })
 }
 
 /// Builds the positional substitution slots for the type arguments of `ty`.
@@ -480,11 +652,12 @@ pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ide
 /// the previous behaviour for opaque fields rather than baking the concrete
 /// argument in.
 pub fn generic_substitution_slots(
-    crate_ref: &TokenStream,
+    crate_ref: &Path,
     ty: &Type,
     substituted: &[syn::Ident],
+    opaque: bool,
 ) -> Vec<TokenStream> {
-    if mentions_opaque(ty) {
+    if opaque {
         return substituted
             .iter()
             .map(|ident| generic_slot(crate_ref, ident))
@@ -495,11 +668,7 @@ pub fn generic_substitution_slots(
 }
 
 /// The slots for one type's own type-argument list.
-fn slots_for_type(
-    crate_ref: &TokenStream,
-    ty: &Type,
-    substituted: &[syn::Ident],
-) -> Vec<TokenStream> {
+fn slots_for_type(crate_ref: &Path, ty: &Type, substituted: &[syn::Ident]) -> Vec<TokenStream> {
     if let Some(ident) = bare_param(ty, substituted) {
         return vec![generic_slot(crate_ref, &ident)];
     }
@@ -511,24 +680,20 @@ fn slots_for_type(
 }
 
 /// The slot for a single type argument.
-fn slot_for_argument(
-    crate_ref: &TokenStream,
-    argument: &Type,
-    substituted: &[syn::Ident],
-) -> TokenStream {
+fn slot_for_argument(crate_ref: &Path, argument: &Type, substituted: &[syn::Ident]) -> TokenStream {
     if let Some(ident) = bare_param(argument, substituted) {
         return generic_slot(crate_ref, &ident);
     }
 
-    if type_params_used_in(argument, substituted).is_empty() {
+    if TypeScan::of(argument, substituted).mentions_nothing() {
         return quote!(#crate_ref::GenericSubstitutionSlot::Skip);
     }
 
     let slots = slots_for_type(crate_ref, argument, substituted);
-    quote!(#crate_ref::GenericSubstitutionSlot::Nested(vec![#(#slots),*]))
+    quote!(#crate_ref::GenericSubstitutionSlot::Nested(::std::vec::Vec::from([#(#slots),*])))
 }
 
-fn generic_slot(crate_ref: &TokenStream, ident: &syn::Ident) -> TokenStream {
+fn generic_slot(crate_ref: &Path, ident: &syn::Ident) -> TokenStream {
     let name = ident.to_string();
     quote!(#crate_ref::GenericSubstitutionSlot::Generic {
         name: ::std::any::type_name::<#ident>(),
@@ -587,26 +752,8 @@ fn type_arguments(ty: &Type) -> Vec<&Type> {
     }
 }
 
-/// Whether `ty` contains a `macro!`/`Verbatim` node the derive cannot see into.
-fn mentions_opaque(ty: &Type) -> bool {
-    struct OpaqueFinder(bool);
-
-    impl Visit<'_> for OpaqueFinder {
-        fn visit_type(&mut self, node: &syn::Type) {
-            match node {
-                syn::Type::Macro(_) | syn::Type::Verbatim(_) => self.0 = true,
-                _ => visit::visit_type(self, node),
-            }
-        }
-    }
-
-    let mut finder = OpaqueFinder(false);
-    finder.visit_type(ty);
-    finder.0
-}
-
 fn visit_field_type(
-    visitor: &mut GenericTypeUseVisitor<'_>,
+    visitor: &mut TypeScan<'_>,
     field: &syn::Field,
     skip_attrs: &[String],
 ) -> syn::Result<()> {
@@ -621,7 +768,7 @@ fn visit_field_type(
 }
 
 pub fn add_type_to_where_clause(
-    ty: &TokenStream,
+    crate_ref: &Path,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
@@ -634,27 +781,15 @@ pub fn add_type_to_where_clause(
         return generics.where_clause.clone();
     }
 
-    let preds = type_predicates(ty, used_generic_types)?;
+    let bound = type_bound(crate_ref);
+    let preds = used_generic_types
+        .iter()
+        .map(|ident| param_predicate(ident, bound.clone()));
 
     match &generics.where_clause {
-        None => Some(parse_quote! { where #(#preds),* }),
-        Some(w) => {
-            let bounds = w.predicates.iter();
-            Some(parse_quote! { where #(#bounds,)* #(#preds),* })
-        }
+        None => Some(where_clause(preds.collect::<Vec<_>>())),
+        Some(w) => Some(where_clause(w.predicates.iter().cloned().chain(preds))),
     }
-}
-
-fn type_predicates(
-    ty: &TokenStream,
-    used_generic_types: &[syn::Ident],
-) -> Option<Vec<syn::WherePredicate>> {
-    (!used_generic_types.is_empty()).then(|| {
-        used_generic_types
-            .iter()
-            .map(|ident| parse_quote!(#ident : #ty))
-            .collect()
-    })
 }
 
 fn merge_custom_bounds(
@@ -666,87 +801,101 @@ fn merge_custom_bounds(
             return generics.where_clause.clone();
         }
 
-        return match &generics.where_clause {
-            None => Some(parse_quote! { where #(#predicates),* }),
-            Some(w) => {
-                let existing = w.predicates.iter();
-                Some(parse_quote! { where #(#existing,)* #(#predicates),* })
-            }
-        };
+        return Some(match &generics.where_clause {
+            None => where_clause(predicates.iter().cloned()),
+            Some(w) => where_clause(w.predicates.iter().chain(predicates).cloned()),
+        });
     }
 
     None
 }
 
-struct GenericTypeUseVisitor<'a> {
-    known_generics: &'a HashSet<String>,
-    used_generics: HashSet<String>,
-    conservative: bool,
-    unsupported_associated_item: Option<syn::Error>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl Visit<'_> for GenericTypeUseVisitor<'_> {
-    fn visit_type_path(&mut self, node: &syn::TypePath) {
-        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
-
-        if node.qself.is_none()
-            && node.path.leading_colon.is_none()
-            && node.path.segments.len() == 1
-            && let Some(segment) = node.path.segments.first()
-        {
-            let segment_name = segment.ident.to_string();
-            if self.known_generics.contains(&segment_name) {
-                self.used_generics.insert(segment_name);
-            }
-        }
-
-        visit::visit_type_path(self, node);
+    fn params(names: &[&str]) -> Vec<syn::Ident> {
+        names
+            .iter()
+            .map(|name| syn::Ident::new(name, Span::call_site()))
+            .collect()
     }
 
-    fn visit_expr_path(&mut self, node: &syn::ExprPath) {
-        self.reject_unsupported_associated_path(&node.path, &node.qself, node);
-
-        visit::visit_expr_path(self, node);
+    fn mentioned(scan: &TypeScan<'_>) -> Vec<String> {
+        scan.mentioned()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
     }
 
-    fn visit_type(&mut self, node: &syn::Type) {
-        match node {
-            syn::Type::Macro(_) | syn::Type::Verbatim(_) => {
-                self.conservative = true;
-            }
-            _ => visit::visit_type(self, node),
+    fn parse(src: &str) -> Type {
+        syn::parse_str(src).expect("test type should parse")
+    }
+
+    #[test]
+    fn scan_reports_the_parameters_a_type_mentions() {
+        let candidates = params(&["T", "U"]);
+        let scan = TypeScan::of(&parse("HashMap<String, U>"), &candidates);
+
+        assert!(!scan.opaque);
+        assert!(!scan.mentions_nothing());
+        assert_eq!(mentioned(&scan), ["U"]);
+    }
+
+    #[test]
+    fn scan_finds_nothing_when_no_parameter_is_mentioned() {
+        let candidates = params(&["T", "U"]);
+
+        assert!(TypeScan::of(&parse("Vec<String>"), &candidates).mentions_nothing());
+        // `TU` is not a mention of `T`, only a path that starts with it.
+        assert!(TypeScan::of(&parse("(TU, u32)"), &candidates).mentions_nothing());
+    }
+
+    #[test]
+    fn scan_without_candidates_mentions_nothing() {
+        // Fields of a container with no used parameters skip the walk entirely.
+        assert!(TypeScan::of(&parse("Option<T>"), &[]).mentions_nothing());
+    }
+
+    /// A `macro!`/`Verbatim` type hides its expansion, so every candidate has to
+    /// be treated as mentioned. `resolve_ty_expr` then falls back to the
+    /// substitution slots instead of the placeholder rewrite, or the first
+    /// instantiation's concrete argument would be baked into the declaration
+    /// (see `tests/tests/bound_nested.rs::macro_typed_field_is_not_baked`).
+    #[test]
+    fn scan_treats_opaque_types_as_mentioning_every_parameter() {
+        let candidates = params(&["T", "U"]);
+
+        for ty in [
+            parse("type_from_macro!(U)"),
+            Type::Verbatim(quote!(some::verbatim::T)),
+        ] {
+            let scan = TypeScan::of(&ty, &candidates);
+            assert!(scan.opaque);
+            assert!(!scan.mentions_nothing());
+            assert_eq!(mentioned(&scan), ["T", "U"]);
         }
     }
-}
 
-impl GenericTypeUseVisitor<'_> {
-    fn reject_unsupported_associated_path(
-        &mut self,
-        path: &syn::Path,
-        qself: &Option<syn::QSelf>,
-        tokens: &impl ToTokens,
-    ) {
-        let direct_associated_item = path
-            .segments
-            .first()
-            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()))
-            && path.segments.len() > 1;
+    /// The scan and the rewrite must agree: `rewritten` is only true when a
+    /// placeholder was actually substituted, which an opaque type prevents even
+    /// though it mentions every parameter.
+    #[test]
+    fn scan_opacity_matches_the_placeholder_rewrite() {
+        let candidates = params(&["T"]);
 
-        let qualified_associated_item = qself
-            .as_ref()
-            .and_then(|qself| match qself.ty.as_ref() {
-                syn::Type::Path(syn::TypePath { qself: None, path }) => path.segments.first(),
-                _ => None,
-            })
-            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()));
+        let ty = parse("Option<T>");
+        assert!(!TypeScan::of(&ty, &candidates).opaque);
+        let (rewritten, rewritten_flag) = rewrite_generics_with_placeholders(&ty, &candidates);
+        assert!(rewritten_flag);
+        assert_eq!(
+            rewritten.to_token_stream().to_string(),
+            "Option < __SPECTA_GENERIC_PLACEHOLDER_T >"
+        );
 
-        if direct_associated_item || qualified_associated_item {
-            self.unsupported_associated_item.get_or_insert_with(|| {
-                syn::Error::new_spanned(
-                    tokens,
-                    "specta: associated types or constants on generic parameters are not supported",
-                )
-            });
-        }
+        let ty = parse("type_from_macro!(T)");
+        assert!(TypeScan::of(&ty, &candidates).opaque);
+        let (_, rewritten_flag) = rewrite_generics_with_placeholders(&ty, &candidates);
+        assert!(!rewritten_flag);
     }
 }
