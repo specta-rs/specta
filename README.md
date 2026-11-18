@@ -252,6 +252,11 @@ moved into this workspace, so it only needs the trusted publisher above. Its
 version must still be bumped for the first release from this repository, because
 Cargo refuses to publish a version which already exists.
 
+Every released crate also has **Require trusted publishing for all new versions**
+enabled in its crates.io settings. That is what makes the workflow the only way
+to publish: a release attempted with an API token is rejected, so if publishing
+breaks, fix the workflow rather than falling back to a manual `cargo publish`.
+
 Adding required reviewers to the `release` GitHub environment is recommended: it
 turns publishing into an approved action rather than something any tag push does.
 
