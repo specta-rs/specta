@@ -315,7 +315,7 @@ fn bit_vec_matches_derived_serde_struct() {
         serde_json::json!({ "storage": [13], "nbits": 4 })
     );
 
-    // The `bit-vec` feature must expose a `Type` impl for both the default
+    // The `bit-vec010` feature must expose a `Type` impl for both the default
     // (`u32`) and alternate storage types.
     fn assert_type<T: Type>() {}
     assert_type::<bit_vec::BitVec>();

@@ -372,6 +372,58 @@ fn file_path_to_module_path(file_path: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::file_path_to_module_path;
+    use crate::Types;
+    use crate::datatype::DataType;
+
+    #[test]
+    fn duplicate_sentinel_reuses_the_first_definition() {
+        fn first(_: &mut Types, ndt: &mut super::NamedDataType) {
+            ndt.name = std::borrow::Cow::Borrowed("Dup");
+            ndt.module_path = std::borrow::Cow::Borrowed("test");
+        }
+
+        fn duplicate(_: &mut Types, _: &mut super::NamedDataType) {
+            panic!("a duplicate sentinel must not rebuild the definition");
+        }
+
+        fn inline(_: &mut Types) -> DataType {
+            unreachable!("inline definitions are not built for a non-inline type")
+        }
+
+        let mut types = Types::default();
+        super::NamedDataType::init_with_sentinel(
+            "test::Dup",
+            &[],
+            &[],
+            false,
+            false,
+            0,
+            &mut types,
+            first,
+            inline,
+        );
+        // The second registration has the same sentinel but a different builder.
+        // It must reuse the first definition instead of exporting another type
+        // with the same name.
+        super::NamedDataType::init_with_sentinel(
+            "test::Dup",
+            &[],
+            &[],
+            false,
+            false,
+            0,
+            &mut types,
+            duplicate,
+            inline,
+        );
+
+        assert_eq!(types.len(), 1);
+        let ndt = types
+            .into_sorted_iter()
+            .next()
+            .expect("the definition is registered");
+        assert_eq!(ndt.name, "Dup");
+    }
 
     #[test]
     fn file_path_to_module_path_supports_unix_and_windows_separators() {
