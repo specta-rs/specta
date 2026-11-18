@@ -102,7 +102,7 @@ macro_rules! selection {
     // Emit the module holding the selection type for a nested struct field.
     ( @module $field:ident { $($fields:tt)+ } ) => {
         pub mod $field {
-            use super::{__specta, __specta_serde};
+            use super::{__sp, __sd};
 
             $crate::selection!(@declare inner Selection [] [] { $($fields)+ });
         }
@@ -115,13 +115,13 @@ macro_rules! selection {
     ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*] { } ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
-            use $crate::__private::{serde as __specta_serde, specta as __specta};
+            use $crate::__private::{serde as __sd, specta as __sp};
 
             $($items)*
 
-            #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
-            #[serde(crate = "self::__specta_serde")]
-            #[specta(crate = self::__specta, inline)]
+            #[derive(self::__sd::Serialize, self::__sp::Type)]
+            #[serde(crate = "self::__sd")]
+            #[specta(crate = self::__sp, inline)]
             pub struct $name<$($fields,)*> {
                 $(pub $fields: $fields,)*
             }
@@ -173,13 +173,13 @@ macro_rules! selection {
     ( @declare root $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
         #[allow(non_camel_case_types)]
         mod selection {
-            use $crate::__private::{serde as __specta_serde, specta as __specta};
+            use $crate::__private::{serde as __sd, specta as __sp};
 
             $($items)*
 
-            #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
-            #[serde(crate = "self::__specta_serde")]
-            #[specta(crate = self::__specta, inline)]
+            #[derive(self::__sd::Serialize, self::__sp::Type)]
+            #[serde(crate = "self::__sd")]
+            #[specta(crate = self::__sp, inline)]
             pub struct $name<$($fields,)*> {
                 $(pub $fields: $fields,)*
             }
@@ -188,9 +188,9 @@ macro_rules! selection {
     ( @declare inner $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
         $($items)*
 
-        #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
-        #[serde(crate = "self::__specta_serde")]
-        #[specta(crate = self::__specta, inline)]
+        #[derive(self::__sd::Serialize, self::__sp::Type)]
+        #[serde(crate = "self::__sd")]
+        #[specta(crate = self::__sp, inline)]
         pub struct $name<$($fields,)*> {
             $(pub $fields: $fields,)*
         }
