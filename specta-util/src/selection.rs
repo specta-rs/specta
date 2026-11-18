@@ -60,162 +60,187 @@ macro_rules! selection {
     // ----------------------------------------------------------------------
 
     // `selection!(user, { ... } as Name)` keeps the partial moves of `user`.
-    ( $s:ident, { $($fields:tt)+ } as $name:ident ) => {{
-        $crate::selection!(@define $name { $($fields)+ });
-        $crate::selection!(@construct [$s] [selection] $name [] { $($fields)+ })
-    }};
+    ( $s:ident, { $($fields:tt)+ } as $name:ident ) => {
+        $crate::selection!(@build $name [$s] [] [] [] { $($fields)+ })
+    };
     ( $s:expr, { $($fields:tt)+ } as $name:ident ) => {{
-        $crate::selection!(@define $name { $($fields)+ });
         let value = $s;
-        $crate::selection!(@construct [value] [selection] $name [] { $($fields)+ })
+        $crate::selection!(@build $name [value] [] [] [] { $($fields)+ })
     }};
     ( $s:ident, { $($fields:tt)+ } ) => {
-        $crate::selection!($s, { $($fields)+ } as Selection)
+        $crate::selection!(@build Selection [$s] [] [] [] { $($fields)+ })
     };
-    ( $s:expr, { $($fields:tt)+ } ) => {
-        $crate::selection!($s, { $($fields)+ } as Selection)
-    };
+    ( $s:expr, { $($fields:tt)+ } ) => {{
+        let value = $s;
+        $crate::selection!(@build Selection [value] [] [] [] { $($fields)+ })
+    }};
 
     // `selection!(users, [{ ... }] as Name)` maps the selection over a list.
+    // A list needs the declaration outside the closure, so it uses the split
+    // declaration/construction passes below.
     ( $s:expr, [{ $($fields:tt)+ }] as $name:ident ) => {{
-        $crate::selection!(@define $name { $($fields)+ });
+        $crate::selection!(@declare root $name [] [] { $($fields)+ });
         let value = $s;
         value
             .into_iter()
             .map(|v| $crate::selection!(@construct [v] [selection] $name [] { $($fields)+ }))
             .collect::<Vec<_>>()
     }};
-    ( $s:expr, [{ $($fields:tt)+ }] ) => {
-        $crate::selection!($s, [{ $($fields)+ }] as Selection)
-    };
+    ( $s:expr, [{ $($fields:tt)+ }] ) => {{
+        $crate::selection!(@declare root Selection [] [] { $($fields)+ });
+        let value = $s;
+        value
+            .into_iter()
+            .map(|v| $crate::selection!(@construct [v] [selection] Selection [] { $($fields)+ }))
+            .collect::<Vec<_>>()
+    }};
 
     // ----------------------------------------------------------------------
-    // Definitions
+    // Definition
     // ----------------------------------------------------------------------
 
-    ( @define $name:ident { $($fields:tt)+ } ) => {
-        #[allow(non_camel_case_types)]
-        mod selection {
-            use $crate::__private::{serde as __specta_serde, specta as __specta};
-
-            $crate::selection!(@declare $name [] [] [] { $($fields)+ });
-        }
-    };
-
-    // Emit a module holding the selection type for a nested struct field.
+    // Emit the module holding the selection type for a nested struct field.
     ( @module $field:ident { $($fields:tt)+ } ) => {
         pub mod $field {
             use super::{__specta, __specta_serde};
 
-            $crate::selection!(@declare Selection [] [] [] { $($fields)+ });
+            $crate::selection!(@declare inner Selection [] [] { $($fields)+ });
         }
     };
 
-    // Walk the fields once, emitting a module for each nested field and
-    // accumulating the struct declaration. Every field becomes a type
-    // parameter so its type is inferred from the value (or the original
-    // struct) at the call site.
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*] { } ) => {
-        $($items)*
-
+    // Declare the type *and* build the value in a single walk. Every field
+    // becomes a type parameter so its type is inferred from the value (or the
+    // original struct) at the call site. Nested fields still need their own
+    // declaration pass (the type lives in an item, the value in an expression).
+    ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*] { } ) => {{
         #[allow(non_camel_case_types)]
-        #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
-        #[serde(crate = "self::__specta_serde")]
-        #[specta(crate = self::__specta, inline)]
-        pub struct $name<$($generics)*> {
-            $($fields)*
+        mod selection {
+            use $crate::__private::{serde as __specta_serde, specta as __specta};
+
+            $($items)*
+
+            #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
+            #[serde(crate = "self::__specta_serde")]
+            #[specta(crate = self::__specta, inline)]
+            pub struct $name<$($fields,)*> {
+                $(pub $fields: $fields,)*
+            }
         }
-    };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: { $($nested:tt)+ }, $($rest:tt)* } ) => {
-        $crate::selection!(@declare $name
+        selection::$name { $($init)* }
+    }};
+    ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*]
+        { $field:ident: { $($nested:tt)+ } $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@build $name
+            [$($recv)*]
             [$($items)* $crate::selection!(@module $field { $($nested)+ });]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { $($rest)* });
+            [$($fields,)* $field,]
+            [$($init)* $field: $crate::selection!(@construct
+                [$($recv)*.$field] [selection::$field] Selection [] { $($nested)+ }),]
+            { $($($rest)*)? })
     };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: { $($nested:tt)+ } } ) => {
-        $crate::selection!(@declare $name
+    ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*]
+        { $field:ident: [{ $($nested:tt)+ }] $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@build $name
+            [$($recv)*]
             [$($items)* $crate::selection!(@module $field { $($nested)+ });]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { });
+            [$($fields,)* $field,]
+            [$($init)* $field: $($recv)*.$field
+                .into_iter()
+                .map(|v| $crate::selection!(@construct
+                    [v] [selection::$field] Selection [] { $($nested)+ }))
+                .collect::<Vec<_>>(),]
+            { $($($rest)*)? })
     };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: [{ $($nested:tt)+ }], $($rest:tt)* } ) => {
-        $crate::selection!(@declare $name
-            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { $($rest)* });
+    ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*]
+        { $field:ident: $value:expr $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@build $name
+            [$($recv)*] [$($items)*] [$($fields,)* $field,]
+            [$($init)* $field: $value,]
+            { $($($rest)*)? })
     };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: [{ $($nested:tt)+ }] } ) => {
-        $crate::selection!(@declare $name
-            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { });
-    };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: $value:expr, $($rest:tt)* } ) => {
-        $crate::selection!(@declare $name
-            [$($items)*]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { $($rest)* });
-    };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident: $value:expr } ) => {
-        $crate::selection!(@declare $name
-            [$($items)*]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { });
-    };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident, $($rest:tt)* } ) => {
-        $crate::selection!(@declare $name
-            [$($items)*]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { $($rest)* });
-    };
-    ( @declare $name:ident [$($items:tt)*] [$($generics:tt)*] [$($fields:tt)*]
-        { $field:ident } ) => {
-        $crate::selection!(@declare $name
-            [$($items)*]
-            [$($generics)* $field,]
-            [$($fields)* pub $field: $field,]
-            { });
+    ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*]
+        { $field:ident $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@build $name
+            [$($recv)*] [$($items)*] [$($fields,)* $field,]
+            [$($init)* $field: $($recv)*.$field,]
+            { $($($rest)*)? })
     };
 
     // ----------------------------------------------------------------------
-    // Construction
+    // Declaration only (nested modules and the list entry point)
+    // ----------------------------------------------------------------------
+
+    ( @declare root $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
+        #[allow(non_camel_case_types)]
+        mod selection {
+            use $crate::__private::{serde as __specta_serde, specta as __specta};
+
+            $($items)*
+
+            #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
+            #[serde(crate = "self::__specta_serde")]
+            #[specta(crate = self::__specta, inline)]
+            pub struct $name<$($fields,)*> {
+                $(pub $fields: $fields,)*
+            }
+        }
+    };
+    ( @declare inner $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
+        $($items)*
+
+        #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
+        #[serde(crate = "self::__specta_serde")]
+        #[specta(crate = self::__specta, inline)]
+        pub struct $name<$($fields,)*> {
+            $(pub $fields: $fields,)*
+        }
+    };
+    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+        { $field:ident: { $($nested:tt)+ } $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@declare $kind $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
+            [$($fields,)* $field,]
+            { $($($rest)*)? });
+    };
+    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+        { $field:ident: [{ $($nested:tt)+ }] $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@declare $kind $name
+            [$($items)* $crate::selection!(@module $field { $($nested)+ });]
+            [$($fields,)* $field,]
+            { $($($rest)*)? });
+    };
+    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+        { $field:ident: $value:expr $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@declare $kind $name
+            [$($items)*]
+            [$($fields,)* $field,]
+            { $($($rest)*)? });
+    };
+    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+        { $field:ident $(, $($rest:tt)*)? } ) => {
+        $crate::selection!(@declare $kind $name
+            [$($items)*]
+            [$($fields,)* $field,]
+            { $($($rest)*)? });
+    };
+
+    // ----------------------------------------------------------------------
+    // Construction only (nested values and the list entry point)
     // ----------------------------------------------------------------------
 
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*] { } ) => {
         $($module)*::$name { $($init)* }
     };
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: { $($nested:tt)+ }, $($rest:tt)* } ) => {
+        { $field:ident: { $($nested:tt)+ } $(, $($rest:tt)*)? } ) => {
         $crate::selection!(@construct
             [$($recv)*] [$($module)*] $name
             [$($init)* $field: $crate::selection!(@construct
                 [$($recv)*.$field] [$($module)*::$field] Selection [] { $($nested)+ }),]
-            { $($rest)* })
+            { $($($rest)*)? })
     };
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: { $($nested:tt)+ } } ) => {
-        $crate::selection!(@construct
-            [$($recv)*] [$($module)*] $name
-            [$($init)* $field: $crate::selection!(@construct
-                [$($recv)*.$field] [$($module)*::$field] Selection [] { $($nested)+ }),]
-            { })
-    };
-    ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: [{ $($nested:tt)+ }], $($rest:tt)* } ) => {
+        { $field:ident: [{ $($nested:tt)+ }] $(, $($rest:tt)*)? } ) => {
         $crate::selection!(@construct
             [$($recv)*] [$($module)*] $name
             [$($init)* $field: $($recv)*.$field
@@ -223,42 +248,19 @@ macro_rules! selection {
                 .map(|v| $crate::selection!(@construct
                     [v] [$($module)*::$field] Selection [] { $($nested)+ }))
                 .collect::<Vec<_>>(),]
-            { $($rest)* })
+            { $($($rest)*)? })
     };
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: [{ $($nested:tt)+ }] } ) => {
-        $crate::selection!(@construct
-            [$($recv)*] [$($module)*] $name
-            [$($init)* $field: $($recv)*.$field
-                .into_iter()
-                .map(|v| $crate::selection!(@construct
-                    [v] [$($module)*::$field] Selection [] { $($nested)+ }))
-                .collect::<Vec<_>>(),]
-            { })
-    };
-    ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: $value:expr, $($rest:tt)* } ) => {
+        { $field:ident: $value:expr $(, $($rest:tt)*)? } ) => {
         $crate::selection!(@construct
             [$($recv)*] [$($module)*] $name [$($init)* $field: $value,]
-            { $($rest)* })
+            { $($($rest)*)? })
     };
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident: $value:expr } ) => {
-        $crate::selection!(@construct
-            [$($recv)*] [$($module)*] $name [$($init)* $field: $value,]
-            { })
-    };
-    ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident, $($rest:tt)* } ) => {
+        { $field:ident $(, $($rest:tt)*)? } ) => {
         $crate::selection!(@construct
             [$($recv)*] [$($module)*] $name [$($init)* $field: $($recv)*.$field,]
-            { $($rest)* })
-    };
-    ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*]
-        { $field:ident } ) => {
-        $crate::selection!(@construct
-            [$($recv)*] [$($module)*] $name [$($init)* $field: $($recv)*.$field,]
-            { })
+            { $($($rest)*)? })
     };
 }
 
