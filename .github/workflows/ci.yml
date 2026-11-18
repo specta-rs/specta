@@ -142,3 +142,29 @@ jobs:
         run: bun install --global typescript@5.9.3
       - name: Typecheck generated TypeScript
         run: cargo test -p specta-tests --test test typescript_precedence
+
+  # `tests/kotlin-typecheck` compiles the generated Kotlin with `kotlinc -Werror` and
+  # round-trips the Serde JSON samples. Nothing in `cargo test` needs Kotlin, so the
+  # compiler is installed only for this job.
+  kotlin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Kotlin compiler
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$RUNNER_TEMP/kotlin-compiler.zip" \
+            https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip
+          unzip -q "$RUNNER_TEMP/kotlin-compiler.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Compile generated Kotlin and round-trip JSON samples
+        run: tests/kotlin-typecheck/run.sh
