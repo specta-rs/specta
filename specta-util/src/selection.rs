@@ -62,12 +62,12 @@ macro_rules! selection {
     // `selection!(user, { ... } as Name)` keeps the partial moves of `user`.
     ( $s:ident, { $($fields:tt)+ } as $name:ident ) => {{
         $crate::selection!(@define $name { $($fields)+ });
-        $crate::selection!(@construct [$s] [selection::definition] $name [] { $($fields)+ })
+        $crate::selection!(@construct [$s] [selection] $name [] { $($fields)+ })
     }};
     ( $s:expr, { $($fields:tt)+ } as $name:ident ) => {{
         $crate::selection!(@define $name { $($fields)+ });
         let value = $s;
-        $crate::selection!(@construct [value] [selection::definition] $name [] { $($fields)+ })
+        $crate::selection!(@construct [value] [selection] $name [] { $($fields)+ })
     }};
     ( $s:ident, { $($fields:tt)+ } ) => {
         $crate::selection!($s, { $($fields)+ } as Selection)
@@ -82,7 +82,7 @@ macro_rules! selection {
         let value = $s;
         value
             .into_iter()
-            .map(|v| $crate::selection!(@construct [v] [selection::definition] $name [] { $($fields)+ }))
+            .map(|v| $crate::selection!(@construct [v] [selection] $name [] { $($fields)+ }))
             .collect::<Vec<_>>()
     }};
     ( $s:expr, [{ $($fields:tt)+ }] ) => {
@@ -96,29 +96,16 @@ macro_rules! selection {
     ( @define $name:ident { $($fields:tt)+ } ) => {
         #[allow(non_camel_case_types)]
         mod selection {
-            #[allow(unused_imports)]
-            mod __specta_deps {
-                pub use $crate::__private::{serde, specta};
-            }
+            use $crate::__private::{serde as __specta_serde, specta as __specta};
 
-            pub mod definition {
-                #[allow(unused_imports)]
-                mod __specta_deps {
-                    pub use super::super::__specta_deps::{serde, specta};
-                }
-
-                $crate::selection!(@declare $name [] [] [] { $($fields)+ });
-            }
+            $crate::selection!(@declare $name [] [] [] { $($fields)+ });
         }
     };
 
     // Emit a module holding the selection type for a nested struct field.
     ( @module $field:ident { $($fields:tt)+ } ) => {
         pub mod $field {
-            #[allow(unused_imports)]
-            mod __specta_deps {
-                pub use super::super::__specta_deps::{serde, specta};
-            }
+            use super::{__specta, __specta_serde};
 
             $crate::selection!(@declare Selection [] [] [] { $($fields)+ });
         }
@@ -132,9 +119,9 @@ macro_rules! selection {
         $($items)*
 
         #[allow(non_camel_case_types)]
-        #[derive(super::__specta_deps::serde::Serialize, super::__specta_deps::specta::Type)]
-        #[serde(crate = "super::__specta_deps::serde")]
-        #[specta(crate = super::__specta_deps::specta, inline)]
+        #[derive(self::__specta_serde::Serialize, self::__specta::Type)]
+        #[serde(crate = "self::__specta_serde")]
+        #[specta(crate = self::__specta, inline)]
         pub struct $name<$($generics)*> {
             $($fields)*
         }
@@ -566,6 +553,39 @@ mod tests {
         assert_eq!(selection.pets[0].name, "Tux");
         assert_eq!(selection.pets[0].toys[0].name, "Ball");
         assert_eq!(selection.pets[0].toys[1].name, "Rope");
+    }
+
+    #[test]
+    fn fields_named_serde_and_specta_do_not_collide() {
+        #[allow(dead_code)]
+        struct Inner {
+            serde: &'static str,
+            specta: &'static str,
+        }
+
+        #[allow(dead_code)]
+        struct Outer {
+            serde: Inner,
+            specta: Inner,
+        }
+
+        let value = Outer {
+            serde: Inner {
+                serde: "a",
+                specta: "b",
+            },
+            specta: Inner {
+                serde: "c",
+                specta: "d",
+            },
+        };
+        let selection = crate::selection!(value, {
+            serde: { serde },
+            specta: { specta },
+        });
+
+        assert_eq!(selection.serde.serde, "a");
+        assert_eq!(selection.specta.specta, "d");
     }
 
     #[test]
