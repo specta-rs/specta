@@ -78,6 +78,8 @@ these types.
 
 Features for third-party crates carry the version that bounds the supported range in their name: the major for 1.x and newer (`uuid1`, `tokio1`), and the major and minor for 0.x (`chrono04`, `glam034`, `smol_str03`). Support for a new major of a crate can then arrive as a new feature in a minor release of Specta rather than a major one. The pre-2.0 unversioned names are gone rather than aliased, so a manifest that enabled `uuid` now says `uuid1` and one that enabled `chrono` says `chrono04`; every feature names the version range it applies to.
 
+Named types are identified by their crate path and type name rather than by crate version, so enabling more than one major of the same crate exports a single type per name, built from whichever version is resolved first. Only enable multiple majors together when their named types have the same serialized shape.
+
 [//]: # (FEATURE_FLAGS_START)
 Core Features
 

@@ -2,6 +2,12 @@ use crate::{Type, Types};
 #[allow(unused_imports)]
 use crate::{datatype::*, r#type::impls::*, r#type::macros::impl_ndt};
 
+// Adding support for a second major of a crate must keep the generated `NamedId`
+// stable: alias the new dependency to the canonical crate name inside its block
+// (`use bson2 as bson;`) instead of writing `bson2::Bson`. The identity is
+// stringified from the path in the impl, so `bson2::Bson` would register a
+// second type with the same exported name instead of collapsing to one.
+
 // `String` requires `std` feature, while `str` does not.
 // We can't use `str` in a lot of places because it's not `Sized`, so this bridges that.
 #[allow(unused)]
