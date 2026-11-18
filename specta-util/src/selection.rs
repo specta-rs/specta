@@ -117,14 +117,7 @@ macro_rules! selection {
         mod selection {
             use $crate::__private::{serde as __sd, specta as __sp};
 
-            $($items)*
-
-            #[derive(self::__sd::Serialize, self::__sp::Type)]
-            #[serde(crate = "self::__sd")]
-            #[specta(crate = self::__sp, inline)]
-            pub struct $name<$($fields,)*> {
-                $(pub $fields: $fields,)*
-            }
+            $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
         }
         selection::$name { $($init)* }
     }};
@@ -175,24 +168,40 @@ macro_rules! selection {
         mod selection {
             use $crate::__private::{serde as __sd, specta as __sp};
 
-            $($items)*
-
-            #[derive(self::__sd::Serialize, self::__sp::Type)]
-            #[serde(crate = "self::__sd")]
-            #[specta(crate = self::__sp, inline)]
-            pub struct $name<$($fields,)*> {
-                $(pub $fields: $fields,)*
-            }
+            $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
         }
     };
     ( @declare inner $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
+        $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
+    };
+
+    // A selection is a private, non-recursive, always-inline named struct, so
+    // skip the derive's named-type protocol and describe it directly. Field
+    // types still resolve through their own `Type` impl, so named field types
+    // stay named references, matching what the derive emits for an inline type.
+    ( @type $name:ident [$($items:tt)*] [$($fields:ident,)*] ) => {
         $($items)*
 
-        #[derive(self::__sd::Serialize, self::__sp::Type)]
+        #[derive(self::__sd::Serialize)]
         #[serde(crate = "self::__sd")]
-        #[specta(crate = self::__sp, inline)]
         pub struct $name<$($fields,)*> {
             $(pub $fields: $fields,)*
+        }
+
+        impl<$($fields,)*> self::__sp::Type for $name<$($fields,)*>
+        where
+            $($fields: self::__sp::Type,)*
+        {
+            fn definition(types: &mut self::__sp::Types) -> self::__sp::datatype::DataType {
+                self::__sp::datatype::Struct::named()
+                    $(.field(
+                        $crate::__private::unraw(stringify!($fields)),
+                        self::__sp::datatype::Field::new(
+                            <$fields as self::__sp::Type>::definition(types),
+                        ),
+                    ))*
+                    .build()
+            }
         }
     };
     ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
