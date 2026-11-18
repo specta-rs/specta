@@ -344,10 +344,23 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> T
     ty
 }
 
+/// How [`resolve_ty_expr`] resolves generic parameters.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GenericResolution {
+    /// Emit both the canonical declaration and the concrete instantiation,
+    /// selected by the generated `declaration` flag.
+    Conditional,
+    /// Emit only the canonical declaration. Used for generic defaults, which
+    /// are always part of the declaration.
+    Declaration,
+    /// Emit only the concrete instantiation. Used for `#[specta(inline)]`
+    /// containers, whose declaration build is unreachable.
+    Concrete,
+}
+
 /// Builds the expression that resolves `ty` to a [`DataType`].
 ///
-/// For the canonical declaration (`conditional == true`, selected by the
-/// generated `declaration` flag) generic parameters are replaced by placeholder
+/// For the canonical declaration generic parameters are replaced by placeholder
 /// types that resolve to `Generic`, so the declaration stays generic without
 /// baking the concrete arguments in.
 ///
@@ -362,7 +375,7 @@ pub fn resolve_ty_expr(
     ty: &Type,
     used_generic_types: &[syn::Ident],
     bounded_params: &HashSet<String>,
-    conditional: bool,
+    resolution: GenericResolution,
 ) -> TokenStream {
     // A field that mentions no enclosing parameter is resolved at its own use
     // site. It must not see the enclosing field's substitution scope: its own
@@ -426,11 +439,13 @@ pub fn resolve_ty_expr(
         ));
     }
 
-    if !conditional {
-        return declaration;
+    match resolution {
+        GenericResolution::Concrete => concrete,
+        GenericResolution::Declaration => declaration,
+        GenericResolution::Conditional => {
+            quote!(if declaration { #declaration } else { #concrete })
+        }
     }
-
-    quote!(if declaration { #declaration } else { #concrete })
 }
 
 /// Returns the subset of `candidates` that appear in `ty`, conservatively
