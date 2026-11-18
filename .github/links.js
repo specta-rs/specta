@@ -21,18 +21,16 @@ const run = (args) =>
 
 // Keyed by `links` value, not crate name: Cargo enforces uniqueness per links
 // value, and differently named crates can declare the same one. `wasm_bindgen`
-// is tolerated because wasm-bindgen-shared declares the link and the all-target
-// graph reaches it through three independent roots: uuid (via js-sys), bson
-// (via getrandom/ahash and rand), and chrono (via iana-time-zone). Chrono is too
-// large to drop just to remove the exception and is effectively unmaintained, so
-// it is reported as a note instead of failing. If a second major of one of those
-// crates ever needs a different wasm-bindgen line, the exception becomes a real
-// conflict and this entry must be revisited.
+// is tolerated because wasm-bindgen-shared declares the link and `--target all`
+// unions edges that never coexist on one platform. On wasm32 it is reached
+// through uuid (js-sys), bson (getrandom), bevy_ecs/bevy_input (web-task) and
+// ulid (web-time); the union additionally routes chrono through iana-time-zone.
+// Those are all large, widely used crates -- chrono is also effectively
+// unmaintained -- so the exception is kept rather than dropping a feature. If a
+// second major of one of them ever needs a different wasm-bindgen line, the
+// exception becomes a real conflict and this entry must be revisited.
 const allowed = new Map([
-  [
-    "wasm_bindgen",
-    "reached on wasm targets through uuid, bson and chrono (wasm-bindgen-shared)",
-  ],
+  ["wasm_bindgen", "reached through uuid, bson, bevy, ulid and chrono"],
 ]);
 
 const tree = run([

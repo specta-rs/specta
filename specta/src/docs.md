@@ -126,7 +126,7 @@ External types
 - `either1` - [either](https://docs.rs/either) 1.x
 - `error-stack08` - [error-stack](https://docs.rs/error-stack) 0.8.x
 - `bevy_ecs020` - [bevy_ecs](https://docs.rs/bevy_ecs) 0.20.x
-- `bevy_input020` - [bevy_input](https://docs.rs/bevy_input) 0.20.x
+- `bevy_input020` - [bevy_input](https://docs.rs/bevy_input) 0.20.x. Enables `bevy_ecs020`.
 - `camino1` - [camino](https://docs.rs/camino) 1.x
 - `geojson1` - [geojson](https://docs.rs/geojson) 1.x
 

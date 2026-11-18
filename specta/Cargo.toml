@@ -97,7 +97,7 @@ either1 = ["dep:either"]
 error-stack08 = ["dep:error-stack"]
 ## [bevy_ecs](https://docs.rs/bevy_ecs) 0.20.x
 bevy_ecs020 = ["dep:bevy_ecs"]
-## [bevy_input](https://docs.rs/bevy_input) 0.20.x
+## [bevy_input](https://docs.rs/bevy_input) 0.20.x. Enables `bevy_ecs020`.
 bevy_input020 = ["dep:bevy_input", "bevy_ecs020", "smol_str03"]
 ## [camino](https://docs.rs/camino) 1.x
 camino1 = ["dep:camino"]
