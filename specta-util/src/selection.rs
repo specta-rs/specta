@@ -76,22 +76,18 @@ macro_rules! selection {
     }};
 
     // `selection!(users, [{ ... }] as Name)` maps the selection over a list.
-    // A list needs the declaration outside the closure, so it uses the split
-    // declaration/construction passes below.
     ( $s:expr, [{ $($fields:tt)+ }] as $name:ident ) => {{
-        $crate::selection!(@declare root $name [] [] { $($fields)+ });
         let value = $s;
         value
             .into_iter()
-            .map(|v| $crate::selection!(@construct [v] [selection] $name [] { $($fields)+ }))
+            .map(|v| $crate::selection!(@build $name [v] [] [] [] { $($fields)+ }))
             .collect::<Vec<_>>()
     }};
     ( $s:expr, [{ $($fields:tt)+ }] ) => {{
-        $crate::selection!(@declare root Selection [] [] { $($fields)+ });
         let value = $s;
         value
             .into_iter()
-            .map(|v| $crate::selection!(@construct [v] [selection] Selection [] { $($fields)+ }))
+            .map(|v| $crate::selection!(@build Selection [v] [] [] [] { $($fields)+ }))
             .collect::<Vec<_>>()
     }};
 
@@ -102,11 +98,22 @@ macro_rules! selection {
     // Emit the module holding the selection type for a nested struct field.
     ( @module $field:ident { $($fields:tt)+ } ) => {
         pub mod $field {
-            use super::{__sp, __sd};
+            use super::{__sp, __sd, __u};
 
-            $crate::selection!(@declare inner Selection [] [] { $($fields)+ });
+            $crate::selection!(@declare Selection [] [] { $($fields)+ });
         }
     };
+
+    // Fast path: a body that is only bare field names needs no walk at all.
+    ( @build $name:ident [$recv:tt] [] [] [] { $($field:ident),* $(,)? } ) => {{
+        #[allow(non_camel_case_types)]
+        mod selection {
+            use $crate::__private::{serde as __sd, specta as __sp, unraw as __u};
+
+            $crate::selection!(@type $name [] [$($field,)*]);
+        }
+        selection::$name { $($field: $recv.$field),* }
+    }};
 
     // Declare the type *and* build the value in a single walk. Every field
     // becomes a type parameter so its type is inferred from the value (or the
@@ -115,7 +122,7 @@ macro_rules! selection {
     ( @build $name:ident [$($recv:tt)*] [$($items:tt)*] [$($fields:ident,)*] [$($init:tt)*] { } ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
-            use $crate::__private::{serde as __sd, specta as __sp};
+            use $crate::__private::{serde as __sd, specta as __sp, unraw as __u};
 
             $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
         }
@@ -160,83 +167,52 @@ macro_rules! selection {
     };
 
     // ----------------------------------------------------------------------
-    // Declaration only (nested modules and the list entry point)
+    // Declaration only (nested modules)
     // ----------------------------------------------------------------------
 
-    ( @declare root $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
-        #[allow(non_camel_case_types)]
-        mod selection {
-            use $crate::__private::{serde as __sd, specta as __sp};
-
-            $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
-        }
+    ( @declare $name:ident [] [] { $($field:ident),* $(,)? } ) => {
+        $crate::selection!(@type $name [] [$($field,)*]);
     };
-    ( @declare inner $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
+    ( @declare $name:ident [$($items:tt)*] [$($fields:ident,)*] { } ) => {
         $crate::selection!(@type $name [$($items)*] [$($fields,)*]);
     };
-
-    // A selection is a private, non-recursive, always-inline named struct, so
-    // skip the derive's named-type protocol and describe it directly. Field
-    // types still resolve through their own `Type` impl, so named field types
-    // stay named references, matching what the derive emits for an inline type.
-    ( @type $name:ident [$($items:tt)*] [$($fields:ident,)*] ) => {
-        $($items)*
-
-        #[derive(self::__sd::Serialize)]
-        #[serde(crate = "self::__sd")]
-        pub struct $name<$($fields,)*> {
-            $(pub $fields: $fields,)*
-        }
-
-        impl<$($fields,)*> self::__sp::Type for $name<$($fields,)*>
-        where
-            $($fields: self::__sp::Type,)*
-        {
-            fn definition(types: &mut self::__sp::Types) -> self::__sp::datatype::DataType {
-                self::__sp::datatype::Struct::named()
-                    $(.field(
-                        $crate::__private::unraw(stringify!($fields)),
-                        self::__sp::datatype::Field::new(
-                            <$fields as self::__sp::Type>::definition(types),
-                        ),
-                    ))*
-                    .build()
-            }
-        }
-    };
-    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+    ( @declare $name:ident [$($items:tt)*] [$($fields:ident,)*]
         { $field:ident: { $($nested:tt)+ } $(, $($rest:tt)*)? } ) => {
-        $crate::selection!(@declare $kind $name
+        $crate::selection!(@declare $name
             [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($fields,)* $field,]
             { $($($rest)*)? });
     };
-    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+    ( @declare $name:ident [$($items:tt)*] [$($fields:ident,)*]
         { $field:ident: [{ $($nested:tt)+ }] $(, $($rest:tt)*)? } ) => {
-        $crate::selection!(@declare $kind $name
+        $crate::selection!(@declare $name
             [$($items)* $crate::selection!(@module $field { $($nested)+ });]
             [$($fields,)* $field,]
             { $($($rest)*)? });
     };
-    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+    ( @declare $name:ident [$($items:tt)*] [$($fields:ident,)*]
         { $field:ident: $value:expr $(, $($rest:tt)*)? } ) => {
-        $crate::selection!(@declare $kind $name
+        $crate::selection!(@declare $name
             [$($items)*]
             [$($fields,)* $field,]
             { $($($rest)*)? });
     };
-    ( @declare $kind:ident $name:ident [$($items:tt)*] [$($fields:ident,)*]
+    ( @declare $name:ident [$($items:tt)*] [$($fields:ident,)*]
         { $field:ident $(, $($rest:tt)*)? } ) => {
-        $crate::selection!(@declare $kind $name
+        $crate::selection!(@declare $name
             [$($items)*]
             [$($fields,)* $field,]
             { $($($rest)*)? });
     };
 
     // ----------------------------------------------------------------------
-    // Construction only (nested values and the list entry point)
+    // Construction only (nested values)
     // ----------------------------------------------------------------------
 
+    ( @construct [$recv:tt] [$($module:tt)*] $name:ident []
+        { $($field:ident),* $(,)? } ) => {
+        $($module)*::$name { $($field: $recv.$field),* }
+    };
     ( @construct [$($recv:tt)*] [$($module:tt)*] $name:ident [$($init:tt)*] { } ) => {
         $($module)*::$name { $($init)* }
     };
@@ -270,6 +246,59 @@ macro_rules! selection {
         $crate::selection!(@construct
             [$($recv)*] [$($module)*] $name [$($init)* $field: $($recv)*.$field,]
             { $($($rest)*)? })
+    };
+
+    // ----------------------------------------------------------------------
+    // The type
+    // ----------------------------------------------------------------------
+
+    // A selection is a private, non-recursive, always-inline named struct, so
+    // describe it directly instead of going through the derive's named-type
+    // protocol. Field types still resolve through their own `Type` impl, so
+    // named field types stay named references, matching what the derive emits
+    // for an inline type.
+    ( @type $name:ident [$($items:tt)*] [$($fields:ident,)*] ) => {
+        $($items)*
+
+        pub struct $name<$($fields,)*> {
+            $(pub $fields: $fields,)*
+        }
+
+        impl<$($fields: self::__sd::Serialize,)*> self::__sd::Serialize
+            for $name<$($fields,)*>
+        {
+            fn serialize<__S>(
+                &self,
+                __serializer: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error>
+            where
+                __S: self::__sd::Serializer,
+            {
+                let mut __state = self::__sd::Serializer::serialize_struct(
+                    __serializer,
+                    __u(stringify!($name)),
+                    const { [$(stringify!($fields)),*].len() },
+                )?;
+                $(self::__sd::ser::SerializeStruct::serialize_field(
+                    &mut __state,
+                    __u(stringify!($fields)),
+                    &self.$fields,
+                )?;)*
+                self::__sd::ser::SerializeStruct::end(__state)
+            }
+        }
+
+        impl<$($fields: self::__sp::Type,)*> self::__sp::Type for $name<$($fields,)*>
+        {
+            fn definition(types: &mut self::__sp::Types) -> self::__sp::datatype::DataType {
+                self::__sp::datatype::Struct::named()
+                    $(.field(
+                        __u(stringify!($fields)),
+                        self::__sp::datatype::Field::new($fields::definition(types)),
+                    ))*
+                    .build()
+            }
+        }
     };
 }
 
@@ -564,6 +593,50 @@ mod tests {
         assert_eq!(selection.pets[0].name, "Tux");
         assert_eq!(selection.pets[0].toys[0].name, "Ball");
         assert_eq!(selection.pets[0].toys[1].name, "Rope");
+    }
+
+    #[test]
+    fn raw_identifier_fields_are_unraw_ed() {
+        #[allow(dead_code)]
+        struct Keywords {
+            r#type: &'static str,
+            r#match: u32,
+        }
+
+        let value = Keywords {
+            r#type: "user",
+            r#match: 1,
+        };
+        let selection = crate::selection!(value, { r#type, r#match });
+
+        assert_eq!(
+            serde_json::to_value(&selection).expect("selection should serialize"),
+            serde_json::json!({ "type": "user", "match": 1 })
+        );
+
+        let mut types = specta::Types::default();
+        fn datatype_of<T: specta::Type>(
+            _: &T,
+            types: &mut specta::Types,
+        ) -> specta::datatype::DataType {
+            T::definition(types)
+        }
+        fn field_names(datatype: &specta::datatype::DataType) -> Vec<&str> {
+            match datatype {
+                specta::datatype::DataType::Struct(struct_ty) => match &struct_ty.fields {
+                    specta::datatype::Fields::Named(fields) => fields
+                        .fields
+                        .iter()
+                        .map(|(name, _)| name.as_ref())
+                        .collect(),
+                    _ => Vec::new(),
+                },
+                _ => Vec::new(),
+            }
+        }
+
+        let datatype = datatype_of(&selection, &mut types);
+        assert_eq!(field_names(&datatype), ["type", "match"]);
     }
 
     #[test]
