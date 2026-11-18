@@ -192,3 +192,21 @@ jobs:
           echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
       - name: Compile generated Kotlin and round-trip JSON samples
         run: tests/kotlin-typecheck/run.sh
+
+  # `specta-elm` only hands its output to the Elm compiler when one is on `PATH`.
+  # This job installs a pinned compiler and sets `SPECTA_ELM` so a missing
+  # compiler is a hard failure rather than a silent skip.
+  elm:
+    runs-on: ubuntu-latest
+    env:
+      SPECTA_ELM: elm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install the Elm compiler
+        run: npm install --global elm@0.19.3-0
+      - name: Compile generated Elm
+        run: cargo test -p specta-elm

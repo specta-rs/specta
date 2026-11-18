@@ -25,6 +25,7 @@
 | --------------- | ------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | **TypeScript**  | ✅ **Stable**       | [`specta-typescript`](https://crates.io/crates/specta-typescript) | Full type support, generics, unions               |
 | **Swift**       | ✅ **Stable**       | [`specta-swift`](https://crates.io/crates/specta-swift)           | Idiomatic Swift, custom Codable, Duration support |
+| **Elm**         | 🧪 **Experimental** | [`specta-elm`](https://crates.io/crates/specta-elm)               | Single-file modules, structs and Serde enums; no generics or recursion |
 | **Rust**        | 🧪 **Experimental** | [`specta-rust`](https://crates.io/crates/specta-rust)             | Rust source, modules, generics; structural wire-only shapes error |
 | **OpenAPI**     | 🧪 **Experimental** | [`specta-openapi`](https://crates.io/crates/specta-openapi)       | OpenAPI 3.1 schemas by default (3.0 opt-in), generics, JSON and YAML |
 | **Go**          | 🧪 **Experimental** | [`specta-go`](https://crates.io/crates/specta-go)                 | Structs, generics, string enums, layouts, Serde   |
@@ -74,6 +75,7 @@ cargo add specta_jsonschema   # JSON Schema (experimental)
 cargo add specta_zod          # Zod schemas (experimental)
 cargo add specta-valibot      # Valibot schemas (experimental)
 cargo add specta-csharp       # C# (experimental)
+cargo add specta-elm          # Elm (experimental)
 ```
 
 Then you can use Specta like following:
@@ -235,15 +237,20 @@ exchange is refused:
 
 The workflow publishes the whole workspace, so each of the following crates needs
 its own trusted publisher: `specta`, `specta-macros`, `specta-serde`,
-`specta-util`, `specta-typescript`, `specta-swift`, `specta-openapi`,
-`specta-jsonschema`, `specta-kotlin`, `specta-csharp`, `specta-go`,
-`specta-python`, `specta-java`, `specta-zod`, `specta-valibot`, `specta-rust` and
-`specta-rescript`.
+`specta-util`, `specta-typescript`, `specta-swift`, `specta-elm`,
+`specta-openapi`, `specta-jsonschema`, `specta-kotlin`, `specta-csharp`,
+`specta-go`, `specta-python`, `specta-java`, `specta-zod`, `specta-valibot`,
+`specta-rust` and `specta-rescript`.
 
 A trusted publisher can only be configured once a crate exists on crates.io, and
 the initial publish requires an API token. `specta-valibot`, `specta-rust` and
 `specta-rescript` have never been released, so publish each of them once from your
 machine before adding its trusted publisher.
+
+`specta-elm` was published as `0.1.0` from its original repository before it
+moved into this workspace, so it only needs the trusted publisher above. Its
+version must still be bumped for the first release from this repository, because
+Cargo refuses to publish a version which already exists.
 
 Adding required reviewers to the `release` GitHub environment is recommended: it
 turns publishing into an approved action rather than something any tag push does.
