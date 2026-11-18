@@ -33,8 +33,8 @@ public sealed interface Event<T> {
     ) : Event<T>
 }
 
-public enum class KeywordEnum {
-    When
+public enum class KeywordEnum(public val wireValue: kotlin.String) {
+    When("when")
 }
 
 @kotlin.jvm.JvmInline
