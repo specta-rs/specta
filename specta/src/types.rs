@@ -513,6 +513,14 @@ impl Types {
         self.types.get(&r.id)?.as_ref()
     }
 
+    /// Gets the named datatype targeted by a [`NamedReference`] mutably.
+    ///
+    /// The entry's identity cannot change; mutating the returned value updates
+    /// the same graph node that the reference resolves to.
+    pub fn get_mut(&mut self, r: &NamedReference) -> Option<&mut NamedDataType> {
+        self.types.get_mut(&r.id)?.as_mut()
+    }
+
     /// Returns the number of completed named datatypes in the collection.
     pub fn len(&self) -> usize {
         debug_assert_eq!(

@@ -71,3 +71,61 @@ fn phase_selection_keeps_concrete_generic_arguments() {
         &<String as Type>::definition(&mut Types::default())
     );
 }
+
+mod same_name_a {
+    #[derive(specta::Type)]
+    pub struct Item {
+        pub left: Option<String>,
+    }
+}
+
+mod same_name_b {
+    #[derive(specta::Type)]
+    pub struct Item {
+        pub right: Option<bool>,
+    }
+}
+
+#[test]
+fn generated_phase_bodies_are_updated_by_identity() {
+    let types = Types::default()
+        .register::<same_name_a::Item>()
+        .register::<same_name_b::Item>();
+    let resolved = specta_serde::PhasesFormat
+        .map_types(&types)
+        .expect("same-named types in different modules should format")
+        .into_owned();
+
+    let fields = resolved
+        .into_unsorted_iter()
+        .filter(|ndt| ndt.name == "Item_Serialize")
+        .map(|ndt| {
+            let Some(DataType::Struct(structure)) = &ndt.ty else {
+                panic!("the generated phase type should be a struct");
+            };
+            let specta::datatype::Fields::Named(fields) = &structure.fields else {
+                panic!("the generated phase type should have named fields");
+            };
+            (
+                ndt.module_path.to_string(),
+                fields.fields[0].0.to_string(),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+
+    assert_eq!(fields.len(), 2, "both module-scoped types should survive");
+    assert_eq!(
+        fields
+            .iter()
+            .find(|(module, _)| module.ends_with("same_name_a"))
+            .map(|(_, field)| field.as_str()),
+        Some("left")
+    );
+    assert_eq!(
+        fields
+            .iter()
+            .find(|(module, _)| module.ends_with("same_name_b"))
+            .map(|(_, field)| field.as_str()),
+        Some("right")
+    );
+}

@@ -392,19 +392,22 @@ impl specta::Format for PhasesFormat {
             }
         }
 
-        out.iter_mut(|ndt| {
-            for generated_types_for_phase in generated.values() {
-                if ndt.name == generated_types_for_phase.serialize.name {
-                    ndt.ty = generated_types_for_phase.serialize.ty.clone();
-                    return;
-                }
-
-                if ndt.name == generated_types_for_phase.deserialize.name {
-                    ndt.ty = generated_types_for_phase.deserialize.ty.clone();
-                    return;
+        // Update the registered generated entries by identity. Matching their
+        // display names previously copied one module's body into every type
+        // that happened to share the generated phase name.
+        for generated_types_for_phase in generated.values() {
+            for generated in [
+                &generated_types_for_phase.serialize,
+                &generated_types_for_phase.deserialize,
+            ] {
+                let Reference::Named(reference) = generated.reference(Vec::new()) else {
+                    unreachable!("named types always produce named references")
+                };
+                if let Some(registered) = out.get_mut(&reference) {
+                    registered.ty = generated.ty.clone();
                 }
             }
-        });
+        }
 
         let mut rewrite_err = None;
         out.iter_mut(|ndt| {
