@@ -2741,3 +2741,25 @@ fn phased_mixed_untagged_variants_split_per_phase() {
 
     insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);
 }
+
+#[test]
+fn variant_builder_field_mut_borrows_the_builder() {
+    let mut named = specta::datatype::Variant::named();
+    named.field_mut(
+        "value",
+        specta::datatype::Field::new(specta::datatype::Primitive::str.into()),
+    );
+    assert!(matches!(
+        named.build().fields,
+        specta::datatype::Fields::Named(fields) if fields.fields.len() == 1
+    ));
+
+    let mut unnamed = specta::datatype::Variant::unnamed();
+    unnamed.field_mut(specta::datatype::Field::new(
+        specta::datatype::Primitive::bool.into(),
+    ));
+    assert!(matches!(
+        unnamed.build().fields,
+        specta::datatype::Fields::Unnamed(fields) if fields.fields.len() == 1
+    ));
+}
