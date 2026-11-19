@@ -2945,9 +2945,7 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
                 panic!("both locals should be structs");
             };
             match &structure.fields {
-                specta::datatype::Fields::Named(fields) => {
-                    fields.fields[0].0.to_string()
-                }
+                specta::datatype::Fields::Named(fields) => fields.fields[0].0.to_string(),
                 _ => panic!("both locals should have named fields"),
             }
         })

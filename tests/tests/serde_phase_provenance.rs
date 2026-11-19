@@ -1,5 +1,8 @@
 use serde::Serialize;
-use specta::{Format as _, Type, Types, datatype::{DataType, Reference}};
+use specta::{
+    Format as _, Type, Types,
+    datatype::{DataType, Reference},
+};
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
@@ -18,11 +21,8 @@ fn user_enums_that_look_like_phase_wrappers_are_preserved() {
         .expect("the enum should format")
         .into_owned();
 
-    let selected = specta_serde::select_phase_datatype(
-        &dt,
-        &resolved,
-        specta_serde::Phase::Serialize,
-    );
+    let selected =
+        specta_serde::select_phase_datatype(&dt, &resolved, specta_serde::Phase::Serialize);
     let DataType::Reference(Reference::Named(reference)) = selected else {
         panic!("the user's enum must not be treated as a generated phase wrapper");
     };
@@ -47,11 +47,8 @@ fn phase_selection_keeps_concrete_generic_arguments() {
         .expect("the generic type should format")
         .into_owned();
 
-    let selected = specta_serde::select_phase_datatype(
-        &dt,
-        &resolved,
-        specta_serde::Phase::Serialize,
-    );
+    let selected =
+        specta_serde::select_phase_datatype(&dt, &resolved, specta_serde::Phase::Serialize);
     let DataType::Reference(Reference::Named(reference)) = selected else {
         panic!("expected a named phase projection");
     };
@@ -106,10 +103,7 @@ fn generated_phase_bodies_are_updated_by_identity() {
             let specta::datatype::Fields::Named(fields) = &structure.fields else {
                 panic!("the generated phase type should have named fields");
             };
-            (
-                ndt.module_path.to_string(),
-                fields.fields[0].0.to_string(),
-            )
+            (ndt.module_path.to_string(), fields.fields[0].0.to_string())
         })
         .collect::<std::collections::HashMap<_, _>>();
 

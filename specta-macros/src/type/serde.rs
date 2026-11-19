@@ -115,9 +115,8 @@ pub(super) fn lower_runtime_attributes(
     generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
 ) -> Result<Option<TokenStream>> {
     match scope {
-        AttributeScope::Container => parse_container_attrs(raw_attrs).map(|attrs| {
-            attrs.map(|attrs| lower_container_attrs(crate_ref, attrs, generics))
-        }),
+        AttributeScope::Container => parse_container_attrs(raw_attrs)
+            .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs, generics))),
         AttributeScope::Variant => {
             parse_variant_attrs(raw_attrs).map(|attrs| attrs.map(lower_variant_attrs))
         }

@@ -880,9 +880,7 @@ impl Configuration {
                                 "Object.prototype.hasOwnProperty.call({js_ident},{})",
                                 js_string_literal(name)
                             );
-                            parts.push(format!(
-                                "...({guard}?{{{key}:{runtime}}}:{{}})"
-                            ));
+                            parts.push(format!("...({guard}?{{{key}:{runtime}}}:{{}})"));
                         } else {
                             parts.push(format!("{key}:{runtime}"));
                         }

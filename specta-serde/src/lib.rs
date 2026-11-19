@@ -504,9 +504,7 @@ impl specta::Format for PhasesFormat {
             }
 
             let mut wrapper = Enum::default();
-            wrapper
-                .attributes
-                .insert("specta:phase_wrapper", true);
+            wrapper.attributes.insert("specta:phase_wrapper", true);
             wrapper
                 .variants
                 .push((Cow::Borrowed("Serialize"), serialize_variant));
@@ -685,10 +683,7 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 .as_ref()
                 .and_then(|ty| select_split_wrapper_variant(ty, phase))
             {
-                instantiate_phase_selection(
-                    &mut selected,
-                    named_reference_generics(reference),
-                );
+                instantiate_phase_selection(&mut selected, named_reference_generics(reference));
                 select_phase_datatype_inner(&mut selected, types, phase);
                 *ty = selected;
                 return;
@@ -742,9 +737,7 @@ fn select_explicit_phased_type(ty: &DataType, phase: Phase) -> Option<DataType> 
 }
 
 fn is_phase_wrapper(wrapper: &Enum) -> bool {
-    wrapper
-        .attributes
-        .contains_key("specta:phase_wrapper")
+    wrapper.attributes.contains_key("specta:phase_wrapper")
 }
 
 fn select_split_wrapper_variant(ty: &DataType, phase: Phase) -> Option<DataType> {
@@ -829,9 +822,8 @@ fn instantiate_phase_selection(
 
     for (generic, ty) in generics {
         if matches!(ty, DataType::Generic(_))
-            && let Some((_, concrete)) = source_generics
-                .iter()
-                .find(|(source, _)| source == generic)
+            && let Some((_, concrete)) =
+                source_generics.iter().find(|(source, _)| source == generic)
         {
             *ty = concrete.clone();
         }
