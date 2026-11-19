@@ -10,7 +10,6 @@ use specta::{
         DataType, Deprecated, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Variant,
     },
-    markers::ENUM_REPR_REWRITTEN_MARKER,
 };
 
 use crate::{CSharp, Error, Layout};
@@ -1358,7 +1357,8 @@ fn is_simple_enum(enm: &specta::datatype::Enum) -> bool {
 }
 
 fn is_rewritten_string_enum(enm: &specta::datatype::Enum) -> bool {
-    enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+    enm.attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
         && enm
             .variants
             .iter()
@@ -1375,7 +1375,9 @@ fn is_rewritten_string_enum(enm: &specta::datatype::Enum) -> bool {
                 };
                 let mut literal_variants =
                     literal.variants.iter().filter(|(_, variant)| !variant.skip);
-                literal.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+                literal
+                    .attributes
+                    .contains_key("specta_serde:enum_repr_rewritten")
                     && matches!(
                         (literal_variants.next(), literal_variants.next()),
                         (Some((literal_name, variant)), None)

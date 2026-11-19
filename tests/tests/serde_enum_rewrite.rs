@@ -15,7 +15,7 @@
 //!   already-tagged variants.
 //!
 //! That heuristic was replaced (PR #522) with an explicit
-//! `ENUM_REPR_REWRITTEN_MARKER` attribute set by every synthetic-enum
+//! `specta_serde:enum_repr_rewritten` attribute set by every synthetic-enum
 //! builder in `specta-serde` once its output reaches its final exported
 //! shape. A Codex P1 review comment on the merged flatten-`Option` PR (#519)
 //! flagged that `flatten_intersection_with_optionals` was missed by that
@@ -92,7 +92,7 @@ enum MixedUntagged {
 // builds a synthetic union `Enum` but - unlike every other synthetic-enum
 // builder in this file (`string_literal_datatype`, `alias_field_union`,
 // `rewrite_identifier_enum_for_phase`'s output) - never marked it with
-// `ENUM_REPR_REWRITTEN_MARKER`. `PhasesFormat` only walks into this payload
+// `specta_serde:enum_repr_rewritten`. `PhasesFormat` only walks into this payload
 // on its *second* rewrite pass over split generated types, which only
 // happens when something else on the same enum forces a serialize/deserialize
 // split (e.g. a field with `skip_serializing_if`); a flattened `Option` field

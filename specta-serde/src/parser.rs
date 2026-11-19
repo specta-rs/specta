@@ -3,79 +3,56 @@
 use crate::{Error, inflection::RenameRule};
 use specta::datatype::{Attributes, DataType};
 
-// The wire keys themselves live in `specta::markers`. Re-export the ones this
-// crate's other modules reference as `parser::*` so each key still has exactly
-// one literal definition across the workspace.
-pub(crate) use specta::markers::{
-    SERDE_CONTAINER_CONTENT, SERDE_CONTAINER_DEFAULT, SERDE_CONTAINER_DENY_UNKNOWN_FIELDS,
-    SERDE_CONTAINER_FIELD_IDENTIFIER, SERDE_CONTAINER_FROM_RESOLVED, SERDE_CONTAINER_FROM_TYPE_SRC,
-    SERDE_CONTAINER_INTO_RESOLVED, SERDE_CONTAINER_INTO_TYPE_SRC,
-    SERDE_CONTAINER_RENAME_ALL_DESERIALIZE, SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
-    SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE, SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
-    SERDE_CONTAINER_RENAME_DESERIALIZE, SERDE_CONTAINER_RENAME_SERIALIZE, SERDE_CONTAINER_TAG,
-    SERDE_CONTAINER_TRANSPARENT, SERDE_CONTAINER_TRY_FROM_RESOLVED,
-    SERDE_CONTAINER_TRY_FROM_TYPE_SRC, SERDE_CONTAINER_UNTAGGED,
-    SERDE_CONTAINER_VARIANT_IDENTIFIER, SERDE_FIELD_ALIASES, SERDE_FIELD_DEFAULT,
-    SERDE_FIELD_FLATTEN, SERDE_FIELD_HAS_DESERIALIZE_WITH, SERDE_FIELD_HAS_SERIALIZE_WITH,
-    SERDE_FIELD_HAS_WITH, SERDE_FIELD_RENAME_DESERIALIZE, SERDE_FIELD_RENAME_SERIALIZE,
-    SERDE_FIELD_SKIP_DESERIALIZING, SERDE_FIELD_SKIP_SERIALIZING, SERDE_FIELD_SKIP_SERIALIZING_IF,
-    SERDE_VARIANT_ALIASES, SERDE_VARIANT_HAS_DESERIALIZE_WITH, SERDE_VARIANT_HAS_SERIALIZE_WITH,
-    SERDE_VARIANT_HAS_WITH, SERDE_VARIANT_OTHER, SERDE_VARIANT_RENAME_ALL_DESERIALIZE,
-    SERDE_VARIANT_RENAME_ALL_SERIALIZE, SERDE_VARIANT_RENAME_DESERIALIZE,
-    SERDE_VARIANT_RENAME_SERIALIZE, SERDE_VARIANT_SKIP_DESERIALIZING,
-    SERDE_VARIANT_SKIP_SERIALIZING, SERDE_VARIANT_UNTAGGED,
-};
-
 const CONTAINER_ATTR_KEYS: &[&str] = &[
-    SERDE_CONTAINER_RENAME_SERIALIZE,
-    SERDE_CONTAINER_RENAME_DESERIALIZE,
-    SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
-    SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
-    SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
-    SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
-    SERDE_CONTAINER_TAG,
-    SERDE_CONTAINER_CONTENT,
-    SERDE_CONTAINER_UNTAGGED,
-    SERDE_CONTAINER_DEFAULT,
-    SERDE_CONTAINER_TRANSPARENT,
-    SERDE_CONTAINER_DENY_UNKNOWN_FIELDS,
-    SERDE_CONTAINER_FROM_TYPE_SRC,
-    SERDE_CONTAINER_FROM_RESOLVED,
-    SERDE_CONTAINER_TRY_FROM_TYPE_SRC,
-    SERDE_CONTAINER_TRY_FROM_RESOLVED,
-    SERDE_CONTAINER_INTO_TYPE_SRC,
-    SERDE_CONTAINER_INTO_RESOLVED,
-    SERDE_CONTAINER_VARIANT_IDENTIFIER,
-    SERDE_CONTAINER_FIELD_IDENTIFIER,
+    "serde:container:rename_serialize",
+    "serde:container:rename_deserialize",
+    "serde:container:rename_all_serialize",
+    "serde:container:rename_all_deserialize",
+    "serde:container:rename_all_fields_serialize",
+    "serde:container:rename_all_fields_deserialize",
+    "serde:container:tag",
+    "serde:container:content",
+    "serde:container:untagged",
+    "serde:container:default",
+    "serde:container:transparent",
+    "serde:container:deny_unknown_fields",
+    "serde:container:from_type_src",
+    "serde:container:from_resolved",
+    "serde:container:try_from_type_src",
+    "serde:container:try_from_resolved",
+    "serde:container:into_type_src",
+    "serde:container:into_resolved",
+    "serde:container:variant_identifier",
+    "serde:container:field_identifier",
 ];
 
 const VARIANT_ATTR_KEYS: &[&str] = &[
-    SERDE_VARIANT_RENAME_SERIALIZE,
-    SERDE_VARIANT_RENAME_DESERIALIZE,
-    SERDE_VARIANT_ALIASES,
-    SERDE_VARIANT_RENAME_ALL_SERIALIZE,
-    SERDE_VARIANT_RENAME_ALL_DESERIALIZE,
-    SERDE_VARIANT_SKIP_SERIALIZING,
-    SERDE_VARIANT_SKIP_DESERIALIZING,
-    SERDE_VARIANT_HAS_SERIALIZE_WITH,
-    SERDE_VARIANT_HAS_DESERIALIZE_WITH,
-    SERDE_VARIANT_HAS_WITH,
-    SERDE_VARIANT_OTHER,
-    SERDE_VARIANT_UNTAGGED,
+    "serde:variant:rename_serialize",
+    "serde:variant:rename_deserialize",
+    "serde:variant:aliases",
+    "serde:variant:rename_all_serialize",
+    "serde:variant:rename_all_deserialize",
+    "serde:variant:skip_serializing",
+    "serde:variant:skip_deserializing",
+    "serde:variant:has_serialize_with",
+    "serde:variant:has_deserialize_with",
+    "serde:variant:has_with",
+    "serde:variant:other",
+    "serde:variant:untagged",
 ];
 
 const FIELD_ATTR_KEYS: &[&str] = &[
-    SERDE_FIELD_RENAME_SERIALIZE,
-    SERDE_FIELD_RENAME_DESERIALIZE,
-    SERDE_FIELD_ALIASES,
-    SERDE_FIELD_DEFAULT,
-    SERDE_FIELD_FLATTEN,
-    SERDE_FIELD_SKIP_SERIALIZING,
-    SERDE_FIELD_SKIP_DESERIALIZING,
-    SERDE_FIELD_SKIP_SERIALIZING_IF,
-    SERDE_FIELD_HAS_SERIALIZE_WITH,
-    SERDE_FIELD_HAS_DESERIALIZE_WITH,
-    SERDE_FIELD_HAS_WITH,
+    "serde:field:rename_serialize",
+    "serde:field:rename_deserialize",
+    "serde:field:aliases",
+    "serde:field:default",
+    "serde:field:flatten",
+    "serde:field:skip_serializing",
+    "serde:field:skip_deserializing",
+    "serde:field:skip_serializing_if",
+    "serde:field:has_serialize_with",
+    "serde:field:has_deserialize_with",
+    "serde:field:has_with",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -112,41 +89,50 @@ impl SerdeContainerAttrs {
         has_any_attr(attributes, CONTAINER_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
-                    rename_serialize: get_string(attributes, SERDE_CONTAINER_RENAME_SERIALIZE),
-                    rename_deserialize: get_string(attributes, SERDE_CONTAINER_RENAME_DESERIALIZE),
+                    rename_serialize: get_string(attributes, "serde:container:rename_serialize"),
+                    rename_deserialize: get_string(
+                        attributes,
+                        "serde:container:rename_deserialize",
+                    ),
                     rename_all_serialize: get_rename_rule(
                         attributes,
-                        SERDE_CONTAINER_RENAME_ALL_SERIALIZE,
+                        "serde:container:rename_all_serialize",
                     )?,
                     rename_all_deserialize: get_rename_rule(
                         attributes,
-                        SERDE_CONTAINER_RENAME_ALL_DESERIALIZE,
+                        "serde:container:rename_all_deserialize",
                     )?,
                     rename_all_fields_serialize: get_rename_rule(
                         attributes,
-                        SERDE_CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
+                        "serde:container:rename_all_fields_serialize",
                     )?,
                     rename_all_fields_deserialize: get_rename_rule(
                         attributes,
-                        SERDE_CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+                        "serde:container:rename_all_fields_deserialize",
                     )?,
-                    tag: get_string(attributes, SERDE_CONTAINER_TAG),
-                    content: get_string(attributes, SERDE_CONTAINER_CONTENT),
-                    untagged: has_attr(attributes, SERDE_CONTAINER_UNTAGGED),
-                    default: has_attr(attributes, SERDE_CONTAINER_DEFAULT),
-                    transparent: has_attr(attributes, SERDE_CONTAINER_TRANSPARENT),
-                    deny_unknown_fields: has_attr(attributes, SERDE_CONTAINER_DENY_UNKNOWN_FIELDS),
-                    from: get_string(attributes, SERDE_CONTAINER_FROM_TYPE_SRC)
+                    tag: get_string(attributes, "serde:container:tag"),
+                    content: get_string(attributes, "serde:container:content"),
+                    untagged: has_attr(attributes, "serde:container:untagged"),
+                    default: has_attr(attributes, "serde:container:default"),
+                    transparent: has_attr(attributes, "serde:container:transparent"),
+                    deny_unknown_fields: has_attr(
+                        attributes,
+                        "serde:container:deny_unknown_fields",
+                    ),
+                    from: get_string(attributes, "serde:container:from_type_src")
                         .map(|type_src| ConversionType { type_src }),
-                    try_from: get_string(attributes, SERDE_CONTAINER_TRY_FROM_TYPE_SRC)
+                    try_from: get_string(attributes, "serde:container:try_from_type_src")
                         .map(|type_src| ConversionType { type_src }),
-                    into: get_string(attributes, SERDE_CONTAINER_INTO_TYPE_SRC)
+                    into: get_string(attributes, "serde:container:into_type_src")
                         .map(|type_src| ConversionType { type_src }),
-                    resolved_from: get_datatype(attributes, SERDE_CONTAINER_FROM_RESOLVED),
-                    resolved_try_from: get_datatype(attributes, SERDE_CONTAINER_TRY_FROM_RESOLVED),
-                    resolved_into: get_datatype(attributes, SERDE_CONTAINER_INTO_RESOLVED),
-                    variant_identifier: has_attr(attributes, SERDE_CONTAINER_VARIANT_IDENTIFIER),
-                    field_identifier: has_attr(attributes, SERDE_CONTAINER_FIELD_IDENTIFIER),
+                    resolved_from: get_datatype(attributes, "serde:container:from_resolved"),
+                    resolved_try_from: get_datatype(
+                        attributes,
+                        "serde:container:try_from_resolved",
+                    ),
+                    resolved_into: get_datatype(attributes, "serde:container:into_resolved"),
+                    variant_identifier: has_attr(attributes, "serde:container:variant_identifier"),
+                    field_identifier: has_attr(attributes, "serde:container:field_identifier"),
                 })
             })
             .transpose()
@@ -174,24 +160,27 @@ impl SerdeVariantAttrs {
         has_any_attr(attributes, VARIANT_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
-                    rename_serialize: get_string(attributes, SERDE_VARIANT_RENAME_SERIALIZE),
-                    rename_deserialize: get_string(attributes, SERDE_VARIANT_RENAME_DESERIALIZE),
-                    aliases: get_strings(attributes, SERDE_VARIANT_ALIASES),
+                    rename_serialize: get_string(attributes, "serde:variant:rename_serialize"),
+                    rename_deserialize: get_string(attributes, "serde:variant:rename_deserialize"),
+                    aliases: get_strings(attributes, "serde:variant:aliases"),
                     rename_all_serialize: get_rename_rule(
                         attributes,
-                        SERDE_VARIANT_RENAME_ALL_SERIALIZE,
+                        "serde:variant:rename_all_serialize",
                     )?,
                     rename_all_deserialize: get_rename_rule(
                         attributes,
-                        SERDE_VARIANT_RENAME_ALL_DESERIALIZE,
+                        "serde:variant:rename_all_deserialize",
                     )?,
-                    skip_serializing: has_attr(attributes, SERDE_VARIANT_SKIP_SERIALIZING),
-                    skip_deserializing: has_attr(attributes, SERDE_VARIANT_SKIP_DESERIALIZING),
-                    has_serialize_with: has_attr(attributes, SERDE_VARIANT_HAS_SERIALIZE_WITH),
-                    has_deserialize_with: has_attr(attributes, SERDE_VARIANT_HAS_DESERIALIZE_WITH),
-                    has_with: has_attr(attributes, SERDE_VARIANT_HAS_WITH),
-                    other: has_attr(attributes, SERDE_VARIANT_OTHER),
-                    untagged: has_attr(attributes, SERDE_VARIANT_UNTAGGED),
+                    skip_serializing: has_attr(attributes, "serde:variant:skip_serializing"),
+                    skip_deserializing: has_attr(attributes, "serde:variant:skip_deserializing"),
+                    has_serialize_with: has_attr(attributes, "serde:variant:has_serialize_with"),
+                    has_deserialize_with: has_attr(
+                        attributes,
+                        "serde:variant:has_deserialize_with",
+                    ),
+                    has_with: has_attr(attributes, "serde:variant:has_with"),
+                    other: has_attr(attributes, "serde:variant:other"),
+                    untagged: has_attr(attributes, "serde:variant:untagged"),
                 })
             })
             .transpose()
@@ -218,17 +207,17 @@ impl SerdeFieldAttrs {
         has_any_attr(attributes, FIELD_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
-                    rename_serialize: get_string(attributes, SERDE_FIELD_RENAME_SERIALIZE),
-                    rename_deserialize: get_string(attributes, SERDE_FIELD_RENAME_DESERIALIZE),
-                    aliases: get_strings(attributes, SERDE_FIELD_ALIASES),
-                    default: has_attr(attributes, SERDE_FIELD_DEFAULT),
-                    flatten: has_attr(attributes, SERDE_FIELD_FLATTEN),
-                    skip_serializing: has_attr(attributes, SERDE_FIELD_SKIP_SERIALIZING),
-                    skip_deserializing: has_attr(attributes, SERDE_FIELD_SKIP_DESERIALIZING),
-                    skip_serializing_if: get_string(attributes, SERDE_FIELD_SKIP_SERIALIZING_IF),
-                    has_serialize_with: has_attr(attributes, SERDE_FIELD_HAS_SERIALIZE_WITH),
-                    has_deserialize_with: has_attr(attributes, SERDE_FIELD_HAS_DESERIALIZE_WITH),
-                    has_with: has_attr(attributes, SERDE_FIELD_HAS_WITH),
+                    rename_serialize: get_string(attributes, "serde:field:rename_serialize"),
+                    rename_deserialize: get_string(attributes, "serde:field:rename_deserialize"),
+                    aliases: get_strings(attributes, "serde:field:aliases"),
+                    default: has_attr(attributes, "serde:field:default"),
+                    flatten: has_attr(attributes, "serde:field:flatten"),
+                    skip_serializing: has_attr(attributes, "serde:field:skip_serializing"),
+                    skip_deserializing: has_attr(attributes, "serde:field:skip_deserializing"),
+                    skip_serializing_if: get_string(attributes, "serde:field:skip_serializing_if"),
+                    has_serialize_with: has_attr(attributes, "serde:field:has_serialize_with"),
+                    has_deserialize_with: has_attr(attributes, "serde:field:has_deserialize_with"),
+                    has_with: has_attr(attributes, "serde:field:has_with"),
                 })
             })
             .transpose()

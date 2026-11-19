@@ -15,7 +15,6 @@ use specta::{
         NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
         Struct, Tuple, Variant,
     },
-    markers::{ALIAS_EXCLUSION_MARKER, DEFERRED_ALIAS_UNION_MARKER, FINITE_NUMBER_MARKER},
 };
 
 use crate::{
@@ -3198,9 +3197,12 @@ fn enum_dt(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    let is_finite_number = e.attributes.get_named_as(FINITE_NUMBER_MARKER) == Some(&true);
+    let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
 
-    if e.attributes.get_named_as(DEFERRED_ALIAS_UNION_MARKER) == Some(&true) {
+    if e.attributes
+        .get_named_as("specta_serde:deferred_alias_union")
+        == Some(&true)
+    {
         return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);
     }
 
@@ -3304,9 +3306,11 @@ fn alias_field_union_dt(
                 .and_then(|field| field.ty.as_mut())
             && let Fields::Named(named) = &mut strct.fields
         {
-            named
-                .fields
-                .retain(|(_, field)| !field.attributes.contains_key(ALIAS_EXCLUSION_MARKER));
+            named.fields.retain(|(_, field)| {
+                !field
+                    .attributes
+                    .contains_key("specta_serde:alias_exclusion")
+            });
             all_optional &= named.fields.iter().all(|(_, field)| field.optional);
         } else {
             all_optional = false;

@@ -41,14 +41,18 @@ jobs:
         run: cargo test --all-features
       - name: Build without default features
         run: cargo build --all --no-default-features
+      - name: Check individually-enabled third-party features
+        shell: bash
+        run: |
+          for feature in bevy_input020 geojson1; do
+            cargo check -p specta --no-default-features --features "std,$feature"
+          done
 
   clippy:
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
 
     steps:
       - uses: actions/checkout@v7
@@ -58,10 +62,28 @@ jobs:
         run: rustup toolchain install stable --profile minimal --component clippy
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+      # `actions-rs/clippy-check` is archived and intermittently fails the job
+      # with "Not Found" while posting its check run, so run clippy directly.
+      - name: Clippy
+        run: cargo clippy --all-features
+
+  features-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the generated feature list is current
+        run: |
+          node .github/features.js
+          git diff --exit-code specta/src/docs.md
+
+  native-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Check for native `links` crates
+        run: node .github/links.js
 
   zod:
     runs-on: ubuntu-latest
@@ -142,3 +164,57 @@ jobs:
         run: bun install --global typescript@5.9.3
       - name: Typecheck generated TypeScript
         run: cargo test -p specta-tests --test test typescript_precedence
+
+  # `tests/kotlin-typecheck` compiles the generated Kotlin with `kotlinc -Werror` and
+  # round-trips the Serde JSON samples. Nothing in `cargo test` needs Kotlin, so the
+  # compiler is installed only for this job.
+  kotlin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Kotlin compiler
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$RUNNER_TEMP/kotlin-compiler.zip" \
+            https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip
+          unzip -q "$RUNNER_TEMP/kotlin-compiler.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Compile generated Kotlin and round-trip JSON samples
+        run: tests/kotlin-typecheck/run.sh
+
+  # `specta-elm` only hands its output to the Elm compiler when one is on `PATH`.
+  # This job installs a pinned compiler and sets `SPECTA_ELM` so a missing
+  # compiler is a hard failure rather than a silent skip.
+  elm:
+    runs-on: ubuntu-latest
+    env:
+      SPECTA_ELM: elm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      # The npm package skips its binary download when install scripts are
+      # disabled, so fetch the release asset itself.
+      - name: Install the Elm compiler
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$RUNNER_TEMP/elm.gz" \
+            https://github.com/elm/compiler/releases/download/0.19.3/elm-0.19.3-linux-x64.gz
+          gunzip -c "$RUNNER_TEMP/elm.gz" > "$RUNNER_TEMP/elm"
+          chmod +x "$RUNNER_TEMP/elm"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Check the compiler version
+        run: elm --version
+      - name: Compile generated Elm
+        run: cargo test -p specta-elm

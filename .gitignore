@@ -28,3 +28,11 @@ node_modules
 
 # insta pending snapshots — review with `cargo insta`, never commit
 *.snap.new
+
+# Kotlin typecheck harness working files
+/tests/kotlin-typecheck/generated
+/tests/kotlin-typecheck/lib
+/tests/kotlin-typecheck/build
+
+# Elm export tests generate a throwaway Elm project here
+/specta-elm/.temp

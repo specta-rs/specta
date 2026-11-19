@@ -13,8 +13,6 @@
 pub mod collect;
 pub mod datatype;
 mod format;
-#[doc(hidden)]
-pub mod markers;
 mod r#type;
 mod types;
 

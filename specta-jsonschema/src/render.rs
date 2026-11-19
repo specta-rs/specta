@@ -10,11 +10,6 @@ use specta::{
         DataType, Deprecated, Enum, Field, Fields, Generic, List, Map as SpectaMap, NamedDataType,
         NamedReference, NamedReferenceType, Primitive, Reference, Struct, Tuple, Variant,
     },
-    markers::{
-        ENUM_OTHER_VARIANT_MARKER, ENUM_REPR_REWRITTEN_MARKER, FLATTENED_PAYLOAD_MARKER,
-        SERDE_CONTAINER_DENY_UNKNOWN_FIELDS, SERDE_CONTAINER_UNTAGGED, SERDE_VARIANT_UNTAGGED,
-        STRICT_OBJECT_MARKER,
-    },
 };
 
 use crate::{Error, SchemaVersion};
@@ -284,10 +279,12 @@ impl<'a> Renderer<'a> {
     fn intersection_denies_unknown_fields(&self, types: &[DataType]) -> bool {
         types.iter().any(|ty| match ty {
             DataType::Struct(strct) => {
-                !strct.attributes.contains_key(FLATTENED_PAYLOAD_MARKER)
+                !strct
+                    .attributes
+                    .contains_key("specta_serde:flattened_payload")
                     && strct
                         .attributes
-                        .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS)
+                        .contains_key("serde:container:deny_unknown_fields")
             }
             DataType::Intersection(types) => self.intersection_denies_unknown_fields(types),
             _ => false,
@@ -512,21 +509,23 @@ impl<'a> Renderer<'a> {
                 _ => false,
             },
             DataType::Enum(enm) => {
-                let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-                let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+                let untagged = enm.attributes.contains_key("serde:container:untagged");
+                let rewritten = enm
+                    .attributes
+                    .contains_key("specta_serde:enum_repr_rewritten");
                 enm.variants
                     .iter()
                     .filter(|(_, variant)| !variant.skip)
                     .all(|(_, variant)| match &variant.fields {
                         Fields::Unit => {
-                            !untagged && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                            !untagged && !variant.attributes.contains_key("serde:variant:untagged")
                         }
                         Fields::Unnamed(fields) => {
                             let mut fields =
                                 fields.fields.iter().filter_map(|field| field.ty.as_ref());
                             (untagged
                                 || rewritten
-                                || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED))
+                                || variant.attributes.contains_key("serde:variant:untagged"))
                                 && fields.next().is_some_and(|ty| {
                                     fields.next().is_none()
                                         && self.is_valid_map_key(ty, generics, depth + 1)
@@ -630,21 +629,23 @@ impl<'a> Renderer<'a> {
                 Fields::Unit | Fields::Named(_) => None,
             },
             DataType::Enum(enm) => {
-                let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-                let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+                let untagged = enm.attributes.contains_key("serde:container:untagged");
+                let rewritten = enm
+                    .attributes
+                    .contains_key("specta_serde:enum_repr_rewritten");
                 let mut schemas = Vec::new();
                 for (name, variant) in enm.variants.iter().filter(|(_, variant)| !variant.skip) {
                     let mut schema = match &variant.fields {
                         Fields::Unit
                             if !untagged
-                                && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) =>
+                                && !variant.attributes.contains_key("serde:variant:untagged") =>
                         {
                             object([("const", string(name))])
                         }
                         Fields::Unnamed(fields)
                             if untagged
                                 || rewritten
-                                || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) =>
+                                || variant.attributes.contains_key("serde:variant:untagged") =>
                         {
                             let Some(field) = fields.fields.iter().find(|field| field.ty.is_some())
                             else {
@@ -736,7 +737,7 @@ impl<'a> Renderer<'a> {
         let deny = self.deny_unknown_fields(
             strct
                 .attributes
-                .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS),
+                .contains_key("serde:container:deny_unknown_fields"),
         );
         self.render_fields(&strct.fields, generics, path, depth, deny)
     }
@@ -886,13 +887,15 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
-        let untagged = enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED);
-        let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
+        let untagged = enm.attributes.contains_key("serde:container:untagged");
+        let rewritten = enm
+            .attributes
+            .contains_key("specta_serde:enum_repr_rewritten");
         // Serde applies a container's `deny_unknown_fields` to each variant's
         // named-field payload, so it is threaded through to `render_variant`.
         let deny_unknown_fields = self.deny_unknown_fields(
             enm.attributes
-                .contains_key(SERDE_CONTAINER_DENY_UNKNOWN_FIELDS),
+                .contains_key("serde:container:deny_unknown_fields"),
         );
         let mut variants = enm
             .variants
@@ -917,7 +920,11 @@ impl<'a> Renderer<'a> {
                 .variants
                 .iter()
                 .filter(|(_, variant)| !variant.skip)
-                .map(|(_, variant)| variant.attributes.contains_key(ENUM_OTHER_VARIANT_MARKER))
+                .map(|(_, variant)| {
+                    variant
+                        .attributes
+                        .contains_key("specta_serde:variant_other")
+                })
                 .collect::<Vec<_>>();
             exclude_known_discriminants(&mut variants, &other_variants);
         }
@@ -935,7 +942,7 @@ impl<'a> Renderer<'a> {
             || untagged
             || rewritten_may_overlap
             || enm.variants.iter().any(|(_, variant)| {
-                !variant.skip && variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                !variant.skip && variant.attributes.contains_key("serde:variant:untagged")
             });
 
         match variants.as_slice() {
@@ -957,7 +964,7 @@ impl<'a> Renderer<'a> {
         path: &str,
         depth: usize,
     ) -> Result<Value, Error> {
-        let schema = if untagged || variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED) {
+        let schema = if untagged || variant.attributes.contains_key("serde:variant:untagged") {
             self.render_untagged_variant(variant, deny_unknown_fields, generics, path, depth)?
         } else {
             match &variant.fields {
@@ -992,7 +999,7 @@ impl<'a> Renderer<'a> {
                     // in that wrapper even without `deny_unknown_fields`, so it
                     // stays closed regardless of the schema policy.
                     let strict_wrapper =
-                        rewritten && variant.attributes.contains_key(STRICT_OBJECT_MARKER);
+                        rewritten && variant.attributes.contains_key("specta:strict_object");
                     let payload = self.render_fields(
                         &Fields::Named(fields.clone()),
                         generics,
@@ -1055,7 +1062,7 @@ impl<'a> Renderer<'a> {
     ///
     /// A rewritten external variant never reaches here: it renders as a named
     /// object through `render_fields`, where the same one-key rule is applied
-    /// via [`STRICT_OBJECT_MARKER`].
+    /// via `specta:strict_object`.
     fn external_variant_schema(&self, name: &str, payload: Value) -> Value {
         let mut properties = Map::new();
         properties.insert(name.to_string(), payload);
@@ -1496,8 +1503,10 @@ fn rust_type_path(ndt: &NamedDataType) -> String {
 }
 
 fn enum_is_string_unit_only(enm: &Enum) -> bool {
-    let rewritten = enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER);
-    (rewritten || !enm.attributes.contains_key(SERDE_CONTAINER_UNTAGGED))
+    let rewritten = enm
+        .attributes
+        .contains_key("specta_serde:enum_repr_rewritten");
+    (rewritten || !enm.attributes.contains_key("serde:container:untagged"))
         && enm
             .variants
             .iter()
@@ -1513,7 +1522,7 @@ fn enum_is_string_unit_only(enm: &Enum) -> bool {
                     field.ty.as_ref().is_some_and(is_string_literal_datatype)
                 } else {
                     matches!(variant.fields, Fields::Unit)
-                        && !variant.attributes.contains_key(SERDE_VARIANT_UNTAGGED)
+                        && !variant.attributes.contains_key("serde:variant:untagged")
                 }
             })
 }
@@ -1522,7 +1531,8 @@ fn is_string_literal_datatype(dt: &DataType) -> bool {
     let DataType::Enum(enm) = dt else {
         return false;
     };
-    enm.attributes.contains_key(ENUM_REPR_REWRITTEN_MARKER)
+    enm.attributes
+        .contains_key("specta_serde:enum_repr_rewritten")
         && matches!(enm.variants.as_slice(), [(_, variant)] if matches!(variant.fields, Fields::Unit))
 }
 
