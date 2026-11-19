@@ -7,7 +7,7 @@ use crate::r#type::attr::deprecated_as_tokens;
 
 use super::{
     AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
-    generics::{GenericResolution, resolve_ty_expr, type_with_inferred_lifetimes},
+    generics::{resolve_ty_expr, type_with_inferred_lifetimes},
 };
 
 pub fn construct_field(
@@ -92,19 +92,13 @@ pub fn construct_field_with_variant_skip(
 
     // The canonical declaration is built with each generic parameter replaced by
     // a placeholder type that resolves to `Generic`. Concrete instantiation
-    // (`declaration == false`) resolves the real parameter. Inline containers
-    // never build the declaration, so only emit the concrete resolution.
-    let resolution = if container_attrs.inline {
-        GenericResolution::Concrete
-    } else {
-        GenericResolution::Conditional
-    };
+    // (`declaration == false`) resolves the real parameter.
     let resolve = resolve_ty_expr(
         crate_ref,
         &field_ty,
         used_generic_types,
         bounded_params,
-        resolution,
+        true,
     );
 
     let field_ty = if attrs.skip || variant_skip {

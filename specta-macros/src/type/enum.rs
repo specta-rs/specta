@@ -2,7 +2,7 @@ use super::{
     AttributeScope,
     attr::*,
     build_runtime_attributes,
-    generics::{GenericResolution, resolve_ty_expr, type_with_inferred_lifetimes},
+    generics::{resolve_ty_expr, type_with_inferred_lifetimes},
     r#struct::decode_field_attrs,
 };
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
@@ -54,17 +54,12 @@ pub fn parse_enum(
 
             let variant_value = if let Some(ref variant_ty) = attrs.r#type {
                 let variant_ty = type_with_inferred_lifetimes(variant_ty);
-                let resolution = if container_attrs.inline {
-                    GenericResolution::Concrete
-                } else {
-                    GenericResolution::Conditional
-                };
                 let resolve = resolve_ty_expr(
                     crate_ref,
                     &variant_ty,
                     used_generic_types,
                     bounded_params,
-                    resolution,
+                    true,
                 );
                 quote!(datatype::Variant::unnamed().field({
                     datatype::Field::new(#resolve)

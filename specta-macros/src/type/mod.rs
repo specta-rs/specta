@@ -9,10 +9,9 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    GenericResolution, add_type_to_where_clause, build_where_clause,
-    generics_with_ident_and_bounds_no_lifetimes, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, placeholder_ident, resolve_ty_expr, type_with_inferred_lifetimes,
-    used_type_params,
+    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
+    generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
+    resolve_ty_expr, type_with_inferred_lifetimes, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -61,14 +60,7 @@ pub(super) fn build_runtime_attributes(
             .collect::<Vec<_>>(),
     )?;
 
-    let Some(serde_insert) = serde_insert else {
-        return Ok(None);
-    };
-
-    // Attributes such as `crate` are consumed by serde but carry no runtime
-    // metadata, so lowering can produce an empty insert list. Skip the block
-    // instead of emitting a no-op.
-    if serde_insert.is_empty() {
+    if serde_insert.is_none() {
         return Ok(None);
     }
 
@@ -172,17 +164,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         let container_ty = type_with_inferred_lifetimes(container_ty);
-        let resolution = if container_attrs.inline {
-            GenericResolution::Concrete
-        } else {
-            GenericResolution::Conditional
-        };
         let resolve = resolve_ty_expr(
             &crate_ref,
             &container_ty,
             &used_generic_types,
             &bounded,
-            resolution,
+            true,
         );
         quote!(datatype::inline(types, |types| #resolve))
     } else {
@@ -244,17 +231,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .filter(|ident| !bounded.contains(&ident.to_string()))
         .cloned()
         .collect::<Vec<_>>();
-    // Inline containers never build the canonical declaration, so the
-    // placeholder types it would substitute are unreachable.
-    let build_placeholders =
-        (!container_attrs.inline).then(|| placeholder_definitions(&crate_ref, &placeholder_params));
+    let build_placeholders = placeholder_definitions(&crate_ref, &placeholder_params);
 
     let build_ty_passthrough_args =
         generic_type_and_const_args(generics, |ty| ty.ident.to_token_stream());
-
-    // Inline containers emit no conditional resolutions, which leaves `build`'s
-    // `declaration` parameter unused.
-    let build_unused_declaration = container_attrs.inline.then(|| quote!(let _ = declaration;));
 
     // `generics_for_ndt` is the declaration's generic list; `instantiation_steps`
     // resolves the type's own arguments in parameter order. Unused parameters
@@ -295,13 +275,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             (Some(default), false) => {
                 // A default may reference another parameter (`U = T`), so
                 // resolve it with the same placeholder rewriting.
-                let resolve = resolve_ty_expr(
-                    &crate_ref,
-                    default,
-                    &used_generic_types,
-                    &bounded,
-                    GenericResolution::Declaration,
-                );
+                let resolve =
+                    resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
                 quote!(Some(#resolve))
             }
         };
@@ -440,7 +415,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 #build_placeholders
 
                 fn build #build_ty_bounds (types: &mut #crate_ref::Types, declaration: bool) -> datatype::DataType #build_ty_where_bound {
-                    #build_unused_declaration
                     #dt_expr
                 }
 
