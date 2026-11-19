@@ -1718,3 +1718,47 @@ fn map_key_helper_names_are_reserved() {
         "the generic map key must still reference the built-in `PropertyKey`:\n{output}"
     );
 }
+
+#[test]
+fn selection_supports_arbitrary_values_and_nested_fields() {
+    #[derive(Clone)]
+    #[allow(dead_code)]
+    struct Pet {
+        name: &'static str,
+        age: u32,
+    }
+
+    #[derive(Clone)]
+    #[allow(dead_code)]
+    struct User {
+        id: u32,
+        name: &'static str,
+        pets: Vec<Pet>,
+    }
+
+    let user = User {
+        id: 1,
+        name: "Monty",
+        pets: vec![Pet {
+            name: "Tux",
+            age: 2,
+        }],
+    };
+    let selection = specta_util::selection!(user, {
+        __typename: "User",
+        name,
+        pets: [{ name }],
+    });
+
+    fn datatype_of<T: Type>(_: &T, types: &mut Types) -> DataType {
+        T::definition(types)
+    }
+
+    let mut types = Types::default();
+    let dt = datatype_of(&selection, &mut types);
+    let rendered = primitives::inline(&Typescript::default(), &types, &dt).unwrap();
+    assert_eq!(
+        rendered,
+        "{\n\t__typename: string,\n\tname: string,\n\tpets: {\n\t\tname: string,\n\t}[],\n}"
+    );
+}
