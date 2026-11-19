@@ -1,33 +1,27 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Ident, Type};
+use syn::Type;
 
 use crate::r#type::attr::deprecated_as_tokens;
 
 use super::{
     AttributeScope, ContainerAttr, FieldAttr, Names, build_runtime_attributes,
-    generics::{resolve_ty_expr, type_with_inferred_lifetimes},
+    generics::{BuildKind, resolve_ty_expr, type_with_inferred_lifetimes},
+    serde::AttributeTarget,
 };
 
-/// A field value together with the statements that prepare it.
+/// A field's value, as the expression that builds it.
 ///
-/// Field metadata is written by mutating a `Field`, so those statements are
-/// emitted ahead of the field's use rather than inside its argument position,
-/// where the pretty-printed form indents every one of them a level deeper.
-/// `binding` names the value in those statements, so a caller that hoists
-/// several fields into one expression can keep them apart.
+/// Field metadata is written with the consuming setters on `datatype::Field`, so
+/// the whole field — type resolution and metadata — is one expression. Keeping
+/// it out of a `let mut` binding also keeps the compiler from having to hold a
+/// `Field` (which owns a map and a `Cow`) alive across statements, with the drop
+/// flag and cleanup path that costs once per field.
 pub struct FieldTokens {
-    pub prelude: TokenStream,
     pub value: TokenStream,
-}
-
-impl FieldTokens {
-    fn bare(value: TokenStream) -> Self {
-        Self {
-            prelude: TokenStream::new(),
-            value,
-        }
-    }
+    /// Whether the type expression names one of the container's parameters, so
+    /// the function holding it must be generic.
+    pub uses_params: bool,
 }
 
 pub fn construct_field(
@@ -38,7 +32,7 @@ pub fn construct_field(
     raw_attrs: &[syn::Attribute],
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
-    binding: &Ident,
+    build: BuildKind,
 ) -> syn::Result<FieldTokens> {
     construct_field_with_variant_skip(
         names,
@@ -49,10 +43,11 @@ pub fn construct_field(
         used_generic_types,
         bounded_params,
         false,
-        binding,
+        build,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn construct_field_with_variant_skip(
     names: &Names,
     container_attrs: &ContainerAttr,
@@ -62,7 +57,7 @@ pub fn construct_field_with_variant_skip(
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
     variant_skip: bool,
-    binding: &Ident,
+    build: BuildKind,
 ) -> syn::Result<FieldTokens> {
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
     // override below: serde only ever sees the real field type, so the
@@ -74,33 +69,36 @@ pub fn construct_field_with_variant_skip(
     let runtime_attrs = build_runtime_attributes(
         names,
         AttributeScope::Field,
-        quote!(#binding.attributes),
+        AttributeTarget::Chain,
         raw_attrs,
         &container_attrs.skip_attrs,
     )?;
 
-    let field_optional = attrs.optional.then(|| quote!(#binding.optional = true;));
+    let field_optional = attrs.optional.then(|| quote!(.optional()));
 
     let field_deprecated = attrs.common.deprecated.map(|deprecated| {
         let tokens = deprecated_as_tokens(&names.dt, deprecated);
-        quote!(#binding.deprecated = #tokens;)
+        quote!(.deprecated(#tokens))
     });
 
     let field_docs = (!attrs.common.doc.is_empty()).then(|| {
         let docs = &attrs.common.doc;
-        quote! {
-            #binding.docs = #docs.into();
-        }
+        quote!(.docs(#docs))
     });
 
+    // The keys are interpolated, not written as literals: `quote!` builds a
+    // literal written in the template by lexing its source text, which costs an
+    // order of magnitude more than turning a `&str` into one.
+    let type_override = "specta:type_override";
     let type_overridden_attribute = attrs
         .r#type
         .as_ref()
-        .map(|_| quote!(#binding.attributes.insert("specta:type_override", true);));
+        .map(|_| quote!(.attribute(#type_override, true)));
 
+    let newtype_skip_ignored = "specta:serde_newtype_skip_ignored";
     let serde_newtype_skip_ignored = attrs
         .serde_newtype_skip_ignored
-        .then(|| quote!(#binding.attributes.insert("specta:serde_newtype_skip_ignored", true);));
+        .then(|| quote!(.attribute(#newtype_skip_ignored, true)));
 
     // Whether a field was declared as `Option<T>` matters to consumers
     // beyond the exported datatype: e.g. serde deserializes a missing value
@@ -110,36 +108,36 @@ pub fn construct_field_with_variant_skip(
     // enters the datatype graph, and elsewhere the exported datatype may be
     // overridden (`#[specta(type = ...)]`), so the real syntax is the only
     // reliable source.
-    let nullable_attribute =
-        declared_ty_is_option.then(|| quote!(#binding.attributes.insert("specta:nullable", true);));
+    let nullable_attribute = declared_ty_is_option.then(|| quote!(.nullable()));
 
     // A skipped field never enters the datatype graph, so its type is not
     // resolved at all.
-    let field_ty = if attrs.skip || variant_skip {
-        None
+    let (field_ty, uses_params) = if attrs.skip || variant_skip {
+        (None, false)
     } else {
         // The canonical declaration is built with each generic parameter
-        // replaced by a placeholder type that resolves to `Generic`. Concrete
-        // instantiation (`declaration == false`) resolves the real parameter.
-        let resolve = resolve_ty_expr(names, &field_ty, used_generic_types, bounded_params, true);
-
-        Some(if attrs.inline {
+        // replaced by a placeholder type that resolves to `Generic`. A concrete
+        // build resolves the real parameter.
+        let resolved = resolve_ty_expr(names, &field_ty, used_generic_types, bounded_params, build);
+        let field_ty = if attrs.inline {
             let dt = &names.dt;
+            let resolve = resolved.tokens;
             quote!(#dt::inline(types, |types| #resolve))
         } else {
-            resolve
-        })
+            resolved.tokens
+        };
+
+        (Some(field_ty), resolved.uses_params)
     };
 
-    let has_metadata = field_optional.is_some()
-        || field_deprecated.is_some()
-        || field_docs.is_some()
-        || runtime_attrs.is_some()
-        || type_overridden_attribute.is_some()
-        || serde_newtype_skip_ignored.is_some()
-        || nullable_attribute.is_some();
-
-    if !has_metadata {
+    if field_optional.is_none()
+        && field_deprecated.is_none()
+        && field_docs.is_none()
+        && runtime_attrs.is_none()
+        && type_overridden_attribute.is_none()
+        && serde_newtype_skip_ignored.is_none()
+        && nullable_attribute.is_none()
+    {
         // A `DataType` converts into the `Field` that carries it, so the bare
         // case hands the type expression straight to the builder instead of
         // wrapping it in a constructor call.
@@ -150,10 +148,12 @@ pub fn construct_field_with_variant_skip(
                 quote!(#dt::Field::default())
             }
         };
-        return Ok(FieldTokens::bare(field));
+        return Ok(FieldTokens {
+            value: field,
+            uses_params,
+        });
     }
 
-    // The metadata statements mutate a `Field`, so this case names one.
     let dt = &names.dt;
     let field = match field_ty {
         Some(ty) => quote!(#dt::Field::new(#ty)),
@@ -161,17 +161,10 @@ pub fn construct_field_with_variant_skip(
     };
 
     Ok(FieldTokens {
-        prelude: quote! {
-            let mut #binding = #field;
-            #field_optional
-            #field_deprecated
-            #field_docs
-            #runtime_attrs
-            #type_overridden_attribute
-            #serde_newtype_skip_ignored
-            #nullable_attribute
+        value: quote! {
+            #field #field_optional #field_deprecated #field_docs #runtime_attrs #type_overridden_attribute #serde_newtype_skip_ignored #nullable_attribute
         },
-        value: quote!(#binding),
+        uses_params,
     })
 }
 

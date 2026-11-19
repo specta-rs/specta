@@ -3,10 +3,10 @@ use crate::{
     utils::{parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, quote};
 use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
-use super::{Names, attr::*};
+use super::{Names, attr::*, generics::BuildKind};
 
 pub fn decode_field_attrs<'a>(
     field: &'a Field,
@@ -22,13 +22,19 @@ pub fn decode_field_attrs<'a>(
     Ok((field_attrs, &field.attrs))
 }
 
+/// Lowers a struct to the expression that builds its datatype.
+///
+/// Also reports whether that expression names one of the container's type
+/// parameters, so the caller knows whether the function holding it must be
+/// generic.
 pub fn parse_struct(
     names: &Names,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
-) -> syn::Result<TokenStream> {
+    build: BuildKind,
+) -> syn::Result<(TokenStream, bool)> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
@@ -59,7 +65,7 @@ pub fn parse_struct(
         let (field_ty, field_attrs, raw_attrs) =
             fields.into_iter().next().expect("fields.len() != 1");
 
-        let FieldTokens { prelude, value } = construct_field(
+        let FieldTokens { value, uses_params } = construct_field(
             names,
             container_attrs,
             field_attrs,
@@ -67,24 +73,24 @@ pub fn parse_struct(
             raw_attrs,
             used_generic_types,
             bounded_params,
-            &format_ident!("field"),
+            build,
         )?;
         let dt = &names.dt;
-        return Ok(chained(
-            quote!(#dt::Struct::unnamed()),
-            vec![(prelude, value)],
+        return Ok((
+            chained(quote!(#dt::Struct::unnamed()), vec![(None, value)]),
+            uses_params,
         ));
     }
 
     let dt = &names.dt;
+    let mut uses_params = false;
 
     let fields = match &data.fields {
         Fields::Named(_) => {
             let fields = data
                 .fields
                 .iter()
-                .enumerate()
-                .map(|(index, field)| {
+                .map(|field| {
                     let (field_attrs, raw_attrs) =
                         decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
@@ -92,7 +98,7 @@ pub fn parse_struct(
                         syn::Error::new(field.span(), "specta: named field must have an identifier")
                     })?);
 
-                    let FieldTokens { prelude, value } = construct_field(
+                    let field = construct_field(
                         names,
                         container_attrs,
                         field_attrs,
@@ -100,11 +106,13 @@ pub fn parse_struct(
                         raw_attrs,
                         used_generic_types,
                         bounded_params,
-                        &format_ident!("field{}", index),
+                        build,
                     )?;
-                    Ok((prelude, quote!(#field_name, #value)))
+                    uses_params |= field.uses_params;
+                    let name = field_name.to_token_stream();
+                    Ok((Some(name), field.value))
                 })
-                .collect::<syn::Result<Vec<(TokenStream, TokenStream)>>>()?;
+                .collect::<syn::Result<Vec<_>>>()?;
 
             chained(quote!(#dt::Struct::named()), fields)
         }
@@ -113,8 +121,7 @@ pub fn parse_struct(
             let fields = data
                 .fields
                 .iter()
-                .enumerate()
-                .map(|(index, field)| {
+                .map(|field| {
                     let (mut field_attrs, raw_attrs) =
                         decode_field_attrs(field, &container_attrs.skip_attrs)?;
                     if is_newtype && field_attrs.serde_skip {
@@ -123,7 +130,10 @@ pub fn parse_struct(
                         field_attrs.skip = false;
                         field_attrs.serde_newtype_skip_ignored = true;
                     }
-                    construct_field(
+                    let FieldTokens {
+                        value,
+                        uses_params: field_uses_params,
+                    } = construct_field(
                         names,
                         container_attrs,
                         field_attrs,
@@ -131,36 +141,37 @@ pub fn parse_struct(
                         raw_attrs,
                         used_generic_types,
                         bounded_params,
-                        &format_ident!("field{}", index),
-                    )
-                    .map(|FieldTokens { prelude, value }| (prelude, value))
+                        build,
+                    )?;
+                    uses_params |= field_uses_params;
+                    Ok((None, value))
                 })
-                .collect::<syn::Result<Vec<(TokenStream, TokenStream)>>>()?;
+                .collect::<syn::Result<Vec<_>>>()?;
 
             chained(quote!(#dt::Struct::unnamed()), fields)
         }
         Fields::Unit => quote!(#dt::Struct::unit().into()),
     };
 
-    Ok(fields)
+    Ok((fields, uses_params))
 }
 
 /// A struct built by chaining its fields onto the constructor.
 ///
-/// The statements that prepare a field are hoisted ahead of the whole chain
-/// rather than inlined into its argument positions, and each field gets its own
-/// binding, so one field's metadata statements never nest inside another's
-/// arguments.
-fn chained(constructor: TokenStream, fields: Vec<(TokenStream, TokenStream)>) -> TokenStream {
-    let calls = fields.iter().map(|(_, args)| quote!(.field(#args)));
+/// The names and values are interpolated directly into the chain template: a
+/// separate `quote!` per `.field(..)` call would pay its fixed cost once per
+/// field for nothing.
+fn chained(
+    constructor: TokenStream,
+    fields: Vec<(Option<TokenStream>, TokenStream)>,
+) -> TokenStream {
+    let named = fields.first().is_some_and(|(name, _)| name.is_some());
+    let names = fields.iter().map(|(name, _)| name);
+    let values = fields.iter().map(|(_, value)| value);
 
-    if fields.iter().all(|(prelude, _)| prelude.is_empty()) {
-        return quote!(#constructor #(#calls)* .build());
+    if named {
+        quote!(#constructor #( .field(#names, #values) )* .build())
+    } else {
+        quote!(#constructor #( .field(#values) )* .build())
     }
-
-    let preludes = fields.iter().map(|(prelude, _)| prelude);
-    quote! {{
-        #(#preludes)*
-        #constructor #(#calls)* .build()
-    }}
 }

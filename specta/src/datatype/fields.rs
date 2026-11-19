@@ -1,9 +1,10 @@
 //! Field types are used by both enums and structs.
 
+use std::{any::Any, borrow::Cow, fmt::Debug, hash::Hash};
+
 use crate::datatype::Struct;
 
 use super::{Attributes, DataType, Deprecated};
-use std::borrow::Cow;
 
 /// Field layout for a struct or enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -60,6 +61,58 @@ impl Field {
             ty: Some(ty),
             attributes: Attributes::default(),
         }
+    }
+
+    /// Sets [`Field::optional`].
+    ///
+    /// This is the consuming form of the assignment the `#[derive(Type)]` output
+    /// used to emit. A field with metadata is otherwise a `let mut` binding that
+    /// is mutated twice and then read; as a chain it is one expression, and the
+    /// compiler does not have to keep a `Field` (which owns a map and a `Cow`)
+    /// alive across statements, with the drop flag and cleanup path that costs.
+    #[doc(hidden)]
+    pub fn optional(mut self) -> Self {
+        self.optional = true;
+        self
+    }
+
+    /// Sets [`Field::deprecated`].
+    #[doc(hidden)]
+    pub fn deprecated(mut self, deprecated: Option<Deprecated>) -> Self {
+        self.deprecated = deprecated;
+        self
+    }
+
+    /// Sets [`Field::docs`].
+    #[doc(hidden)]
+    pub fn docs(mut self, docs: &'static str) -> Self {
+        self.docs = Cow::Borrowed(docs);
+        self
+    }
+
+    /// Inserts one runtime attribute, like [`Attributes::insert`].
+    #[doc(hidden)]
+    pub fn attribute<T>(mut self, key: &'static str, value: T) -> Self
+    where
+        T: Any + Clone + Eq + Hash + Debug + Send + Sync + 'static,
+    {
+        self.attributes.insert(key, value);
+        self
+    }
+
+    /// Records that the field was declared as `Option<T>`.
+    ///
+    /// This is the `specta:nullable` runtime attribute, which consumers such as
+    /// `specta-serde` and `specta-swift` read to tell a missing value apart from
+    /// an absent field. It has its own setter because a derive sets it on every
+    /// field declared as an `Option`, and it keeps that key out of every one of
+    /// those call sites. The flag is syntactic: it is recorded on the declared
+    /// Rust type even when the exported datatype is overridden or the field is
+    /// skipped, so it cannot be derived from the datatype afterwards.
+    #[doc(hidden)]
+    pub fn nullable(mut self) -> Self {
+        self.attributes.insert("specta:nullable", true);
+        self
     }
 }
 

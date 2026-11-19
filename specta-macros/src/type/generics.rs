@@ -316,17 +316,30 @@ fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
         .collect()
 }
 
+/// The type parameters of the container that its fields mention, plus whether
+/// any field type is opaque (a `macro!`/`Verbatim` node whose expansion the
+/// derive cannot see).
+pub struct UsedTypeParams {
+    pub idents: Vec<syn::Ident>,
+    /// An opaque field mentions every parameter and can never be rewritten to a
+    /// placeholder.
+    pub opaque: bool,
+}
+
 // Code adopted from ts-rs. Thanks to it's original author!
 pub fn used_type_params(
     generics: &Generics,
     data: &Data,
     container_type: Option<&Type>,
     skip_attrs: &[String],
-) -> syn::Result<Vec<syn::Ident>> {
+) -> syn::Result<UsedTypeParams> {
     let all_generic_type_idents = all_type_param_idents(generics);
 
     if all_generic_type_idents.is_empty() {
-        return Ok(Vec::new());
+        return Ok(UsedTypeParams {
+            idents: Vec::new(),
+            opaque: false,
+        });
     }
 
     let mut visitor = TypeScan::new(&all_generic_type_idents);
@@ -368,7 +381,10 @@ pub fn used_type_params(
 
     // An opaque type mentions every parameter: the derive can't see what it
     // expands to, so `mentioned` conservatively returns all of them.
-    Ok(visitor.mentioned())
+    Ok(UsedTypeParams {
+        idents: visitor.mentioned(),
+        opaque: visitor.opaque,
+    })
 }
 
 /// The placeholder type used to stand in for the generic parameter at `index`
@@ -551,10 +567,34 @@ impl Visit<'_> for TypeScan<'_> {
     }
 }
 
+/// Which of a container's two datatype builds a field expression belongs to.
+///
+/// A generic container builds its datatype twice: once as the canonical
+/// declaration (parameters replaced by `Generic` placeholders) and once per
+/// concrete instantiation (parameters resolved as written). The derive emits the
+/// helpers each half needs, so only the concrete build is monomorphised per
+/// instantiation.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum BuildKind {
+    /// The canonical declaration: parameters become placeholders.
+    Declaration,
+    /// A concrete instantiation: each parameter is resolved as written.
+    Concrete,
+}
+
+/// The expression [`resolve_ty_expr`] built, plus whether it names one of the
+/// container's type parameters.
+pub struct ResolvedExpression {
+    pub tokens: TokenStream,
+    /// Whether `tokens` mentions a generic parameter. A declaration expression
+    /// only does when it resolves through a generic-substitution scope, which
+    /// means the function holding it must be generic too.
+    pub uses_params: bool,
+}
+
 /// Builds the expression that resolves `ty` to a [`DataType`].
 ///
-/// For the canonical declaration (`conditional == true`, selected by the
-/// generated `declaration` flag) generic parameters are replaced by placeholder
+/// For the canonical declaration generic parameters are replaced by placeholder
 /// types that resolve to `Generic`, so the declaration stays generic without
 /// baking the concrete arguments in.
 ///
@@ -569,17 +609,19 @@ pub fn resolve_ty_expr(
     ty: &Type,
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
-    conditional: bool,
-) -> TokenStream {
+    build: BuildKind,
+) -> ResolvedExpression {
     // One walk answers every question this function asks of the type.
     let scan = TypeScan::of(ty, used_generic_types);
 
-    // Nothing to rewrite and no parameter to substitute: resolve concretely.
-    // A container with no used type parameters already isolated its entire
-    // `build` body with one shared empty scope (see [`shares_field_isolation`]).
+    // Nothing to rewrite and no parameter to substitute: both builds resolve
+    // the same way. A container with no used type parameters already isolated
+    // its entire body with one shared empty scope (see
+    // [`shares_field_isolation`]).
     let ty_trait = &names.ty;
+    let crate_ref = &names.crate_ref;
     if scan.mentions_nothing() {
-        return if shares_field_isolation(used_generic_types) {
+        let tokens = if shares_field_isolation(used_generic_types) {
             quote!(<#ty as #ty_trait>::definition(types))
         } else {
             // A field that mentions no enclosing parameter is resolved at its
@@ -587,10 +629,17 @@ pub fn resolve_ty_expr(
             // scope: its own concrete element type could otherwise match an
             // enclosing slot and bake that parameter into a nested declaration
             // (issue #609).
-            quote!(types.with_generic_substitution(
+            //
+            // The function item is monomorphised either way; wrapping it in a
+            // closure would add a second body and its `call_once` shim.
+            quote!(types.with_generic_substitution_fn(
                 &[],
-                |types| <#ty as #ty_trait>::definition(types),
+                <#ty as #ty_trait>::definition,
             ))
+        };
+        return ResolvedExpression {
+            tokens,
+            uses_params: false,
         };
     }
 
@@ -624,16 +673,29 @@ pub fn resolve_ty_expr(
     // concrete argument would be baked into the shared declaration.
     let substituted = if rewritten { bounded } else { mentioned };
 
-    let mut declaration = quote!(types.define_root::<#declaration_ty>());
+    // The concrete half inherits whatever substitution scope is active. That
+    // scope belongs to an enclosing *declaration* whose slots describe this
+    // field's own arguments, which is what an inlined generic type needs to
+    // rewrite its expansion back to `Generic` (issue #613 regressed this: an
+    // empty scope baked the first instantiation's concrete arguments into a
+    // generic inline declaration).
+    let concrete = quote!(<#ty as #ty_trait>::definition(types));
+
+    if build == BuildKind::Concrete {
+        return ResolvedExpression {
+            tokens: concrete,
+            uses_params: false,
+        };
+    }
+
+    let declaration = quote!(types.define_root::<#declaration_ty>());
 
     if substituted.is_empty() {
-        // No substitution scope: the declaration is a plain placeholder type, so
-        // the conditional resolves both forms with one call instead of an
-        // `if`/`else` pair at every field.
-        return if conditional {
-            quote!(types.define_split::<#declaration_ty, #ty>(declaration))
-        } else {
-            declaration
+        // No substitution scope: the declaration resolves with one call, and
+        // the build that holds it names no parameter.
+        return ResolvedExpression {
+            tokens: declaration,
+            uses_params: false,
         };
     }
 
@@ -644,23 +706,22 @@ pub fn resolve_ty_expr(
     //
     // The placeholder rewrite only renames idents, so an opaque node in `ty`
     // is still opaque in `declaration_ty`.
+    //
+    // `define_root` is passed as a function item: it is monomorphised for the
+    // declaration type either way, and a closure around it would add a second
+    // body plus its `call_once` shim per field.
     let slots = generic_substitution_slots(names, declaration_ty, &substituted, scan.opaque);
-    declaration = quote!(types.with_generic_substitution(
+    let declaration = quote!(types.with_generic_substitution_fn(
         &[#(#slots),*],
-        |types| #declaration,
+        #crate_ref::Types::define_root::<#declaration_ty>,
     ));
 
-    if !conditional {
-        return declaration;
+    // The slots name the parameters they substitute (`type_name::<T>()`), so
+    // the function holding this expression has to be generic.
+    ResolvedExpression {
+        tokens: declaration,
+        uses_params: true,
     }
-
-    // The concrete half of a conditional resolution instead inherits whatever
-    // scope is active. That scope belongs to an enclosing *declaration* whose
-    // slots describe this field's own arguments, which is what an inlined
-    // generic type needs to rewrite its expansion back to `Generic` (issue
-    // #613 regressed this: an empty scope baked the first instantiation's
-    // concrete arguments into a generic inline declaration).
-    quote!(if declaration { #declaration } else { <#ty as #ty_trait>::definition(types) })
 }
 
 /// Builds the positional substitution slots for the type arguments of `ty`.

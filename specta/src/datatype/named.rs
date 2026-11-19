@@ -147,11 +147,12 @@ impl NamedDataType {
     ) -> Reference {
         Self::init(
             sentinel,
-            instantiation_generics,
+            instantiation_generics.to_vec(),
             instantiation_generic_identities,
             has_const_param,
             passthrough,
             generic_substitution_base,
+            Location::caller().to_owned(),
             types,
             &build_ndt,
             build_ty,
@@ -165,21 +166,25 @@ impl NamedDataType {
     /// was given. Taking it by reference (instead of `impl Fn`) keeps this
     /// function non-generic, so it is compiled once in this crate instead of
     /// once per distinct closure type in every crate that derives `Type`.
+    ///
+    /// `location` is passed in rather than read here because callers such as
+    /// [`Types::define_instantiation_params`] run this from inside a closure,
+    /// which `#[track_caller]` cannot see through.
     #[track_caller]
     pub(crate) fn init(
         sentinel: &'static str,
-        instantiation_generics: &[(Generic, DataType)],
+        instantiation_generics: Vec<(Generic, DataType)>,
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
         passthrough: bool,
         generic_substitution_base: usize,
+        location: Location<'static>,
         types: &mut Types,
         build_ndt: &dyn Fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
         let id = NamedId::Static(sentinel);
-        let location = Location::caller().to_owned();
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
 
@@ -231,7 +236,7 @@ impl NamedDataType {
                 return Reference::Named(NamedReference {
                     id,
                     inner: NamedReferenceType::Reference {
-                        generics: instantiation_generics.to_owned(),
+                        generics: instantiation_generics,
                     },
                 });
             }
@@ -242,7 +247,7 @@ impl NamedDataType {
                 let mut h = DefaultHasher::new();
                 sentinel.hash(&mut h);
                 ptr::hash(sentinel, &mut h);
-                for (generic_r, generic) in instantiation_generics {
+                for (generic_r, generic) in &instantiation_generics {
                     generic_r.hash(&mut h);
                     generic.hash(&mut h);
                 }
@@ -254,12 +259,12 @@ impl NamedDataType {
                 .types
                 .get(&id)
                 .and_then(|ndt| ndt.as_ref())
-                .map(|ndt| RecursiveInlineFrame::new(types, ndt, instantiation_generics))
+                .map(|ndt| RecursiveInlineFrame::new(types, ndt, &instantiation_generics))
                 .unwrap_or_else(|| {
                     RecursiveInlineFrame::from_type_path(
                         types,
                         sentinel.into(),
-                        instantiation_generics,
+                        &instantiation_generics,
                     )
                 });
 
@@ -285,7 +290,7 @@ impl NamedDataType {
                             .map(|frame| frame.ty.clone())
                             .chain(std::iter::once(current_ty))
                             .collect(),
-                        instantiation_generics.to_vec(),
+                        instantiation_generics.clone(),
                     )),
                 });
             }
@@ -322,7 +327,7 @@ impl NamedDataType {
             Reference::Named(NamedReference {
                 id,
                 inner: NamedReferenceType::Reference {
-                    generics: instantiation_generics.to_owned(),
+                    generics: instantiation_generics,
                 },
             })
         }
@@ -362,7 +367,11 @@ impl Deprecated {
     /// Constructs deprecation metadata with a note.
     ///
     /// Corresponds to `#[deprecated = "Use something else"]`.
-    pub fn with_note(note: Cow<'static, str>) -> Self {
+    ///
+    /// `const` so a generated implementation can keep the metadata in a
+    /// `static` and pass a reference to it, instead of building a temporary in
+    /// every monomorphised `definition`.
+    pub const fn with_note(note: Cow<'static, str>) -> Self {
         Self {
             note: Some(note),
             since: None,
@@ -372,7 +381,12 @@ impl Deprecated {
     /// Constructs deprecation metadata with a note and optional `since` version.
     ///
     /// Corresponds to `#[deprecated(since = "1.0.0", note = "Use something else")]`.
-    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+    ///
+    /// `const` for the same reason as [`Deprecated::with_note`].
+    pub const fn with_since_note(
+        since: Option<Cow<'static, str>>,
+        note: Cow<'static, str>,
+    ) -> Self {
         Self {
             note: Some(note),
             since,

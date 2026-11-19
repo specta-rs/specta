@@ -1,5 +1,6 @@
 """Generates the `derive-perf` fixture crate used to measure `#[derive(Type)]`."""
 
+import json
 import os
 import pathlib
 
@@ -185,6 +186,11 @@ pathlib.Path(__file__).with_name("derive-perf").joinpath("src/lib.rs").write_tex
     "\n".join(out) + "\n"
 )
 print(f"{len(out)} lines")
+
+pathlib.Path(__file__).with_name("derive-perf").joinpath("fixture.json").write_text(
+    json.dumps({"derives": sum(line.count("#[derive(Type") for line in out)}, indent=2)
+    + "\n"
+)
 
 pathlib.Path(__file__).with_name("derive-perf").joinpath("Cargo.toml").write_text(
     """[package]

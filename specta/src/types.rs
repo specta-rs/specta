@@ -1,13 +1,15 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, hash_map},
     fmt,
-    panic::{self, AssertUnwindSafe},
+    panic::{self, AssertUnwindSafe, Location},
 };
 
 use crate::{
     Type,
     datatype::{
-        DataType, Deprecated, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame,
+        self, DataType, Deprecated, Generic, GenericDefinition, NamedDataType, NamedId,
+        NamedReference, RecursiveInlineFrame,
     },
 };
 
@@ -196,6 +198,63 @@ pub(crate) struct InlineResolutionFrame {
     pub(crate) ty: RecursiveInlineFrame,
 }
 
+/// One type parameter of a generic `Type` implementation, in declaration order.
+///
+/// A derived `definition` builds an array of these and hands it to
+/// [`Types::define_instantiation_params`], which resolves each parameter through
+/// the active generic substitution and builds the instantiation metadata. That
+/// keeps the per-instantiation scaffolding compiled once in this crate instead
+/// of once per monomorphised `definition`.
+#[doc(hidden)]
+pub enum InstantiationParam {
+    /// A parameter this implementation resolves.
+    Resolved {
+        /// The parameter's name, as written.
+        name: &'static str,
+        /// `<T as Type>::definition`.
+        definition: fn(&mut Types) -> DataType,
+    },
+    /// A parameter this implementation never resolves: it is always reported as
+    /// its own `Generic` placeholder.
+    ///
+    /// The built-in `impl_ndt!` containers use this for an inline definition
+    /// whose `where` clause keeps the parameter opaque, so its reference carries
+    /// the declaration's `Generic` rather than the concrete argument.
+    Generic {
+        /// The parameter's name, as written.
+        name: &'static str,
+    },
+    /// A parameter this implementation does not resolve. Its substitution slot
+    /// is stepped over so the parameters after it stay aligned (see issue
+    /// <https://github.com/specta-rs/specta/issues/609>).
+    Skipped,
+}
+
+/// Everything one instantiation of a named datatype fixes, gathered so
+/// [`Types::instantiate`] can build it without being generic.
+struct Instantiation<'a> {
+    sentinel: &'static str,
+    name: &'static str,
+    module_path: &'static str,
+    generics: Cow<'static, [GenericDefinition]>,
+    docs: &'static str,
+    /// Borrowed rather than owned so a `static` path can pass a reference to
+    /// its metadata: an owned `Option<Deprecated>` is a temporary that every
+    /// monomorphised `definition` would need a drop flag, drop glue and a
+    /// cleanup path for.
+    deprecated: Option<&'a Deprecated>,
+    instantiation_generics: Vec<(Generic, DataType)>,
+    instantiation_generic_identities: &'a [&'static str],
+    has_const_param: bool,
+    inline: bool,
+    passthrough: bool,
+    generic_substitution_base: usize,
+    generic_substitution_after: usize,
+    location: Location<'static>,
+    build_ty: fn(&mut Types) -> DataType,
+    build_reference_ty: fn(&mut Types) -> DataType,
+}
+
 impl fmt::Debug for Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Types")
@@ -251,17 +310,24 @@ impl Types {
     /// the nested scope the derive paired with its slot.
     #[doc(hidden)]
     pub fn define<T: Type + ?Sized>(&mut self) -> DataType {
-        let name = std::any::type_name::<T>();
+        self.define_with(std::any::type_name::<T>(), T::definition)
+    }
 
+    /// The non-generic body of [`Types::define`].
+    ///
+    /// Keeping it out of the generic method means a crate with many
+    /// instantiations compiles this logic once instead of once per `T`: each
+    /// `define::<T>` call site is only `type_name` plus one indirect call.
+    fn define_with(&mut self, name: &'static str, f: fn(&mut Types) -> DataType) -> DataType {
         if let Some(generic) = self.take_substitution(name) {
             return DataType::Generic(generic);
         }
 
         if let Some(slots) = self.take_nested_slot() {
-            return self.with_generic_substitution(&slots, |types| T::definition(types));
+            return self.with_generic_substitution_fn(&slots, f);
         }
 
-        T::definition(self)
+        f(self)
     }
 
     /// Resolves the field type itself, like [`Types::define`].
@@ -274,33 +340,14 @@ impl Types {
     /// slot.
     #[doc(hidden)]
     pub fn define_root<T: Type + ?Sized>(&mut self) -> DataType {
-        let name = std::any::type_name::<T>();
-
-        if let Some(generic) = self.take_substitution(name) {
-            return DataType::Generic(generic);
-        }
-
-        T::definition(self)
+        self.define_root_with(std::any::type_name::<T>(), T::definition)
     }
 
-    /// Resolves a field type in whichever form the current build needs.
-    ///
-    /// `#[derive(Type)]` resolves the same field twice from one expression: the
-    /// canonical declaration uses a placeholder-rewritten type ([`Decl`]), the
-    /// concrete resolution uses the field's own type ([`Concrete`]).
-    /// `declaration` selects which. This is [`Types::define_root`] for the
-    /// declaration and [`Type::definition`] for the concrete resolution; it
-    /// exists so a field with no substitution scope can be emitted as one call
-    /// instead of an `if`/`else` pair.
-    #[doc(hidden)]
-    pub fn define_split<Decl: Type + ?Sized, Concrete: Type + ?Sized>(
-        &mut self,
-        declaration: bool,
-    ) -> DataType {
-        if declaration {
-            self.define_root::<Decl>()
-        } else {
-            Concrete::definition(self)
+    /// The non-generic body of [`Types::define_root`].
+    fn define_root_with(&mut self, name: &'static str, f: fn(&mut Types) -> DataType) -> DataType {
+        match self.take_substitution(name) {
+            Some(generic) => DataType::Generic(generic),
+            None => f(self),
         }
     }
 
@@ -316,6 +363,12 @@ impl Types {
     /// call instead of the full argument list plus a closure that only assigns
     /// the metadata it was given. It is `#[track_caller]` so the recorded
     /// [`NamedDataType::location`] stays the derive's own.
+    ///
+    /// `build_ty` runs inside one empty generic-substitution scope, which keeps
+    /// the fields of a non-generic container from seeing an enclosing
+    /// declaration's scope (issue #609). Doing it here means the derive does not
+    /// emit a fresh `with_generic_substitution(&[], ..)` closure — and so a
+    /// second copy of the whole body — for every type it derives.
     #[doc(hidden)]
     #[track_caller]
     pub fn define_named(
@@ -327,24 +380,262 @@ impl Types {
         deprecated: Option<Deprecated>,
         build_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
-        NamedDataType::init(
+        let generic_substitution_base = self.generic_substitution_cursor();
+        let location = Location::caller().to_owned();
+
+        self.with_generic_substitution(&[], |types| {
+            NamedDataType::init(
+                sentinel,
+                Vec::new(),
+                &[],
+                false,
+                false,
+                generic_substitution_base,
+                location,
+                types,
+                &|types, ndt| {
+                    ndt.name = Cow::Borrowed(name);
+                    ndt.module_path = Cow::Borrowed(module_path);
+                    ndt.docs = Cow::Borrowed(docs);
+                    ndt.deprecated = deprecated.clone();
+                    ndt.ty = Some(build_ty(types));
+                },
+                build_ty,
+            )
+            .into()
+        })
+    }
+
+    /// Registers a named datatype with the arguments a generic `Type`
+    /// implementation fixes per instantiation.
+    ///
+    /// This is the non-generic half of [`NamedDataType::init_with_sentinel`]:
+    /// the derived code and the built-in container implementations in this
+    /// crate pass everything that only depends on the concrete instantiation —
+    /// the name, module path, generic declarations and the two datatype builders
+    /// — as arguments, and both the metadata builder and the inline wrapping are
+    /// compiled once in this crate. Previously each concrete `Vec<X>`,
+    /// `Option<X>`, ... instantiation compiled its own copy of those closure
+    /// bodies.
+    ///
+    /// `generics` and `deprecated` are borrowed, so a `definition` body passes
+    /// promoted constants and a reference to a `static` instead of building a
+    /// `Cow` and an `Option<Deprecated>` temporary. Those are the difference
+    /// between the body being the parameter table plus one call and it also
+    /// carrying two drop flags, two drop-glue calls and a cleanup path — once
+    /// per monomorphisation.
+    ///
+    /// `params` holds one entry per type parameter of the implementation, in
+    /// declaration order. This resolves them exactly like the generated code
+    /// used to — [`Types::define_param`] for a parameter the implementation
+    /// resolves, [`Types::skip_param_slot`] for one it does not — and reads the
+    /// substitution cursor around them itself.
+    ///
+    /// The point is code size: a crate with many instantiations otherwise
+    /// compiles the array construction and drop glue of every `definition` body
+    /// once per concrete argument.
+    #[doc(hidden)]
+    #[track_caller]
+    #[allow(clippy::too_many_arguments)]
+    pub fn define_instantiation_params(
+        &mut self,
+        sentinel: &'static str,
+        name: &'static str,
+        module_path: &'static str,
+        generics: &'static [GenericDefinition],
+        docs: &'static str,
+        deprecated: Option<&'static Deprecated>,
+        params: &[InstantiationParam],
+        instantiation_generic_identities: &[&'static str],
+        has_const_param: bool,
+        inline: bool,
+        passthrough: bool,
+        build_ty: fn(&mut Types) -> DataType,
+        build_reference_ty: fn(&mut Types) -> DataType,
+    ) -> DataType {
+        let location = Location::caller().to_owned();
+        self.instantiate_params(
             sentinel,
-            &[],
-            &[],
-            false,
-            false,
-            self.generic_substitution_cursor(),
-            self,
-            &|types, ndt| {
-                ndt.name = name.into();
-                ndt.module_path = module_path.into();
-                ndt.docs = docs.into();
-                ndt.deprecated = deprecated.clone();
-                ndt.ty = Some(build_ty(types));
-            },
+            name,
+            module_path,
+            Cow::Borrowed(generics),
+            docs,
+            deprecated,
+            params,
+            instantiation_generic_identities,
+            has_const_param,
+            inline,
+            passthrough,
+            location,
             build_ty,
+            build_reference_ty,
         )
-        .into()
+    }
+
+    /// [`Types::define_instantiation_params`] with owned declarations.
+    ///
+    /// Only the derived implementation's generic-default path needs this: a
+    /// parameter default can name another parameter (`U = T`), so its
+    /// `GenericDefinition` list is resolved at runtime and cannot be a
+    /// `&'static` slice.
+    #[doc(hidden)]
+    #[track_caller]
+    #[allow(clippy::too_many_arguments)]
+    pub fn define_instantiation_params_owned(
+        &mut self,
+        sentinel: &'static str,
+        name: &'static str,
+        module_path: &'static str,
+        generics: Cow<'static, [GenericDefinition]>,
+        docs: &'static str,
+        deprecated: Option<Deprecated>,
+        params: &[InstantiationParam],
+        instantiation_generic_identities: &[&'static str],
+        has_const_param: bool,
+        inline: bool,
+        passthrough: bool,
+        build_ty: fn(&mut Types) -> DataType,
+        build_reference_ty: fn(&mut Types) -> DataType,
+    ) -> DataType {
+        let location = Location::caller().to_owned();
+        self.instantiate_params(
+            sentinel,
+            name,
+            module_path,
+            generics,
+            docs,
+            deprecated.as_ref(),
+            params,
+            instantiation_generic_identities,
+            has_const_param,
+            inline,
+            passthrough,
+            location,
+            build_ty,
+            build_reference_ty,
+        )
+    }
+
+    /// The shared body of the two instantiation entry points.
+    #[allow(clippy::too_many_arguments)]
+    fn instantiate_params(
+        &mut self,
+        sentinel: &'static str,
+        name: &'static str,
+        module_path: &'static str,
+        generics: Cow<'static, [GenericDefinition]>,
+        docs: &'static str,
+        deprecated: Option<&Deprecated>,
+        params: &[InstantiationParam],
+        instantiation_generic_identities: &[&'static str],
+        has_const_param: bool,
+        inline: bool,
+        passthrough: bool,
+        location: Location<'static>,
+        build_ty: fn(&mut Types) -> DataType,
+        build_reference_ty: fn(&mut Types) -> DataType,
+    ) -> DataType {
+        let generic_substitution_base = self.generic_substitution_cursor();
+        let mut instantiation_generics = Vec::with_capacity(params.len());
+
+        for param in params {
+            match param {
+                InstantiationParam::Resolved { name, definition } => {
+                    instantiation_generics.push((
+                        Generic::new((*name).into()),
+                        self.define_param_with(*definition),
+                    ));
+                }
+                InstantiationParam::Generic { name } => {
+                    let generic = Generic::new((*name).into());
+                    instantiation_generics.push((generic.clone(), DataType::Generic(generic)));
+                }
+                InstantiationParam::Skipped => self.skip_param_slot(),
+            }
+        }
+
+        let instantiation = Instantiation {
+            sentinel,
+            name,
+            module_path,
+            generics,
+            docs,
+            deprecated,
+            has_const_param,
+            inline,
+            passthrough,
+            instantiation_generics,
+            instantiation_generic_identities,
+            generic_substitution_base,
+            generic_substitution_after: self.generic_substitution_cursor(),
+            location,
+            build_ty,
+            build_reference_ty,
+        };
+        self.instantiate(instantiation)
+    }
+
+    /// Builds the named datatype one instantiation describes.
+    ///
+    /// Every argument is fixed by the concrete arguments, so this — the metadata
+    /// builder and the inline wrapping — is compiled once here instead of once
+    /// per monomorphised `definition`.
+    fn instantiate(&mut self, instantiation: Instantiation<'_>) -> DataType {
+        if instantiation.inline {
+            return datatype::inline(self, |types| types.init_instantiation(instantiation));
+        }
+
+        self.init_instantiation(instantiation)
+    }
+
+    /// [`Types::instantiate`] with the inline context already entered.
+    fn init_instantiation(&mut self, instantiation: Instantiation<'_>) -> DataType {
+        let Instantiation {
+            sentinel,
+            name,
+            module_path,
+            generics,
+            docs,
+            deprecated,
+            has_const_param,
+            inline,
+            passthrough,
+            instantiation_generics,
+            instantiation_generic_identities,
+            generic_substitution_base,
+            generic_substitution_after,
+            location,
+            build_ty,
+            build_reference_ty,
+        } = instantiation;
+
+        let build_ndt = |types: &mut Types, ndt: &mut NamedDataType| {
+            ndt.name = Cow::Borrowed(name);
+            ndt.module_path = Cow::Borrowed(module_path);
+            ndt.generics = generics.clone();
+            ndt.docs = Cow::Borrowed(docs);
+            ndt.deprecated = deprecated.cloned();
+            if !inline && !passthrough {
+                ndt.ty = Some(build_reference_ty(types));
+            }
+        };
+
+        let reference = NamedDataType::init(
+            sentinel,
+            instantiation_generics,
+            instantiation_generic_identities,
+            has_const_param,
+            passthrough,
+            generic_substitution_base,
+            location,
+            self,
+            &build_ndt,
+            build_ty,
+        );
+
+        self.set_generic_substitution_cursor(generic_substitution_after);
+
+        DataType::Reference(reference)
     }
 
     /// Resolves the next positional slot of the innermost substitution scope,
@@ -358,9 +649,14 @@ impl Types {
     /// parameters stay aligned.
     #[doc(hidden)]
     pub fn define_param<T: Type + ?Sized>(&mut self) -> DataType {
+        self.define_param_with(T::definition)
+    }
+
+    /// The non-generic body of [`Types::define_param`].
+    fn define_param_with(&mut self, f: fn(&mut Types) -> DataType) -> DataType {
         let nested = {
             let Some(scope) = self.generic_substitutions.last_mut() else {
-                return T::definition(self);
+                return f(self);
             };
 
             match scope.take_slot() {
@@ -373,8 +669,8 @@ impl Types {
         };
 
         match nested {
-            Some(slots) => self.with_generic_substitution(&slots, |types| T::definition(types)),
-            None => T::definition(self),
+            Some(slots) => self.with_generic_substitution_fn(&slots, f),
+            None => f(self),
         }
     }
 
@@ -488,6 +784,23 @@ impl Types {
             Ok(result) => result,
             Err(payload) => panic::resume_unwind(payload),
         }
+    }
+
+    /// [`Types::with_generic_substitution`] taking a function pointer.
+    ///
+    /// The generic form monomorphises its whole body — `catch_unwind` machinery
+    /// included — once per closure type. Generated implementations call it once
+    /// per field, so a crate with many instantiations pays for thousands of
+    /// near-identical copies. A `fn` pointer is a single type, so this keeps one
+    /// copy of the body in this crate; non-capturing closures coerce to it and
+    /// each call site pays one indirect call instead.
+    #[doc(hidden)]
+    pub fn with_generic_substitution_fn(
+        &mut self,
+        substitutions: &[GenericSubstitutionSlot],
+        f: fn(&mut Types) -> DataType,
+    ) -> DataType {
+        self.with_generic_substitution(substitutions, f)
     }
 
     /// Returns the concrete datatypes explicitly registered as top-level roots.

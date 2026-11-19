@@ -84,15 +84,20 @@ pub enum AttributeSource {
 }
 
 impl AttributeSource {
-    /// The source named `name`, which was parsed from `ident`.
-    fn from_name(name: &str, ident: &Ident) -> Self {
-        match name {
-            "specta" => Self::Specta,
-            "serde" => Self::Serde,
-            "doc" => Self::Doc,
-            "deprecated" => Self::Deprecated,
-            "repr" => Self::Repr,
-            _ => Self::Other(ident.clone()),
+    /// The source an attribute's outermost identifier names.
+    fn from_ident(ident: &Ident) -> Self {
+        if ident == "specta" {
+            Self::Specta
+        } else if ident == "serde" {
+            Self::Serde
+        } else if ident == "doc" {
+            Self::Doc
+        } else if ident == "deprecated" {
+            Self::Deprecated
+        } else if ident == "repr" {
+            Self::Repr
+        } else {
+            Self::Other(ident.clone())
         }
     }
 
@@ -359,12 +364,11 @@ pub fn parse_attrs_with_filter(
         // accepts shorthand syntax such as `%value` that is not valid for
         // Specta's generic metadata parser and should never be interpreted as
         // Specta configuration.
-        let attr_name = ident.to_string();
-        if attr_name == "instrument" || skip_attrs.contains(&attr_name) {
+        if ident == "instrument" || skip_attrs.iter().any(|skip| ident == skip.as_str()) {
             continue;
         }
 
-        let source = AttributeSource::from_name(&attr_name, &ident);
+        let source = AttributeSource::from_ident(&ident);
 
         result.append(&mut match &attr.meta {
             Meta::Path(_) => vec![Attribute {
