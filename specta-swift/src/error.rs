@@ -13,6 +13,17 @@ pub enum Error {
     #[error("Invalid identifier: {0}")]
     InvalidIdentifier(String),
 
+    /// Multiple Rust types render as the same top-level Swift declaration.
+    #[error("Duplicate Swift type name {name:?}: {first} and {second} both export as {name}")]
+    DuplicateTypeName {
+        /// The colliding Swift declaration name.
+        name: String,
+        /// Rust identity of the first declaration.
+        first: String,
+        /// Rust identity of the second declaration.
+        second: String,
+    },
+
     /// Circular reference detected in type definitions.
     #[error("Circular reference detected")]
     CircularReference,
