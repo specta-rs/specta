@@ -682,6 +682,10 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 .as_ref()
                 .and_then(|ty| select_split_wrapper_variant(ty, phase))
             {
+                instantiate_phase_selection(
+                    &mut selected,
+                    named_reference_generics(reference),
+                );
                 select_phase_datatype_inner(&mut selected, types, phase);
                 *ty = selected;
                 return;
@@ -802,6 +806,33 @@ fn select_split_type_variant<'a>(
     };
 
     types.get(reference)
+}
+
+/// Applies a use-site generic environment to a selected phase projection.
+///
+/// Generated wrappers store symbolic `Generic` arguments because their
+/// declaration is shared. Selecting one from a concrete reference must carry
+/// the concrete arguments across, or the projection escapes with an unbound T.
+fn instantiate_phase_selection(
+    selected: &mut DataType,
+    source_generics: &[(specta::datatype::Generic, DataType)],
+) {
+    let DataType::Reference(Reference::Named(reference)) = selected else {
+        return;
+    };
+    let NamedReferenceType::Reference { generics, .. } = &mut reference.inner else {
+        return;
+    };
+
+    for (generic, ty) in generics {
+        if matches!(ty, DataType::Generic(_))
+            && let Some((_, concrete)) = source_generics
+                .iter()
+                .find(|(source, _)| source == generic)
+        {
+            *ty = concrete.clone();
+        }
+    }
 }
 
 fn named_reference_generics(

@@ -31,3 +31,43 @@ fn user_enums_that_look_like_phase_wrappers_are_preserved() {
         Some("LegitimatePhaseNames")
     );
 }
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct GenericPhaseItem<T> {
+    value: Option<T>,
+}
+
+#[test]
+fn phase_selection_keeps_concrete_generic_arguments() {
+    let mut types = Types::default();
+    let dt = GenericPhaseItem::<String>::definition(&mut types);
+    let resolved = specta_serde::PhasesFormat
+        .map_types(&types)
+        .expect("the generic type should format")
+        .into_owned();
+
+    let selected = specta_serde::select_phase_datatype(
+        &dt,
+        &resolved,
+        specta_serde::Phase::Serialize,
+    );
+    let DataType::Reference(Reference::Named(reference)) = selected else {
+        panic!("expected a named phase projection");
+    };
+    let specta::datatype::NamedReferenceType::Reference { generics, .. } = reference.inner else {
+        panic!("expected a reference projection");
+    };
+    let argument = generics
+        .first()
+        .map(|(_, dt)| dt)
+        .expect("the projection should keep its generic argument");
+    assert!(
+        !matches!(argument, DataType::Generic(_)),
+        "selection leaked the declaration's placeholder: {argument:?}"
+    );
+    assert_eq!(
+        argument,
+        &<String as Type>::definition(&mut Types::default())
+    );
+}
