@@ -1355,3 +1355,28 @@ fn runtime_transforms_instantiate_generic_named_types() {
         "the runtime expression should reach the generic argument: {transformed:?}"
     );
 }
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct RecursiveStruct {
+    site: Website,
+    next: Option<Box<RecursiveStruct>>,
+}
+
+#[test]
+fn recursive_structs_with_runtime_transforms_are_reported_unsupported() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<RecursiveStruct>();
+
+    let result = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect_err("a partial recursive transform must fail closed");
+    assert!(
+        result.to_string().contains("the type is recursive"),
+        "{result}"
+    );
+
+    // The infallible API keeps its documented best-effort behavior; callers
+    // that need a sound contract use the try_* variant above.
+    assert!(semantic.apply_deserialize(&types, &dt, "value").is_some());
+}

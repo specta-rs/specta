@@ -602,6 +602,18 @@ impl Configuration {
             current: None,
         };
         let result = self.apply_inner(&mut walk, dt, js_ident);
+        // A recursive struct is cut by the cycle stack just like an enum. If
+        // the visible part still needs a runtime transform, emitting that
+        // expression would transform the first level and silently leave every
+        // recursive descendant untransformed.
+        if walk.recursion_cut
+            && walk.error.is_none()
+            && result
+                .as_ref()
+                .is_some_and(|(_, runtime)| runtime != js_ident)
+        {
+            self.record_unsupported(&mut walk, RECURSIVE_STRUCT_REASON);
+        }
         (prune_identity_root(types, dt, js_ident, result), walk.error)
     }
 
@@ -1411,6 +1423,7 @@ struct Walk<'a> {
 
 const UNSUPPORTED_ENUM_REASON: &str = "the enum's wire shape cannot be discriminated without guessing (for example overlapping `#[serde(untagged)]` variants); use a tagged representation or apply the rule to a non-ambiguous position";
 const RECURSIVE_ENUM_REASON: &str = "the enum is recursive, so a single expression cannot transform nested values without the exported type claiming more than the runtime value provides";
+const RECURSIVE_STRUCT_REASON: &str = "the type is recursive, so a single expression cannot transform nested values without the exported type claiming more than the runtime value provides";
 
 /// How a single enum branch is selected at runtime.
 enum BranchGuard {
