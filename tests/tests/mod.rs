@@ -52,6 +52,7 @@ mod serde_unknown_attrs;
 mod serde_untagged_unit;
 mod serde_validate_coverage;
 mod serde_validate_recursion;
+mod serde_validation_cache;
 mod swift;
 mod types;
 mod typescript;

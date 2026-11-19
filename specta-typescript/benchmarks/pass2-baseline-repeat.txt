@@ -1,0 +1,7 @@
+chain/1024/flat                      median_us= 1328507.291 min_us= 1317492.625 max_us= 1501769.584 bytes=44103 fnv1a=4f41987f3a92dc94
+records/1024/flat                    median_us=  682219.917 min_us=  675441.750 max_us=  717858.958 bytes=108614 fnv1a=019d6b1be708f72a
+api/512/flat                         median_us=    7047.461 min_us=    7024.992 max_us=    7300.969 bytes=55785 fnv1a=044c4ca44e9cac7c
+generic-api/512/flat                 median_us=    2513.350 min_us=    2497.042 max_us=    2535.332 bytes=42601 fnv1a=75822e7bf7376438
+maps/1024/flat                       median_us=   13247.614 min_us=   13115.308 max_us=   13583.570 bytes=156978 fnv1a=cd854525a600bc91
+cycle/128/flat                       median_us=   51268.658 min_us=   50996.358 max_us=   55868.642 bytes=4042 fnv1a=75654f59c29b29f0
+enums/1024/flat                      median_us=    3940.892 min_us=    3933.753 max_us=    4022.096 bytes=55370 fnv1a=0af8376171d6ac54

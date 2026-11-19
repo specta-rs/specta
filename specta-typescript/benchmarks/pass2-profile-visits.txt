@@ -1,0 +1,14 @@
+   Compiling specta-serde v0.0.15 (/Users/oscar/.worktree/typescript-export-performance/specta-serde)
+   Compiling specta-typescript v0.0.15 (/Users/oscar/.worktree/typescript-export-performance/specta-typescript)
+    Finished `bench` profile [optimized] target(s) in 2.60s
+     Running benches/export.rs (target/release/build/specta-typescript/f9d5d8ade50ec800/out/export-f9d5d8ade50ec800)
+serde validation=6.701875ms rewrite=3.278125ms
+serde validation=6.0295ms rewrite=2.799167ms
+serde validation=5.464958ms rewrite=2.643542ms
+serde validation=5.110333ms rewrite=2.523792ms
+serde validation=4.817625ms rewrite=2.423625ms
+serde validation=4.647833ms rewrite=2.335125ms
+serde validation=4.608ms rewrite=2.232041ms
+serde validation=4.407875ms rewrite=2.18575ms
+serde validation=4.381125ms rewrite=2.257708ms
+chain/1024/flat                      median_us=    8755.209 min_us=    8014.166 max_us=   10637.667 bytes=44103 fnv1a=4f41987f3a92dc94

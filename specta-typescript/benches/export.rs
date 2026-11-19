@@ -168,6 +168,33 @@ fn api(count: usize) -> Types {
     types
 }
 
+#[derive(Type, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Status {
+    Pending,
+    Active,
+    Archived,
+}
+
+fn maps(count: usize) -> Types {
+    let mut types = Types::default();
+    let by_status = <std::collections::HashMap<Status, User>>::definition(&mut types);
+    let by_id = <std::collections::HashMap<u32, User>>::definition(&mut types);
+    let metadata = <std::collections::HashMap<String, String>>::definition(&mut types);
+    for i in 0..count {
+        named(
+            &mut types,
+            format!("Index{i:04}"),
+            Struct::named()
+                .field("by_status", Field::new(by_status.clone()))
+                .field("by_id", Field::new(by_id.clone()))
+                .field("metadata", Field::new(metadata.clone()))
+                .build(),
+        );
+    }
+    types
+}
+
 fn checksum(s: &str) -> u64 {
     s.bytes().fold(0xcbf29ce484222325, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
@@ -238,6 +265,7 @@ fn main() {
             (|n| unions(n, true)) as fn(usize) -> Types,
         ),
         ("api", &[8, 128, 512][..], api as fn(usize) -> Types),
+        ("maps", &[32, 256, 1024][..], maps as fn(usize) -> Types),
         ("cycle", &[1, 8, 32, 128][..], cycles as fn(usize) -> Types),
         (
             "generic-api",
