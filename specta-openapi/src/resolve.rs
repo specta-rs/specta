@@ -56,17 +56,16 @@ impl Resolved {
 struct Premapped<F>(F);
 
 impl<F: Format> Format for Premapped<F> {
-    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        // The returned borrow is tied to `&self`, not `types`, so identity
-        // still clones - the same cost class as the probe collection clone.
-        Ok(Cow::Owned(types.clone()))
+    fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
+        // Mapping has already run, so the prepared collection can be borrowed.
+        Ok(Cow::Borrowed(types))
     }
 
-    fn map_type(
-        &'_ self,
-        types: &Types,
-        dt: &DataType,
-    ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> Result<Cow<'a, DataType>, specta::FormatError> {
         self.0.map_type(types, dt)
     }
 }
