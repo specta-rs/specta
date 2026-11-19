@@ -1319,3 +1319,39 @@ fn semantic_map_keys_are_not_remapped_or_transformed() {
         "({...payload,wide:Object.fromEntries(Object.entries(payload.wide).map(([k,v])=>[k,BigInt(v)]))})"
     );
 }
+
+#[derive(Type)]
+struct SemanticWire(String);
+
+#[derive(Type)]
+struct SemanticGeneric<T> {
+    value: T,
+}
+
+#[derive(Type)]
+struct SemanticGenericUser {
+    generic: SemanticGeneric<SemanticWire>,
+}
+
+#[test]
+fn runtime_transforms_instantiate_generic_named_types() {
+    use specta_typescript::semantic::{Configuration, Transform};
+
+    let mut types = Types::default();
+    let dt = SemanticGenericUser::definition(&mut types);
+    let configuration = Configuration::empty().define::<SemanticWire>(
+        |_| specta_typescript::define("Date").into(),
+        None,
+        Some(Transform::new(|value| format!("new Date({value})"))),
+    );
+
+    let transformed = configuration
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("a concrete generic argument must be transformable")
+        .expect("the nested wire value needs a runtime transform");
+
+    assert!(
+        transformed.1.contains("new Date("),
+        "the runtime expression should reach the generic argument: {transformed:?}"
+    );
+}

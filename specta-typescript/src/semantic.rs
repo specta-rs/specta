@@ -596,6 +596,7 @@ impl Configuration {
             remap_bigint,
             types,
             stack: Vec::new(),
+            generic_scopes: Vec::new(),
             error: None,
             recursion_cut: false,
             current: None,
@@ -669,9 +670,12 @@ impl Configuration {
                         }
                         walk.stack.push(key);
                         let previous = walk.current.replace(ndt);
+                        walk.generic_scopes
+                            .push(named_reference_generics(r).to_vec());
                         let result = self
                             .apply_inner(walk, ty, js_ident)
                             .map(|(_, runtime)| (None, runtime));
+                        walk.generic_scopes.pop();
                         walk.current = previous;
                         walk.stack.pop();
                         result
@@ -801,9 +805,19 @@ impl Configuration {
                 }
             }
             DataType::Enum(e) => self.apply_enum(walk, e, js_ident),
-            DataType::Primitive(_)
-            | DataType::Generic(_)
-            | DataType::Reference(Reference::Opaque(_)) => None,
+            DataType::Generic(generic) => walk
+                .generic_scopes
+                .iter()
+                .rev()
+                .find_map(|scope| {
+                    scope
+                        .iter()
+                        .find(|(candidate, _)| candidate == generic)
+                        .map(|(_, dt)| dt.clone())
+                })
+                .filter(|dt| !matches!(dt, DataType::Generic(_)))
+                .and_then(|dt| self.apply_inner(walk, &dt, js_ident)),
+            DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
         self.apply_builtin_remaps(walk.remap_bigint, dt, js_ident, result)
@@ -1146,6 +1160,15 @@ fn registered_generics_changed(dt: &DataType, next_ty: &DataType) -> bool {
     source != remapped
 }
 
+fn named_reference_generics(
+    reference: &specta::datatype::NamedReference,
+) -> &[(specta::datatype::Generic, DataType)] {
+    match &reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &[],
+    }
+}
+
 fn is_lossless_bigint_primitive(dt: &DataType) -> bool {
     matches!(
         dt,
@@ -1376,6 +1399,8 @@ struct Walk<'a> {
     types: &'a Types,
     /// Named types currently being expanded, used to cut recursive cycles.
     stack: Vec<(Cow<'static, str>, Cow<'static, str>)>,
+    /// Concrete generic environments of the named references being expanded.
+    generic_scopes: Vec<Vec<(specta::datatype::Generic, DataType)>>,
     /// The first unsupported construct encountered, if any.
     error: Option<Error>,
     /// Set when a recursive reference was cut short by [`Walk::stack`].
