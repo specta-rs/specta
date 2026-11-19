@@ -404,14 +404,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             ndt.docs = Cow::Borrowed(#docs);
         }
     });
-    let instantiation_generic_identities = (!erase_generics)
-        .then(|| {
-            used_generic_types
-                .iter()
-                .map(|generic| quote!(std::any::type_name::<#generic>()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    let instantiation_generic_identities = if erase_generics {
+        Vec::new()
+    } else {
+        used_generic_types
+            .iter()
+            .map(|generic| quote!(std::any::type_name::<#generic>()))
+            .collect::<Vec<_>>()
+    };
     let deprecated = container_attrs.common.deprecated.map(|deprecated| {
         let tokens = deprecated_as_tokens(deprecated);
         quote!(ndt.deprecated = #tokens;)

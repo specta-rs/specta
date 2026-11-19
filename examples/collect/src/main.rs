@@ -1,6 +1,9 @@
 //! Exports every type reachable through `specta::collect()` to TypeScript.
 
 #![allow(unused)]
+// The derive writes its generated bound in the impl position, which clippy
+// sees alongside this deliberately constrained example struct.
+#![allow(clippy::multiple_bound_locations)]
 
 use specta::Type;
 use specta_typescript::Typescript;
