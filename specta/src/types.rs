@@ -432,6 +432,19 @@ impl Types {
         self.roots.iter()
     }
 
+    /// Transforms the explicitly registered top-level roots.
+    ///
+    /// Graph transformations that change datatypes must use this in addition
+    /// to [`Types::map`], otherwise a root can keep referring to the
+    /// pre-transformation shape.
+    pub fn map_roots<F>(mut self, f: F) -> Self
+    where
+        F: FnMut(DataType) -> DataType,
+    {
+        self.roots = std::mem::take(&mut self.roots).into_iter().map(f).collect();
+        self
+    }
+
     /// Gets the named datatype targeted by a [`NamedReference`].
     ///
     /// Returns `None` if the reference is unknown or currently only has an
