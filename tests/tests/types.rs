@@ -2811,3 +2811,30 @@ fn skipped_variant_does_not_resolve_its_type_override() {
     assert!(hidden.skip);
     assert!(matches!(hidden.fields, specta::datatype::Fields::Unit));
 }
+
+#[test]
+fn named_type_mutation_preserves_graph_identity() {
+    use specta::datatype::{NamedDataType, Primitive};
+
+    let mut types = Types::default();
+    let a = NamedDataType::new("A", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
+    assert_eq!(types.len(), 2);
+
+    let a_reference = a.reference(Vec::new());
+    let mut types = types.map(|_| a.clone());
+    assert_eq!(
+        types
+            .get(match &a_reference {
+                specta::datatype::Reference::Named(reference) => reference,
+                _ => unreachable!(),
+            })
+            .map(|ndt| ndt.name.as_ref()),
+        Some("A")
+    );
+
+    types.iter_mut(|ndt| *ndt = a.clone());
+    assert_eq!(types.len(), 2);
+}

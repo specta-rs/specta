@@ -522,23 +522,35 @@ impl Types {
     }
 
     /// Mutably modifies each [`NamedDataType`] in the collection.
+    ///
+    /// The named type's identity is preserved across the callback, including
+    /// when the callback replaces the whole value. References to the type
+    /// therefore keep resolving to this entry.
     pub fn iter_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
     {
-        for ndt in self.types.values_mut().flatten() {
-            f(ndt);
+        for (id, slot) in &mut self.types {
+            if let Some(ndt) = slot {
+                f(ndt);
+                ndt.id = id.clone();
+            }
         }
     }
 
     /// Transforms each [`NamedDataType`] in the collection.
+    ///
+    /// The named type's identity is preserved across the callback, including
+    /// when the callback returns a clone of a different named type.
     pub fn map<F>(mut self, mut f: F) -> Self
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for slot in self.types.values_mut() {
+        for (id, slot) in &mut self.types {
             if let Some(ndt) = slot.take() {
-                *slot = Some(f(ndt));
+                let mut mapped = f(ndt);
+                mapped.id = id.clone();
+                *slot = Some(mapped);
             }
         }
         self

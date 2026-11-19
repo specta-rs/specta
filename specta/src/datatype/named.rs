@@ -84,6 +84,10 @@ impl NamedDataType {
             ty: None,
         };
         build(types, &mut ndt);
+        // The closure receives the whole value, so it can replace it with a
+        // clone of another named type. The map key and `len` already describe
+        // this registration, so restore its identity before inserting.
+        ndt.id = NamedId::Dynamic(Arc::new(()));
         types.types.insert(ndt.id.clone(), Some(ndt.clone()));
         types.len += 1;
         ndt
@@ -179,6 +183,10 @@ impl NamedDataType {
                 }
                 panic::resume_unwind(payload);
             };
+            // `build_ndt` receives the whole value and may have replaced it
+            // with a clone of another type. The key is already registered as
+            // this sentinel's identity, so the stored value must match it.
+            ndt.id = id.clone();
 
             // We patch the Tauri `Type` implementation.
             let is_tauri_type =
