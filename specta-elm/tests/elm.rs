@@ -11,8 +11,9 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
-    path::{Path, PathBuf},
+    path::Path,
     process::Command,
+    sync::{Mutex, PoisonError},
 };
 
 use specta::{Type, Types};
@@ -20,6 +21,16 @@ use specta_elm::{Elm, IntoExporter, exporter};
 
 /// The Elm version the generated `elm.json` targets.
 const ELM_VERSION: &str = "0.19.3";
+
+/// Serialises compiler runs.
+///
+/// Elm's package cache is keyed by `ELM_HOME` and isn't safe to populate from
+/// several processes at once, so parallel tests building `elm/core` for the
+/// first time can corrupt it.
+fn elm_lock() -> &'static Mutex<()> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    &LOCK
+}
 
 /// A throwaway Elm project to export into.
 struct TestProject {
@@ -62,23 +73,28 @@ impl TestProject {
     }
 
     /// Export, returning the generated sources keyed by their path in the project.
-    fn export<O: IntoExporter>(&self, types: Types, output: O) -> BTreeMap<PathBuf, String> {
+    fn export<O: IntoExporter>(&self, types: Types, output: O) -> BTreeMap<String, String> {
         self.init(types).export(output).unwrap();
         self.generated_sources()
     }
 
-    fn generated_sources(&self) -> BTreeMap<PathBuf, String> {
-        fn walk(root: &Path, dir: &Path, files: &mut BTreeMap<PathBuf, String>) {
+    fn generated_sources(&self) -> BTreeMap<String, String> {
+        fn walk(root: &Path, dir: &Path, files: &mut BTreeMap<String, String>) {
             for entry in fs::read_dir(dir).unwrap() {
                 let path = entry.unwrap().path();
                 if path.is_dir() {
                     walk(root, &path, files);
                 } else if path.extension().is_some_and(|ext| ext == "elm") {
-                    let name = path.strip_prefix(root).unwrap().to_string_lossy();
-                    files.insert(
-                        PathBuf::from(name.into_owned()),
-                        fs::read_to_string(&path).unwrap(),
-                    );
+                    // Keys use `/` on every platform so snapshots and assertions
+                    // are identical on Windows.
+                    let name = path
+                        .strip_prefix(root)
+                        .unwrap()
+                        .components()
+                        .map(|segment| segment.as_os_str().to_string_lossy())
+                        .collect::<Vec<_>>()
+                        .join("/");
+                    files.insert(name, fs::read_to_string(&path).unwrap());
                 }
             }
         }
@@ -94,6 +110,8 @@ impl TestProject {
             return;
         };
 
+        let _guard = elm_lock().lock().unwrap_or_else(PoisonError::into_inner);
+
         for path in self.generated_sources().keys() {
             let output = Command::new(&elm)
                 .current_dir(self.path())
@@ -105,8 +123,7 @@ impl TestProject {
 
             assert!(
                 output.status.success(),
-                "the Elm compiler rejected {}:\n{}",
-                path.display(),
+                "the Elm compiler rejected {path}:\n{}",
                 String::from_utf8_lossy(&output.stderr)
             );
         }
@@ -131,10 +148,10 @@ fn elm_compiler() -> Option<String> {
         .map(|_| "elm".to_string())
 }
 
-fn render(files: &BTreeMap<PathBuf, String>) -> String {
+fn render(files: &BTreeMap<String, String>) -> String {
     files
         .iter()
-        .map(|(path, content)| format!("// {}\n{content}", path.display()))
+        .map(|(path, content)| format!("// {path}\n{content}"))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -252,8 +269,8 @@ fn msg_file_is_written_to_the_expected_module() {
     let files = project.export(Types::default().register::<User>(), exporter::MsgFile);
 
     assert_eq!(
-        files.keys().collect::<Vec<_>>(),
-        [&PathBuf::from("src/Msg.elm")]
+        files.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["src/Msg.elm"]
     );
     project.assert_compiles();
 }
@@ -267,8 +284,8 @@ fn nested_modules_are_named_after_their_path() {
     );
 
     assert_eq!(
-        files.keys().collect::<Vec<_>>(),
-        [&PathBuf::from("src/Api/Types.elm")]
+        files.keys().map(String::as_str).collect::<Vec<_>>(),
+        ["src/Api/Types.elm"]
     );
     assert!(render(&files).starts_with("// src/Api/Types.elm\nmodule Api.Types exposing (..)"));
     project.assert_compiles();
