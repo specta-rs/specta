@@ -1,12 +1,25 @@
-use proc_macro2::{Span, TokenTree};
+use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::{
     Expr, Ident, Lit, Meta, Path, Result, Token, Type, TypePath,
     ext::IdentExt,
-    parse::{Parse, ParseStream},
+    parse::{Parse, ParseStream, Parser},
     spanned::Spanned,
     token::Paren,
 };
+
+/// Wrap a fragment in an invisible group.
+///
+/// The tokens are unchanged — rustc's parser treats an invisible group as if it
+/// were not there, so the expanded AST and its printed form are identical — but
+/// the fragment becomes a single token. `quote!` interpolates a stream by
+/// reference and that clones one `Ident` per identifier (their text is owned),
+/// while cloning a group is a reference-count bump; the derive nests its body
+/// several levels deep on the way to the output, so wrapping the large
+/// fragments before they are interpolated avoids most of that copying.
+pub fn invisible(tokens: TokenStream) -> TokenStream {
+    TokenStream::from(TokenTree::Group(Group::new(Delimiter::None, tokens)))
+}
 
 #[derive(Clone)]
 pub enum AttributeValue {
@@ -269,8 +282,13 @@ struct NestedAttributeList {
     unstructured_argument: Option<Span>,
 }
 
-impl Parse for NestedAttributeList {
-    fn parse(input: ParseStream) -> Result<Self> {
+impl NestedAttributeList {
+    /// Parse a list whose attributes all belong to `source`.
+    ///
+    /// The source is passed down rather than recovered from each key: a nested
+    /// attribute is part of the attribute it sits in, and cloning the key to
+    /// guess that would cost an `Ident` per nested attribute.
+    fn parse_with_source(input: ParseStream, source: &AttributeSource) -> Result<Self> {
         let mut attrs = Vec::new();
         let mut unstructured_argument = None;
         while !input.is_empty() {
@@ -291,13 +309,13 @@ impl Parse for NestedAttributeList {
                     let key_span = key.span();
 
                     attrs.push(Attribute {
-                        source: AttributeSource::Other(key.clone()),
+                        source: source.clone(),
                         key,
                         value: match false {
                             _ if input.peek(Paren) => {
                                 let content;
                                 syn::parenthesized!(content in input);
-                                let nested = content.parse::<NestedAttributeList>()?;
+                                let nested = Self::parse_with_source(&content, source)?;
                                 if unstructured_argument.is_none() {
                                     unstructured_argument = nested.unstructured_argument;
                                 }
@@ -349,36 +367,45 @@ pub fn parse_attrs_with_filter(
     attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> syn::Result<Vec<Attribute>> {
-    let mut result = Vec::new();
+    // One `Attribute` per input attribute at most, so the common case (no
+    // nesting surprises) is a single allocation.
+    let mut result = Vec::with_capacity(attrs.len());
 
     for attr in attrs {
-        let ident = attr
+        let ident = &attr
             .path()
             .segments
             .last()
             .expect("Attribute path must have at least one segment")
-            .ident
-            .clone();
+            .ident;
 
         // Skip attributes that are in the skip list. `#[tracing::instrument]`
         // accepts shorthand syntax such as `%value` that is not valid for
         // Specta's generic metadata parser and should never be interpreted as
         // Specta configuration.
-        if ident == "instrument" || skip_attrs.iter().any(|skip| ident == skip.as_str()) {
+        //
+        // The `Ident` is compared directly: it has a `str` comparison that
+        // spells raw identifiers the same way `Ident::to_string` does, so this
+        // needs no allocation per attribute.
+        if *ident == "instrument" || skip_attrs.iter().any(|skip| ident == skip.as_str()) {
             continue;
         }
 
-        let source = AttributeSource::from_ident(&ident);
+        let source = AttributeSource::from_ident(ident);
+        let ident = ident.clone();
 
-        result.append(&mut match &attr.meta {
-            Meta::Path(_) => vec![Attribute {
+        match &attr.meta {
+            Meta::Path(_) => result.push(Attribute {
                 source,
                 key: ident,
                 value: None,
-            }],
+            }),
             Meta::List(meta) => {
                 let span = ident.span();
-                let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
+                let tokens = meta.tokens.clone();
+                let parsed =
+                    (|input: ParseStream| NestedAttributeList::parse_with_source(input, &source))
+                        .parse2(tokens)?;
                 if source.is("specta")
                     && let Some(span) = parsed.unstructured_argument
                 {
@@ -387,38 +414,40 @@ pub fn parse_attrs_with_filter(
                         "specta: unsupported attribute syntax",
                     ));
                 }
-                for a in &mut parsed.attrs {
-                    a.source = source.clone();
-                }
-                vec![Attribute {
+                result.push(Attribute {
                     source,
                     key: ident,
                     value: Some(AttributeValue::Attribute {
                         span,
                         attr: parsed.attrs,
                     }),
-                }]
+                });
             }
-            Meta::NameValue(meta) => {
-                vec![Attribute {
-                    source,
-                    key: ident,
-                    value: Some(attribute_value_from_expr(&meta.value)),
-                }]
-            }
-        });
+            Meta::NameValue(meta) => result.push(Attribute {
+                source,
+                key: ident,
+                value: Some(attribute_value_from_expr(&meta.value)),
+            }),
+        }
     }
 
     Ok(result)
 }
 
+/// The name an identifier is exported under: the identifier without its raw
+/// prefix (`r#type` is exported as `type`).
+///
+/// This is an owned `String` because that is what the exported name becomes: a
+/// string literal in the generated code. `proc_macro2` has no way to ask an
+/// `Ident` whether it is raw without formatting it first, so the common case
+/// cannot avoid the allocation — but the raw prefix is drained from the same
+/// buffer instead of copying the remaining name into a second one.
 pub fn unraw_raw_ident(ident: &Ident) -> String {
-    let ident = ident.to_string();
-    if ident.starts_with("r#") {
-        ident.trim_start_matches("r#").to_owned()
-    } else {
-        ident
+    let mut name = ident.to_string();
+    if name.starts_with("r#") {
+        name.drain(..2);
     }
+    name
 }
 
 #[cfg(feature = "DO_NOT_USE_function")]

@@ -59,7 +59,9 @@ impl RustCAttr {
 
         let mut deprecated = None;
         if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
-            let attr_value = attrs[pos].clone();
+            // Removed rather than cloned: an `Attribute` owns an `Ident` and a
+            // nested attribute list, and the value is not used again.
+            let attr_value = attrs.swap_remove(pos);
 
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
@@ -82,8 +84,6 @@ impl RustCAttr {
                 }
                 None => deprecated = Some(Deprecated::new()),
             }
-
-            attrs.swap_remove(pos);
         };
 
         Ok(RustCAttr { doc, deprecated })
@@ -110,9 +110,10 @@ fn parse_deprecated_string_attr(
 /// `dt` is the path the generated code uses for the `datatype` module.
 pub(crate) fn deprecated_as_tokens(
     dt: &syn::Ident,
-    Deprecated { note, since }: Deprecated,
+    Deprecated { note, since }: &Deprecated,
 ) -> TokenStream {
     let since = since
+        .as_deref()
         .map(|v| quote!(Some(#v.into())))
         .unwrap_or(quote!(None));
 
@@ -122,6 +123,7 @@ pub(crate) fn deprecated_as_tokens(
     // template, which `quote!` would have to lex.
     let empty = "";
     let note = note
+        .as_deref()
         .map(|note| quote!(#note.into()))
         .unwrap_or(quote!(#empty.into()));
 
@@ -137,14 +139,16 @@ pub(crate) fn deprecated_as_tokens(
 /// `Cow` is built directly.
 pub(crate) fn deprecated_as_const_tokens(
     dt: &syn::Ident,
-    Deprecated { note, since }: Deprecated,
+    Deprecated { note, since }: &Deprecated,
 ) -> TokenStream {
     let since = since
+        .as_deref()
         .map(|v| quote!(::core::option::Option::Some(::std::borrow::Cow::Borrowed(#v))))
         .unwrap_or(quote!(::core::option::Option::None));
 
     let empty = "";
     let note = note
+        .as_deref()
         .map(|note| quote!(::std::borrow::Cow::Borrowed(#note)))
         .unwrap_or(quote!(::std::borrow::Cow::Borrowed(#empty)));
 

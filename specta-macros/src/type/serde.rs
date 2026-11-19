@@ -3,6 +3,7 @@ use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
 use super::AttributeScope;
+use crate::utils::invisible;
 
 #[derive(Clone)]
 struct ConversionType {
@@ -127,7 +128,7 @@ pub(crate) enum AttributeTarget {
 type AttributeEntry = (&'static str, TokenStream);
 
 pub(super) fn lower_runtime_attributes<'a>(
-    type_trait: &syn::Path,
+    type_trait: &syn::Ident,
     scope: AttributeScope,
     target: AttributeTarget,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
@@ -146,19 +147,20 @@ pub(super) fn lower_runtime_attributes<'a>(
 
 /// Writes `entries` to `target`, as statements or as chained calls.
 fn write(target: &AttributeTarget, entries: Vec<AttributeEntry>) -> TokenStream {
+    let keys = entries.iter().map(|(key, _)| key);
+    let values = entries.iter().map(|(_, value)| value);
+
+    // Each entry is one token template rather than a `quote!` of its own that is
+    // then copied into this one: the values carry a string literal and a method
+    // call each, so the second pass doubled the cost of the common case.
     match target {
         AttributeTarget::Statements(target) => {
-            let inserts = entries
-                .into_iter()
-                .map(|(key, value)| quote!(#target.insert(#key, #value);));
-            quote!(#(#inserts)*)
+            // A place expression like `e.attributes`, already a group so that
+            // interpolating it once per entry does not copy its tokens each time.
+            let target = invisible(target.clone());
+            quote!(#( #target.insert(#keys, #values); )*)
         }
-        AttributeTarget::Chain => {
-            let calls = entries
-                .into_iter()
-                .map(|(key, value)| quote!(.attribute(#key, #value)));
-            quote!(#(#calls)*)
-        }
+        AttributeTarget::Chain => quote!(#( .attribute(#keys, #values) )*),
     }
 }
 
@@ -433,7 +435,7 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn container_entries(type_trait: &syn::Path, attrs: ContainerAttrs) -> Vec<AttributeEntry> {
+fn container_entries(type_trait: &syn::Ident, attrs: ContainerAttrs) -> Vec<AttributeEntry> {
     let mut entries = Vec::new();
     push_opt_string(
         &mut entries,
@@ -645,7 +647,7 @@ fn push_opt_rename_rule(
 
 fn push_opt_conversion(
     entries: &mut Vec<AttributeEntry>,
-    type_trait: &syn::Path,
+    type_trait: &syn::Ident,
     src_key: &'static str,
     resolved_key: &'static str,
     value: &Option<ConversionType>,

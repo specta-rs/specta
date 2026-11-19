@@ -4,10 +4,12 @@ use syn::Type;
 
 use crate::r#type::attr::deprecated_as_tokens;
 
+use crate::utils::invisible;
+
 use super::{
-    AttributeScope, ContainerAttr, FieldAttr, Names, build_runtime_attributes,
+    Names,
     generics::{BuildKind, resolve_ty_expr, type_with_inferred_lifetimes},
-    serde::AttributeTarget,
+    r#struct::FieldInfo,
 };
 
 /// A field's value, as the expression that builds it.
@@ -26,20 +28,16 @@ pub struct FieldTokens {
 
 pub fn construct_field(
     names: &Names,
-    container_attrs: &ContainerAttr,
-    attrs: FieldAttr,
+    field: &FieldInfo,
     field_ty: &Type,
-    raw_attrs: &[syn::Attribute],
-    used_generic_types: &[syn::Ident],
-    bounded_params: &[syn::Ident],
+    used_generic_types: &[&syn::Ident],
+    bounded_params: &[&syn::Ident],
     build: BuildKind,
 ) -> syn::Result<FieldTokens> {
     construct_field_with_variant_skip(
         names,
-        container_attrs,
-        attrs,
+        field,
         field_ty,
-        raw_attrs,
         used_generic_types,
         bounded_params,
         false,
@@ -50,15 +48,17 @@ pub fn construct_field(
 #[allow(clippy::too_many_arguments)]
 pub fn construct_field_with_variant_skip(
     names: &Names,
-    container_attrs: &ContainerAttr,
-    attrs: FieldAttr,
+    field: &FieldInfo,
     field_ty: &Type,
-    raw_attrs: &[syn::Attribute],
-    used_generic_types: &[syn::Ident],
-    bounded_params: &[syn::Ident],
+    used_generic_types: &[&syn::Ident],
+    bounded_params: &[&syn::Ident],
     variant_skip: bool,
     build: BuildKind,
 ) -> syn::Result<FieldTokens> {
+    crate::phase!("field:construct");
+
+    let attrs = &field.attrs;
+
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
     // override below: serde only ever sees the real field type, so the
     // override must not influence serde-behavioral markers.
@@ -66,17 +66,11 @@ pub fn construct_field_with_variant_skip(
 
     let field_ty = type_with_inferred_lifetimes(attrs.r#type.as_ref().unwrap_or(field_ty));
 
-    let runtime_attrs = build_runtime_attributes(
-        names,
-        AttributeScope::Field,
-        AttributeTarget::Chain,
-        raw_attrs,
-        &container_attrs.skip_attrs,
-    )?;
+    let runtime_attrs = field.runtime_attrs.as_ref();
 
     let field_optional = attrs.optional.then(|| quote!(.optional()));
 
-    let field_deprecated = attrs.common.deprecated.map(|deprecated| {
+    let field_deprecated = attrs.common.deprecated.as_ref().map(|deprecated| {
         let tokens = deprecated_as_tokens(&names.dt, deprecated);
         quote!(.deprecated(#tokens))
     });
@@ -142,10 +136,11 @@ pub fn construct_field_with_variant_skip(
         // case hands the type expression straight to the builder instead of
         // wrapping it in a constructor call.
         let field = match field_ty {
+            // Already an invisible group from `resolve_ty_expr`.
             Some(ty) => ty,
             None => {
                 let dt = &names.dt;
-                quote!(#dt::Field::default())
+                invisible(quote!(#dt::Field::default()))
             }
         };
         return Ok(FieldTokens {
@@ -161,9 +156,9 @@ pub fn construct_field_with_variant_skip(
     };
 
     Ok(FieldTokens {
-        value: quote! {
+        value: invisible(quote! {
             #field #field_optional #field_deprecated #field_docs #runtime_attrs #type_overridden_attribute #serde_newtype_skip_ignored #nullable_attribute
-        },
+        }),
         uses_params,
     })
 }

@@ -207,7 +207,7 @@ pub fn attribute(
     let common = crate::r#type::attr::RustCAttr::from_attrs(&mut attrs)?;
 
     let deprecated = if let Some(deprecated) = common.deprecated {
-        let tokens = deprecated_as_tokens(&quote::format_ident!("datatype"), deprecated);
+        let tokens = deprecated_as_tokens(&quote::format_ident!("datatype"), &deprecated);
         quote!(#tokens)
     } else {
         quote!(None)

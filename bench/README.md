@@ -594,3 +594,328 @@ What is left, and why it was not taken:
   scaffolding.
 * `define_named`'s sentinel is the last per-derive token the identity model
   refuses to give up (see pass 4).
+
+### The macro's own allocations
+
+Everything above reduces what the derive *emits*. What is left of its own work is
+allocation and bookkeeping, and at 1248 derives and 1.33 M emitted tokens the
+rustc fixtures barely show an individual change to it, so this pass added a way
+to measure it directly.
+
+#### Harness
+
+`specta-macros/src/alloc.rs` installs a counting `#[global_allocator]` for
+`cargo test` (thread-local counters, disabled unless a measurement is running),
+and `specta-macros/src/type/alloc_test.rs` drives it:
+
+```sh
+RUSTFLAGS="-C prefer-dynamic=no" \
+  cargo test -p specta-macros --lib -- --ignored --nocapture alloc
+```
+
+`RUSTFLAGS` is required. A proc-macro crate's unit test links `libstd`
+dynamically, and a dylib's `Vec`/`String` allocations go through its own copy of
+the allocator shim instead of the crate's, so without it only `Box`/`Rc`
+allocations are counted — the harness detects that and prints a warning.
+
+Two `#[ignore]`d tests:
+
+* `alloc_report` generates 130 definitions in code (named/tuple/newtype/unit
+  structs, enums with all four variant shapes, generic structs/enums with
+  bounds, defaults and const parameters, serde/specta metadata, docs,
+  deprecation, raw identifiers), then for each parses the tokens and runs
+  `derive_tokens` over them. It reports allocations and bytes per derive for
+  lexing, the `syn` parse and the expansion itself (the parse is measured
+  separately and subtracted, since `derive_tokens` parses the identical tokens),
+  a per-shape table, and an attribution table of small inputs that isolate one
+  cost (a unit struct's floor, per-field, per-attribute, generic shapes).
+* `alloc_primitives` prices what the bookkeeping is built from: `quote!()` is 1
+  allocation, `quote!(#ident)` 3, `parse_quote!(specta)` 13, `Ident::new` 1.
+
+The numbers are only comparable *relatively*: a unit test links `proc-macro2`'s
+fallback, where a token stream is an `Rc` and an `Ident` clone copies its string,
+so ident traffic is overstated against a real build. Every change below was
+therefore kept only when it also held up on the rustc fixtures.
+
+Baseline (start of the pass) → final, the 130-derive sample:
+
+| phase                          | allocs/derive | bytes/derive    | total allocs    |
+| ------------------------------ | ------------- | --------------- | --------------- |
+| lexing (source)                | 30            | 2,534           | 3,990           |
+| `syn` parse                    | 141           | 11,912          | 18,450          |
+| expansion                      | 691 → 635     | 70,845 → 67,218 | 89,890 → 82,610 |
+| expansion floor (unit struct)  | 219 → 179     | 17,221 → 15,559 |                 |
+
+By shape, expansion allocations per derive:
+
+| shape                    | before | after |
+| ------------------------ | ------ | ----- |
+| named struct             | 339    | 287   |
+| tuple struct             | 288    | 248   |
+| newtype struct           | 247    | 207   |
+| unit struct              | 219    | 179   |
+| enum, 4 unit variants    | 402    | 362   |
+| enum, 4 newtype variants | 568    | 528   |
+| enum, 4 tuple variants   | 647    | 607   |
+| enum, 4 named variants   | 652    | 588   |
+| generic struct           | 1,244  | 1,151 |
+| generic enum             | 1,262  | 1,194 |
+| metadata-heavy enum      | 1,813  | 1,729 |
+| specta attributes        | 1,037  | 951   |
+
+−8.1 % allocations and −5.1 % bytes. Both fixtures, `expanded_bytes` and
+`expanded_tokens` unchanged, min of 9 measured back to back in one session:
+
+| fixture       | metric             | before  | after   |         |
+| ------------- | ------------------ | ------- | ------- | ------- |
+| `derive-perf` | `expand_crate`     | 0.167 s | 0.160 s | −4.2 %  |
+|               | `type_check_crate` | 0.195 s | 0.195 s | —       |
+|               | `codegen_crate`    | 0.053 s | 0.053 s | —       |
+|               | `total`            | 1.084 s | 1.070 s | −1.3 %  |
+| `derive-inst` | `expand_crate`     | 0.035 s | 0.033 s | −5.7 %  |
+|               | `type_check_crate` | 0.038 s | 0.038 s | —       |
+|               | `codegen_crate`    | 0.060 s | 0.059 s | —       |
+|               | `total`            | 0.496 s | 0.491 s | −1.0 %  |
+
+Raw runs in `bench/results/alloc-base-*` and `alloc-A*`. A second 13-run pair
+measured 0.166 → 0.159 s and 0.035 → 0.033 s, so the `expand_crate` delta is the
+change and not drift; nothing else moves beyond noise, which is what a
+macro-internal change should do.
+
+#### What moved it
+
+In the order they were taken, each measured with the harness (Δ is the
+130-derive sample); the aggregate was then measured on the fixtures.
+
+* **`Names` aliases are idents.** The three aliases (`__T`, `__Types`, `__D`)
+  were `parse_quote!`s and a `format_ident!`; a `parse_quote!` lexes a token
+  stream and re-parses it into a `Path` (13 allocations, 524 bytes), an
+  `Ident::new` is 1. The default `specta` path likewise became
+  `Path::from(Ident::new(..))` (2 vs 13). −36 allocations (−5.2 %), −1.5 KB
+  (−2.1 %) per derive, uniformly across shapes; also removes three runtime
+  re-lexes per derive in a real build.
+* **`parse_attrs_with_filter` compares the `Ident`.** It formatted every
+  attribute's name into a `String` only to compare it with `"instrument"` and
+  the `skip_attr` list; `Ident`'s `str` comparison spells raw identifiers the
+  same way. Also one `Vec` per attribute became a `push`, and the result vector
+  is sized up front. −2 allocations, −1.3 KB.
+* **Names are interpolated, not converted.** `unraw_raw_ident(..).to_token_stream()`
+  built a `TokenStream` per field/variant/container name only to copy it into the
+  one that contains it; `String` has a `ToTokens` impl that writes the literal
+  directly. −12 allocations, −669 bytes (5 per named field).
+* **Generics are borrowed.** `UsedTypeParams`, `TypeScan`, `bounded_params` and
+  `resolve_ty_expr` cloned every parameter `Ident` into fresh `Vec`s per field;
+  they now hold `Vec<&Ident>` / `&[&Ident]` borrowed from the container's
+  `Generics` and collect `&Ident`s. −4 allocations per derive overall, −10 to
+  −21 on the generic shapes.
+* **`TypeScan` counts in a bitmask.** A scan allocates once per field type (and
+  once per type argument while building substitution slots) for a `Vec<bool>`
+  that is 1–3 bits long. `Mentioned` is a `u64` and falls back to a `Vec<bool>`
+  past 64 parameters, so it cannot truncate. −2 allocations; the win is
+  concentrated in generic containers, as expected.
+* Smaller: a type parameter's name string is only built where it is emitted
+  (skipped parameters need none), `#[deprecated]` is removed from the attribute
+  list instead of cloned, and `unraw_raw_ident` drains the raw prefix from the
+  same buffer instead of copying the name into a second one.
+
+#### Priced and not taken
+
+* `unraw_raw_ident` returning `Cow<'_, str>`. `proc_macro2` has no way to ask an
+  `Ident` whether it is raw without formatting it first, so the common case
+  cannot skip the `String`; and the name becomes a string literal in the output
+  anyway, which is a second allocation. It now reuses the buffer for the raw
+  case instead, which is the only allocation a `Cow` could have saved.
+* The `where`-clause predicate dedup (`quote!(#predicate).to_string()` into a
+  `HashSet`). It only runs when the container declares its own predicates — the
+  set is empty and allocates nothing otherwise — and on the one fixture shape
+  that has a `where` clause it is ~9 of 1,119 allocations. Rewriting it to
+  compare structurally would trade a measurable nothing for a hand-rolled
+  token comparison.
+* `Vec::with_capacity` in `NestedAttributeList::parse`. The number of nested
+  attributes is not available before parsing them.
+* A `smallvec` dependency, a reusable scratch buffer threaded through every
+  `parse_attrs` call, and making `AttributeValue` borrow its `Lit`. Each changes
+  a signature every attribute parser shares, and none of them showed a win in
+  the harness that the changes above do not already take.
+* Parsing each attribute once instead of twice (the generic `Attribute` list and
+  the serde lowering each walk the raw tokens). That is a redesign of attribute
+  handling with real diagnostic risk, and the second walk only exists for
+  attributes serde actually recognises.
+
+#### Pass 2: attributing the expansion, and what a copy costs
+
+The pass above could only see parse vs expand, so this pass first made the
+harness report *where* inside the expansion an allocation happens.
+
+The measuring helper is now an RAII guard: `alloc::guard(label)` snapshots the
+counters, and on drop reports `current - snapshot` — inclusive of everything its
+children counted — and adds that to its parent, so each guard can also report its
+own share by subtracting. `measure` opens a label-less root guard, which is how
+the "between the measured regions" row below is produced. Every point that
+deserves attribution opens one (`crate::phase!("...")`, a no-op without
+`cargo test`), which also means the table adds up: rows are `own` allocations and
+they partition the run.
+
+`alloc_detail` prints the same table for one shape at a time, which is what makes
+a change's effect visible on the shapes that pay for it rather than on the
+average, and `alloc_report` now prints the emitted identifier count next to the
+allocation count: in this harness every emitted `Ident` is an owned string, so
+one allocation per ident is the floor an expansion cannot go below.
+
+Baseline (start of this pass) → final, own allocations per derive:
+
+| phase                                          | before | after |
+| ---------------------------------------------- | ------ | ----- |
+| `parse` (the derive's own `syn` parse)         | 136    | 136   |
+| container attributes (`parse_attrs` + decode)  | 26     | 26    |
+| container serde lowering                       | 12     | 10    |
+| item attributes (parse + decode + lowering)¹   | 38     | 40    |
+| generics: used-parameter scan and bounds       | 17     | 4     |
+| generics: where clauses and token lists        | 32     | 26    |
+| struct body                                    | 28     | 19    |
+| enum body                                      | 56     | 35    |
+| per variant                                    | 78     | 62    |
+| per field construction                         | 21     | 20    |
+| per field type resolution                      | 74     | 74    |
+| scaffolding (definition, build fns, params, placeholders, sentinel) | 178 | 129 |
+| final `quote!` (the `impl` block)              | 55     | 39    |
+| between the measured regions                   | 25     | 29    |
+| **total**                                      | **776** | **664** |
+
+¹ Not directly comparable: the hoisted decode also computes the exported field
+and variant names, which used to be attributed to the body rows.
+
+Rows are the largest phases and are rounded means; a few 1–3 allocation rows are
+omitted, so the columns do not add exactly to the total.
+
+776/664 include the derive's own `parse`, which the expansion metric subtracts
+(a separate parse of the same tokens); expansion itself goes 635 → 523, bytes
+67,218 → 47,643. The shape table moves by −15 % to −23 % everywhere:
+
+| shape                    | before | after |
+| ------------------------ | ------ | ----- |
+| named struct             | 287    | 243   |
+| tuple struct             | 248    | 211   |
+| newtype struct           | 207    | 176   |
+| unit struct              | 179    | 149   |
+| enum, 4 unit variants    | 362    | 307   |
+| enum, 4 newtype variants | 528    | 453   |
+| enum, 4 tuple variants   | 607    | 516   |
+| enum, 4 named variants   | 588    | 500   |
+| generic struct           | 1,151  | 948   |
+| generic enum             | 1,194  | 992   |
+| metadata-heavy enum      | 1,729  | 1,351 |
+| specta attributes        | 951    | 774   |
+| specta transparent       | 230    | 191   |
+
+##### What moved it
+
+In the order taken, each measured with the harness (Δ is the 130-derive sample):
+
+* **Group the datatype before interpolating it.** `quote!` interpolates a stream
+  by reference and that clones one `Ident` per identifier in it — a 200-ident
+  stream cost 203 allocations to interpolate, while the same stream wrapped in a
+  `Delimiter::None` group costs ~2 and every later copy is a reference-count
+  bump. The derive nests its body up to five deep (field value → chain → build
+  fn → `definition` → `impl`), so the body, the build fns, the `definition`
+  expression, the imports, the placeholder items and each substitution slot are
+  now built once and wrapped in an invisible group (`utils::invisible`). rustc's
+  parser treats an invisible group as if it were not there, so the expanded AST
+  is unchanged. −34 allocations (635 → 601), concentrated in enums and generic
+  containers.
+
+* **Lower each serde attribute list once.** `serde::write` built one `quote!`
+  per entry and then copied all of them into a second one. It is now a single
+  template with two repetitions; a three-entry container attribute drops from 62
+  to 37 allocations on its own. −20 (601 → 581).
+
+* **Build only what the chosen branch uses.** The deprecation metadata was
+  rendered in both its owned and its `static` form for every deprecated
+  container, the `ndt.ty` assignment was built for every container that could
+  take the `init_with_sentinel` path, the container's `GenericDefinition` list
+  was built for the instantiation path that never reads it, and the declaration
+  generics were built even when there was no declaration. Each is now built in
+  the branch that emits it. −28 (581 → 553).
+
+* **Don't resolve the declaration on the concrete build.** `resolve_ty_expr` did
+  the placeholder scan, collected three `Vec<&Ident>`s and cloned the field type
+  into a rewritten copy *before* checking whether it was building the concrete
+  half, which never reads any of it. A generic container builds every field
+  twice, so that was half of this work for nothing. −6 (553 → 547).
+
+* **Decode each item's attributes once.** A generic container's attributes were
+  parsed three times: once by the used-parameter scan, and once per build (the
+  concrete instantiation and the canonical declaration). The `serde:*` lowering
+  ran twice for the same reason. `decode_items` now decodes every field and
+  variant once into `FieldInfo`/`VariantInfo` — attribute list, `FieldAttr`, the
+  lowered metadata (identical for both builds: it resolves only types written in
+  the attribute, which the placeholder rewrite never touches) and the exported
+  name — and the scan and both builds read it. −16 (547 → 531), metadata-heavy
+  enum −20 %.
+
+* Pass the attribute's own source down into its nested list instead of cloning
+  each nested key into an `Ident` to guess it, and only build the `Type` bound
+  when a parameter is actually predicated on. −5 (531 → 526).
+
+* Borrow field names (`&str`) instead of cloning the `String` per named field,
+  and drop the group around the sentinel, which is interpolated exactly once.
+  −3 (526 → 523).
+
+##### Priced and not taken
+
+* `Attribute::parse_args_with`. The premise — that it parses in place — does not
+  hold in syn 2.0.118: `MetaList::parse_args_with` is
+  `parse_scoped(parser, scope, self.tokens.clone())`, the same clone
+  `syn::parse2(meta.tokens.clone())` already did. Measured: no change.
+* A caller-provided `Vec<Attribute>` buffer. It saves one allocation per item
+  that *has* attributes (an empty list allocates nothing today) and adds a
+  `&mut` parameter to every attribute entry point: measured at under 1 %.
+* `TokenStream::with_capacity` for the final assembly. proc-macro2 1.0.106 does
+  not expose it (`pub(crate)` only), so a fragment cannot be pre-sized; the
+  growth of each `quote!`'s backing vector is ~4 allocations per ten-token
+  fragment and is part of the cost below.
+* Lowering the serde attributes from the already-parsed `Attribute` list
+  instead of re-parsing their tokens. It would remove one parse per serde
+  attribute (~8 allocations/derive on this sample), but `extract` consumes some
+  of those keys before lowering runs (`#[serde(transparent)]` becomes
+  `ContainerAttr.transparent`), so it needs the extraction and lowering phases
+  reordered — a redesign of `serde.rs` for a small win.
+* Wrapping the small fragments too (`variant_value`, the `e.variants` list, the
+  field chain constructor). A group costs ~1 allocation and only pays off when
+  the fragment has more than ~3 identifiers or is interpolated more than once;
+  wrapping these measured *worse* (523 → 529) and was reverted.
+
+##### Against the target
+
+The target for this pass was under 500 allocations per derive. The result is
+523, and the measurement says why the rest is not derive-side: the expansion
+emits 127 identifiers per derive in this fixture and every one of them is an
+owned string in the harness, so 127 allocations are the floor (24 % of 523). Of
+the remaining ~396, the fixed scaffolding that the emitted code itself requires
+(the `impl`, `fn definition`, `build` fn header, sentinel and registration call
+are ~136), the `TokenStream` growth above, and the per-item `quote!` templates
+are the bulk. The three changes that could still reach 500 all change behaviour
+or the output: lowering serde from the generic attribute list, emitting the
+declaration body in the same pass as the concrete one (it needs a different type
+rewrite and the placeholder path is already used wherever the language allows
+it), and dropping the invisible groups (measured worse). The rustc target was
+met: see below.
+
+Both fixtures, min of 11 runs, back to back in one session, against
+`bench/results/alloc-A*` (the start of this pass):
+
+| fixture       | metric             | before  | after   |         |
+| ------------- | ------------------ | ------- | ------- | ------- |
+| `derive-perf` | `expand_crate`     | 0.160 s | 0.148 s | −7.5 %  |
+|               | `type_check_crate` | 0.195 s | 0.189 s | −3.1 %  |
+|               | `codegen_crate`    | 0.053 s | 0.050 s | −5.7 %  |
+|               | `total`            | 1.070 s | 1.038 s | −3.0 %  |
+| `derive-inst` | `expand_crate`     | 0.033 s | 0.031 s | −6.1 %  |
+|               | `type_check_crate` | 0.038 s | 0.036 s | −5.3 %  |
+|               | `codegen_crate`    | 0.059 s | 0.057 s | −3.4 %  |
+|               | `total`            | 0.491 s | 0.476 s | −3.1 %  |
+
+`expanded_bytes` and `expanded_tokens` are unchanged on both fixtures
+(2,217,712 / 1,332,099 and 434,533 / 295,912), so the emitted crate is
+byte-identical. Raw runs in `bench/results/alloc-B-perf.json` and
+`alloc-B-inst.json`.

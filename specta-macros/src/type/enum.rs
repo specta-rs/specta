@@ -1,17 +1,19 @@
 use super::{
-    AttributeScope, Names,
+    Names,
     attr::*,
-    build_runtime_attributes,
+    field::construct_field_with_variant_skip,
     generics::{BuildKind, resolve_ty_expr, type_with_inferred_lifetimes},
-    serde::AttributeTarget,
-    r#struct::decode_field_attrs,
+    r#struct::VariantInfo,
 };
-use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::quote;
 use syn::{DataEnum, Fields, spanned::Spanned};
 
+use crate::utils::invisible;
+
 /// Lowers an enum to the expression that builds its datatype.
+///
+/// `variants` are the decoded variant metadata, parallel to `data.variants`.
 ///
 /// `attrs_apply` is the container's runtime attributes, already targeting the
 /// `Enum` value this function binds as `e`. Writing them there keeps the whole
@@ -25,11 +27,14 @@ pub fn parse_enum(
     names: &Names,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
-    used_generic_types: &[syn::Ident],
-    bounded_params: &[syn::Ident],
+    variants: &[VariantInfo],
+    used_generic_types: &[&syn::Ident],
+    bounded_params: &[&syn::Ident],
     attrs_apply: Option<&TokenStream>,
     build: BuildKind,
 ) -> syn::Result<(TokenStream, bool)> {
+    crate::phase!("enum:build");
+
     if container_attrs.transparent {
         return Err(syn::Error::new(
             data.enum_token.span(),
@@ -38,169 +43,125 @@ pub fn parse_enum(
     }
 
     let mut uses_params = false;
-    let variant_steps = data
-        .variants
-        .iter()
-        .enumerate()
-        .map(|(index, v)| {
-            // Numbered so every variant lands in its own binding, which the
-            // variant list below collects in one assignment.
-            let binding = format_ident!("v{}", index);
+    let mut variant_steps = Vec::with_capacity(variants.len());
 
-            // We pass all the attributes at the start and when decoding them pop them off the list.
-            // This means at the end we can check for any that weren't consumed and throw an error.
-            let mut attrs = parse_attrs_with_filter(&v.attrs, &container_attrs.skip_attrs)?;
-            let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
+    for (variant, info) in data.variants.iter().zip(variants) {
+        crate::phase!("variant:build");
 
-            reject_unknown_specta_attrs(&attrs, Scope::Variant)?;
+        let attrs = &info.attrs;
+        let binding = &info.binding;
 
-            let runtime_attrs = build_runtime_attributes(
+        let variant_value = if let Some(ref variant_ty) = attrs.r#type {
+            let variant_ty = type_with_inferred_lifetimes(variant_ty);
+            let resolved = resolve_ty_expr(
                 names,
-                AttributeScope::Variant,
-                AttributeTarget::Statements(quote!(#binding.attributes)),
-                &v.attrs,
-                &container_attrs.skip_attrs,
-            )?;
+                &variant_ty,
+                used_generic_types,
+                bounded_params,
+                build,
+            );
+            uses_params |= resolved.uses_params;
+            let dt = &names.dt;
+            let resolve = resolved.tokens;
+            invisible(quote!(#dt::Variant::unnamed().field(#resolve).build()))
+        } else {
+            match &variant.fields {
+                Fields::Unit => {
+                    let dt = &names.dt;
+                    invisible(quote!(#dt::Variant::unit()))
+                }
+                Fields::Unnamed(fields) => {
+                    let mut calls = Vec::with_capacity(fields.unnamed.len());
 
-            Ok((v, variant_attrs, runtime_attrs, binding))
-        })
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .map(|(variant, attrs, runtime_attrs, binding)| {
-            let variant_name_str = unraw_raw_ident(&variant.ident);
-
-            let variant_value = if let Some(ref variant_ty) = attrs.r#type {
-                let variant_ty = type_with_inferred_lifetimes(variant_ty);
-                let resolved = resolve_ty_expr(
-                    names,
-                    &variant_ty,
-                    used_generic_types,
-                    bounded_params,
-                    build,
-                );
-                uses_params |= resolved.uses_params;
-                let dt = &names.dt;
-                let resolve = resolved.tokens;
-                quote!(#dt::Variant::unnamed().field(#resolve).build())
-            } else {
-                match &variant.fields {
-                    Fields::Unit => {
-                        let dt = &names.dt;
-                        quote!(#dt::Variant::unit())
+                    for (field, field_info) in fields.unnamed.iter().zip(&info.fields) {
+                        let field = construct_field_with_variant_skip(
+                            names,
+                            field_info,
+                            &field.ty,
+                            used_generic_types,
+                            bounded_params,
+                            attrs.skip,
+                            build,
+                        )?;
+                        uses_params |= field.uses_params;
+                        calls.push((None, field.value));
                     }
-                    Fields::Unnamed(fields) => {
-                        let fields = fields
-                            .unnamed
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, field)| {
-                                let (mut field_attrs, raw_attrs) =
-                                    decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                                if attrs.inline && idx == 0 {
-                                    field_attrs.inline = true;
-                                }
+                    let dt = &names.dt;
+                    invisible(variant_builder(quote!(#dt::Variant::unnamed()), calls))
+                }
+                Fields::Named(fields) => {
+                    let mut calls = Vec::with_capacity(fields.named.len());
 
-                                let field = construct_field_with_variant_skip(
-                                    names,
-                                    container_attrs,
-                                    field_attrs,
-                                    &field.ty,
-                                    raw_attrs,
-                                    used_generic_types,
-                                    bounded_params,
-                                    attrs.skip,
-                                    build,
-                                )?;
-                                uses_params |= field.uses_params;
-                                Ok((None, field.value))
-                            })
-                            .collect::<syn::Result<Vec<_>>>()?;
+                    for (field, field_info) in fields.named.iter().zip(&info.fields) {
+                        let field_name = field_info.name.as_deref().ok_or_else(|| {
+                            syn::Error::new(
+                                field.span(),
+                                "specta: named field must have an identifier",
+                            )
+                        })?;
 
-                        let dt = &names.dt;
-                        variant_builder(quote!(#dt::Variant::unnamed()), fields)
+                        let field = construct_field_with_variant_skip(
+                            names,
+                            field_info,
+                            &field.ty,
+                            used_generic_types,
+                            bounded_params,
+                            attrs.skip,
+                            build,
+                        )?;
+                        uses_params |= field.uses_params;
+                        calls.push((Some(field_name), field.value));
                     }
-                    Fields::Named(fields) => {
-                        let field_calls = fields
-                            .named
-                            .iter()
-                            .map(|field| {
-                                let (field_attrs, raw_attrs) =
-                                    decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                                let field_name =
-                                    unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
-                                        syn::Error::new(
-                                            field.span(),
-                                            "specta: named field must have an identifier",
-                                        )
-                                    })?);
-
-                                let field = construct_field_with_variant_skip(
-                                    names,
-                                    container_attrs,
-                                    field_attrs,
-                                    &field.ty,
-                                    raw_attrs,
-                                    used_generic_types,
-                                    bounded_params,
-                                    attrs.skip,
-                                    build,
-                                )?;
-                                uses_params |= field.uses_params;
-                                let name = field_name.to_token_stream();
-                                Ok((Some(name), field.value))
-                            })
-                            .collect::<syn::Result<Vec<_>>>()?;
-
-                        let dt = &names.dt;
-                        variant_builder(quote!(#dt::Variant::named()), field_calls)
-                    }
+                    let dt = &names.dt;
+                    invisible(variant_builder(quote!(#dt::Variant::named()), calls))
                 }
-            };
+            }
+        };
 
-            let variant_skip = attrs.skip.then(|| quote!( #binding.skip = true;));
+        let variant_skip = attrs.skip.then(|| quote!( #binding.skip = true;));
 
-            let variant_docs = (!attrs.common.doc.is_empty()).then(|| {
-                let docs = &attrs.common.doc;
-                quote! {
-                    #binding.docs = #docs.into();
-                }
-            });
-            let field_deprecated = attrs.common.deprecated.map(|deprecated| {
-                let tokens = deprecated_as_tokens(&names.dt, deprecated);
-                quote!(#binding.deprecated = #tokens;)
-            });
+        let variant_docs = (!attrs.common.doc.is_empty()).then(|| {
+            let docs = &attrs.common.doc;
+            quote! {
+                #binding.docs = #docs.into();
+            }
+        });
+        let field_deprecated = attrs.common.deprecated.as_ref().map(|deprecated| {
+            let tokens = deprecated_as_tokens(&names.dt, deprecated);
+            quote!(#binding.deprecated = #tokens;)
+        });
 
-            let type_overridden_attribute = attrs
-                .r#type
-                .as_ref()
-                .map(|_| quote!(#binding.attributes.insert("specta:type_override", true);));
+        let type_overridden_attribute = attrs
+            .r#type
+            .as_ref()
+            .map(|_| quote!(#binding.attributes.insert("specta:type_override", true);));
 
-            let variant_metadata = attrs.skip
-                || attrs.r#type.is_some()
-                || !attrs.common.doc.is_empty()
-                || field_deprecated.is_some()
-                || runtime_attrs.is_some();
+        let variant_metadata = attrs.skip
+            || attrs.r#type.is_some()
+            || !attrs.common.doc.is_empty()
+            || field_deprecated.is_some()
+            || info.runtime_attrs.is_some();
 
-            let steps = if !variant_metadata {
-                quote! {
-                    let #binding = #variant_value;
-                }
-            } else {
-                quote! {
-                    let mut #binding = #variant_value;
-                    #variant_skip
-                    #field_deprecated
-                    #variant_docs
-                    #runtime_attrs
-                    #type_overridden_attribute
-                }
-            };
+        let runtime_attrs = info.runtime_attrs.as_ref();
+        let steps = if !variant_metadata {
+            quote! {
+                let #binding = #variant_value;
+            }
+        } else {
+            quote! {
+                let mut #binding = #variant_value;
+                #variant_skip
+                #field_deprecated
+                #variant_docs
+                #runtime_attrs
+                #type_overridden_attribute
+            }
+        };
 
-            Ok((steps, variant_name_str))
-        })
-        .collect::<syn::Result<Vec<(TokenStream, String)>>>()?;
+        variant_steps.push(invisible(steps));
+    }
 
     // The variants are built as statements and only then collected into the
     // list: building them inside the literal nests each one (and everything in
@@ -210,12 +171,12 @@ pub fn parse_enum(
         return Ok((quote!(#dt::Enum::default().into()), uses_params));
     }
 
-    let steps = variant_steps.iter().map(|(steps, _)| steps);
-    let variants = variant_steps.iter().enumerate().map(|(index, (_, name))| {
-        let binding = format_ident!("v{}", index);
+    let steps = variant_steps.iter();
+    let variants = variant_steps.iter().zip(variants).map(|(_, info)| {
+        let name = &info.name;
+        let binding = &info.binding;
         quote!((#name.into(), #binding))
     });
-
     Ok((
         quote!({
             let mut e = #dt::Enum::default();
@@ -234,7 +195,7 @@ pub fn parse_enum(
 /// chained; each field's own value is a self-contained expression.
 fn variant_builder(
     constructor: TokenStream,
-    fields: Vec<(Option<TokenStream>, TokenStream)>,
+    fields: Vec<(Option<&str>, TokenStream)>,
 ) -> TokenStream {
     if fields.is_empty() {
         return quote!(#constructor.build());
