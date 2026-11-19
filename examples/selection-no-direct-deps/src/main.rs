@@ -1,3 +1,5 @@
+//! Checks that `selection!` works without depending on `serde` or `specta` directly.
+
 #[derive(Clone)]
 #[allow(dead_code)]
 struct Pet {

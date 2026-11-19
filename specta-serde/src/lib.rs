@@ -5729,7 +5729,7 @@ fn field_is_optional_for_mode(
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::panic)]
+    #![allow(clippy::panic, dead_code)] // Directional-attribute fixtures are only used through their `Type` impls.
 
     use serde::{Deserialize, Serialize};
     use specta::{Format as _, Type, Types, datatype::DataType};

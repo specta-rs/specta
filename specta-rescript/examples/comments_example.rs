@@ -1,3 +1,7 @@
+//! Shows how Rust doc comments become comments in the generated ReScript.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 /// A response returned by API commands.
@@ -79,6 +83,7 @@ enum Severity {
     Error,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         .register::<ApiResponse<String>>()

@@ -1,3 +1,7 @@
+//! Exports a small user-management API to ReScript.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 // Simple user management types
@@ -30,6 +34,7 @@ enum ApiResponse<T> {
     Err(String),
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         .register::<User>()

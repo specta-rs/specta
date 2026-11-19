@@ -1,3 +1,7 @@
+//! Shows how generic Rust types map to ReScript type parameters.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 /// Example showcasing generic types in ReScript.
@@ -70,6 +74,7 @@ struct ValidationError {
     message: String,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     // Register with concrete type arguments so all referenced types are included
     Types::default()
