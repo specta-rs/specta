@@ -355,3 +355,30 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.args[0].0, @"myArg");
     }
 }
+
+mod same_name_a {
+    #[specta::specta]
+    pub fn same(value: String) -> bool {
+        value.is_empty()
+    }
+}
+
+mod same_name_b {
+    #[specta::specta]
+    pub fn same(value: bool) -> String {
+        value.to_string()
+    }
+}
+
+#[test]
+fn public_functions_with_the_same_name_do_not_collide_across_modules() {
+    let mut types = Types::default();
+    let a = fn_datatype![same_name_a::same](&mut types);
+    let b = fn_datatype![same_name_b::same](&mut types);
+
+    let ts = Typescript::new();
+    assert_eq!(render_datatype(&ts, &types, &a.args()[0].1), "string");
+    assert_eq!(render_datatype(&ts, &types, a.result().unwrap()), "boolean");
+    assert_eq!(render_datatype(&ts, &types, &b.args()[0].1), "boolean");
+    assert_eq!(render_datatype(&ts, &types, b.result().unwrap()), "string");
+}
