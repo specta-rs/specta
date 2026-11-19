@@ -276,8 +276,7 @@ pub fn used_type_params(
                 // Serde ignores `#[serde(skip)]` on the sole field of a
                 // newtype struct, so that field is still part of the wire
                 // shape and must participate in generic usage analysis.
-                let is_newtype =
-                    matches!(data.fields, syn::Fields::Unnamed(ref fields) if fields.unnamed.len() == 1);
+                let is_newtype = matches!(data.fields, syn::Fields::Unnamed(ref fields) if fields.unnamed.len() == 1);
 
                 for field in &data.fields {
                     visit_field_type(&mut visitor, field, skip_attrs, is_newtype)?;
