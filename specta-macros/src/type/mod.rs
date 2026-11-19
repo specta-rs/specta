@@ -242,11 +242,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // aligned (issue #609).
     let mut generics_for_ndt: Vec<TokenStream> = Vec::new();
     let mut instantiation_steps: Vec<TokenStream> = Vec::new();
+    // `#[specta(bound = "")]` explicitly disables every inferred bound, which
+    // includes the `Type` bound needed to resolve a parameter's concrete
+    // argument. Such parameters cannot participate in the exported generic
+    // declaration; field types can still ignore them through a wrapper whose
+    // own `Type` implementation is unconditional.
+    let erase_generics = container_attrs.bound.as_ref().is_some_and(Vec::is_empty);
 
     for param in &generics.params {
         let GenericParam::Type(t) = param else {
             continue;
         };
+
+        if erase_generics {
+            continue;
+        }
 
         let i = &t.ident;
         let i_str = i.to_string();
@@ -348,9 +358,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             ndt.docs = Cow::Borrowed(#docs);
         }
     });
-    let instantiation_generic_identities = used_generic_types
-        .iter()
-        .map(|generic| quote!(std::any::type_name::<#generic>()));
+    let instantiation_generic_identities = (!erase_generics)
+        .then(|| {
+            used_generic_types
+                .iter()
+                .map(|generic| quote!(std::any::type_name::<#generic>()))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     let deprecated = container_attrs.common.deprecated.map(|deprecated| {
         let tokens = deprecated_as_tokens(deprecated);
         quote!(ndt.deprecated = #tokens;)

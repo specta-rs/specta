@@ -191,10 +191,14 @@ pub fn build_where_clause(
     let mut seen = HashSet::new();
     predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
 
-    for ident in used_generic_types {
-        let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
-        if seen.insert(quote!(#predicate).to_string()) {
-            predicates.push(predicate);
+    // `#[specta(bound = "...")]` replaces the inferred `Type` bounds. An empty
+    // string explicitly asks for none.
+    if custom_bounds.is_none() {
+        for ident in used_generic_types {
+            let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
+            if seen.insert(quote!(#predicate).to_string()) {
+                predicates.push(predicate);
+            }
         }
     }
 
@@ -626,8 +630,10 @@ pub fn add_type_to_where_clause(
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
 ) -> Option<WhereClause> {
-    if let Some(where_clause) = merge_custom_bounds(generics, custom_bounds) {
-        return Some(where_clause);
+    // A custom bound replaces the automatically inferred `Type` predicates,
+    // including the empty bound which explicitly requests no inference.
+    if custom_bounds.is_some() {
+        return merge_custom_bounds(generics, custom_bounds);
     }
 
     if used_generic_types.is_empty() {
