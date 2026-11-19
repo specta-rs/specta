@@ -475,7 +475,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     module_path!(),
                     "::",
                     stringify!(#raw_ident),
-                    "::",
+                    "#",
                     #source_suffix
                 );
 

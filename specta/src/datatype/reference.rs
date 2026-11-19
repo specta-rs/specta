@@ -407,7 +407,13 @@ impl hash::Hash for NamedId {
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(s) => write!(f, "s:{}", s),
+            NamedId::Static(s) => {
+                // The `#<hash>` suffix only distinguishes declarations that
+                // share a module path and name. Keep it out of diagnostics,
+                // where the human-readable Rust path is what matters.
+                let path = s.split_once('#').map_or(*s, |(path, _)| path);
+                write!(f, "s:{path}")
+            }
             NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }
