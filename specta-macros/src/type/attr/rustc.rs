@@ -106,17 +106,20 @@ fn parse_deprecated_string_attr(
     }
 }
 
-pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> TokenStream {
+/// `dt` is the path the generated code uses for the `datatype` module.
+pub(crate) fn deprecated_as_tokens(
+    dt: &TokenStream,
+    Deprecated { note, since }: Deprecated,
+) -> TokenStream {
     let since = since
         .map(|v| quote!(Some(#v.into())))
         .unwrap_or(quote!(None));
 
-    // `with_since_note` takes a `Cow`, and the generated impl already imports
-    // `Cow`, so the no-note case stays hygienic without a `.unwrap_or_default()`
-    // chain.
+    // `with_since_note` takes a `Cow`, so an empty note is an empty `&str`
+    // converted into one, without needing `Cow` in the generated scope.
     let note = note
         .map(|note| quote!(#note.into()))
-        .unwrap_or(quote!(Cow::default()));
+        .unwrap_or(quote!("".into()));
 
-    quote!(Some(datatype::Deprecated::with_since_note(#since, #note)))
+    quote!(Some(#dt::Deprecated::with_since_note(#since, #note)))
 }

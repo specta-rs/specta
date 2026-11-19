@@ -59,11 +59,54 @@ fn attribute_value_from_expr(expr: &Expr) -> AttributeValue {
 #[derive(Clone)]
 pub struct Attribute {
     /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
-    pub source: String,
+    pub source: AttributeSource,
     /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
     pub key: Ident,
     /// Value of the item. Eg. `String` in `#[specta(type = String)]`
     pub value: Option<AttributeValue>,
+}
+
+/// The attribute an [`Attribute`] was parsed from.
+///
+/// The names Specta looks at are compared as a small enum, so the common case
+/// costs no allocation and no proc-macro bridge round-trip. Every other
+/// attribute keeps the `Ident` it was parsed from, so extraction by a name this
+/// list doesn't know about still works: the `#[specta]` function macro reads
+/// `#[command(rename_all = ...)]`.
+#[derive(Clone, PartialEq, Eq)]
+pub enum AttributeSource {
+    Specta,
+    Serde,
+    Doc,
+    Deprecated,
+    Repr,
+    Other(Ident),
+}
+
+impl AttributeSource {
+    /// The source named `name`, which was parsed from `ident`.
+    fn from_name(name: &str, ident: &Ident) -> Self {
+        match name {
+            "specta" => Self::Specta,
+            "serde" => Self::Serde,
+            "doc" => Self::Doc,
+            "deprecated" => Self::Deprecated,
+            "repr" => Self::Repr,
+            _ => Self::Other(ident.clone()),
+        }
+    }
+
+    /// Whether this source was the attribute named `name`.
+    fn is(&self, name: &str) -> bool {
+        match self {
+            Self::Specta => name == "specta",
+            Self::Serde => name == "serde",
+            Self::Doc => name == "doc",
+            Self::Deprecated => name == "deprecated",
+            Self::Repr => name == "repr",
+            Self::Other(ident) => ident == name,
+        }
+    }
 }
 
 impl Attribute {
@@ -138,7 +181,7 @@ impl AttrExtract for Vec<Attribute> {
         // 1. Check for top-level match (e.g., #[deprecated])
         if let Some(pos) = self
             .iter()
-            .position(|attr| attr.source == source && attr.key == key)
+            .position(|attr| attr.source.is(source) && attr.key == key)
         {
             return Some(self.swap_remove(pos));
         }
@@ -147,7 +190,7 @@ impl AttrExtract for Vec<Attribute> {
         //    e.g., extract("specta", "inline") from #[specta(inline)]
         //    Structure: Attribute { source: "specta", key: "specta", value: Attribute { key: "inline" } }
         for i in 0..self.len() {
-            if self[i].source == source
+            if self[i].source.is(source)
                 && self[i].key == source
                 && let Some(AttributeValue::Attribute {
                     attr: nested_attrs, ..
@@ -174,7 +217,7 @@ impl AttrExtract for Vec<Attribute> {
         // 1. Extract all top-level matches
         let mut i = 0;
         while i < self.len() {
-            if self[i].source == source && self[i].key == key {
+            if self[i].source.is(source) && self[i].key == key {
                 result.push(self.swap_remove(i));
                 // Don't increment i, as swap_remove moved a new element to position i
             } else {
@@ -187,7 +230,7 @@ impl AttrExtract for Vec<Attribute> {
         while i < self.len() {
             let mut should_remove_parent = false;
 
-            if self[i].source == source
+            if self[i].source.is(source)
                 && self[i].key == source
                 && let Some(AttributeValue::Attribute {
                     attr: nested_attrs, ..
@@ -243,7 +286,7 @@ impl Parse for NestedAttributeList {
                     let key_span = key.span();
 
                     attrs.push(Attribute {
-                        source: String::new(),
+                        source: AttributeSource::Other(key.clone()),
                         key,
                         value: match false {
                             _ if input.peek(Paren) => {
@@ -321,17 +364,18 @@ pub fn parse_attrs_with_filter(
             continue;
         }
 
+        let source = AttributeSource::from_name(&attr_name, &ident);
+
         result.append(&mut match &attr.meta {
             Meta::Path(_) => vec![Attribute {
-                source: attr_name,
+                source,
                 key: ident,
                 value: None,
             }],
             Meta::List(meta) => {
-                let source = attr_name;
                 let span = ident.span();
                 let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
-                if source == "specta"
+                if source.is("specta")
                     && let Some(span) = parsed.unstructured_argument
                 {
                     return Err(syn::Error::new(
@@ -353,7 +397,7 @@ pub fn parse_attrs_with_filter(
             }
             Meta::NameValue(meta) => {
                 vec![Attribute {
-                    source: attr_name,
+                    source,
                     key: ident,
                     value: Some(attribute_value_from_expr(&meta.value)),
                 }]
@@ -420,6 +464,30 @@ mod tests {
                 .parse_string()
                 .expect("rename_all should be a string"),
             "camelCase"
+        );
+    }
+
+    /// The `#[specta]` function macro reads `#[command(rename_all = ...)]`, a
+    /// source name the `AttributeSource` enum doesn't name. Extraction has to
+    /// still match it.
+    #[test]
+    fn extracts_attributes_whose_source_is_not_a_known_name() {
+        let input = syn::parse_str::<syn::DeriveInput>(
+            r#"
+                #[command(rename_all = "kebab-case")]
+                struct Func;
+            "#,
+        )
+        .expect("test input should parse");
+
+        let mut attrs = parse_attrs(&input.attrs).expect("attributes should parse");
+        assert_eq!(
+            attrs
+                .extract("command", "rename_all")
+                .expect("rename_all should be captured")
+                .parse_string()
+                .expect("rename_all should be a string"),
+            "kebab-case"
         );
     }
 

@@ -1,25 +1,47 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Type;
+use syn::{Ident, Type};
 
 use crate::r#type::attr::deprecated_as_tokens;
 
 use super::{
-    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
+    AttributeScope, ContainerAttr, FieldAttr, Names, build_runtime_attributes,
     generics::{resolve_ty_expr, type_with_inferred_lifetimes},
 };
 
+/// A field value together with the statements that prepare it.
+///
+/// Field metadata is written by mutating a `Field`, so those statements are
+/// emitted ahead of the field's use rather than inside its argument position,
+/// where the pretty-printed form indents every one of them a level deeper.
+/// `binding` names the value in those statements, so a caller that hoists
+/// several fields into one expression can keep them apart.
+pub struct FieldTokens {
+    pub prelude: TokenStream,
+    pub value: TokenStream,
+}
+
+impl FieldTokens {
+    fn bare(value: TokenStream) -> Self {
+        Self {
+            prelude: TokenStream::new(),
+            value,
+        }
+    }
+}
+
 pub fn construct_field(
-    crate_ref: &syn::Path,
+    names: &Names,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
-) -> syn::Result<TokenStream> {
+    binding: &Ident,
+) -> syn::Result<FieldTokens> {
     construct_field_with_variant_skip(
-        crate_ref,
+        names,
         container_attrs,
         attrs,
         field_ty,
@@ -27,11 +49,12 @@ pub fn construct_field(
         used_generic_types,
         bounded_params,
         false,
+        binding,
     )
 }
 
 pub fn construct_field_with_variant_skip(
-    crate_ref: &syn::Path,
+    names: &Names,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
@@ -39,7 +62,8 @@ pub fn construct_field_with_variant_skip(
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
     variant_skip: bool,
-) -> syn::Result<TokenStream> {
+    binding: &Ident,
+) -> syn::Result<FieldTokens> {
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
     // override below: serde only ever sees the real field type, so the
     // override must not influence serde-behavioral markers.
@@ -48,35 +72,35 @@ pub fn construct_field_with_variant_skip(
     let field_ty = type_with_inferred_lifetimes(attrs.r#type.as_ref().unwrap_or(field_ty));
 
     let runtime_attrs = build_runtime_attributes(
-        crate_ref,
+        names,
         AttributeScope::Field,
-        quote!(field.attributes),
+        quote!(#binding.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
     )?;
 
-    let field_optional = attrs.optional.then(|| quote!(field.optional = true;));
+    let field_optional = attrs.optional.then(|| quote!(#binding.optional = true;));
 
     let field_deprecated = attrs.common.deprecated.map(|deprecated| {
-        let tokens = deprecated_as_tokens(deprecated);
-        quote!(field.deprecated = #tokens;)
+        let tokens = deprecated_as_tokens(&names.dt, deprecated);
+        quote!(#binding.deprecated = #tokens;)
     });
 
     let field_docs = (!attrs.common.doc.is_empty()).then(|| {
         let docs = &attrs.common.doc;
         quote! {
-            field.docs = Cow::Borrowed(#docs);
+            #binding.docs = #docs.into();
         }
     });
 
     let type_overridden_attribute = attrs
         .r#type
         .as_ref()
-        .map(|_| quote!(field.attributes.insert("specta:type_override", true);));
+        .map(|_| quote!(#binding.attributes.insert("specta:type_override", true);));
 
     let serde_newtype_skip_ignored = attrs
         .serde_newtype_skip_ignored
-        .then(|| quote!(field.attributes.insert("specta:serde_newtype_skip_ignored", true);));
+        .then(|| quote!(#binding.attributes.insert("specta:serde_newtype_skip_ignored", true);));
 
     // Whether a field was declared as `Option<T>` matters to consumers
     // beyond the exported datatype: e.g. serde deserializes a missing value
@@ -87,7 +111,7 @@ pub fn construct_field_with_variant_skip(
     // overridden (`#[specta(type = ...)]`), so the real syntax is the only
     // reliable source.
     let nullable_attribute =
-        declared_ty_is_option.then(|| quote!(field.attributes.insert("specta:nullable", true);));
+        declared_ty_is_option.then(|| quote!(#binding.attributes.insert("specta:nullable", true);));
 
     // A skipped field never enters the datatype graph, so its type is not
     // resolved at all.
@@ -97,27 +121,14 @@ pub fn construct_field_with_variant_skip(
         // The canonical declaration is built with each generic parameter
         // replaced by a placeholder type that resolves to `Generic`. Concrete
         // instantiation (`declaration == false`) resolves the real parameter.
-        let resolve = resolve_ty_expr(
-            crate_ref,
-            &field_ty,
-            used_generic_types,
-            bounded_params,
-            true,
-        );
+        let resolve = resolve_ty_expr(names, &field_ty, used_generic_types, bounded_params, true);
 
         Some(if attrs.inline {
-            quote!(datatype::inline(types, |types| #resolve))
+            let dt = &names.dt;
+            quote!(#dt::inline(types, |types| #resolve))
         } else {
             resolve
         })
-    };
-
-    // `Field::default()` plus `field.ty = Some(..)` is exactly `Field::new`, so
-    // a field that has a type always starts from the latter; only a skipped
-    // field (which has none) needs the metadata-only constructor.
-    let field = match field_ty {
-        Some(ty) => quote!(datatype::Field::new(#ty)),
-        None => quote!(datatype::Field::default()),
     };
 
     let has_metadata = field_optional.is_some()
@@ -129,20 +140,39 @@ pub fn construct_field_with_variant_skip(
         || nullable_attribute.is_some();
 
     if !has_metadata {
-        return Ok(field);
+        // A `DataType` converts into the `Field` that carries it, so the bare
+        // case hands the type expression straight to the builder instead of
+        // wrapping it in a constructor call.
+        let field = match field_ty {
+            Some(ty) => ty,
+            None => {
+                let dt = &names.dt;
+                quote!(#dt::Field::default())
+            }
+        };
+        return Ok(FieldTokens::bare(field));
     }
 
-    Ok(quote!({
-        let mut field = #field;
-        #field_optional
-        #field_deprecated
-        #field_docs
-        #runtime_attrs
-        #type_overridden_attribute
-        #serde_newtype_skip_ignored
-        #nullable_attribute
-        field
-    }))
+    // The metadata statements mutate a `Field`, so this case names one.
+    let dt = &names.dt;
+    let field = match field_ty {
+        Some(ty) => quote!(#dt::Field::new(#ty)),
+        None => quote!(#dt::Field::default()),
+    };
+
+    Ok(FieldTokens {
+        prelude: quote! {
+            let mut #binding = #field;
+            #field_optional
+            #field_deprecated
+            #field_docs
+            #runtime_attrs
+            #type_overridden_attribute
+            #serde_newtype_skip_ignored
+            #nullable_attribute
+        },
+        value: quote!(#binding),
+    })
 }
 
 /// Whether a type is syntactically the standard `Option<T>`.

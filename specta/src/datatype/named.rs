@@ -143,6 +143,38 @@ impl NamedDataType {
         generic_substitution_base: usize,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
+        build_ty: fn(&mut Types) -> DataType,
+    ) -> Reference {
+        Self::init(
+            sentinel,
+            instantiation_generics,
+            instantiation_generic_identities,
+            has_const_param,
+            passthrough,
+            generic_substitution_base,
+            types,
+            &build_ndt,
+            build_ty,
+        )
+    }
+
+    /// The shared body of [`NamedDataType::init_with_sentinel`].
+    ///
+    /// `build_ndt` is a `&dyn Fn` rather than a `fn` pointer so
+    /// [`Types::define_named`] can pass a closure that captures the metadata it
+    /// was given. Taking it by reference (instead of `impl Fn`) keeps this
+    /// function non-generic, so it is compiled once in this crate instead of
+    /// once per distinct closure type in every crate that derives `Type`.
+    #[track_caller]
+    pub(crate) fn init(
+        sentinel: &'static str,
+        instantiation_generics: &[(Generic, DataType)],
+        instantiation_generic_identities: &[&'static str],
+        has_const_param: bool,
+        passthrough: bool,
+        generic_substitution_base: usize,
+        types: &mut Types,
+        build_ndt: &dyn Fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);

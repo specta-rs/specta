@@ -6,7 +6,9 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    datatype::{
+        DataType, Deprecated, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame,
+    },
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -279,6 +281,70 @@ impl Types {
         }
 
         T::definition(self)
+    }
+
+    /// Resolves a field type in whichever form the current build needs.
+    ///
+    /// `#[derive(Type)]` resolves the same field twice from one expression: the
+    /// canonical declaration uses a placeholder-rewritten type ([`Decl`]), the
+    /// concrete resolution uses the field's own type ([`Concrete`]).
+    /// `declaration` selects which. This is [`Types::define_root`] for the
+    /// declaration and [`Type::definition`] for the concrete resolution; it
+    /// exists so a field with no substitution scope can be emitted as one call
+    /// instead of an `if`/`else` pair.
+    #[doc(hidden)]
+    pub fn define_split<Decl: Type + ?Sized, Concrete: Type + ?Sized>(
+        &mut self,
+        declaration: bool,
+    ) -> DataType {
+        if declaration {
+            self.define_root::<Decl>()
+        } else {
+            Concrete::definition(self)
+        }
+    }
+
+    /// Registers a named datatype that declares no generic parameters.
+    ///
+    /// This is [`NamedDataType::init_with_sentinel`] with every argument that
+    /// the `#[derive(Type)]` output would fix up front: no instantiation
+    /// generics or identities, no const parameters and no passthrough, with the
+    /// caller's cursor as the substitution base. The build function both fills
+    /// `NamedDataType::ty` and serves as the inline definition.
+    ///
+    /// It exists so the derive — for which this is the common case — emits one
+    /// call instead of the full argument list plus a closure that only assigns
+    /// the metadata it was given. It is `#[track_caller]` so the recorded
+    /// [`NamedDataType::location`] stays the derive's own.
+    #[doc(hidden)]
+    #[track_caller]
+    pub fn define_named(
+        &mut self,
+        sentinel: &'static str,
+        name: &'static str,
+        module_path: &'static str,
+        docs: &'static str,
+        deprecated: Option<Deprecated>,
+        build_ty: fn(&mut Types) -> DataType,
+    ) -> DataType {
+        NamedDataType::init(
+            sentinel,
+            &[],
+            &[],
+            false,
+            false,
+            self.generic_substitution_cursor(),
+            self,
+            &|types, ndt| {
+                ndt.name = name.into();
+                ndt.module_path = module_path.into();
+                ndt.docs = docs.into();
+                ndt.deprecated = deprecated.clone();
+                ndt.ty = Some(build_ty(types));
+            },
+            build_ty,
+        )
+        .into()
     }
 
     /// Resolves the next positional slot of the innermost substitution scope,

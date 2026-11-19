@@ -63,6 +63,13 @@ impl Field {
     }
 }
 
+impl From<DataType> for Field {
+    /// Constructs a field with the given type, exactly like [`Field::new`].
+    fn from(ty: DataType) -> Self {
+        Self::new(ty)
+    }
+}
+
 /// Fields for an unnamed tuple struct or tuple enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -90,14 +97,14 @@ pub struct StructBuilder<F = ()> {
 
 impl StructBuilder<NamedFields> {
     /// Adds a named field and returns the updated builder.
-    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        self.fields.fields.push((name.into(), field));
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: impl Into<Field>) -> Self {
+        self.fields.fields.push((name.into(), field.into()));
         self
     }
 
     /// Adds a named field in-place.
-    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
-        self.fields.fields.push((name.into(), field));
+    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: impl Into<Field>) {
+        self.fields.fields.push((name.into(), field.into()));
     }
 
     /// Finalizes this builder into a [`DataType::Struct`] with named fields.
@@ -111,14 +118,14 @@ impl StructBuilder<NamedFields> {
 
 impl StructBuilder<UnnamedFields> {
     /// Adds an unnamed field and returns the updated builder.
-    pub fn field(mut self, field: Field) -> Self {
-        self.fields.fields.push(field);
+    pub fn field(mut self, field: impl Into<Field>) -> Self {
+        self.fields.fields.push(field.into());
         self
     }
 
     /// Adds an unnamed field in-place.
-    pub fn field_mut(&mut self, field: Field) {
-        self.fields.fields.push(field);
+    pub fn field_mut(&mut self, field: impl Into<Field>) {
+        self.fields.fields.push(field.into());
     }
 
     /// Finalizes this builder into a [`DataType::Struct`] with unnamed fields.

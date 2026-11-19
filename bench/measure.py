@@ -63,6 +63,9 @@ expanded = subprocess.run(
     check=True,
 )
 expanded_bytes = len(expanded.stdout.encode())
+# Pretty-printed indentation is most of `expanded_bytes` and costs rustc
+# nothing, so also report the bytes rustc actually has to chew on.
+expanded_tokens = len("".join(expanded.stdout.split()).encode())
 
 samples = []
 for _ in range(iters):
@@ -95,6 +98,7 @@ result = {
     "iters": iters,
     "rustc": subprocess.run(["rustc", "+nightly", "-V"], capture_output=True, text=True).stdout.strip(),
     "expanded_bytes": expanded_bytes,
+    "expanded_tokens": expanded_tokens,
     "passes": {
         name: {
             "min": min(s[name] for s in samples),
@@ -108,7 +112,8 @@ out = ROOT / "bench" / "results" / f"{label}.json"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(result, indent=2) + "\n")
 
-print(f"expanded_bytes {expanded_bytes:,}")
+print(f"expanded_bytes  {expanded_bytes:,}")
+print(f"expanded_tokens {expanded_tokens:,}")
 print(f"{'pass':22} {'min':>8} {'median':>8}")
 for name, value in result["passes"].items():
     print(f"{name:22} {value['min']:8.3f} {value['median']:8.3f}")

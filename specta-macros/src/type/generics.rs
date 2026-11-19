@@ -1,5 +1,6 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
+use std::borrow::Cow;
 use std::collections::HashSet;
 use syn::{
     ConstParam, Data, GenericParam, Generics, LifetimeParam, Path, Type, TypeParam, WhereClause,
@@ -9,7 +10,7 @@ use syn::{
 
 use crate::utils::parse_attrs_with_filter;
 
-use super::{FieldAttr, VariantAttr};
+use super::{FieldAttr, Names, VariantAttr};
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
@@ -282,10 +283,18 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn type_with_inferred_lifetimes(ty: &Type) -> Type {
+/// The type with each lifetime replaced by an inferred `'_`.
+///
+/// The AST is only cloned when it names a lifetime at all: walking it is much
+/// cheaper than cloning every node only to find nothing to rewrite.
+pub fn type_with_inferred_lifetimes(ty: &Type) -> Cow<'_, Type> {
+    if !mentions_lifetime(|finder| finder.visit_type(ty)) {
+        return Cow::Borrowed(ty);
+    }
+
     let mut ty = ty.clone();
     InferredLifetimeVisitor.visit_type_mut(&mut ty);
-    ty
+    Cow::Owned(ty)
 }
 
 struct InferredLifetimeVisitor;
@@ -362,10 +371,13 @@ pub fn used_type_params(
     Ok(visitor.mentioned())
 }
 
-/// The placeholder type used to stand in for a generic parameter while the
-/// canonical declaration of a type is being built.
-pub fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
-    quote::format_ident!("__SPECTA_GENERIC_PLACEHOLDER_{}", ident)
+/// The placeholder type used to stand in for the generic parameter at `index`
+/// while the canonical declaration of a type is being built.
+///
+/// `index` is the parameter's position in the container's unbounded parameter
+/// list, which both the placeholder declarations and the rewrite read.
+pub fn placeholder_ident(index: usize) -> syn::Ident {
+    quote::format_ident!("__P{}", index)
 }
 
 /// Rewrites single-segment paths that name one of `params` to their
@@ -385,8 +397,8 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> (
                 && node.path.segments.len() == 1
             {
                 let ident = node.path.segments[0].ident.clone();
-                if self.params.contains(&ident) {
-                    node.path.segments[0].ident = placeholder_ident(&ident);
+                if let Some(index) = self.params.iter().position(|param| *param == ident) {
+                    node.path.segments[0].ident = placeholder_ident(index);
                     self.rewritten = true;
                 }
             }
@@ -553,7 +565,7 @@ impl Visit<'_> for TypeScan<'_> {
 /// declared bounds cannot be required by any field type (the container would not
 /// compile otherwise), so the precise placeholder path is used for them.
 pub fn resolve_ty_expr(
-    crate_ref: &Path,
+    names: &Names,
     ty: &Type,
     used_generic_types: &[syn::Ident],
     bounded_params: &[syn::Ident],
@@ -565,9 +577,10 @@ pub fn resolve_ty_expr(
     // Nothing to rewrite and no parameter to substitute: resolve concretely.
     // A container with no used type parameters already isolated its entire
     // `build` body with one shared empty scope (see [`shares_field_isolation`]).
+    let ty_trait = &names.ty;
     if scan.mentions_nothing() {
         return if shares_field_isolation(used_generic_types) {
-            quote!(<#ty as #crate_ref::Type>::definition(types))
+            quote!(<#ty as #ty_trait>::definition(types))
         } else {
             // A field that mentions no enclosing parameter is resolved at its
             // own use site. It must not see the enclosing field's substitution
@@ -576,13 +589,16 @@ pub fn resolve_ty_expr(
             // (issue #609).
             quote!(types.with_generic_substitution(
                 &[],
-                |types| <#ty as #crate_ref::Type>::definition(types),
+                |types| <#ty as #ty_trait>::definition(types),
             ))
         };
     }
 
     let mentioned = scan.mentioned();
-    let unbounded = mentioned
+    // Placeholder indices are positions in the container's unbounded parameter
+    // list, which is also what `placeholder_definitions` numbers, so it is
+    // rebuilt here rather than taken from the parameters this type mentions.
+    let unbounded = used_generic_types
         .iter()
         .filter(|ident| !bounded_params.contains(*ident))
         .cloned()
@@ -610,21 +626,29 @@ pub fn resolve_ty_expr(
 
     let mut declaration = quote!(types.define_root::<#declaration_ty>());
 
-    if !substituted.is_empty() {
-        // One slot per type argument of the declaration type, in source order.
-        // `Types::define_param` consumes them positionally as the nested type
-        // resolves its own parameters, so two parameters instantiated with the
-        // same concrete type still map to distinct `Generic` names. See #609.
-        //
-        // The placeholder rewrite only renames idents, so an opaque node in `ty`
-        // is still opaque in `declaration_ty`.
-        let slots =
-            generic_substitution_slots(crate_ref, declaration_ty, &substituted, scan.opaque);
-        declaration = quote!(types.with_generic_substitution(
-            &[#(#slots),*],
-            |types| #declaration,
-        ));
+    if substituted.is_empty() {
+        // No substitution scope: the declaration is a plain placeholder type, so
+        // the conditional resolves both forms with one call instead of an
+        // `if`/`else` pair at every field.
+        return if conditional {
+            quote!(types.define_split::<#declaration_ty, #ty>(declaration))
+        } else {
+            declaration
+        };
     }
+
+    // One slot per type argument of the declaration type, in source order.
+    // `Types::define_param` consumes them positionally as the nested type
+    // resolves its own parameters, so two parameters instantiated with the
+    // same concrete type still map to distinct `Generic` names. See #609.
+    //
+    // The placeholder rewrite only renames idents, so an opaque node in `ty`
+    // is still opaque in `declaration_ty`.
+    let slots = generic_substitution_slots(names, declaration_ty, &substituted, scan.opaque);
+    declaration = quote!(types.with_generic_substitution(
+        &[#(#slots),*],
+        |types| #declaration,
+    ));
 
     if !conditional {
         return declaration;
@@ -636,7 +660,7 @@ pub fn resolve_ty_expr(
     // generic type needs to rewrite its expansion back to `Generic` (issue
     // #613 regressed this: an empty scope baked the first instantiation's
     // concrete arguments into a generic inline declaration).
-    quote!(if declaration { #declaration } else { <#ty as #crate_ref::Type>::definition(types) })
+    quote!(if declaration { #declaration } else { <#ty as #ty_trait>::definition(types) })
 }
 
 /// Builds the positional substitution slots for the type arguments of `ty`.
@@ -652,7 +676,7 @@ pub fn resolve_ty_expr(
 /// the previous behaviour for opaque fields rather than baking the concrete
 /// argument in.
 pub fn generic_substitution_slots(
-    crate_ref: &Path,
+    names: &Names,
     ty: &Type,
     substituted: &[syn::Ident],
     opaque: bool,
@@ -660,44 +684,48 @@ pub fn generic_substitution_slots(
     if opaque {
         return substituted
             .iter()
-            .map(|ident| generic_slot(crate_ref, ident))
+            .map(|ident| generic_slot(names, ident))
             .collect();
     }
 
-    slots_for_type(crate_ref, ty, substituted)
+    slots_for_type(names, ty, substituted)
 }
 
 /// The slots for one type's own type-argument list.
-fn slots_for_type(crate_ref: &Path, ty: &Type, substituted: &[syn::Ident]) -> Vec<TokenStream> {
+fn slots_for_type(names: &Names, ty: &Type, substituted: &[syn::Ident]) -> Vec<TokenStream> {
     if let Some(ident) = bare_param(ty, substituted) {
-        return vec![generic_slot(crate_ref, &ident)];
+        return vec![generic_slot(names, &ident)];
     }
 
     type_arguments(ty)
         .into_iter()
-        .map(|argument| slot_for_argument(crate_ref, argument, substituted))
+        .map(|argument| slot_for_argument(names, argument, substituted))
         .collect()
 }
 
 /// The slot for a single type argument.
-fn slot_for_argument(crate_ref: &Path, argument: &Type, substituted: &[syn::Ident]) -> TokenStream {
+fn slot_for_argument(names: &Names, argument: &Type, substituted: &[syn::Ident]) -> TokenStream {
+    let crate_ref = &names.crate_ref;
+
     if let Some(ident) = bare_param(argument, substituted) {
-        return generic_slot(crate_ref, &ident);
+        return generic_slot(names, &ident);
     }
 
     if TypeScan::of(argument, substituted).mentions_nothing() {
         return quote!(#crate_ref::GenericSubstitutionSlot::Skip);
     }
 
-    let slots = slots_for_type(crate_ref, argument, substituted);
-    quote!(#crate_ref::GenericSubstitutionSlot::Nested(::std::vec::Vec::from([#(#slots),*])))
+    let slots = slots_for_type(names, argument, substituted);
+    quote!(#crate_ref::GenericSubstitutionSlot::Nested([#(#slots),*].into()))
 }
 
-fn generic_slot(crate_ref: &Path, ident: &syn::Ident) -> TokenStream {
+fn generic_slot(names: &Names, ident: &syn::Ident) -> TokenStream {
+    let crate_ref = &names.crate_ref;
+    let dt = &names.dt;
     let name = ident.to_string();
     quote!(#crate_ref::GenericSubstitutionSlot::Generic {
         name: ::std::any::type_name::<#ident>(),
-        generic: #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(#name)),
+        generic: #dt::Generic::new(#name.into()),
     })
 }
 
@@ -888,10 +916,7 @@ mod tests {
         assert!(!TypeScan::of(&ty, &candidates).opaque);
         let (rewritten, rewritten_flag) = rewrite_generics_with_placeholders(&ty, &candidates);
         assert!(rewritten_flag);
-        assert_eq!(
-            rewritten.to_token_stream().to_string(),
-            "Option < __SPECTA_GENERIC_PLACEHOLDER_T >"
-        );
+        assert_eq!(rewritten.to_token_stream().to_string(), "Option < __P0 >");
 
         let ty = parse("type_from_macro!(T)");
         assert!(TypeScan::of(&ty, &candidates).opaque);

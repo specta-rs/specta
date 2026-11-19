@@ -109,19 +109,18 @@ struct FieldAttrs {
 }
 
 pub(super) fn lower_runtime_attributes<'a>(
-    crate_ref: &syn::Path,
+    type_trait: &syn::Path,
     scope: AttributeScope,
+    target: &TokenStream,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
 ) -> Result<Option<TokenStream>> {
     match scope {
         AttributeScope::Container => parse_container_attrs(raw_attrs)
-            .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs))),
-        AttributeScope::Variant => {
-            parse_variant_attrs(raw_attrs).map(|attrs| attrs.map(lower_variant_attrs))
-        }
-        AttributeScope::Field => {
-            parse_field_attrs(raw_attrs).map(|attrs| attrs.map(lower_field_attrs))
-        }
+            .map(|attrs| attrs.map(|attrs| lower_container_attrs(type_trait, target, attrs))),
+        AttributeScope::Variant => parse_variant_attrs(raw_attrs)
+            .map(|attrs| attrs.map(|attrs| lower_variant_attrs(target, attrs))),
+        AttributeScope::Field => parse_field_attrs(raw_attrs)
+            .map(|attrs| attrs.map(|attrs| lower_field_attrs(target, attrs))),
     }
 }
 
@@ -396,80 +395,112 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn lower_container_attrs(crate_ref: &syn::Path, attrs: ContainerAttrs) -> TokenStream {
+fn lower_container_attrs(
+    type_trait: &syn::Path,
+    target: &TokenStream,
+    attrs: ContainerAttrs,
+) -> TokenStream {
     let mut inserts = Vec::new();
     push_opt_string(
         &mut inserts,
+        target,
         "serde:container:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
         &mut inserts,
+        target,
         "serde:container:rename_deserialize",
         &attrs.rename_deserialize,
     );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:container:rename_all_serialize",
         attrs.rename_all_serialize,
     );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:container:rename_all_deserialize",
         attrs.rename_all_deserialize,
     );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:container:rename_all_fields_serialize",
         attrs.rename_all_fields_serialize,
     );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:container:rename_all_fields_deserialize",
         attrs.rename_all_fields_deserialize,
     );
-    push_opt_string(&mut inserts, "serde:container:tag", &attrs.tag);
-    push_opt_string(&mut inserts, "serde:container:content", &attrs.content);
-    push_bool(&mut inserts, "serde:container:untagged", attrs.untagged);
-    push_bool(&mut inserts, "serde:container:default", attrs.default);
+    push_opt_string(&mut inserts, target, "serde:container:tag", &attrs.tag);
+    push_opt_string(
+        &mut inserts,
+        target,
+        "serde:container:content",
+        &attrs.content,
+    );
     push_bool(
         &mut inserts,
+        target,
+        "serde:container:untagged",
+        attrs.untagged,
+    );
+    push_bool(
+        &mut inserts,
+        target,
+        "serde:container:default",
+        attrs.default,
+    );
+    push_bool(
+        &mut inserts,
+        target,
         "serde:container:transparent",
         attrs.transparent,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:container:deny_unknown_fields",
         attrs.deny_unknown_fields,
     );
     push_opt_conversion(
         &mut inserts,
-        crate_ref,
+        target,
+        type_trait,
         "serde:container:from_type_src",
         "serde:container:from_resolved",
         &attrs.from,
     );
     push_opt_conversion(
         &mut inserts,
-        crate_ref,
+        target,
+        type_trait,
         "serde:container:try_from_type_src",
         "serde:container:try_from_resolved",
         &attrs.try_from,
     );
     push_opt_conversion(
         &mut inserts,
-        crate_ref,
+        target,
+        type_trait,
         "serde:container:into_type_src",
         "serde:container:into_resolved",
         &attrs.into,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:container:variant_identifier",
         attrs.variant_identifier,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:container:field_identifier",
         attrs.field_identifier,
     );
@@ -477,136 +508,180 @@ fn lower_container_attrs(crate_ref: &syn::Path, attrs: ContainerAttrs) -> TokenS
     quote!(#(#inserts)*)
 }
 
-fn lower_variant_attrs(attrs: VariantAttrs) -> TokenStream {
+fn lower_variant_attrs(target: &TokenStream, attrs: VariantAttrs) -> TokenStream {
     let mut inserts = Vec::new();
     push_opt_string(
         &mut inserts,
+        target,
         "serde:variant:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
         &mut inserts,
+        target,
         "serde:variant:rename_deserialize",
         &attrs.rename_deserialize,
     );
-    push_vec_string(&mut inserts, "serde:variant:aliases", &attrs.aliases);
+    push_vec_string(
+        &mut inserts,
+        target,
+        "serde:variant:aliases",
+        &attrs.aliases,
+    );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:variant:rename_all_serialize",
         attrs.rename_all_serialize,
     );
     push_opt_rename_rule(
         &mut inserts,
+        target,
         "serde:variant:rename_all_deserialize",
         attrs.rename_all_deserialize,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:variant:skip_serializing",
         attrs.skip_serializing,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:variant:skip_deserializing",
         attrs.skip_deserializing,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:variant:has_serialize_with",
         attrs.has_serialize_with,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:variant:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_bool(&mut inserts, "serde:variant:has_with", attrs.has_with);
-    push_bool(&mut inserts, "serde:variant:other", attrs.other);
-    push_bool(&mut inserts, "serde:variant:untagged", attrs.untagged);
+    push_bool(
+        &mut inserts,
+        target,
+        "serde:variant:has_with",
+        attrs.has_with,
+    );
+    push_bool(&mut inserts, target, "serde:variant:other", attrs.other);
+    push_bool(
+        &mut inserts,
+        target,
+        "serde:variant:untagged",
+        attrs.untagged,
+    );
 
     quote!(#(#inserts)*)
 }
 
-fn lower_field_attrs(attrs: FieldAttrs) -> TokenStream {
+fn lower_field_attrs(target: &TokenStream, attrs: FieldAttrs) -> TokenStream {
     let mut inserts = Vec::new();
     push_opt_string(
         &mut inserts,
+        target,
         "serde:field:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
         &mut inserts,
+        target,
         "serde:field:rename_deserialize",
         &attrs.rename_deserialize,
     );
-    push_vec_string(&mut inserts, "serde:field:aliases", &attrs.aliases);
-    push_bool(&mut inserts, "serde:field:default", attrs.default);
-    push_bool(&mut inserts, "serde:field:flatten", attrs.flatten);
+    push_vec_string(&mut inserts, target, "serde:field:aliases", &attrs.aliases);
+    push_bool(&mut inserts, target, "serde:field:default", attrs.default);
+    push_bool(&mut inserts, target, "serde:field:flatten", attrs.flatten);
     push_bool(
         &mut inserts,
+        target,
         "serde:field:skip_serializing",
         attrs.skip_serializing,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:field:skip_deserializing",
         attrs.skip_deserializing,
     );
     push_opt_string(
         &mut inserts,
+        target,
         "serde:field:skip_serializing_if",
         &attrs.skip_serializing_if,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:field:has_serialize_with",
         attrs.has_serialize_with,
     );
     push_bool(
         &mut inserts,
+        target,
         "serde:field:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_bool(&mut inserts, "serde:field:has_with", attrs.has_with);
+    push_bool(&mut inserts, target, "serde:field:has_with", attrs.has_with);
 
     quote!(#(#inserts)*)
 }
 
-fn push_opt_string(inserts: &mut Vec<TokenStream>, key: &str, value: &Option<String>) {
+fn push_opt_string(
+    inserts: &mut Vec<TokenStream>,
+    target: &TokenStream,
+    key: &str,
+    value: &Option<String>,
+) {
     if let Some(value) = value {
-        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
+        inserts.push(quote!(#target.insert(#key, #value.to_owned());));
     }
 }
 
-fn push_vec_string(inserts: &mut Vec<TokenStream>, key: &str, value: &[String]) {
+fn push_vec_string(
+    inserts: &mut Vec<TokenStream>,
+    target: &TokenStream,
+    key: &str,
+    value: &[String],
+) {
     if value.is_empty() {
         return;
     }
 
-    let value = value
-        .iter()
-        .map(|value| quote!(::std::string::String::from(#value)));
+    let value = value.iter().map(|value| quote!(#value.to_owned()));
     // `Vec::from([..])` instead of `vec![..]` keeps the `vec!` box machinery out
     // of every lowered attribute.
-    inserts.push(quote!(attrs.insert(#key, ::std::vec::Vec::from([#(#value),*]));));
+    inserts.push(quote!(#target.insert(#key, ::std::vec::Vec::from([#(#value),*]));));
 }
 
-fn push_bool(inserts: &mut Vec<TokenStream>, key: &str, value: bool) {
+fn push_bool(inserts: &mut Vec<TokenStream>, target: &TokenStream, key: &str, value: bool) {
     if value {
-        inserts.push(quote!(attrs.insert(#key, true);));
+        inserts.push(quote!(#target.insert(#key, true);));
     }
 }
 
-fn push_opt_rename_rule(inserts: &mut Vec<TokenStream>, key: &str, value: Option<RenameRule>) {
+fn push_opt_rename_rule(
+    inserts: &mut Vec<TokenStream>,
+    target: &TokenStream,
+    key: &str,
+    value: Option<RenameRule>,
+) {
     if let Some(value) = value {
         let value = value.as_str();
-        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
+        inserts.push(quote!(#target.insert(#key, #value.to_owned());));
     }
 }
 
 fn push_opt_conversion(
     inserts: &mut Vec<TokenStream>,
-    crate_ref: &syn::Path,
+    target: &TokenStream,
+    type_trait: &syn::Path,
     src_key: &str,
     resolved_key: &str,
     value: &Option<ConversionType>,
@@ -614,9 +689,8 @@ fn push_opt_conversion(
     if let Some(value) = value {
         let type_src = &value.type_src;
         let ty = &value.ty;
-        inserts.push(quote!(attrs.insert(#src_key, ::std::string::String::from(#type_src));));
-        inserts.push(
-            quote!(attrs.insert(#resolved_key, <#ty as #crate_ref::Type>::definition(types));),
-        );
+        inserts.push(quote!(#target.insert(#src_key, #type_src.to_owned());));
+        inserts
+            .push(quote!(#target.insert(#resolved_key, <#ty as #type_trait>::definition(types));));
     }
 }

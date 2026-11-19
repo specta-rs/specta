@@ -13,7 +13,10 @@ mod rustc;
 mod variant;
 
 pub fn reject_unknown_specta_attrs(attrs: &[Attribute], scope: Scope) -> syn::Result<()> {
-    let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") else {
+    let Some(attr) = attrs
+        .iter()
+        .find(|attr| attr.source == crate::utils::AttributeSource::Specta)
+    else {
         return Ok(());
     };
 
