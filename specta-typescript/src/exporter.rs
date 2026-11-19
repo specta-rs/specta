@@ -468,13 +468,9 @@ impl Exporter {
             }
 
             match path.metadata() {
-                Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
-                    if source.kind() == std::io::ErrorKind::NotFound {
-                        Ok(())
-                    } else {
-                        Err(Error::remove_file(path.to_path_buf(), source))
-                    }
-                })?,
+                Ok(meta) if !meta.is_dir() => {
+                    return Err(Error::expected_directory(path.to_path_buf()));
+                }
                 Ok(_) => {}
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
                 Err(source) => {
