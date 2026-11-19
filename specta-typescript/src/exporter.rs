@@ -233,7 +233,7 @@ impl Exporter {
 
             // User types (if not included in framework runtime)
             if !has_manually_exported_user_types {
-                render_types(&mut out, &exporter, Some(&format), types, "")?;
+                render_types(&mut out, &exporter, None, types, "")?;
             }
 
             Ok(out)
@@ -285,7 +285,7 @@ impl Exporter {
                 }
 
                 if !has_manually_exported_user_types {
-                    render_types(&mut result, &exporter, Some(&format), types, "")?;
+                    render_types(&mut result, &exporter, None, types, "")?;
                 }
 
                 if let Some(parent) = path.parent() {
@@ -380,7 +380,7 @@ impl Exporter {
             let mut root_types = String::new();
             export(
                 &exporter,
-                Some(&format),
+                None,
                 types,
                 &mut build_module_graph(types),
                 &mut root_types,
@@ -515,15 +515,48 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    Ok(
-        match format
-            .map_types(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))?
-        {
-            Cow::Borrowed(_) => Cow::Borrowed(types),
-            Cow::Owned(types) => Cow::Owned(types),
-        },
-    )
+    let mapped = match format
+        .map_types(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))?
+    {
+        Cow::Borrowed(_) => types.clone(),
+        Cow::Owned(types) => types,
+    };
+    let source = mapped.clone();
+    let mut output = mapped;
+    let mut error = None;
+
+    output.iter_mut(|ndt| {
+        if error.is_some() {
+            return;
+        }
+
+        let path = vec![rust_type_path(ndt)];
+        for generic in ndt.generics.to_mut() {
+            let Some(default) = generic.default.clone() else {
+                continue;
+            };
+            let mut generic_path = path.clone();
+            generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
+            match map_datatype_format(Some(format), &source, &default, &generic_path) {
+                Ok(default) => generic.default = Some(default),
+                Err(source) => {
+                    error = Some(source.with_named_datatype(ndt));
+                    return;
+                }
+            }
+        }
+
+        let Some(datatype) = ndt.ty.clone() else {
+            return;
+        };
+        match map_datatype_format(Some(format), &source, &datatype, &path) {
+            Ok(datatype) => ndt.ty = Some(datatype),
+            Err(source) => error = Some(source.with_named_datatype(ndt)),
+        }
+    });
+
+    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
 }
 
 fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {
@@ -778,21 +811,6 @@ fn map_datatype_fields(
     Ok(())
 }
 
-fn map_named_datatype_format(
-    format: Option<&dyn Format>,
-    types: &Types,
-    ndt: &NamedDataType,
-) -> Result<NamedDataType, Error> {
-    let mut mapped = ndt.clone();
-    mapped.ty = ndt
-        .ty
-        .clone()
-        .map(|ty| map_datatype_format_children(format, types, ty, &[rust_type_path(ndt)]))
-        .transpose()
-        .map_err(|err| err.with_named_datatype(ndt))?;
-    Ok(mapped)
-}
-
 impl AsRef<Exporter> for Exporter {
     fn as_ref(&self) -> &Exporter {
         self
@@ -890,7 +908,7 @@ impl FrameworkExporter<'_> {
         render_types(
             &mut s,
             self.exporter,
-            self.format,
+            None,
             self.types,
             self.files_root_types,
         )?;
@@ -918,10 +936,7 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
-        let mapped = ndts
-            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
-            .collect::<Result<Vec<_>, _>>()?;
-        primitives::export(self, self.types, mapped.iter(), indent)
+        primitives::export(self, self.types, ndts, indent)
     }
 }
 

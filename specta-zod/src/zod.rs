@@ -391,15 +391,45 @@ impl Zod {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    Ok(
-        match format
-            .map_types(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))?
-        {
-            Cow::Borrowed(_) => Cow::Borrowed(types),
-            Cow::Owned(types) => Cow::Owned(types),
-        },
-    )
+    let mapped = match format
+        .map_types(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))?
+    {
+        Cow::Borrowed(_) => types.clone(),
+        Cow::Owned(types) => types,
+    };
+    let source = mapped.clone();
+    let mut output = mapped;
+    let mut error = None;
+
+    output.iter_mut(|ndt| {
+        if error.is_some() {
+            return;
+        }
+
+        for generic in ndt.generics.to_mut() {
+            let Some(default) = generic.default.clone() else {
+                continue;
+            };
+            match map_datatype_format(Some(format), &source, &default) {
+                Ok(default) => generic.default = Some(default),
+                Err(source) => {
+                    error = Some(source);
+                    return;
+                }
+            }
+        }
+
+        let Some(datatype) = ndt.ty.clone() else {
+            return;
+        };
+        match map_datatype_format(Some(format), &source, &datatype) {
+            Ok(datatype) => ndt.ty = Some(datatype),
+            Err(source) => error = Some(source),
+        }
+    });
+
+    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
 }
 
 fn map_datatype_format(
@@ -570,20 +600,6 @@ fn map_datatype_fields(
     Ok(())
 }
 
-fn map_named_datatype_format(
-    format: Option<&dyn Format>,
-    types: &Types,
-    ndt: &NamedDataType,
-) -> Result<NamedDataType, Error> {
-    let mut mapped = ndt.clone();
-    mapped.ty = ndt
-        .ty
-        .clone()
-        .map(|ty| map_datatype_format_children(format, types, ty))
-        .transpose()?;
-    Ok(mapped)
-}
-
 impl AsRef<Zod> for Zod {
     fn as_ref(&self) -> &Zod {
         self
@@ -656,10 +672,7 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
-        let mapped = ndts
-            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
-            .collect::<Result<Vec<_>, _>>()?;
-        primitives::export(self, self.types, mapped.iter(), indent)
+        primitives::export(self, self.types, ndts, indent)
     }
 }
 
