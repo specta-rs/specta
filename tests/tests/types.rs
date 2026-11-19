@@ -2781,3 +2781,33 @@ fn type_override_accepts_reference_types_with_explicit_lifetimes() {
         Some(&DataType::Primitive(specta::datatype::Primitive::str))
     );
 }
+
+#[derive(Type)]
+enum SkippedVariantOverride {
+    #[specta(skip, type = NotAType)]
+    Hidden(NotAType),
+    Visible,
+}
+
+struct NotAType;
+
+#[test]
+fn skipped_variant_does_not_resolve_its_type_override() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <SkippedVariantOverride as Type>::definition(&mut types)
+    else {
+        panic!("the enum should be exported as a named type");
+    };
+    let Some(DataType::Enum(enumeration)) = types.get(&reference).and_then(|ndt| ndt.ty.as_ref())
+    else {
+        panic!("the definition should be an enum");
+    };
+    let (_, hidden) = enumeration
+        .variants
+        .iter()
+        .find(|(name, _)| name == "Hidden")
+        .expect("the skipped variant should remain in the graph");
+    assert!(hidden.skip);
+    assert!(matches!(hidden.fields, specta::datatype::Fields::Unit));
+}

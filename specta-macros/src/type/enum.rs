@@ -52,7 +52,11 @@ pub fn parse_enum(
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
 
-            let variant_value = if let Some(ref variant_ty) = attrs.r#type {
+            let variant_value = if attrs.skip {
+                // A skipped variant is not exported, so resolving its override
+                // would add an unnecessary `Type` bound to the container.
+                quote!(datatype::Variant::unit())
+            } else if let Some(ref variant_ty) = attrs.r#type {
                 let variant_ty = type_with_inferred_lifetimes(variant_ty);
                 let resolve = resolve_ty_expr(
                     crate_ref,
