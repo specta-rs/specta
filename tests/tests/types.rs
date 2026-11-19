@@ -2809,7 +2809,11 @@ fn skipped_variant_does_not_resolve_its_type_override() {
         .find(|(name, _)| name == "Hidden")
         .expect("the skipped variant should remain in the graph");
     assert!(hidden.skip);
-    assert!(matches!(hidden.fields, specta::datatype::Fields::Unit));
+    let specta::datatype::Fields::Unnamed(fields) = &hidden.fields else {
+        panic!("the skipped variant should keep its Rust payload layout");
+    };
+    assert_eq!(fields.fields.len(), 1);
+    assert!(fields.fields[0].ty.is_none());
 }
 
 #[test]

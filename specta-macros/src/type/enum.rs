@@ -55,8 +55,31 @@ pub fn parse_enum(
 
             let variant_value = if attrs.skip {
                 // A skipped variant is not exported, so resolving its override
-                // would add an unnecessary `Type` bound to the container.
-                quote!(datatype::Variant::unit())
+                // would add an unnecessary `Type` bound to the container. Keep
+                // the Rust field layout with untyped fields, because Serde may
+                // still serialize that payload even when Specta hides it.
+                match &variant.fields {
+                    Fields::Unit => quote!(datatype::Variant::unit()),
+                    Fields::Unnamed(fields) => {
+                        let field_calls = fields
+                            .unnamed
+                            .iter()
+                            .map(|_| quote!(.field(datatype::Field::default())));
+                        quote!(datatype::Variant::unnamed() #(#field_calls)* .build())
+                    }
+                    Fields::Named(fields) => {
+                        let fields = fields.named.iter().map(|field| {
+                            let name = field
+                                .ident
+                                .as_ref()
+                                .map(unraw_raw_ident)
+                                .unwrap_or_default();
+                            let name = name.to_token_stream();
+                            quote!(.field(#name, datatype::Field::default()))
+                        });
+                        quote!(datatype::Variant::named() #(#fields)* .build())
+                    }
+                }
             } else if let Some(ref variant_ty) = attrs.r#type {
                 let variant_ty = type_with_inferred_lifetimes(variant_ty);
                 let resolve = resolve_ty_expr(
