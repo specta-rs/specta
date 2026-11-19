@@ -61,7 +61,7 @@ rust_decimal1 = ["dep:rust_decimal"]
 indexmap2 = ["dep:indexmap"]
 ## [ordered-float](https://docs.rs/ordered-float) 3.x through 5.x. The version range is the policy for this crate, so the feature name carries no major.
 ordered-float = ["dep:ordered-float"]
-## [heapless](https://docs.rs/heapless) 0.7.x through 0.9.x. The version range is the policy for this crate, so the feature name carries no major.
+## [heapless](https://docs.rs/heapless) 0.9.x. The supported API generation is the policy for this crate, so the feature name carries no major.
 heapless = ["dep:heapless"]
 ## [semver](https://docs.rs/semver) 1.x
 semver1 = ["dep:semver"]
@@ -128,7 +128,7 @@ indexmap = { version = "2", optional = true, default-features = false, features 
   "std",
 ] } # TODO: Don't require `std`
 ordered-float = { version = ">=3, <6", optional = true, default-features = false }
-heapless = { version = ">=0.7, <0.10", optional = true, default-features = false, features = [] }
+heapless = { version = "0.9", optional = true, default-features = false, features = [] }
 semver = { version = "1", optional = true, default-features = false, features = [] }
 smol_str = { version = "0.3", optional = true, default-features = false, features = [] }
 arrayvec = { version = ">=0.6, <0.8", optional = true, default-features = false, features = [] }
