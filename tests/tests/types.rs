@@ -2863,3 +2863,26 @@ fn generic_defaults_do_not_reference_erased_parameters() {
         "a default referencing an erased parameter must be dropped"
     );
 }
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct SerdeSkippedNewtype<T: Serialize>(#[serde(skip)] T);
+
+#[test]
+fn serde_ignored_newtype_skip_still_requires_type_on_its_parameter() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <SerdeSkippedNewtype<String> as Type>::definition(&mut types)
+    else {
+        panic!("the newtype should be a named reference");
+    };
+    let Some(DataType::Struct(structure)) = types.get(&reference).and_then(|ndt| ndt.ty.as_ref())
+    else {
+        panic!("the newtype definition should be a struct");
+    };
+    let specta::datatype::Fields::Unnamed(fields) = &structure.fields else {
+        panic!("the newtype definition should have an unnamed field");
+    };
+    assert_eq!(fields.fields.len(), 1);
+    assert!(fields.fields[0].ty.is_some());
+}

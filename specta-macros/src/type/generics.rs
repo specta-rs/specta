@@ -273,8 +273,14 @@ pub fn used_type_params(
     } else {
         match data {
             Data::Struct(data) => {
+                // Serde ignores `#[serde(skip)]` on the sole field of a
+                // newtype struct, so that field is still part of the wire
+                // shape and must participate in generic usage analysis.
+                let is_newtype =
+                    matches!(data.fields, syn::Fields::Unnamed(ref fields) if fields.unnamed.len() == 1);
+
                 for field in &data.fields {
-                    visit_field_type(&mut visitor, field, skip_attrs)?;
+                    visit_field_type(&mut visitor, field, skip_attrs, is_newtype)?;
                 }
             }
             Data::Enum(data) => {
@@ -290,7 +296,7 @@ pub fn used_type_params(
                         visitor.visit_type(ty);
                     } else {
                         for field in &variant.fields {
-                            visit_field_type(&mut visitor, field, skip_attrs)?;
+                            visit_field_type(&mut visitor, field, skip_attrs, false)?;
                         }
                     }
                 }
@@ -613,11 +619,13 @@ fn visit_field_type(
     visitor: &mut GenericTypeUseVisitor<'_>,
     field: &syn::Field,
     skip_attrs: &[String],
+    serde_newtype_skip_ignored: bool,
 ) -> syn::Result<()> {
     let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
     let attrs = FieldAttr::from_attrs(&mut attrs)?;
 
-    if !attrs.skip {
+    let skipped = attrs.skip && !(serde_newtype_skip_ignored && attrs.serde_skip);
+    if !skipped {
         visitor.visit_type(attrs.r#type.as_ref().unwrap_or(&field.ty));
     }
 
