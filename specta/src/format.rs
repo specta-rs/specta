@@ -17,8 +17,10 @@ pub trait Format {
     ///
     /// Returns [`Cow::Borrowed`] when no changes are needed, or
     /// [`Cow::Owned`] when the formatter produces a transformed collection.
-    fn map_types<'a>(&'a self, types: &'a Types)
-    -> std::result::Result<Cow<'a, Types>, FormatError>;
+    fn map_types<'a>(
+        &'a self,
+        types: &'a Types,
+    ) -> std::result::Result<Cow<'a, Types>, FormatError>;
 
     /// Map an individual [`DataType`] with access to the surrounding [`Types`].
     ///

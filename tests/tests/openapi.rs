@@ -1125,8 +1125,8 @@ fn request_body_examples_are_typed_values() {
             specta_serde::Format,
         )
         .expect("replaced bodies should export");
-    let media = &replaced["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]
-        ["application/json"];
+    let media =
+        &replaced["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]["application/json"];
     assert_eq!(media["schema"]["type"], "boolean");
     assert!(media.get("example").is_none());
 }
@@ -1522,15 +1522,14 @@ fn a_user_type_can_use_the_probe_preferred_name() {
     let types = Types::default().register::<__specta_openapi_probe>();
     let document = OpenApi::default()
         .operation(
-            Operation::get("/probe")
-                .response::<__specta_openapi_probe>(200, "The user's type"),
+            Operation::get("/probe").response::<__specta_openapi_probe>(200, "The user's type"),
         )
         .export_document(&types, specta_serde::Format)
         .expect("the internal probe must not reserve a user-visible name");
 
     assert_eq!(
-        document["paths"]["/probe"]["get"]["responses"]["200"]["content"]["application/json"]
-            ["schema"]["$ref"],
+        document["paths"]["/probe"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+            ["$ref"],
         "#/components/schemas/__specta_openapi_probe"
     );
     assert!(
