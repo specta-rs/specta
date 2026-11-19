@@ -32,3 +32,7 @@ serde = { version = "1", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"] }
 specta = { version = "=2.0.0-rc.28", path = "../specta", features = ["derive", "collect"] }
 specta-serde = { path = "../specta-serde" }
+
+[[bench]]
+name = "export"
+harness = false
