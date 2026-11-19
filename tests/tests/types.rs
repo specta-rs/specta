@@ -2886,3 +2886,31 @@ fn serde_ignored_newtype_skip_still_requires_type_on_its_parameter() {
     assert_eq!(fields.fields.len(), 1);
     assert!(fields.fields[0].ty.is_some());
 }
+
+#[derive(Type)]
+struct AliasPair<A, B> {
+    a: A,
+    b: B,
+}
+
+type FlippedPair<X, Y> = AliasPair<Y, X>;
+
+#[derive(Type)]
+struct UsesFlippedAlias<T, U> {
+    pair: FlippedPair<T, U>,
+}
+
+#[test]
+fn generic_aliases_keep_parameter_meaning_when_reordered() {
+    let output = specta_typescript::Typescript::default()
+        .export(
+            &Types::default().register::<UsesFlippedAlias<String, bool>>(),
+            specta_serde::Format,
+        )
+        .expect("the alias should export");
+
+    assert!(
+        output.contains("pair: AliasPair<U, T>"),
+        "the alias flips the arguments, so Pair's parameters must flip too:\n{output}"
+    );
+}
