@@ -1,5 +1,7 @@
-// These types exist only to be exported into the `tests/typescript-typecheck`
-// harness, so their fields are never read.
+//! Generates the sources compiled by the `tests/typescript-typecheck` harness.
+//!
+//! These types exist only to be exported, so their fields are never read.
+
 #![allow(dead_code)]
 
 use std::{collections::HashMap, path::Path};

@@ -82,6 +82,7 @@ macro_rules! types {
     }};
 }
 
+/// The primitive types paired with the wire representation they export as.
 #[rustfmt::skip]
 pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
@@ -415,6 +416,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     )
 }
 
+/// Types whose wire representation differs between the serde phases.
 #[rustfmt::skip]
 pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
     let mut types = Types::default();

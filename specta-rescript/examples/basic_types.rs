@@ -1,3 +1,7 @@
+//! Exports a broad sample of Rust types to ReScript.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 use std::collections::HashMap;
 
@@ -100,6 +104,7 @@ struct User {
     tags: Vec<String>,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         .register::<Primitives>()

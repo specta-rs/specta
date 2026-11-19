@@ -1,3 +1,5 @@
+//! Checks that `selection!` works without depending on `serde` or `specta` directly.
+
 struct User {
     serde: String,
     specta: u32,
