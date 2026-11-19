@@ -71,8 +71,9 @@ impl NamedDataType {
         build: impl FnOnce(&mut Types, &mut NamedDataType),
     ) -> Self {
         let location = Location::caller();
+        let id = NamedId::Dynamic(Arc::new(()));
         let mut ndt = Self {
-            id: NamedId::Dynamic(Arc::new(())),
+            id: id.clone(),
             name: name.into(),
             docs: Cow::Borrowed(""),
             deprecated: None,
@@ -85,10 +86,10 @@ impl NamedDataType {
         };
         build(types, &mut ndt);
         // The closure receives the whole value, so it can replace it with a
-        // clone of another named type. The map key and `len` already describe
-        // this registration, so restore its identity before inserting.
-        ndt.id = NamedId::Dynamic(Arc::new(()));
-        types.types.insert(ndt.id.clone(), Some(ndt.clone()));
+        // clone of another named type. Restore the identity the closure may
+        // have used for self-references before inserting.
+        ndt.id = id.clone();
+        types.types.insert(id, Some(ndt.clone()));
         types.len += 1;
         ndt
     }
