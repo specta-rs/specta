@@ -2914,3 +2914,43 @@ fn generic_aliases_keep_parameter_meaning_when_reordered() {
         "the alias flips the arguments, so Pair's parameters must flip too:\n{output}"
     );
 }
+
+fn register_local_a(types: &mut Types) {
+    #[derive(Type)]
+    struct Local {
+        a: String,
+    }
+    types.register_mut::<Local>();
+}
+
+fn register_local_b(types: &mut Types) {
+    #[derive(Type)]
+    struct Local {
+        b: bool,
+    }
+    types.register_mut::<Local>();
+}
+
+#[test]
+fn same_named_types_in_different_function_scopes_stay_distinct() {
+    let mut types = Types::default();
+    register_local_a(&mut types);
+    register_local_b(&mut types);
+
+    let fields = types
+        .into_sorted_iter()
+        .filter(|ndt| ndt.name == "Local")
+        .map(|ndt| {
+            let Some(DataType::Struct(structure)) = &ndt.ty else {
+                panic!("both locals should be structs");
+            };
+            match &structure.fields {
+                specta::datatype::Fields::Named(fields) => {
+                    fields.fields[0].0.to_string()
+                }
+                _ => panic!("both locals should have named fields"),
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(fields, ["a", "b"]);
+}

@@ -91,7 +91,28 @@ fn generic_type_and_const_args(
         })
 }
 
+/// Builds an identifier suffix unique to this declaration's source position.
+///
+/// `module_path!()` does not distinguish declarations in separate function or
+/// block scopes, so its result is not a unique type identity on its own.
+fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let span = input
+        .clone()
+        .into_iter()
+        .next()
+        .map_or_else(proc_macro::Span::call_site, |token| token.span());
+    let mut hasher = DefaultHasher::new();
+    span.file().hash(&mut hasher);
+    span.line().hash(&mut hasher);
+    span.column().hash(&mut hasher);
+
+    format!("{:x}", hasher.finish())
+}
+
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
+    let source_suffix = source_position_suffix(&input);
     let DeriveInput {
         ident: raw_ident,
         generics,
@@ -450,7 +471,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 use std::borrow::Cow;
                 use #crate_ref::datatype;
 
-                static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
+                static SENTINEL: &str = concat!(
+                    module_path!(),
+                    "::",
+                    stringify!(#raw_ident),
+                    "::",
+                    #source_suffix
+                );
 
                 #build_placeholders
 
