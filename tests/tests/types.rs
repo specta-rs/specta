@@ -2763,3 +2763,21 @@ fn variant_builder_field_mut_borrows_the_builder() {
         specta::datatype::Fields::Unnamed(fields) if fields.fields.len() == 1
     ));
 }
+
+#[derive(Type)]
+#[specta(type = &'static str)]
+struct TypeOverrideReference;
+
+#[test]
+fn type_override_accepts_reference_types_with_explicit_lifetimes() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <TypeOverrideReference as Type>::definition(&mut types)
+    else {
+        panic!("the override should be exported as a named type");
+    };
+    assert_eq!(
+        types.get(&reference).and_then(|ndt| ndt.ty.as_ref()),
+        Some(&DataType::Primitive(specta::datatype::Primitive::str))
+    );
+}

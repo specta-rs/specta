@@ -70,8 +70,8 @@ impl RustCAttr {
                 Some(AttributeValue::Path(_)) => {
                     unreachable!("deprecated attribute can't be a path!")
                 }
-                Some(AttributeValue::Expr(_)) => {
-                    unreachable!("deprecated attribute can't be an expression!")
+                Some(AttributeValue::Expr(_)) | Some(AttributeValue::Type(_)) => {
+                    unreachable!("deprecated attribute can't be an expression or type!")
                 }
                 Some(AttributeValue::Attribute { attr, .. }) => {
                     let since = parse_deprecated_string_attr(attr, "since")?;
