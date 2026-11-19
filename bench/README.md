@@ -919,3 +919,39 @@ Both fixtures, min of 11 runs, back to back in one session, against
 (2,217,712 / 1,332,099 and 434,533 / 295,912), so the emitted crate is
 byte-identical. Raw runs in `bench/results/alloc-B-perf.json` and
 `alloc-B-inst.json`.
+
+## Scaling with repository size
+
+`bench/scaling.py <label> [iters]` regenerates the plain fixture at `SCALE`
+1/2/4/8 (318 → 2488 derives) and the instantiation fixture at `INST`
+100/250/500/1000 (500 → 5000 instantiations), measuring each. Run it once per
+tree with a different label and fit the two files: the cost is linear in both
+units with no measurable intercept, so a per-unit marginal cost is all the model
+needs. `harness.py` also records `rss_start_mb` / `rss_peak_mb` from
+`-Ztime-passes`, which tracks the AST rather than the macro's own traffic.
+
+Results from `scaling-base.json` / `scaling-head.json` (branch point vs final,
+min of 5 runs each, nightly 1.102, dev profile):
+
+| unit                | `expand_crate`    | `type_check_crate` | `codegen_crate`   | rustc `total`     |
+| ------------------- | ----------------- | ------------------ | ----------------- | ----------------- |
+| one plain derive    | 234 → 115 µs (−51 %) | 425 → 148 µs (−65 %) | 305 → 40 µs (−87 %) | 2.45 → 0.81 ms (−67 %) |
+| one instantiation   | 56 → 28 µs (−49 %)   | 116 → 33 µs (−72 %)  | 391 → 59 µs (−85 %) | 1.49 → 0.47 ms (−69 %) |
+
+| memory per unit                       | before   | after    |          |
+| ------------------------------------- | -------- | -------- | -------- |
+| macro allocations / derive            | 691      | 523      | −24 %    |
+| macro allocation bytes / derive       | 70.8 kB  | 47.6 kB  | −33 %    |
+| expanded AST / derive                 | 5.22 kB  | 1.74 kB  | −67 %    |
+| rustc peak RSS / derive               | 5.7 kB   | 1.9 kB   | −67 %    |
+| rustc peak RSS / instantiation        | 3.7 kB   | 0.9 kB   | −75 %    |
+
+So 10 000 derives cost 24.5 s of rustc before and 8.1 s after; 10 000
+instantiations cost 14.9 s before and 4.7 s after (see the PR for the full
+projection table). The "instantiation" unit in that fixture bundles ~0.4
+wrapper derives per instantiation, so it is an upper bound on a purely
+generic-heavy crate.
+
+Note the fixture is compiled with the dev profile, where the proc macro itself
+is built unoptimised: `expand_crate` is therefore the worst case, and a release
+build shifts the balance even further towards the type-check/codegen wins.

@@ -97,6 +97,12 @@ def time_crate(fixture, iters):
             for value, name in re.findall(r"time:\s+([\d.]+);[^\t]*\t(\S+)", run.stderr)
             if name in PASSES or name in EXTRA_PASSES
         }
+        # Peak resident memory rustc reaches, which tracks the AST and the
+        # expanded crate rather than the macro's own allocation traffic.
+        rss = re.search(r"rss:\s+(\d+)MB ->\s+(\d+)MB[^\n]*\ttotal", run.stderr)
+        if rss:
+            passes["rss_start_mb"] = float(rss.group(1))
+            passes["rss_peak_mb"] = float(rss.group(2))
         passes["wall"] = wall
         passes["cpu"] = (after.ru_utime - before.ru_utime) + (
             after.ru_stime - before.ru_stime
