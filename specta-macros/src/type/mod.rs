@@ -11,7 +11,7 @@ use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 use self::generics::{
     add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
     generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
-    resolve_ty_expr, type_with_inferred_lifetimes, used_type_params,
+    resolve_ty_expr, type_params_used_in, type_with_inferred_lifetimes, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -249,6 +249,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // own `Type` implementation is unconditional.
     let erase_generics = container_attrs.bound.as_ref().is_some_and(Vec::is_empty);
 
+    let all_type_params = generics
+        .params
+        .iter()
+        .filter_map(|param| match param {
+            GenericParam::Type(param) => Some(param.ident.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
     for param in &generics.params {
         let GenericParam::Type(t) = param else {
             continue;
@@ -283,11 +292,23 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         let default = match (&t.default, skip_default) {
             (_, true) | (None, false) => quote!(None),
             (Some(default), false) => {
-                // A default may reference another parameter (`U = T`), so
-                // resolve it with the same placeholder rewriting.
-                let resolve =
-                    resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
-                quote!(Some(#resolve))
+                let mentioned = type_params_used_in(default, &all_type_params);
+                if mentioned
+                    .iter()
+                    .any(|param| !used_generic_types.contains(param))
+                {
+                    // The declaration omits unused parameters, so a default
+                    // that references one cannot be represented. Dropping the
+                    // default is preferable to emitting a dangling name or
+                    // requiring a bound for a parameter that is not exported.
+                    quote!(None)
+                } else {
+                    // A default may reference another parameter (`U = T`), so
+                    // resolve it with the same placeholder rewriting.
+                    let resolve =
+                        resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
+                    quote!(Some(#resolve))
+                }
             }
         };
 

@@ -2838,3 +2838,28 @@ fn named_type_mutation_preserves_graph_identity() {
     types.iter_mut(|ndt| *ndt = a.clone());
     assert_eq!(types.len(), 2);
 }
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct DefaultReferencesSkipped<T, U = T> {
+    #[specta(skip)]
+    marker: std::marker::PhantomData<T>,
+    value: U,
+}
+
+#[test]
+fn generic_defaults_do_not_reference_erased_parameters() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <DefaultReferencesSkipped<String> as Type>::definition(&mut types)
+    else {
+        panic!("the outer type should be a named reference");
+    };
+    let ndt = types.get(&reference).expect("the named type should exist");
+    assert_eq!(ndt.generics.len(), 1);
+    assert_eq!(ndt.generics[0].name, "U");
+    assert!(
+        ndt.generics[0].default.is_none(),
+        "a default referencing an erased parameter must be dropped"
+    );
+}
