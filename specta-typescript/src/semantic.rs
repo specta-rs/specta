@@ -869,7 +869,23 @@ impl Configuration {
                         changed = true;
                     }
                     if runtime != field_ident {
-                        parts.push(format!("{}:{runtime}", js_object_key(name)));
+                        let key = js_object_key(name);
+                        if field.optional {
+                            // An absent optional field has no value to
+                            // transform. Only add the property when the input
+                            // actually owns it, so omission stays omission
+                            // instead of becoming `undefined` or an invalid
+                            // value produced from a missing input.
+                            let guard = format!(
+                                "Object.prototype.hasOwnProperty.call({js_ident},{})",
+                                js_string_literal(name)
+                            );
+                            parts.push(format!(
+                                "...({guard}?{{{key}:{runtime}}}:{{}})"
+                            ));
+                        } else {
+                            parts.push(format!("{key}:{runtime}"));
+                        }
                     }
                 }
 
