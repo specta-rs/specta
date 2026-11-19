@@ -1509,3 +1509,33 @@ fn plain_option_fields_split_per_phase() {
         serde_json::json!(["id"])
     );
 }
+
+#[derive(Type)]
+#[allow(non_camel_case_types)]
+#[specta(collect = false)]
+struct __specta_openapi_probe {
+    value: String,
+}
+
+#[test]
+fn a_user_type_can_use_the_probe_preferred_name() {
+    let types = Types::default().register::<__specta_openapi_probe>();
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/probe")
+                .response::<__specta_openapi_probe>(200, "The user's type"),
+        )
+        .export_document(&types, specta_serde::Format)
+        .expect("the internal probe must not reserve a user-visible name");
+
+    assert_eq!(
+        document["paths"]["/probe"]["get"]["responses"]["200"]["content"]["application/json"]
+            ["schema"]["$ref"],
+        "#/components/schemas/__specta_openapi_probe"
+    );
+    assert!(
+        document["components"]["schemas"]
+            .get("__specta_openapi_probe")
+            .is_some()
+    );
+}
