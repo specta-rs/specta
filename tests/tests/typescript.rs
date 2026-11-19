@@ -1762,3 +1762,25 @@ fn selection_supports_arbitrary_values_and_nested_fields() {
         "{\n\t__typename: string,\n\tname: string,\n\tpets: {\n\t\tname: string,\n\t}[],\n}"
     );
 }
+
+specta_typescript::branded!(pub struct QualifiedBrand(String) as "qualifiedBrand");
+
+#[derive(Type)]
+struct UsesQualifiedBrand {
+    value: QualifiedBrand,
+}
+
+#[test]
+fn branded_macro_supports_qualified_invocation() {
+    let output = Typescript::default()
+        .export(
+            &Types::default().register::<UsesQualifiedBrand>(),
+            specta_serde::Format,
+        )
+        .expect("qualified branded! invocation should work");
+
+    assert!(
+        output.contains("value: string & {"),
+        "the qualified branded! expansion should render its brand:\n{output}"
+    );
+}
