@@ -1110,6 +1110,25 @@ fn request_body_examples_are_typed_values() {
             .get("example")
             .is_none()
     );
+
+    // Replacing the body must also discard an example belonging to the old
+    // type; otherwise the document pairs a valid example with the wrong schema.
+    let replaced = OpenApi::default()
+        .operation(
+            Operation::post("/v1/accounts")
+                .request_body_with_example("old".to_owned())
+                .request_body::<bool>()
+                .response::<SignupRequest>(201, "Created"),
+        )
+        .export_document(
+            &Types::default().register::<SignupRequest>(),
+            specta_serde::Format,
+        )
+        .expect("replaced bodies should export");
+    let media = &replaced["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]
+        ["application/json"];
+    assert_eq!(media["schema"]["type"], "boolean");
+    assert!(media.get("example").is_none());
 }
 
 /// Error responses can be served as `application/problem+json`, security
