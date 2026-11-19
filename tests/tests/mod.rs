@@ -47,6 +47,7 @@ mod serde_flatten_option;
 mod serde_identifiers;
 mod serde_internal_tag_payloads;
 mod serde_other;
+mod serde_phase_provenance;
 mod serde_unified_asymmetry;
 mod serde_unknown_attrs;
 mod serde_untagged_unit;

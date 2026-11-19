@@ -502,6 +502,9 @@ impl specta::Format for PhasesFormat {
 
             let mut wrapper = Enum::default();
             wrapper
+                .attributes
+                .insert("specta:phase_wrapper", true);
+            wrapper
                 .variants
                 .push((Cow::Borrowed("Serialize"), serialize_variant));
             wrapper
@@ -731,12 +734,18 @@ fn select_explicit_phased_type(ty: &DataType, phase: Phase) -> Option<DataType> 
     })
 }
 
+fn is_phase_wrapper(wrapper: &Enum) -> bool {
+    wrapper
+        .attributes
+        .contains_key("specta:phase_wrapper")
+}
+
 fn select_split_wrapper_variant(ty: &DataType, phase: Phase) -> Option<DataType> {
     let DataType::Enum(wrapper) = ty else {
         return None;
     };
 
-    if wrapper.variants.len() != 2 {
+    if !is_phase_wrapper(wrapper) || wrapper.variants.len() != 2 {
         return None;
     }
 
@@ -769,7 +778,7 @@ fn select_split_type_variant<'a>(
         return None;
     };
 
-    if wrapper.variants.len() != 2 {
+    if !is_phase_wrapper(wrapper) || wrapper.variants.len() != 2 {
         return None;
     }
 
