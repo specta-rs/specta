@@ -26,6 +26,21 @@ pub struct Comment {
     body: String,
 }
 
+/// A bound that the `()` placeholder used by automatic collection could never
+/// satisfy. Generic declarations are collected only when the application
+/// registers a concrete instantiation.
+#[derive(Type)]
+pub struct DisplayValue<T: std::fmt::Display> {
+    value: T,
+}
+
+/// Const-generic declarations are likewise registered at a chosen
+/// instantiation rather than guessed during collection.
+#[derive(Type)]
+pub struct ConstValue<const N: usize> {
+    value: [u8; N],
+}
+
 /// A type which can still derive `Type`, but is left out of `specta::collect()`.
 #[derive(Type)]
 #[specta(collect = false)]

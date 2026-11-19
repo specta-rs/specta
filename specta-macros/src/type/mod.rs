@@ -324,18 +324,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         ));
     }
 
-    if cfg!(feature = "DO_NOT_USE_collect")
-        && has_const_param
-        && !container_attrs.inline
-        && container_attrs.collect.unwrap_or(true)
-    {
-        return Err(syn::Error::new(
-            raw_ident.span(),
-            "specta: automatic collection does not support const generics; use `#[specta(collect = false)]`",
-        ));
-    }
+    // Automatic collection has no concrete arguments to register a generic
+    // declaration with. The previous `()` placeholders broke any parameter
+    // with a real bound, so generic declarations are left for the application
+    // to register at the instantiations it actually exports.
+    let has_generic_params = generics
+        .params
+        .iter()
+        .any(|param| !matches!(param, GenericParam::Lifetime(_)));
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect")
+        && !has_generic_params
         && !container_attrs.inline
         && container_attrs.collect.unwrap_or(true))
     .then(|| {
