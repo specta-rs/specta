@@ -180,9 +180,10 @@ impl NamedDataType {
                 panic::resume_unwind(payload);
             };
 
-            // We patch the Tauri `Type` implementation.
-            let is_tauri_type =
-                ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::");
+            // Patch legacy Tauri channels, but preserve explicit opaque definitions.
+            let is_tauri_type = ndt.name == "TAURI_CHANNEL"
+                && ndt.module_path.starts_with("tauri::")
+                && !matches!(ndt.ty, Some(DataType::Reference(Reference::Opaque(_))));
             if is_tauri_type {
                 ndt.ty = None;
                 inline = true;
