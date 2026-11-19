@@ -54,6 +54,7 @@ pub fn construct_field_with_variant_skip(
         quote!(field.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
+        None,
     )?;
 
     let field_optional = attrs.optional.then(|| quote!(field.optional = true;));

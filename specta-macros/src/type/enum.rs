@@ -42,6 +42,7 @@ pub fn parse_enum(
                 quote!(v.attributes),
                 &v.attrs,
                 &container_attrs.skip_attrs,
+                None,
             )?;
 
             Ok((v, variant_attrs, runtime_attrs))

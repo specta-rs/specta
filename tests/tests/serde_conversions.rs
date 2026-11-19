@@ -1084,3 +1084,31 @@ fn identifier_enums_require_phases() {
         )
         .expect("valid field_identifier enum should pass in PhasesFormat");
 }
+
+#[derive(Clone, Type, Serialize)]
+#[specta(collect = false)]
+#[serde(into = "Vec<T>")]
+struct GenericConversion<T: Clone> {
+    value: T,
+}
+
+impl<T: Clone> From<GenericConversion<T>> for Vec<T> {
+    fn from(value: GenericConversion<T>) -> Self {
+        vec![value.value]
+    }
+}
+
+#[test]
+fn conversion_attributes_use_generic_placeholders() {
+    let types = Types::default()
+        .register::<GenericConversion<String>>()
+        .register::<GenericConversion<bool>>();
+    let output = Typescript::default()
+        .export(&types, specta_serde::PhasesFormat)
+        .expect("generic conversions should export");
+
+    assert!(
+        output.contains("export type GenericConversion_Serialize<T> = T[];"),
+        "the conversion shape must depend on T, not on the first registered instantiation:\n{output}"
+    );
+}

@@ -43,6 +43,7 @@ pub(super) fn build_runtime_attributes(
     attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
+    generics: Option<(&[syn::Ident], &HashSet<String>)>,
 ) -> syn::Result<Option<TokenStream>> {
     let serde_insert = serde::lower_runtime_attributes(
         crate_ref,
@@ -58,6 +59,7 @@ pub(super) fn build_runtime_attributes(
             })
             .cloned()
             .collect::<Vec<_>>(),
+        generics,
     )?;
 
     if serde_insert.is_none() {
@@ -122,12 +124,27 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     reject_unknown_specta_attrs(&attrs, Scope::Container)?;
 
+    let used_generic_types = used_type_params(
+        generics,
+        data,
+        container_attrs.r#type.as_ref(),
+        &container_attrs.skip_attrs,
+    )?;
+
+    let bounded = bounded_params(
+        generics,
+        container_attrs.bound.as_deref(),
+        &used_generic_types,
+    );
+
+    let generic_context = Some((used_generic_types.as_slice(), &bounded));
     let container_runtime_attrs = build_runtime_attributes(
         &crate_ref,
         AttributeScope::Container,
         quote!(s.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
+        generic_context,
     )?;
     let enum_runtime_attrs = build_runtime_attributes(
         &crate_ref,
@@ -135,6 +152,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote!(en.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
+        generic_context,
     )?;
     let container_runtime_attrs =
         if container_runtime_attrs.is_some() || enum_runtime_attrs.is_some() {
@@ -148,19 +166,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         } else {
             quote!()
         };
-
-    let used_generic_types = used_type_params(
-        generics,
-        data,
-        container_attrs.r#type.as_ref(),
-        &container_attrs.skip_attrs,
-    )?;
-
-    let bounded = bounded_params(
-        generics,
-        container_attrs.bound.as_deref(),
-        &used_generic_types,
-    );
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         let container_ty = type_with_inferred_lifetimes(container_ty);
