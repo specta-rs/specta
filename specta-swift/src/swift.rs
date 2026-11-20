@@ -221,6 +221,7 @@ impl Swift {
         let formatted_types = format_types(types, &format)?.into_owned();
         let raw_types = &formatted_types;
         validate_type_names(&exporter, raw_types)?;
+        validate_member_names(&exporter, raw_types)?;
 
         let mut result = String::new();
 
@@ -309,6 +310,53 @@ fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
                 first,
                 second: identity,
             });
+        }
+    }
+
+    Ok(())
+}
+
+/// Reject two members of one type that render as the same Swift identifier.
+///
+/// A naming convention can collapse distinct wire names (`foo_bar` and
+/// `fooBar` both become `fooBar` under camelCase). Swift rejects the
+/// duplicate property or enum case, so report the collision rather than emit
+/// source that cannot compile.
+fn validate_member_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
+    for ndt in types.into_sorted_iter() {
+        let Some(ty) = &ndt.ty else {
+            continue;
+        };
+
+        let members = match ty {
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .filter(|(_, field)| field.ty.is_some())
+                    .map(|(name, _)| (exporter.naming.convert_field(name), name.as_ref()))
+                    .collect::<Vec<_>>(),
+                Fields::Unit | Fields::Unnamed(_) => continue,
+            },
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .filter(|(_, variant)| !variant.skip)
+                .map(|(name, _)| (exporter.naming.convert_enum_case(name), name.as_ref()))
+                .collect::<Vec<_>>(),
+            _ => continue,
+        };
+
+        let mut seen = HashMap::<String, String>::new();
+        for (swift_name, wire_name) in members {
+            if let Some(first) = seen.insert(swift_name.clone(), wire_name.to_string()) {
+                return Err(Error::DuplicateMemberName {
+                    type_name: ndt.name.to_string(),
+                    name: swift_name,
+                    first,
+                    second: wire_name.to_string(),
+                });
+            }
         }
     }
 

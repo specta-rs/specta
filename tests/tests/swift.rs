@@ -2641,3 +2641,55 @@ fn swift_deprecation_message_is_escaped() {
 
     run_swift(&rendered, "print(\"SWIFT-OK\")");
 }
+
+/// Two wire names can convert to one Swift identifier: the exporter's default
+/// naming convention turns both `foo_bar` and `fooBar` into `fooBar`. Swift
+/// rejects the duplicate property/case as an invalid redeclaration, so the
+/// exporter must report the collision instead of emitting uncompilable source.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DuplicateFieldNames {
+    #[serde(rename = "foo_bar")]
+    first: String,
+    #[serde(rename = "fooBar")]
+    second: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "camelCase")]
+enum DuplicateVariantNames {
+    FooBar,
+    Foo_Bar,
+}
+
+#[test]
+fn swift_duplicate_member_names_are_rejected() {
+    let struct_error = Swift::default()
+        .export(
+            &Types::default().register::<DuplicateFieldNames>(),
+            specta_serde::Format,
+        )
+        .expect_err("two Swift properties cannot share a name");
+    let struct_message = struct_error.to_string();
+    assert!(struct_message.contains("fooBar"), "{struct_message}");
+    assert!(struct_message.contains("foo_bar"), "{struct_message}");
+    assert!(
+        struct_message.contains("DuplicateFieldNames"),
+        "{struct_message}"
+    );
+
+    let enum_error = Swift::default()
+        .export(
+            &Types::default().register::<DuplicateVariantNames>(),
+            specta_serde::Format,
+        )
+        .expect_err("two Swift enum cases cannot share a name");
+    let enum_message = enum_error.to_string();
+    assert!(enum_message.contains("fooBar"), "{enum_message}");
+    assert!(enum_message.contains("foo_Bar"), "{enum_message}");
+    assert!(
+        enum_message.contains("DuplicateVariantNames"),
+        "{enum_message}"
+    );
+}
