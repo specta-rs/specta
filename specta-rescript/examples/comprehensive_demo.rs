@@ -1,3 +1,7 @@
+//! Exercises the full range of specta-rescript features against a task management model.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 /// Comprehensive demonstration of all specta-rescript functionality.
@@ -287,6 +291,7 @@ struct SystemHealth {
     memory_usage: f64,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         // Enums

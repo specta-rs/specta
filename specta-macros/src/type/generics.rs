@@ -119,14 +119,11 @@ fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
 /// The `build` fn parameter list.
 ///
 /// `build` is a nested fn, so it cannot name the container's lifetime
-/// parameters; lifetime bounds and `crate_ref::Type` bounds are dropped. The
-/// former are never needed because field types are rewritten to inferred `'_`
-/// lifetimes, and the latter are re-added to the `where` clause by
-/// [`build_where_clause`].
-pub fn generics_with_ident_and_bounds_no_lifetimes(
-    crate_ref: &TokenStream,
-    generics: &Generics,
-) -> Option<TokenStream> {
+/// parameters; lifetime parameters are dropped and all bounds are carried by
+/// the `where` clause from [`build_where_clause`]. Declaring them in both places
+/// would trip `clippy::multiple_bound_locations` in every crate that derives a
+/// bounded generic type.
+pub fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -135,19 +132,7 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(
             use GenericParam::*;
 
             generics.params.iter().filter_map(|param| match param {
-                Type(TypeParam { ident, bounds, .. }) => {
-                    let bounds = bounds
-                        .iter()
-                        .filter(|bound| {
-                            !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref)
-                        })
-                        .collect::<Vec<_>>();
-                    if bounds.is_empty() {
-                        Some(quote!(#ident))
-                    } else {
-                        Some(quote!(#ident: #(#bounds)+*))
-                    }
-                }
+                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
                 Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
@@ -165,9 +150,11 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(
 ///
 /// It carries the container's declared bounds (so `build`'s body type-checks
 /// wherever it mentions a bounded field type) plus the automatic `Type`
-/// predicates. Lifetime bounds are dropped: `build` cannot name the container's
-/// lifetime parameters, and field types use inferred `'_` lifetimes so they are
-/// never required.
+/// predicates. Bounds are collected here rather than on the parameter list so
+/// each bound has exactly one location, which keeps the generated code clean
+/// under `clippy::multiple_bound_locations`. Lifetime bounds are dropped:
+/// `build` cannot name the container's lifetime parameters, and field types use
+/// inferred `'_` lifetimes so they are never required.
 pub fn build_where_clause(
     crate_ref: &TokenStream,
     generics: &Generics,
@@ -175,6 +162,23 @@ pub fn build_where_clause(
     used_generic_types: &[syn::Ident],
 ) -> Option<WhereClause> {
     let mut predicates: Vec<syn::WherePredicate> = Vec::new();
+
+    for param in &generics.params {
+        let GenericParam::Type(param) = param else {
+            continue;
+        };
+
+        let bounds = param
+            .bounds
+            .iter()
+            .filter(|bound| !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref))
+            .cloned()
+            .collect::<syn::punctuated::Punctuated<_, syn::Token![+]>>();
+        if !bounds.is_empty() {
+            let ident = &param.ident;
+            predicates.push(parse_quote!(#ident: #bounds));
+        }
+    }
 
     if let Some(where_clause) = &generics.where_clause {
         predicates.extend(
@@ -191,10 +195,14 @@ pub fn build_where_clause(
     let mut seen = HashSet::new();
     predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
 
-    for ident in used_generic_types {
-        let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
-        if seen.insert(quote!(#predicate).to_string()) {
-            predicates.push(predicate);
+    // `#[specta(bound = "...")]` replaces the inferred `Type` bounds. An empty
+    // string explicitly asks for none.
+    if custom_bounds.is_none() {
+        for ident in used_generic_types {
+            let predicate: syn::WherePredicate = parse_quote!(#ident: #crate_ref::Type);
+            if seen.insert(quote!(#predicate).to_string()) {
+                predicates.push(predicate);
+            }
         }
     }
 
@@ -269,8 +277,13 @@ pub fn used_type_params(
     } else {
         match data {
             Data::Struct(data) => {
+                // Serde ignores `#[serde(skip)]` on the sole field of a
+                // newtype struct, so that field is still part of the wire
+                // shape and must participate in generic usage analysis.
+                let is_newtype = matches!(data.fields, syn::Fields::Unnamed(ref fields) if fields.unnamed.len() == 1);
+
                 for field in &data.fields {
-                    visit_field_type(&mut visitor, field, skip_attrs)?;
+                    visit_field_type(&mut visitor, field, skip_attrs, is_newtype)?;
                 }
             }
             Data::Enum(data) => {
@@ -286,7 +299,7 @@ pub fn used_type_params(
                         visitor.visit_type(ty);
                     } else {
                         for field in &variant.fields {
-                            visit_field_type(&mut visitor, field, skip_attrs)?;
+                            visit_field_type(&mut visitor, field, skip_attrs, false)?;
                         }
                     }
                 }
@@ -609,11 +622,13 @@ fn visit_field_type(
     visitor: &mut GenericTypeUseVisitor<'_>,
     field: &syn::Field,
     skip_attrs: &[String],
+    serde_newtype_skip_ignored: bool,
 ) -> syn::Result<()> {
     let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
     let attrs = FieldAttr::from_attrs(&mut attrs)?;
 
-    if !attrs.skip {
+    let skipped = attrs.skip && !(serde_newtype_skip_ignored && attrs.serde_skip);
+    if !skipped {
         visitor.visit_type(attrs.r#type.as_ref().unwrap_or(&field.ty));
     }
 
@@ -626,8 +641,10 @@ pub fn add_type_to_where_clause(
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[syn::Ident],
 ) -> Option<WhereClause> {
-    if let Some(where_clause) = merge_custom_bounds(generics, custom_bounds) {
-        return Some(where_clause);
+    // A custom bound replaces the automatically inferred `Type` predicates,
+    // including the empty bound which explicitly requests no inference.
+    if custom_bounds.is_some() {
+        return merge_custom_bounds(generics, custom_bounds);
     }
 
     if used_generic_types.is_empty() {

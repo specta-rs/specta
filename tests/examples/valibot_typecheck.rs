@@ -1,3 +1,5 @@
+//! Generates the sources compiled by the `tests/valibot-typecheck` harness.
+
 use std::{borrow::Cow, collections::HashMap, iter, path::Path};
 
 use serde::{Deserialize, Serialize};

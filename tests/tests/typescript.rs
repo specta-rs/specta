@@ -1718,3 +1718,84 @@ fn map_key_helper_names_are_reserved() {
         "the generic map key must still reference the built-in `PropertyKey`:\n{output}"
     );
 }
+
+#[test]
+fn selection_supports_arbitrary_values_and_nested_fields() {
+    #[derive(Clone)]
+    #[allow(dead_code)]
+    struct Pet {
+        name: &'static str,
+        age: u32,
+    }
+
+    #[derive(Clone)]
+    #[allow(dead_code)]
+    struct User {
+        id: u32,
+        name: &'static str,
+        pets: Vec<Pet>,
+    }
+
+    let user = User {
+        id: 1,
+        name: "Monty",
+        pets: vec![Pet {
+            name: "Tux",
+            age: 2,
+        }],
+    };
+    let selection = specta_util::selection!(user, {
+        __typename: "User",
+        name,
+        pets: [{ name }],
+    });
+
+    fn datatype_of<T: Type>(_: &T, types: &mut Types) -> DataType {
+        T::definition(types)
+    }
+
+    let mut types = Types::default();
+    let dt = datatype_of(&selection, &mut types);
+    let rendered = primitives::inline(&Typescript::default(), &types, &dt).unwrap();
+    assert_eq!(
+        rendered,
+        "{\n\t__typename: string,\n\tname: string,\n\tpets: {\n\t\tname: string,\n\t}[],\n}"
+    );
+}
+
+specta_typescript::branded!(pub struct QualifiedBrand(String) as "qualifiedBrand");
+
+#[derive(Type)]
+struct UsesQualifiedBrand {
+    value: QualifiedBrand,
+}
+
+#[test]
+fn branded_macro_supports_qualified_invocation() {
+    let output = Typescript::default()
+        .export(
+            &Types::default().register::<UsesQualifiedBrand>(),
+            specta_serde::Format,
+        )
+        .expect("qualified branded! invocation should work");
+
+    assert!(
+        output.contains("value: string & {"),
+        "the qualified branded! expansion should render its brand:\n{output}"
+    );
+}
+
+#[test]
+fn files_layout_refuses_to_delete_an_existing_regular_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("bindings");
+    std::fs::write(&path, "hand-written file").unwrap();
+
+    let error = Typescript::default()
+        .layout(Layout::Files)
+        .export_to(&path, &Types::default(), specta_serde::Format)
+        .expect_err("a files layout must not replace a regular file");
+
+    assert!(error.to_string().contains("Refusing to delete it"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "hand-written file");
+}

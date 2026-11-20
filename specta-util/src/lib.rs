@@ -22,6 +22,12 @@ mod remapper;
 pub mod __private {
     pub use serde;
     pub use specta;
+
+    /// Strip the `r#` prefix from a raw identifier.
+    #[inline]
+    pub fn unraw(ident: &'static str) -> &'static str {
+        ident.strip_prefix("r#").unwrap_or(ident)
+    }
 }
 
 pub use array::FixedArray;

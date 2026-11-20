@@ -37,7 +37,9 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 /// - `#[specta(remote = path::ToType)]` implements `Type` for a remote type instead of the
 ///   local derive input name.
 /// - `#[specta(collect)]` or `#[specta(collect = true)]` enables collection for this type when
-///   the `collect` feature is used. Use `#[specta(collect = false)]` to prevent collection.
+///   the `collect` feature is used. Generic declarations are not collected automatically
+///   because they need a concrete instantiation; register those explicitly. Use
+///   `#[specta(collect = false)]` to prevent collection.
 /// - `#[specta(skip_attr = "attr_name")]` ignores attributes named `attr_name` while parsing and
 ///   while collecting runtime attributes. This may be repeated.
 /// - `#[specta(transparent)]` or `#[specta(transparent = true)]` treats a struct as its single

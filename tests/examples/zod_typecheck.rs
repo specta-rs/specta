@@ -1,3 +1,5 @@
+//! Generates the sources compiled by the `tests/zod-typecheck` harness.
+
 use std::{collections::HashMap, path::Path};
 
 use serde::{Deserialize, Serialize};

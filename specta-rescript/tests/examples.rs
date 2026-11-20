@@ -1,124 +1,122 @@
+//! Golden-file tests that export each example and compare it to the checked-in output.
+
 use specta_rescript::ReScript;
 
 fn assert_export_eq(actual: String, golden: &str) {
     assert_eq!(actual.replace("\r\n", "\n"), golden.replace("\r\n", "\n"));
 }
 
-mod simple_usage {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/simple_usage.rs");
+#[path = "../examples/simple_usage.rs"]
+mod simple_usage;
 
-    #[test]
-    fn default_export() {
-        let golden = include_str!("../examples/generated/SimpleUsage.res");
-        assert_export_eq(ReScript::default().export(&types()).unwrap(), golden);
-    }
+#[path = "../examples/basic_types.rs"]
+mod basic_types;
+
+#[path = "../examples/variants.rs"]
+mod variants;
+
+#[path = "../examples/generics.rs"]
+mod generics;
+
+#[path = "../examples/result_types.rs"]
+mod result_types;
+
+#[path = "../examples/comments_example.rs"]
+mod comments_example;
+
+#[path = "../examples/comprehensive_demo.rs"]
+mod comprehensive_demo;
+
+#[path = "../examples/recursive.rs"]
+mod recursive;
+
+#[test]
+fn simple_usage_default_export() {
+    let golden = include_str!("../examples/generated/SimpleUsage.res");
+    assert_export_eq(
+        ReScript::default().export(&simple_usage::types()).unwrap(),
+        golden,
+    );
 }
 
-mod basic_types {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/basic_types.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/BasicTypes.res");
-        assert_export_eq(
-            ReScript::default()
-                .without_serde()
-                .export(&types())
-                .unwrap(),
-            golden,
-        );
-    }
+#[test]
+fn basic_types_export() {
+    let golden = include_str!("../examples/generated/BasicTypes.res");
+    assert_export_eq(
+        ReScript::default()
+            .without_serde()
+            .export(&basic_types::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod variants {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/variants.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/Variants.res");
-        assert_export_eq(
-            ReScript::default()
-                .without_serde()
-                .export(&types())
-                .unwrap(),
-            golden,
-        );
-    }
+#[test]
+fn variants_export() {
+    let golden = include_str!("../examples/generated/Variants.res");
+    assert_export_eq(
+        ReScript::default()
+            .without_serde()
+            .export(&variants::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod generics {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/generics.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/Generics.res");
-        assert_export_eq(
-            ReScript::default()
-                .without_serde()
-                .export(&types())
-                .unwrap(),
-            golden,
-        );
-    }
+#[test]
+fn generics_export() {
+    let golden = include_str!("../examples/generated/Generics.res");
+    assert_export_eq(
+        ReScript::default()
+            .without_serde()
+            .export(&generics::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod result_types {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/result_types.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/ResultTypes.res");
-        assert_export_eq(
-            ReScript::default()
-                .without_serde()
-                .export(&types())
-                .unwrap(),
-            golden,
-        );
-    }
+#[test]
+fn result_types_export() {
+    let golden = include_str!("../examples/generated/ResultTypes.res");
+    assert_export_eq(
+        ReScript::default()
+            .without_serde()
+            .export(&result_types::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod comments_example {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/comments_example.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/CommentsExample.res");
-        assert_export_eq(ReScript::default().export(&types()).unwrap(), golden);
-    }
+#[test]
+fn comments_example_export() {
+    let golden = include_str!("../examples/generated/CommentsExample.res");
+    assert_export_eq(
+        ReScript::default()
+            .export(&comments_example::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod comprehensive_demo {
-    use super::{ReScript, assert_export_eq};
-    include!("../examples/comprehensive_demo.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/ComprehensiveDemo.res");
-        assert_export_eq(ReScript::default().export(&types()).unwrap(), golden);
-    }
+#[test]
+fn comprehensive_demo_export() {
+    let golden = include_str!("../examples/generated/ComprehensiveDemo.res");
+    assert_export_eq(
+        ReScript::default()
+            .export(&comprehensive_demo::types())
+            .unwrap(),
+        golden,
+    );
 }
 
-mod recursive {
-    use super::assert_export_eq;
-
-    include!("../examples/recursive.rs");
-
-    #[test]
-    fn export() {
-        let golden = include_str!("../examples/generated/Recursive.res");
-        assert_export_eq(
-            ReScript::default()
-                .without_serde()
-                .export(&types())
-                .unwrap(),
-            golden,
-        );
-    }
+#[test]
+fn recursive_export() {
+    let golden = include_str!("../examples/generated/Recursive.res");
+    assert_export_eq(
+        ReScript::default()
+            .without_serde()
+            .export(&recursive::types())
+            .unwrap(),
+        golden,
+    );
 }

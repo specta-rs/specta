@@ -36,9 +36,9 @@ function = []
 
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json) 1.x
-serde_json1 = ["dep:serde_json"]
+serde_json1 = ["dep:serde_json", "std"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml) 0.9.x
-serde_yaml09 = ["dep:serde_yaml"]
+serde_yaml09 = ["dep:serde_yaml", "std"]
 ## Support for [toml](https://github.com/toml-rs/toml) 1.x
 toml1 = ["dep:toml", "std"]
 
@@ -61,7 +61,7 @@ rust_decimal1 = ["dep:rust_decimal"]
 indexmap2 = ["dep:indexmap"]
 ## [ordered-float](https://docs.rs/ordered-float) 3.x through 5.x. The version range is the policy for this crate, so the feature name carries no major.
 ordered-float = ["dep:ordered-float"]
-## [heapless](https://docs.rs/heapless) 0.7.x through 0.9.x. The version range is the policy for this crate, so the feature name carries no major.
+## [heapless](https://docs.rs/heapless) 0.9.x. The supported API generation is the policy for this crate, so the feature name carries no major.
 heapless = ["dep:heapless"]
 ## [semver](https://docs.rs/semver) 1.x
 semver1 = ["dep:semver"]
@@ -78,7 +78,7 @@ mac_address1 = ["dep:mac_address"]
 ## [bit-vec](https://docs.rs/bit-vec) 0.10.x
 bit-vec010 = ["dep:bit-vec"]
 ## [bson](https://docs.rs/bson) 3.x
-bson3 = ["dep:bson"]
+bson3 = ["dep:bson", "std"]
 ## [bytes](https://docs.rs/bytes) 1.x
 bytes1 = ["dep:bytes"]
 ## [uhlc](https://docs.rs/uhlc) 0.9.x
@@ -90,7 +90,7 @@ glam034 = ["dep:glam"]
 ## [tokio](https://docs.rs/tokio) 1.x
 tokio1 = ["dep:tokio"]
 ## [url](https://docs.rs/url) 2.x
-url2 = ["dep:url"]
+url2 = ["dep:url", "std"]
 ## [either](https://docs.rs/either) 1.x
 either1 = ["dep:either"]
 ## [error-stack](https://docs.rs/error-stack) 0.8.x
@@ -102,7 +102,7 @@ bevy_input020 = ["dep:bevy_input", "bevy_ecs020", "smol_str03"]
 ## [camino](https://docs.rs/camino) 1.x
 camino1 = ["dep:camino"]
 ## [geojson](https://docs.rs/geojson) 1.x
-geojson1 = ["dep:geojson", "serde_json1"]
+geojson1 = ["dep:geojson", "serde_json1", "std"]
 
 [lints]
 workspace = true
@@ -127,7 +127,7 @@ indexmap = { version = "2", optional = true, default-features = false, features 
   "std",
 ] } # TODO: Don't require `std`
 ordered-float = { version = ">=3, <6", optional = true, default-features = false }
-heapless = { version = ">=0.7, <0.10", optional = true, default-features = false, features = [] }
+heapless = { version = "0.9", optional = true, default-features = false, features = [] }
 semver = { version = "1", optional = true, default-features = false, features = [] }
 smol_str = { version = "0.3", optional = true, default-features = false, features = [] }
 arrayvec = { version = ">=0.6, <0.8", optional = true, default-features = false, features = [] }

@@ -1,3 +1,7 @@
+//! Output tests for the core type shapes the ReScript exporter supports.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{
     Type, Types,
     datatype::{DataType, Field, NamedDataType, Primitive, Struct},

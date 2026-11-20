@@ -596,11 +596,24 @@ impl Configuration {
             remap_bigint,
             types,
             stack: Vec::new(),
+            generic_scopes: Vec::new(),
             error: None,
             recursion_cut: false,
             current: None,
         };
         let result = self.apply_inner(&mut walk, dt, js_ident);
+        // A recursive struct is cut by the cycle stack just like an enum. If
+        // the visible part still needs a runtime transform, emitting that
+        // expression would transform the first level and silently leave every
+        // recursive descendant untransformed.
+        if walk.recursion_cut
+            && walk.error.is_none()
+            && result
+                .as_ref()
+                .is_some_and(|(_, runtime)| runtime != js_ident)
+        {
+            self.record_unsupported(&mut walk, RECURSIVE_STRUCT_REASON);
+        }
         (prune_identity_root(types, dt, js_ident, result), walk.error)
     }
 
@@ -669,9 +682,12 @@ impl Configuration {
                         }
                         walk.stack.push(key);
                         let previous = walk.current.replace(ndt);
+                        walk.generic_scopes
+                            .push(named_reference_generics(r).to_vec());
                         let result = self
                             .apply_inner(walk, ty, js_ident)
                             .map(|(_, runtime)| (None, runtime));
+                        walk.generic_scopes.pop();
                         walk.current = previous;
                         walk.stack.pop();
                         result
@@ -801,9 +817,19 @@ impl Configuration {
                 }
             }
             DataType::Enum(e) => self.apply_enum(walk, e, js_ident),
-            DataType::Primitive(_)
-            | DataType::Generic(_)
-            | DataType::Reference(Reference::Opaque(_)) => None,
+            DataType::Generic(generic) => walk
+                .generic_scopes
+                .iter()
+                .rev()
+                .find_map(|scope| {
+                    scope
+                        .iter()
+                        .find(|(candidate, _)| candidate == generic)
+                        .map(|(_, dt)| dt.clone())
+                })
+                .filter(|dt| !matches!(dt, DataType::Generic(_)))
+                .and_then(|dt| self.apply_inner(walk, &dt, js_ident)),
+            DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => None,
         };
 
         self.apply_builtin_remaps(walk.remap_bigint, dt, js_ident, result)
@@ -843,7 +869,21 @@ impl Configuration {
                         changed = true;
                     }
                     if runtime != field_ident {
-                        parts.push(format!("{}:{runtime}", js_object_key(name)));
+                        let key = js_object_key(name);
+                        if field.optional {
+                            // An absent optional field has no value to
+                            // transform. Only add the property when the input
+                            // actually owns it, so omission stays omission
+                            // instead of becoming `undefined` or an invalid
+                            // value produced from a missing input.
+                            let guard = format!(
+                                "Object.prototype.hasOwnProperty.call({js_ident},{})",
+                                js_string_literal(name)
+                            );
+                            parts.push(format!("...({guard}?{{{key}:{runtime}}}:{{}})"));
+                        } else {
+                            parts.push(format!("{key}:{runtime}"));
+                        }
                     }
                 }
 
@@ -1146,6 +1186,15 @@ fn registered_generics_changed(dt: &DataType, next_ty: &DataType) -> bool {
     source != remapped
 }
 
+fn named_reference_generics(
+    reference: &specta::datatype::NamedReference,
+) -> &[(specta::datatype::Generic, DataType)] {
+    match &reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => &[],
+    }
+}
+
 fn is_lossless_bigint_primitive(dt: &DataType) -> bool {
     matches!(
         dt,
@@ -1376,6 +1425,8 @@ struct Walk<'a> {
     types: &'a Types,
     /// Named types currently being expanded, used to cut recursive cycles.
     stack: Vec<(Cow<'static, str>, Cow<'static, str>)>,
+    /// Concrete generic environments of the named references being expanded.
+    generic_scopes: Vec<Vec<(specta::datatype::Generic, DataType)>>,
     /// The first unsupported construct encountered, if any.
     error: Option<Error>,
     /// Set when a recursive reference was cut short by [`Walk::stack`].
@@ -1386,6 +1437,7 @@ struct Walk<'a> {
 
 const UNSUPPORTED_ENUM_REASON: &str = "the enum's wire shape cannot be discriminated without guessing (for example overlapping `#[serde(untagged)]` variants); use a tagged representation or apply the rule to a non-ambiguous position";
 const RECURSIVE_ENUM_REASON: &str = "the enum is recursive, so a single expression cannot transform nested values without the exported type claiming more than the runtime value provides";
+const RECURSIVE_STRUCT_REASON: &str = "the type is recursive, so a single expression cannot transform nested values without the exported type claiming more than the runtime value provides";
 
 /// How a single enum branch is selected at runtime.
 enum BranchGuard {

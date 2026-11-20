@@ -1,3 +1,7 @@
+//! Shows how Rust `Result` maps to ReScript's built-in `result` type.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 /// Example showcasing ReScript's built-in `result<ok, err>` type.
@@ -69,6 +73,7 @@ struct SearchResult {
     total_count: u32,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         .register::<MyResult<String, String>>()

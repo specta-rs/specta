@@ -9,3 +9,6 @@ publish = false
 specta = { path = "../../specta", features = ["derive"] }
 specta-typescript = { path = "../../specta-typescript" }
 serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

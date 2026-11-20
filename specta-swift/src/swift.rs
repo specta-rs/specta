@@ -1,6 +1,6 @@
 //! Swift language exporter configuration and main export functionality.
 
-use std::{borrow::Cow, fmt, path::Path};
+use std::{borrow::Cow, collections::HashMap, fmt, path::Path};
 
 use specta::{
     Format, Types,
@@ -220,6 +220,7 @@ impl Swift {
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?.into_owned();
         let raw_types = &formatted_types;
+        validate_type_names(&exporter, raw_types)?;
 
         let mut result = String::new();
 
@@ -277,6 +278,41 @@ impl Swift {
         std::fs::write(path, content)?;
         Ok(())
     }
+}
+
+/// Reject two exported Rust types that render as the same Swift declaration.
+///
+/// Swift has no module-level name space in this exporter's single-file output,
+/// so emitting both declarations produces uncompilable source. Detecting the
+/// collision before rendering gives the Rust type names and a useful error.
+fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
+    let mut names = HashMap::<String, String>::new();
+
+    for ndt in types.into_sorted_iter() {
+        if !matches!(
+            ndt.ty,
+            Some(DataType::Struct(_) | DataType::Enum(_) | DataType::Tuple(_))
+        ) {
+            continue;
+        }
+
+        let name = exporter.naming.convert(&ndt.name);
+        let identity = if ndt.module_path.is_empty() {
+            ndt.name.to_string()
+        } else {
+            format!("{}::{}", ndt.module_path, ndt.name)
+        };
+
+        if let Some(first) = names.insert(name.clone(), identity.clone()) {
+            return Err(Error::DuplicateTypeName {
+                name,
+                first,
+                second: identity,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {

@@ -7,16 +7,16 @@ use specta_csharp::{CSharp, Error, Layout, Visibility};
 struct IdentityFormat;
 
 impl Format for IdentityFormat {
-    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        Ok(Cow::Owned(types.clone()))
+    fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
+        Ok(Cow::Borrowed(types))
     }
 
-    fn map_type(
-        &'_ self,
-        _types: &Types,
-        datatype: &specta::datatype::DataType,
-    ) -> Result<Cow<'_, specta::datatype::DataType>, specta::FormatError> {
-        Ok(Cow::Owned(datatype.clone()))
+    fn map_type<'a>(
+        &'a self,
+        _types: &'a Types,
+        datatype: &'a specta::datatype::DataType,
+    ) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
+        Ok(Cow::Borrowed(datatype))
     }
 }
 
