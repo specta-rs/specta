@@ -43,6 +43,9 @@ impl Parse for AttributeValue {
 #[derive(Clone)]
 pub(crate) struct Attribute {
     /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
+    ///
+    /// Only set on top-level attributes: entries nested inside an attribute list
+    /// (`inline` in `#[specta(inline)]`) are matched by key alone.
     pub(crate) source: String,
     /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
     pub(crate) key: Ident,
@@ -297,35 +300,35 @@ pub(crate) fn parse_attrs_with_filter(
     attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> syn::Result<Vec<Attribute>> {
-    let mut result = Vec::new();
+    let mut result = Vec::with_capacity(attrs.len());
 
     for attr in attrs {
-        let ident = attr
+        let key = &attr
             .path()
             .segments
             .last()
             .expect("Attribute path must have at least one segment")
-            .clone()
             .ident;
 
         // Skip attributes that are in the skip list. `#[tracing::instrument]`
         // accepts shorthand syntax such as `%value` that is not valid for
         // Specta's generic metadata parser and should never be interpreted as
-        // Specta configuration.
-        let attr_name = ident.to_string();
-        if attr_name == "instrument" || skip_attrs.contains(&attr_name) {
+        // Specta configuration. Both checks compare idents directly so an
+        // attribute that is thrown away costs no allocation.
+        if key == "instrument" || skip_attrs.iter().any(|skip| *key == *skip) {
             continue;
         }
 
-        result.append(&mut match &attr.meta {
-            Meta::Path(_) => vec![Attribute {
-                source: attr_name.clone(),
-                key: ident.clone(),
+        let source = key.to_string();
+
+        result.push(match &attr.meta {
+            Meta::Path(_) => Attribute {
+                source,
+                key: key.clone(),
                 value: None,
-            }],
+            },
             Meta::List(meta) => {
-                let source = attr_name.clone();
-                let mut parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
+                let parsed = syn::parse2::<NestedAttributeList>(meta.tokens.clone())?;
                 if source == "specta"
                     && let Some(span) = parsed.unstructured_argument
                 {
@@ -334,17 +337,16 @@ pub(crate) fn parse_attrs_with_filter(
                         "specta: unsupported attribute syntax",
                     ));
                 }
-                for a in &mut parsed.attrs {
-                    a.source = source.clone();
-                }
-                vec![Attribute {
+                // Nested entries are only ever matched by key, so they don't
+                // need the source to be cloned into them.
+                Attribute {
                     source,
-                    key: ident.clone(),
+                    key: key.clone(),
                     value: Some(AttributeValue::Attribute {
-                        span: ident.span(),
+                        span: key.span(),
                         attr: parsed.attrs,
                     }),
-                }]
+                }
             }
             Meta::NameValue(meta) => {
                 let value = match &meta.value {
@@ -353,11 +355,11 @@ pub(crate) fn parse_attrs_with_filter(
                     expr => AttributeValue::Expr(expr.clone()),
                 };
 
-                vec![Attribute {
-                    source: attr_name.clone(),
-                    key: ident.clone(),
+                Attribute {
+                    source,
+                    key: key.clone(),
                     value: Some(value),
-                }]
+                }
             }
         });
     }
