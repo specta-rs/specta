@@ -538,15 +538,17 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             break;
         }
 
-        let path = vec![rust_type_path(ndt)];
+        let mut path = FormatPath::new(rust_type_path(ndt));
         let mut defaults = Vec::new();
         for (idx, generic) in ndt.generics.iter().enumerate() {
             let Some(default) = generic.default.as_ref() else {
                 continue;
             };
-            let mut generic_path = path.clone();
-            generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
-            match map_datatype_format(Some(format), &mapped, default, &generic_path) {
+            let segment =
+                PathSegment::Name(Cow::Owned(format!("<generic_default:{}>", generic.name)));
+            match path.with(segment, |path| {
+                map_datatype_format(Some(format), &mapped, default, path)
+            }) {
                 Ok(default) => defaults.push((idx, default.into_owned())),
                 Err(source) => {
                     error = Some(source.with_named_datatype(ndt));
@@ -561,7 +563,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
         let datatype = ndt
             .ty
             .as_ref()
-            .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &path))
+            .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &mut path))
             .transpose();
         match datatype {
             Ok(datatype) => bodies.push((defaults, datatype.map(Cow::into_owned))),
@@ -624,7 +626,7 @@ fn map_datatype_format<'a>(
     format: Option<&'a dyn Format>,
     types: &'a Types,
     dt: &'a DataType,
-    path: &[Cow<'static, str>],
+    path: &mut FormatPath,
 ) -> Result<Cow<'a, DataType>, Error> {
     if matches!(dt, DataType::Generic(_)) {
         return Ok(Cow::Borrowed(dt));
@@ -647,7 +649,7 @@ fn map_datatype_format<'a>(
             }
             Err(Error::format_at(
                 "datatype formatter failed",
-                path.join("."),
+                path.join(),
                 err,
             ))
         }
@@ -737,17 +739,14 @@ fn map_datatype_format_children<'a>(
     format: &'a dyn Format,
     types: &'a Types,
     dt: &'a DataType,
-    path: &[Cow<'static, str>],
+    path: &mut FormatPath,
 ) -> Result<Cow<'a, DataType>, Error> {
     match dt {
         DataType::Primitive(_) | DataType::Generic(_) => Ok(Cow::Borrowed(dt)),
         DataType::List(list) => Ok(
-            match map_datatype_format(
-                Some(format),
-                types,
-                &list.ty,
-                &format_path(path, "<list_item>"),
-            )? {
+            match path.with(PathSegment::Static("<list_item>"), |path| {
+                map_datatype_format(Some(format), types, &list.ty, path)
+            })? {
                 Cow::Borrowed(_) => Cow::Borrowed(dt),
                 Cow::Owned(ty) => {
                     let mut list = list.clone();
@@ -757,10 +756,12 @@ fn map_datatype_format_children<'a>(
             },
         ),
         DataType::Map(map) => {
-            let key_path = format_path(path, "<map_key>");
-            let value_path = format_path(path, "<map_value>");
-            let key = map_datatype_format(Some(format), types, map.key_ty(), &key_path)?;
-            let value = map_datatype_format(Some(format), types, map.value_ty(), &value_path)?;
+            let key = path.with(PathSegment::Static("<map_key>"), |path| {
+                map_datatype_format(Some(format), types, map.key_ty(), path)
+            })?;
+            let value = path.with(PathSegment::Static("<map_value>"), |path| {
+                map_datatype_format(Some(format), types, map.value_ty(), path)
+            })?;
             if matches!((&key, &value), (Cow::Borrowed(_), Cow::Borrowed(_))) {
                 return Ok(Cow::Borrowed(dt));
             }
@@ -788,10 +789,10 @@ fn map_datatype_format_children<'a>(
         DataType::Enum(enm) => {
             let mut changed: Option<Vec<(usize, Vec<(usize, DataType)>)>> = None;
             for (idx, (variant_name, variant)) in enm.variants.iter().enumerate() {
-                let variant_path = format_path(path, variant_name.clone());
-                if let Some(changes) =
-                    map_datatype_fields(format, types, &variant.fields, &variant_path)?
-                {
+                let segment = PathSegment::Name(variant_name.clone());
+                if let Some(changes) = path.with(segment, |path| {
+                    map_datatype_fields(format, types, &variant.fields, path)
+                })? {
                     changed.get_or_insert_with(Vec::new).push((idx, changes));
                 }
             }
@@ -812,12 +813,9 @@ fn map_datatype_format_children<'a>(
         DataType::Tuple(tuple) => {
             let mut changed: Option<Vec<(usize, DataType)>> = None;
             for (idx, element) in tuple.elements.iter().enumerate() {
-                if let Cow::Owned(element) = map_datatype_format(
-                    Some(format),
-                    types,
-                    element,
-                    &format_path(path, idx.to_string()),
-                )? {
+                if let Cow::Owned(element) = path.with(PathSegment::Index(idx), |path| {
+                    map_datatype_format(Some(format), types, element, path)
+                })? {
                     changed.get_or_insert_with(Vec::new).push((idx, element));
                 }
             }
@@ -919,13 +917,48 @@ fn map_datatype_format_children<'a>(
     }
 }
 
-fn format_path(
-    path: &[Cow<'static, str>],
-    segment: impl Into<Cow<'static, str>>,
-) -> Vec<Cow<'static, str>> {
-    let mut path = path.to_vec();
-    path.push(segment.into());
-    path
+/// Location within the datatype currently being formatted, for error messages.
+///
+/// Segments are pushed and popped on a single stack as the recursion descends,
+/// so tracking the path costs no allocation unless a format actually fails.
+#[derive(Default)]
+struct FormatPath(Vec<PathSegment>);
+
+enum PathSegment {
+    Static(&'static str),
+    Index(usize),
+    Name(Cow<'static, str>),
+}
+
+impl FormatPath {
+    fn new(root: Cow<'static, str>) -> Self {
+        Self(vec![PathSegment::Name(root)])
+    }
+
+    fn with<T>(&mut self, segment: PathSegment, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.0.push(segment);
+        let out = f(self);
+        self.0.pop();
+        out
+    }
+
+    fn join(&self) -> String {
+        let mut out = String::new();
+        for (idx, segment) in self.0.iter().enumerate() {
+            if idx != 0 {
+                out.push('.');
+            }
+            match segment {
+                PathSegment::Static(segment) => out.push_str(segment),
+                PathSegment::Name(name) => out.push_str(name),
+                PathSegment::Index(idx) => {
+                    use fmt::Write;
+                    let _ = write!(out, "{idx}");
+                }
+            }
+        }
+        out
+    }
 }
 
 fn named_reference_generics_mut(
@@ -945,7 +978,7 @@ fn map_datatype_fields(
     format: &dyn Format,
     types: &Types,
     fields: &Fields,
-    path: &[Cow<'static, str>],
+    path: &mut FormatPath,
 ) -> Result<Option<Vec<(usize, DataType)>>, Error> {
     let mut changed: Option<Vec<(usize, DataType)>> = None;
 
@@ -956,8 +989,9 @@ fn map_datatype_fields(
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
-                let field_path = format_path(path, idx.to_string());
-                if let Cow::Owned(ty) = map_datatype_format(Some(format), types, ty, &field_path)? {
+                if let Cow::Owned(ty) = path.with(PathSegment::Index(idx), |path| {
+                    map_datatype_format(Some(format), types, ty, path)
+                })? {
                     changed.get_or_insert_with(Vec::new).push((idx, ty));
                 }
             }
@@ -967,8 +1001,9 @@ fn map_datatype_fields(
                 let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
-                let field_path = format_path(path, name.clone());
-                if let Cow::Owned(ty) = map_datatype_format(Some(format), types, ty, &field_path)? {
+                if let Cow::Owned(ty) = path.with(PathSegment::Name(name.clone()), |path| {
+                    map_datatype_format(Some(format), types, ty, path)
+                })? {
                     changed.get_or_insert_with(Vec::new).push((idx, ty));
                 }
             }
@@ -1041,7 +1076,7 @@ impl Deref for BrandedTypeExporter<'_> {
 impl BrandedTypeExporter<'_> {
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        let mapped = map_datatype_format(self.format, self.types, dt, &mut FormatPath::default())?;
         primitives::inline(self, self.types, &mapped)
     }
 
@@ -1049,7 +1084,7 @@ impl BrandedTypeExporter<'_> {
     ///
     /// See [`primitives::reference`] for details.
     pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
-        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        let mapped = map_datatype_format(self.format, self.types, dt, &mut FormatPath::default())?;
         primitives::reference(self, self.types, &mapped)
     }
 }
@@ -1105,7 +1140,7 @@ impl FrameworkExporter<'_> {
 
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        let mapped = map_datatype_format(self.format, self.types, dt, &mut FormatPath::default())?;
         primitives::inline(self, self.types, &mapped)
     }
 
@@ -1113,7 +1148,7 @@ impl FrameworkExporter<'_> {
     ///
     /// See [`primitives::reference`] for details.
     pub fn reference(&self, dt: &DataType) -> Result<String, Error> {
-        let mapped = map_datatype_format(self.format, self.types, dt, &[])?;
+        let mapped = map_datatype_format(self.format, self.types, dt, &mut FormatPath::default())?;
         primitives::reference(self, self.types, &mapped)
     }
 
