@@ -1,15 +1,11 @@
-use crate::{
-    r#type::field::construct_field,
-    utils::{parse_attrs_with_filter, unraw_raw_ident},
-};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use std::collections::HashSet;
 use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
-use super::attr::*;
+use super::{attr::*, field::construct_field};
 
-pub fn decode_field_attrs<'a>(
+pub(crate) fn decode_field_attrs<'a>(
     field: &'a Field,
     skip_attrs: &[String],
 ) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
@@ -23,7 +19,7 @@ pub fn decode_field_attrs<'a>(
     Ok((field_attrs, &field.attrs))
 }
 
-pub fn parse_struct(
+pub(crate) fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,

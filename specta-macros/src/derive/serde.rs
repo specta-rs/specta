@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
-use super::AttributeScope;
+use super::Scope;
 
 #[derive(Clone)]
 struct ConversionType {
@@ -110,19 +110,17 @@ struct FieldAttrs {
 
 pub(super) fn lower_runtime_attributes(
     crate_ref: &TokenStream,
-    scope: AttributeScope,
+    scope: Scope,
     raw_attrs: &[Attribute],
     generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
 ) -> Result<Option<TokenStream>> {
     match scope {
-        AttributeScope::Container => parse_container_attrs(raw_attrs)
+        Scope::Container => parse_container_attrs(raw_attrs)
             .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs, generics))),
-        AttributeScope::Variant => {
+        Scope::Variant => {
             parse_variant_attrs(raw_attrs).map(|attrs| attrs.map(lower_variant_attrs))
         }
-        AttributeScope::Field => {
-            parse_field_attrs(raw_attrs).map(|attrs| attrs.map(lower_field_attrs))
-        }
+        Scope::Field => parse_field_attrs(raw_attrs).map(|attrs| attrs.map(lower_field_attrs)),
     }
 }
 

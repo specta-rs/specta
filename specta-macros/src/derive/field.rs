@@ -3,14 +3,14 @@ use quote::quote;
 use std::collections::HashSet;
 use syn::Type;
 
-use crate::r#type::attr::deprecated_as_tokens;
-
 use super::{
-    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
+    ContainerAttr, FieldAttr, Scope,
+    attr::deprecated_as_tokens,
+    build_runtime_attributes,
     generics::{resolve_ty_expr, type_with_inferred_lifetimes},
 };
 
-pub fn construct_field(
+pub(crate) fn construct_field(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
@@ -31,7 +31,7 @@ pub fn construct_field(
     )
 }
 
-pub fn construct_field_with_variant_skip(
+pub(crate) fn construct_field_with_variant_skip(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
@@ -50,7 +50,7 @@ pub fn construct_field_with_variant_skip(
 
     let runtime_attrs = build_runtime_attributes(
         crate_ref,
-        AttributeScope::Field,
+        Scope::Field,
         quote!(field.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,

@@ -1,17 +1,17 @@
 use super::{
-    AttributeScope,
+    Scope,
     attr::*,
     build_runtime_attributes,
+    field::construct_field_with_variant_skip,
     generics::{resolve_ty_expr, type_with_inferred_lifetimes},
     r#struct::decode_field_attrs,
 };
-use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use std::collections::HashSet;
 use syn::{DataEnum, Fields, spanned::Spanned};
 
-pub fn parse_enum(
+pub(crate) fn parse_enum(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
@@ -38,7 +38,7 @@ pub fn parse_enum(
 
             let runtime_attrs = build_runtime_attributes(
                 crate_ref,
-                AttributeScope::Variant,
+                Scope::Variant,
                 quote!(v.attributes),
                 &v.attrs,
                 &container_attrs.skip_attrs,
