@@ -1530,6 +1530,11 @@ fn keyed_fields<'a>(
         let Some(original) = field.ty.as_ref() else {
             continue;
         };
+        if unsupported_payload_field(field) {
+            return Err(Error::UnsupportedType(format!(
+                "field {name:?} of a named struct has a type Swift's `Codable` cannot encode"
+            )));
+        }
         let rust_nullable = field.attributes.contains_key("specta:nullable");
         let property_type = format!(
             "{}{}",

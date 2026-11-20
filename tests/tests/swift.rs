@@ -2772,3 +2772,39 @@ fn swift_invalid_identifiers_are_rejected() {
         "{type_error}"
     );
 }
+
+/// A tuple field has no Codable representation: Swift renders it as a Swift
+/// tuple, which does not conform to either protocol. The exporter has to reject
+/// it like it already rejects tuple payloads, instead of emitting source that
+/// cannot compile.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftKeyedTupleField {
+    pair: (u8, u8),
+}
+
+/// A unit field serializes as null, but Void is not Codable.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftKeyedUnitField {
+    unit: (),
+}
+
+#[test]
+fn swift_keyed_tuple_and_unit_fields_report_errors() {
+    let tuple = Swift::default()
+        .export(
+            &Types::default().register::<SwiftKeyedTupleField>(),
+            specta_serde::Format,
+        )
+        .expect_err("a tuple-valued keyed field cannot be expressed in Swift");
+    assert!(tuple.to_string().contains("cannot encode"), "{tuple}");
+
+    let unit = Swift::default()
+        .export(
+            &Types::default().register::<SwiftKeyedUnitField>(),
+            specta_serde::Format,
+        )
+        .expect_err("a unit keyed field cannot be expressed in Swift");
+    assert!(unit.to_string().contains("cannot encode"), "{unit}");
+}
