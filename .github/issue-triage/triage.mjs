@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { askJson } from "./lib/agent.mjs";
+import { askJson, prepare } from "./lib/opencode.mjs";
 import { duplicateComment, MARKER, needsInfoComment, notABugComment } from "./lib/comment.mjs";
 import { b64, optional, required, setOutput, summary, truncate } from "./lib/env.mjs";
-import { createRepoTools } from "./lib/fs-tools.mjs";
 import { commentOnIssue, getIssue, issueUrl, listComments, listRecentIssues } from "./lib/gh.mjs";
 import { validateSpec } from "./lib/repro-spec.mjs";
 import { candidateDigest, rankCandidates } from "./lib/similar.mjs";
@@ -96,8 +94,7 @@ async function main() {
   const recent = await listRecentIssues(repo);
   const candidates = rankCandidates({ number: issueNumber, title, body }, recent);
 
-  const system = readFileSync(path.join(root, ".github/issue-triage/prompts/triage.md"), "utf8");
-  const { tools, handlers } = createRepoTools(root);
+  prepare(root, path.join(root, ".github/issue-triage"));
 
   const user = [
     `<repository>${repo}</repository>`,
@@ -114,10 +111,9 @@ async function main() {
   ].join("\n");
 
   const result = await askJson({
-    system,
-    user,
-    tools,
-    handlers,
+    root,
+    agent: "triage",
+    prompt: user,
     schema: SCHEMA,
     session: `ses_triage_${issueNumber}`,
     extraChecks: (parsed) => {

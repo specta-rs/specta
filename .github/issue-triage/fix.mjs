@@ -1,12 +1,10 @@
 // Asks the model for a patch. It never runs cargo: the reproduction and the
 // test suite execute in a separate job with no credentials.
 
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { askJson } from "./lib/agent.mjs";
+import { askJson, prepare } from "./lib/opencode.mjs";
 import { b64, optional, required, setOutput, summary, unb64 } from "./lib/env.mjs";
-import { createRepoTools } from "./lib/fs-tools.mjs";
 import { inspectPatch } from "./lib/patch.mjs";
 import { validateSpec } from "./lib/repro-spec.mjs";
 import { escapeModelText, wrapUntrusted } from "./lib/untrusted.mjs";
@@ -28,8 +26,7 @@ async function main() {
   const runLog = unb64(optional("REPRO_LOG_B64"));
   const issueBody = unb64(optional("ISSUE_BODY_B64"));
 
-  const system = readFileSync(path.join(root, ".github/issue-triage/prompts/fix.md"), "utf8");
-  const { tools, handlers } = createRepoTools(root);
+  prepare(root, path.join(root, ".github/issue-triage"));
 
   const user = [
     `<repository>${optional("REPO", "specta-rs/specta")}</repository>`,
@@ -59,10 +56,9 @@ async function main() {
   ].join("\n");
 
   const result = await askJson({
-    system,
-    user,
-    tools,
-    handlers,
+    root,
+    agent: "fix",
+    prompt: user,
     schema: SCHEMA,
     session: `ses_fix_${issueNumber}`,
     extraChecks: (parsed) => {

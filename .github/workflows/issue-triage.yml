@@ -38,7 +38,11 @@ env:
   # OPENCODE_MODEL (and optionally OPENCODE_BASE_URL) under Settings → Variables
   # to change models without editing this file.
   OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL || 'kimi-k3' }}
-  OPENCODE_BASE_URL: ${{ vars.OPENCODE_BASE_URL || 'https://opencode.ai/inference' }}
+  # Optional. Unset means the catalog `opencode` provider, which already points
+  # at Console. Set it to the full OpenAI-compatible base (ending in /v1) only to
+  # route through another gateway, for example the Go plan.
+  OPENCODE_BASE_URL: ${{ vars.OPENCODE_BASE_URL }}
+  OPENCODE_VERSION: ${{ vars.OPENCODE_VERSION || '2.2.7' }}
   TRIAGE_FULL_SUITE: ${{ vars.TRIAGE_FULL_SUITE || 'true' }}
   ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
   REPO: ${{ github.repository }}
@@ -67,6 +71,11 @@ jobs:
       # issues but cannot read the repository or push to it.
       - name: Clone
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Install OpenCode
+        run: |
+          curl --fail --silent --show-error --location https://opencode.ai/install \
+            | bash -s -- --version "$OPENCODE_VERSION" --no-modify-path
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Triage
         id: triage
         env:
@@ -113,6 +122,11 @@ jobs:
     steps:
       - name: Clone
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Install OpenCode
+        run: |
+          curl --fail --silent --show-error --location https://opencode.ai/install \
+            | bash -s -- --version "$OPENCODE_VERSION" --no-modify-path
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Propose a fix
         id: fix
         env:

@@ -28,35 +28,83 @@ are given no secrets.
 1. Add a repository secret `OPENCODE_API_KEY` with an [OpenCode Console](https://opencode.ai/console)
    API key. A service account key is the right choice for CI; it is not tied to
    one person.
-2. Optionally add repository **variables** (not secrets) to pick the model:
+2. Optionally add repository **variables** (not secrets):
 
    | Variable | Default | Meaning |
    | --- | --- | --- |
-   | `OPENCODE_MODEL` | `kimi-k3` | Model id served by Console |
-   | `OPENCODE_BASE_URL` | `https://opencode.ai/inference` | Console gateway; use the `/go` base for a Go plan |
+   | `OPENCODE_MODEL` | `kimi-k3` | Console model id, used as `opencode/<id>` |
+   | `OPENCODE_VERSION` | `2.2.7` | Pinned OpenCode CLI version |
+   | `OPENCODE_BASE_URL` | unset | Full OpenAI-compatible base URL, for a gateway other than the catalog |
    | `TRIAGE_FULL_SUITE` | `true` | Run `cargo test --all-features` before opening a PR |
 
-   Use the bare model id from the Console catalog (`kimi-k3`, `glm-5.3`,
-   `claude-sonnet-5-5`); an `opencode/` prefix is accepted and stripped.
-   Changing the model is therefore a settings change, not a code change.
+   Changing the model is a settings change, not a code change. The catalog
+   `opencode` provider already points at Console and reads `OPENCODE_API_KEY`
+   from the environment, so `OPENCODE_BASE_URL` is only needed for a gateway
+   such as the Go plan (`https://opencode.ai/inference/go/openai/v1`).
 3. Create a `triage:skip` label if you want a way to opt individual issues out.
+
+## The agents are OpenCode agents
+
+There is no bespoke model client. Both phases are Markdown agents, so they can
+be read, diffed and run interactively:
+
+```
+.github/issue-triage/
+├── opencode.json          the permission policy installed into the clone
+├── agents/triage.md       system prompt + permissions for the triage phase
+├── agents/fix.md          system prompt + permissions for the fix phase
+└── lib/opencode.mjs       the only place the CLI is invoked
+```
+
+`lib/opencode.mjs` copies those files into the clone before each run. It first
+deletes every configuration file the repository ships, including
+`.opencode/opencode.json`, which outranks a root `opencode.json` — otherwise a
+checked-in config could widen the agent's permissions.
+
+The permission policy is the security boundary. Its first rule denies every
+action, then it allows exactly three read-only ones:
+
+```jsonc
+{ "permissions": [
+  { "action": "*",    "resource": "*", "effect": "deny"  },
+  { "action": "read", "resource": "*", "effect": "allow" },
+  { "action": "grep", "resource": "*", "effect": "allow" },
+  { "action": "glob", "resource": "*", "effect": "allow" },
+  { "action": "external_directory", "resource": "*", "effect": "deny" },
+] }
+```
+
+The wildcard deny is what makes this hold for tools that do not exist yet: a
+future shell, fetch or MCP tool is denied by default rather than allowed by
+default. The CLI is never given `--auto`, which would auto-approve anything a
+rule did not mention.
+
+To try an agent locally, copy the two files into place and run OpenCode:
+
+```bash
+cp .github/issue-triage/opencode.json opencode.json
+mkdir -p .opencode/agents && cp .github/issue-triage/agents/*.md .opencode/agents/
+opencode        # then select the triage agent
+```
 
 ## On "no secrets, no OAuth, no permissions, no cache"
 
-Some of that is achievable and some of it is not. Precisely:
+Precisely what is and is not possible:
 
 - **No OAuth.** There is no app, no installation, no user token anywhere.
 - **No cache.** No `actions/cache`, no `Swatinem/rust-cache`, no uploaded
-  artifacts. `CARGO_INCREMENTAL=0` and nothing survives the runner.
+  artifacts, `CARGO_INCREMENTAL=0`. OpenCode's own state is redirected to
+  `$RUNNER_TEMP`. Nothing survives the runner.
 - **No secrets except one.** An LLM has to authenticate somewhere. GitHub Models
   was retired on 2026-07-30 and was the only zero-secret inference path in
   Actions, so inference now requires `OPENCODE_API_KEY`. It is the only secret
-  the workflow reads, and only the `triage` and `fix` jobs receive it. A truly
-  secret-free workflow can only be deterministic, and then it cannot write a fix.
+  the workflow reads, only the `triage` and `fix` jobs receive it — and inside
+  those jobs the model process gets an allowlisted environment containing that
+  key and **not** `GITHUB_TOKEN`.
 - **No permissions that matter.** `permissions: {}` is the default. The jobs that
-  touch untrusted code have no permissions at all. The workflow can never read
-  repository contents with its token (it clones anonymously over HTTPS) and the
-  only job that can push is `publish`, which runs nothing from the report.
+  touch untrusted code have no permissions at all. The workflow never reads the
+  repository with its token (it clones anonymously over HTTPS), and the only job
+  that can push is `publish`, which runs nothing from the report.
 
 ## Why prompt injection in the issue is contained
 
@@ -67,11 +115,12 @@ Five independent layers, in the order an attacker would have to defeat them:
    and rewrites `<untrusted_data>` / `</untrusted_data>` (and the other wrapper
    names) so the text cannot close its own container, and each prompt repeats
    that the contents are data, not instructions.
-2. **Capability.** The model has exactly three tools — `read_file`, `list_dir`,
-   `search_repo` — implemented in `lib/fs-tools.mjs`. There is no shell, no
-   network tool, no write tool, and no way to ask the workflow to perform an
-   action. The strongest thing a successful injection can do is make the model
-   read files it would have read anyway.
+2. **Capability.** The agent has `read`, `grep` and `glob` and nothing else, by
+   permission rather than by convention: shell, edit, write, fetch, search,
+   skills, subagents and every MCP tool are denied by a leading wildcard rule.
+   `external_directory` is denied too, so `/proc/self/environ` and `$HOME` are
+   out of reach. There is no tool that performs an action for the model, so a
+   successful injection can at worst waste tokens.
 3. **Separation.** The agent never runs the code it writes. `reproduce` and
    `verify` execute it in jobs with `permissions: {}` and no secret, and
    `sandbox.sh` re-executes cargo under `env -i`, so `GITHUB_TOKEN`,
@@ -85,10 +134,14 @@ Five independent layers, in the order an attacker would have to defeat them:
    `rust-toolchain*`, `repro/` or `.gitmodules`. The patch is revalidated in
    `publish`, not trusted from the previous job.
 5. **Rendering.** The model does not write to the issue. Comments are templates
-   in `lib/comment.mjs`: fixed prose, escaped model fields, `@` defused,
-   URLs defused, links constructed by the workflow. `publish` only gets a
-   branch and a draft PR, and the PR body says plainly that the patch is
-   unreviewed.
+   in `lib/comment.mjs`: fixed prose, escaped model fields, `@` defused, URLs
+   replaced, fences in run output neutralised, links constructed by the
+   workflow. `publish` only gets a branch and a draft PR, and the PR body says
+   plainly that the patch is unreviewed.
+
+`self-test.mjs` runs in CI and asserts these properties, including asking
+OpenCode what permissions it actually resolved for each agent rather than
+trusting the file we wrote.
 
 What is *not* contained, and should be understood before enabling this:
 
@@ -109,6 +162,8 @@ What is *not* contained, and should be understood before enabling this:
   instead. If you want CI on the PR, the only way is a personal access token,
   which is exactly the credential this design avoids.
 - The anonymous clone requires the repository to be public.
+- The reproduction crate is a scratch harness: it is never committed, and the
+  regression test belongs in `tests/` as part of the patch.
 - Only `issues: opened` triggers it. Edits, comments and re-runs are
   `workflow_dispatch` with `force` enabled.
 - One model call per phase, no retries across phases. A failure after triage
@@ -122,7 +177,7 @@ What is *not* contained, and should be understood before enabling this:
 gh workflow run issue-triage.yml -f issue_number=123 -f force=true
 ```
 
-To exercise a single stage locally:
+To exercise the triage phase locally against a real issue:
 
 ```bash
 OPENCODE_API_KEY=oc_sk_... \

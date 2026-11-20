@@ -4,7 +4,13 @@
 //
 //   node .github/issue-triage/self-test.mjs
 
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { prepare } from "./lib/opencode.mjs";
 
 import { cannotReproduceComment } from "./lib/comment.mjs";
 import { inspectPatch } from "./lib/patch.mjs";
@@ -234,6 +240,113 @@ check("jobs that run untrusted code have no secret and no permission", () => {
     assert(!/secrets\./.test(block), `${job} must not receive a secret`);
     assert(!/GITHUB_TOKEN:/.test(block), `${job} must not receive a token`);
   }
+});
+
+// --- the agent runtime -----------------------------------------------------
+
+const config = JSON.parse(readFileSync(new URL("./opencode.json", import.meta.url), "utf8"));
+const runner = readFileSync(new URL("./lib/opencode.mjs", import.meta.url), "utf8");
+
+check("the agent's first permission rule denies everything", () => {
+  const [first] = config.permissions ?? [];
+  assert(first && first.action === "*" && first.resource === "*" && first.effect === "deny", "expected a leading deny-all rule");
+});
+
+check("the agent may only read", () => {
+  const allowed = new Set((config.permissions ?? []).filter((rule) => rule.effect === "allow").map((rule) => rule.action));
+  for (const action of allowed) {
+    assert(["read", "grep", "glob"].includes(action), `${action} must not be allowed`);
+  }
+  assert(allowed.has("read"), "reading the checkout has to work");
+});
+
+check("the agent cannot reach outside the checkout", () => {
+  assert(
+    (config.permissions ?? []).some((rule) => rule.action === "external_directory" && rule.effect === "deny"),
+    "external_directory must be denied so the agent cannot read /proc or $HOME"
+  );
+});
+
+check("each agent is a primary agent that repeats the deny-all rule", () => {
+  for (const agent of ["triage", "fix"]) {
+    const text = readFileSync(new URL(`./agents/${agent}.md`, import.meta.url), "utf8");
+    assert(/^mode: primary$/m.test(text), `${agent} must be selectable with --agent`);
+    const firstRule = text.indexOf('action: "*"');
+    assert(firstRule > 0, `${agent} has no deny-all rule`);
+    assert(text.slice(firstRule, firstRule + 120).includes("effect: deny"), `${agent}'s deny-all rule must deny`);
+  }
+});
+
+check("the runner never auto-approves a permission", () => {
+  assert(!runner.includes('"--auto"'), "--auto would auto-approve anything not explicitly denied");
+  assert(runner.includes('"--standalone"'), "each run should own its server");
+});
+
+check("the runner deletes repository-supplied configuration", () => {
+  assert(runner.includes(".opencode/opencode.json"), "the higher-priority project config must be removed");
+  assert(runner.includes("opencode.jsonc"), "the jsonc variant must be removed too");
+});
+
+check("the model process does not inherit the workflow's credentials", () => {
+  const allowlist = runner.slice(runner.indexOf("const PASS_THROUGH"), runner.indexOf("function childEnvironment"));
+  assert(!allowlist.includes("GITHUB_TOKEN"), "GITHUB_TOKEN must not reach the model process");
+  assert(!allowlist.includes("ACTIONS_"), "runner tokens must not reach the model process");
+  assert(allowlist.includes("OPENCODE_API_KEY"), "the model key is the one credential it needs");
+});
+
+check("the model process is pinned to the clone's directory", () => {
+  assert(/env\.PWD = path\.resolve\(root\)/.test(runner), "PWD must follow cwd or the CLI reads the caller's project");
+});
+
+// The static rules above describe what we wrote. This asks OpenCode what it
+// actually resolved, which is the only claim that matters.
+check("OpenCode resolves read-only permissions for both agents", () => {
+  const available = spawnSync("which", ["opencode"], { encoding: "utf8" }).status === 0;
+  if (!available) {
+    console.log("  (skipped: opencode is not installed)");
+    return;
+  }
+
+  const scratch = mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "specta-selftest-"));
+  const harness = fileURLToPath(new URL(".", import.meta.url));
+  prepare(scratch, harness);
+
+  const result = spawnSync("opencode", ["debug", "agents"], {
+    cwd: scratch,
+    encoding: "utf8",
+    timeout: 120_000,
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, PWD: scratch },
+  });
+  assert(result.status === 0, `opencode debug agents failed: ${(result.stderr ?? "").slice(0, 300)}`);
+
+  const agents = JSON.parse(result.stdout);
+  for (const id of ["triage", "fix"]) {
+    const agent = agents.find((candidate) => candidate.id === id);
+    assert(agent, `${id} was not discovered`);
+
+    // Broad effect for an action: the last rule that names a wildcard resource
+    // wins. Path-specific exceptions (like `*.env`) are deliberately ignored
+    // here, because this asserts the default, not every override.
+    const effective = (action) => {
+      let effect = "ask";
+      for (const rule of agent.permissions ?? []) {
+        if (rule.resource !== "*") continue;
+        if (rule.action !== "*" && rule.action !== action) continue;
+        effect = rule.effect;
+      }
+      return effect;
+    };
+
+    for (const action of ["shell", "edit", "write", "webfetch", "websearch", "subagent", "skill"]) {
+      assert(effective(action) !== "allow", `${id} can ${action}`);
+    }
+    for (const action of ["read", "grep", "glob"]) {
+      assert(effective(action) === "allow", `${id} cannot ${action}`);
+    }
+    assert(effective("external_directory") !== "allow", `${id} can reach outside the checkout`);
+  }
+
+  rmSync(scratch, { recursive: true, force: true });
 });
 
 // --- report ----------------------------------------------------------------
