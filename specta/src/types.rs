@@ -6,7 +6,10 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    datatype::{
+        DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame,
+        RecursiveInlineIdentity,
+    },
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -206,10 +209,60 @@ impl GenericSubstitutionSlot {
     }
 }
 
+/// One entry on the inline resolution stack.
+///
+/// Only the identity of the use site is stored. The human-readable description
+/// (module path, type name, rendered generic arguments) is built on demand when
+/// a cycle is reported, because frames are pushed for every inline and
+/// passthrough use site while cycles are rare.
 #[derive(Debug, Clone)]
 pub(crate) struct InlineResolutionFrame {
-    pub(crate) hash: u64,
-    pub(crate) ty: RecursiveInlineFrame,
+    pub(crate) identity: RecursiveInlineIdentity,
+    /// Concrete type names of the generic arguments.
+    ///
+    /// Needed because an inlined generic type records its arguments as
+    /// placeholders, so two different instantiations can carry identical
+    /// [`DataType`] arguments.
+    pub(crate) generic_identities: Vec<&'static str>,
+    pub(crate) generics: Vec<(Generic, DataType)>,
+}
+
+impl InlineResolutionFrame {
+    /// Records a use site of `identity` with its concrete generic arguments.
+    pub(crate) fn new(
+        identity: RecursiveInlineIdentity,
+        generic_identities: &[&'static str],
+        generics: &[(Generic, DataType)],
+    ) -> Self {
+        Self {
+            identity,
+            generic_identities: generic_identities.to_vec(),
+            generics: generics.to_vec(),
+        }
+    }
+
+    /// Whether this frame is the same use site as `identity` with `generics`.
+    ///
+    /// This replaces the previous hashed comparison: comparing the identity and
+    /// arguments directly is both cheaper (no hashing of whole `DataType`
+    /// trees) and free of hash collisions, which could previously report a
+    /// cycle that did not exist.
+    pub(crate) fn is_use_site(
+        &self,
+        identity: &RecursiveInlineIdentity,
+        generic_identities: &[&'static str],
+        generics: &[(Generic, DataType)],
+    ) -> bool {
+        // Cheapest comparisons first; the datatypes are the expensive part.
+        self.identity == *identity
+            && self.generic_identities == generic_identities
+            && self.generics == generics
+    }
+
+    /// Renders this frame's description for a reported cycle.
+    pub(crate) fn describe(&self, types: &Types) -> RecursiveInlineFrame {
+        RecursiveInlineFrame::describe(types, &self.identity, &self.generics)
+    }
 }
 
 impl fmt::Debug for Types {

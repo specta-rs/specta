@@ -1,9 +1,7 @@
 use std::{
     borrow::Cow,
-    hash::{DefaultHasher, Hash, Hasher},
     mem,
     panic::{self, AssertUnwindSafe, Location},
-    ptr,
     sync::Arc,
 };
 
@@ -11,7 +9,8 @@ use crate::{
     Types,
     datatype::{
         DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
+        RecursiveInlineIdentity, RecursiveInlineType, Reference, generic::GenericDefinition,
+        reference::NamedId,
     },
     types::InlineResolutionFrame,
 };
@@ -216,32 +215,20 @@ impl NamedDataType {
         }
 
         if inline {
-            let hash = {
-                let mut h = DefaultHasher::new();
-                sentinel.hash(&mut h);
-                ptr::hash(sentinel, &mut h);
-                for (generic_r, generic) in instantiation_generics {
-                    generic_r.hash(&mut h);
-                    generic.hash(&mut h);
-                }
-                instantiation_generic_identities.hash(&mut h);
-                h.finish()
+            let identity = match types.types.get(&id) {
+                Some(Some(_)) => RecursiveInlineIdentity::Named(id.clone()),
+                // The type has no (completed) entry, so the sentinel path is all
+                // the diagnostics can show.
+                _ => RecursiveInlineIdentity::Path(sentinel.into()),
             };
 
-            let current_ty = types
-                .types
-                .get(&id)
-                .and_then(|ndt| ndt.as_ref())
-                .map(|ndt| RecursiveInlineFrame::new(types, ndt, instantiation_generics))
-                .unwrap_or_else(|| {
-                    RecursiveInlineFrame::from_type_path(
-                        types,
-                        sentinel.into(),
-                        instantiation_generics,
-                    )
-                });
-
-            if let Some(cycle_start) = types.stack.iter().position(|frame| frame.hash == hash) {
+            if let Some(cycle_start) = types.stack.iter().position(|frame| {
+                frame.is_use_site(
+                    &identity,
+                    instantiation_generic_identities,
+                    instantiation_generics,
+                )
+            }) {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
                 if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
@@ -255,14 +242,20 @@ impl NamedDataType {
                     }
                 }
 
+                let mut cycle = types.stack[cycle_start..]
+                    .iter()
+                    .map(|frame| frame.describe(types))
+                    .collect::<Vec<_>>();
+                cycle.push(RecursiveInlineFrame::describe(
+                    types,
+                    &identity,
+                    instantiation_generics,
+                ));
+
                 return Reference::Named(NamedReference {
                     id,
                     inner: NamedReferenceType::Recursive(RecursiveInlineType::from_cycle(
-                        types.stack[cycle_start..]
-                            .iter()
-                            .map(|frame| frame.ty.clone())
-                            .chain(std::iter::once(current_ty))
-                            .collect(),
+                        cycle,
                         instantiation_generics.to_vec(),
                     )),
                 });
@@ -275,10 +268,11 @@ impl NamedDataType {
             let child_inline = passthrough && caller_inline;
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
-            types.stack.push(InlineResolutionFrame {
-                hash,
-                ty: current_ty,
-            });
+            types.stack.push(InlineResolutionFrame::new(
+                identity,
+                instantiation_generic_identities,
+                instantiation_generics,
+            ));
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
             if let Some(prev_inline) = prev_inline {
                 types.should_inline = prev_inline;
