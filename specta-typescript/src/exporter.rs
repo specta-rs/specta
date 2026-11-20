@@ -522,41 +522,71 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
         Cow::Borrowed(_) => types.clone(),
         Cow::Owned(types) => types,
     };
-    let source = mapped.clone();
-    let mut output = mapped;
+    let mut mapped = mapped;
+
+    // Bodies are formatted against the pre-format graph, so the results can be
+    // computed from a shared borrow of it and applied afterwards. Mapping in a
+    // single `iter_mut` pass instead needs the graph to also be readable while
+    // it is written, which would force a deep clone of every named datatype.
+    let mut bodies = Vec::with_capacity(mapped.len());
     let mut error = None;
 
-    output.iter_mut(|ndt| {
+    for ndt in mapped.into_unsorted_iter() {
         if error.is_some() {
-            return;
+            break;
         }
 
         let path = vec![rust_type_path(ndt)];
-        for generic in ndt.generics.to_mut() {
-            let Some(default) = generic.default.clone() else {
+        let mut defaults = Vec::new();
+        for (idx, generic) in ndt.generics.iter().enumerate() {
+            let Some(default) = generic.default.as_ref() else {
                 continue;
             };
             let mut generic_path = path.clone();
             generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
-            match map_datatype_format(Some(format), &source, &default, &generic_path) {
-                Ok(default) => generic.default = Some(default),
+            match map_datatype_format(Some(format), &mapped, default, &generic_path) {
+                Ok(default) => defaults.push((idx, default)),
                 Err(source) => {
                     error = Some(source.with_named_datatype(ndt));
-                    return;
+                    break;
                 }
             }
         }
+        if error.is_some() {
+            break;
+        }
 
-        let Some(datatype) = ndt.ty.clone() else {
-            return;
-        };
-        match map_datatype_format(Some(format), &source, &datatype, &path) {
-            Ok(datatype) => ndt.ty = Some(datatype),
+        let datatype = ndt
+            .ty
+            .as_ref()
+            .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &path))
+            .transpose();
+        match datatype {
+            Ok(datatype) => bodies.push((defaults, datatype)),
             Err(source) => error = Some(source.with_named_datatype(ndt)),
         }
+    }
+
+    if let Some(error) = error {
+        return Err(error);
+    }
+
+    let mut bodies = bodies.into_iter();
+    mapped.iter_mut(|ndt| {
+        let Some((defaults, datatype)) = bodies.next() else {
+            return;
+        };
+
+        // `to_mut` is only paid for when the format actually rewrote a default.
+        for (idx, default) in defaults {
+            if let Some(generic) = ndt.generics.to_mut().get_mut(idx) {
+                generic.default = Some(default);
+            }
+        }
+        ndt.ty = datatype;
     });
 
-    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
+    Ok(Cow::Owned(mapped))
 }
 
 fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {
