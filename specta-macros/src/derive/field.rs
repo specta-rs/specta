@@ -129,13 +129,30 @@ pub(crate) fn construct_field_with_variant_skip(
         true,
     );
 
-    let field_ty = if attrs.skip || variant_skip {
-        quote!()
+    let skipped = attrs.skip || variant_skip;
+    let field_ty = if skipped {
+        None
     } else if attrs.inline {
-        quote!(field.ty = Some(datatype::inline(types, |types| #resolve));)
+        Some(quote!(datatype::inline(types, |types| #resolve)))
     } else {
-        quote!(field.ty = Some(#resolve);)
+        Some(resolve)
     };
+
+    // A field without any other metadata is exactly `Field::new`, so skip the
+    // `mut field` block: it is most fields, and each statement is type-checked
+    // and borrow-checked per derive.
+    let has_metadata = field_optional.is_some()
+        || field_deprecated.is_some()
+        || field_docs.is_some()
+        || runtime_attrs.is_some()
+        || type_overridden_attribute.is_some()
+        || serde_newtype_skip_ignored.is_some()
+        || nullable_attribute.is_some();
+    if let (Some(ty), false) = (&field_ty, has_metadata) {
+        return Ok(quote!(datatype::Field::new(#ty)));
+    }
+
+    let field_ty = field_ty.map(|ty| quote!(field.ty = Some(#ty);));
 
     Ok(quote!({
         let mut field = datatype::Field::default();
