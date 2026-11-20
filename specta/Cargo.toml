@@ -33,7 +33,7 @@ std = []
 derive = ["dep:specta-macros"]
 
 ## Support for collecting up a global type map
-collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
+collect = ["dep:small_ctor", "derive", "specta-macros/DO_NOT_USE_collect"]
 
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json) 1.x
