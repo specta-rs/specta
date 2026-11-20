@@ -1553,7 +1553,10 @@ fn responses_with_the_same_status_merge_content_types() {
         .expect("distinct content types merge");
 
     let content = &document["paths"]["/merged"]["get"]["responses"]["200"]["content"];
-    assert!(content["application/json"]["schema"].is_object(), "{content}");
+    assert!(
+        content["application/json"]["schema"].is_object(),
+        "{content}"
+    );
     assert!(content["text/plain"]["schema"].is_object(), "{content}");
 }
 

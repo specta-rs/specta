@@ -185,7 +185,7 @@ impl Java {
     }
 }
 
-fn format_types(types: &Types, format: &dyn Format) -> Result<Types, Error>{
+fn format_types(types: &Types, format: &dyn Format) -> Result<Types, Error> {
     types
         .format(format)
         .map_err(|err| Error::format("type graph formatter failed", err))

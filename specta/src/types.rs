@@ -7,8 +7,8 @@ use std::{
 use crate::{
     Format, FormatError, Type,
     datatype::{
-        DataType, Fields, Generic, NamedDataType, NamedReference, NamedReferenceType, Reference,
-        RecursiveInlineFrame, NamedTypeId,
+        DataType, Fields, Generic, NamedDataType, NamedReference, NamedReferenceType, NamedTypeId,
+        RecursiveInlineFrame, Reference,
     },
 };
 

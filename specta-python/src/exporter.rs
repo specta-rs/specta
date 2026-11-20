@@ -100,12 +100,8 @@ impl Python {
         match self.layout {
             Layout::Namespaces => render_namespaces(&mut out, self, types.as_ref())?,
             Layout::FlatFile | Layout::ModulePrefixedName => {
-                let body = primitives::export(
-                    self,
-                    types.as_ref(),
-                    types.as_ref().iter_sorted(),
-                    "",
-                )?;
+                let body =
+                    primitives::export(self, types.as_ref(), types.as_ref().iter_sorted(), "")?;
                 append_section(&mut out, &body);
             }
             Layout::Files => unreachable!("files layout was rejected above"),
@@ -668,4 +664,3 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
         .map(Cow::Owned)
         .map_err(|err| Error::format("type graph formatter failed", err))
 }
-

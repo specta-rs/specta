@@ -63,7 +63,9 @@ pub enum Error {
     },
 
     /// Two responses describe the same status and content type.
-    #[error("operation {path:?} declares response {status} with content type {content_type:?} twice")]
+    #[error(
+        "operation {path:?} declares response {status} with content type {content_type:?} twice"
+    )]
     DuplicateResponse {
         /// Templated path.
         path: String,

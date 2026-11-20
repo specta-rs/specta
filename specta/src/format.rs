@@ -95,7 +95,10 @@ pub fn is_unresolved_generic(err: &(dyn error::Error + 'static)) -> bool {
 ///
 /// This is the free-function form of [`Types::format`], which documents the
 /// traversal contract shared by every exporter.
-pub fn format_types(types: &crate::Types, format: &dyn Format) -> std::result::Result<crate::Types, FormatError> {
+pub fn format_types(
+    types: &crate::Types,
+    format: &dyn Format,
+) -> std::result::Result<crate::Types, FormatError> {
     types.format(format)
 }
 

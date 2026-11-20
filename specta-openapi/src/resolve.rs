@@ -51,7 +51,6 @@ impl Resolved {
     }
 }
 
-
 /// Exports `types`, and resolves every type referenced by `operations` per side.
 ///
 /// Returns the components with the probe removed, so the caller exports exactly what it would have

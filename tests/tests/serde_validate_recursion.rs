@@ -758,7 +758,7 @@ fn dynamic_self_cycle(
     arg: impl Fn(usize) -> specta::datatype::DataType,
 ) -> Types {
     use specta::datatype::{
-        DataType, Enum, Field, GenericDefinition, Generic, NamedDataType, Variant,
+        DataType, Enum, Field, Generic, GenericDefinition, NamedDataType, Variant,
     };
 
     let mut types = Types::default();
@@ -779,9 +779,7 @@ fn dynamic_self_cycle(
         e.variants.push((
             "Terminal".into(),
             Variant::unnamed()
-                .field(Field::new(DataType::Generic(Generic::new(
-                    "T".into(),
-                ))))
+                .field(Field::new(DataType::Generic(Generic::new("T".into()))))
                 .build(),
         ));
         ndt.ty = Some(DataType::Enum(e));
@@ -832,9 +830,7 @@ fn divergent_instantiation_set_still_fails_honestly() {
     use specta::datatype::{DataType, Generic};
 
     let types = dynamic_self_cycle("Diverge", 1, |_| {
-        DataType::Nullable(Box::new(DataType::Generic(Generic::new(
-            "T".into(),
-        ))))
+        DataType::Nullable(Box::new(DataType::Generic(Generic::new("T".into()))))
     });
 
     let err = with_timeout(Duration::from_secs(20), move || {

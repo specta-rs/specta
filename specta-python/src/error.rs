@@ -104,7 +104,9 @@ impl Error {
     }
 
     pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
-        let named_datatype = specta::named_datatype(source.as_ref()).cloned().map(Box::new);
+        let named_datatype = specta::named_datatype(source.as_ref())
+            .cloned()
+            .map(Box::new);
         Self {
             kind: ErrorKind::Format {
                 message,

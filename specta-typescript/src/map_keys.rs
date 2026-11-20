@@ -2,9 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{
-        DataType, Fields, Generic, NamedReferenceType, Primitive, Reference,
-    },
+    datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;

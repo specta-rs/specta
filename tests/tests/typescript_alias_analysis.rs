@@ -186,13 +186,7 @@ fn alias_proofs_do_not_survive_between_exports_or_conflate_cloned_declarations()
         vec![reference(&nodes[0]), Primitive::bool.into()]
     });
     assert_eq!(
-        primitives::export(
-            &Typescript::default(),
-            &changed,
-            changed.iter_sorted(),
-            ""
-        )
-        .unwrap(),
+        primitives::export(&Typescript::default(), &changed, changed.iter_sorted(), "").unwrap(),
         "export type Node0000 = boolean;\n"
     );
 }
