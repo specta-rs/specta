@@ -1,8 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, fmt, path::Path};
 
-use specta::{
-    Format, Types,
-};
+use specta::{Format, Types};
 
 use crate::{Error, primitives};
 
@@ -115,10 +113,7 @@ impl Go {
         match self.layout {
             Layout::FlatFile => write_file(
                 path,
-                &self.render_file(
-                    &primitives::export(self, types, types.iter_sorted())?,
-                    true,
-                ),
+                &self.render_file(&primitives::export(self, types, types.iter_sorted())?, true),
             ),
             Layout::Files => {
                 if path.exists() && !path.is_dir() {

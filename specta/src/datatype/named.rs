@@ -10,7 +10,9 @@ use crate::{
     Types,
     datatype::{
         Attributes, DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference, generic::GenericDefinition, reference::{NamedId, NamedTypeId},
+        RecursiveInlineType, Reference,
+        generic::GenericDefinition,
+        reference::{NamedId, NamedTypeId},
     },
     types::InlineResolutionFrame,
 };
@@ -167,12 +169,12 @@ impl NamedDataType {
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
-        let id = NamedTypeId(nominal.map_or(NamedId::Static(sentinel), |id| {
-            NamedId::Nominal {
+        let id = NamedTypeId(
+            nominal.map_or(NamedId::Static(sentinel), |id| NamedId::Nominal {
                 label: sentinel,
                 id,
-            }
-        }));
+            }),
+        );
         let location = Location::caller().to_owned();
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;

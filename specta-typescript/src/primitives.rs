@@ -1222,11 +1222,7 @@ fn push_nullable(s: &mut String, inner: &str) {
     }
 }
 
-fn is_exhaustive_map_key(
-    dt: &DataType,
-    types: &Types,
-    generics: &[(Generic, DataType)],
-) -> bool {
+fn is_exhaustive_map_key(dt: &DataType, types: &Types, generics: &[(Generic, DataType)]) -> bool {
     match dt {
         DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
         DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r, &[])
@@ -3357,10 +3353,7 @@ fn enum_dt(
 ) -> Result<(), Error> {
     let is_finite_number = e.attributes.get_as("specta:finite_number") == Some(&true);
 
-    if e.attributes
-        .get_as("specta_serde:deferred_alias_union")
-        == Some(&true)
-    {
+    if e.attributes.get_as("specta_serde:deferred_alias_union") == Some(&true) {
         return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);
     }
 

@@ -390,7 +390,7 @@ impl Zod {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error>{
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
     types
         .format(format)
         .map(Cow::Owned)

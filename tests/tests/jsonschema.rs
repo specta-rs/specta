@@ -623,8 +623,7 @@ fn draft7_root_reference_does_not_shadow_its_definitions() {
 
     assert!(schema.get("$ref").is_none(), "{schema}");
     assert_eq!(
-        schema["allOf"][0]["$ref"],
-        "#/definitions/Draft7Item",
+        schema["allOf"][0]["$ref"], "#/definitions/Draft7Item",
         "{schema}"
     );
     assert!(schema["definitions"]["Draft7Item"].is_object(), "{schema}");

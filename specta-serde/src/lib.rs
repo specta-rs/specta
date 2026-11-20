@@ -557,9 +557,7 @@ impl specta::Format for PhasesFormat {
 }
 
 fn datatype_is_registered_definition(types: &Types, dt: &DataType) -> bool {
-    types
-        .iter_unsorted()
-        .any(|ndt| ndt.ty.as_ref() == Some(dt))
+    types.iter_unsorted().any(|ndt| ndt.ty.as_ref() == Some(dt))
 }
 
 /// Rewrites a [`DataType`] to the requested directional shape for [`PhasesFormat`].

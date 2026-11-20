@@ -1166,11 +1166,7 @@ fn map_dt(
     Ok(())
 }
 
-fn map_key_is_finite(
-    dt: &DataType,
-    types: &Types,
-    generics: &[(Generic, DataType)],
-) -> bool {
+fn map_key_is_finite(dt: &DataType, types: &Types, generics: &[(Generic, DataType)]) -> bool {
     match dt {
         DataType::Primitive(Primitive::bool) => true,
         DataType::Enum(enm) => enm

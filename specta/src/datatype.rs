@@ -30,7 +30,6 @@ pub(crate) use reference::RecursiveInlineFrame;
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
-
 /// Runtime type-erased representation of a Rust type.
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.
