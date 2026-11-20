@@ -394,9 +394,14 @@ pub(crate) fn resolve_ty_expr(
     // concrete element type could otherwise match an enclosing slot and bake
     // that parameter into a nested declaration (issue #609).
     if mentioned.is_empty() {
+        // Pass the method as a `fn` pointer rather than a closure. The pointer
+        // has one type for every field, so `with_generic_substitution` is
+        // instantiated once per crate instead of once per field, and no closure
+        // body has to be type-checked or borrow-checked per field.
         return quote!(types.with_generic_substitution(
             &[],
-            |types| <#ty as #crate_ref::Type>::definition(types),
+            <#ty as #crate_ref::Type>::definition
+                as fn(&mut #crate_ref::Types) -> #crate_ref::datatype::DataType,
         ));
     }
 
