@@ -181,9 +181,12 @@ pub(crate) fn parse_enum(
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
+    // `vec![..]` lowers to the `Box`-based in-place array initialisation, which
+    // is a sizeable block of intrinsic calls per enum in the expanded code; a
+    // plain `push` per variant keeps the generated impl small.
     Ok(quote!({
         let mut e = datatype::Enum::default();
-        e.variants = vec![#(#variant_types),*];
+        #(e.variants.push(#variant_types);)*
         e.into()
     }))
 }
