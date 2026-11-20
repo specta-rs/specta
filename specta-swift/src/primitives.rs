@@ -224,6 +224,28 @@ fn variant_wrapper_name(enum_name: &str, variant_name: &str) -> String {
     format!("{}{}Data", enum_name, to_pascal_case(variant_name))
 }
 
+/// The wrapper structs `export_type` will declare for a named enum, paired
+/// with the variant that produces each one.
+///
+/// The caller uses these to reserve the generated names when validating the
+/// file's top-level declarations: a wrapper shares the file's namespace and
+/// must not shadow (or be shadowed by) an ordinary exported type.
+pub(crate) fn variant_wrapper_names(
+    exporter: &Swift,
+    ndt: &specta::datatype::NamedDataType,
+) -> Vec<(String, String)> {
+    let Some(DataType::Enum(enm)) = &ndt.ty else {
+        return Vec::new();
+    };
+
+    let enum_name = exporter.naming.convert(&ndt.name);
+    enm.variants
+        .iter()
+        .filter(|(name, variant)| !variant.skip && wrapper_fields(name, variant).is_some())
+        .map(|(name, _)| (variant_wrapper_name(&enum_name, name), name.to_string()))
+        .collect()
+}
+
 /// The named fields a variant's generated wrapper struct holds.
 ///
 /// Returns `None` when the variant is not represented by a wrapper struct (its

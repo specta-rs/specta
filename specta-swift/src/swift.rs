@@ -317,6 +317,19 @@ fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
                 second: identity,
             });
         }
+
+        // A named-field variant is declared as a wrapper struct in the same
+        // file namespace, so its generated name has to be reserved too.
+        for (wrapper, variant) in crate::primitives::variant_wrapper_names(exporter, ndt) {
+            let wrapper_identity = format!("{identity}::{variant} (generated variant wrapper)");
+            if let Some(first) = names.insert(wrapper.clone(), wrapper_identity.clone()) {
+                return Err(Error::DuplicateTypeName {
+                    name: wrapper,
+                    first,
+                    second: wrapper_identity,
+                });
+            }
+        }
     }
 
     Ok(())

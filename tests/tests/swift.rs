@@ -2808,3 +2808,32 @@ fn swift_keyed_tuple_and_unit_fields_report_errors() {
         .expect_err("a unit keyed field cannot be expressed in Swift");
     assert!(unit.to_string().contains("cannot encode"), "{unit}");
 }
+
+/// A named-field variant is emitted as a generated wrapper struct. Its name is
+/// derived from the enum and variant, so it can collide with an ordinary
+/// exported type (or another wrapper) and produce an invalid redeclaration.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct EVData {
+    y: u8,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum E {
+    V { x: u8 },
+}
+
+#[test]
+fn swift_generated_variant_wrapper_names_are_validated() {
+    let error = Swift::default()
+        .export(
+            &Types::default().register::<EVData>().register::<E>(),
+            specta_serde::Format,
+        )
+        .expect_err("the generated wrapper collides with an exported type");
+    let message = error.to_string();
+    assert!(message.contains("Duplicate Swift type name"), "{message}");
+    assert!(message.contains("EVData"), "{message}");
+    assert!(message.contains("generated variant wrapper"), "{message}");
+}
