@@ -237,14 +237,24 @@ impl JsonSchema {
                     definition: definition.to_string(),
                 });
             }
-            root.insert(
-                "$ref".to_string(),
-                Value::String(format!(
-                    "#/{}/{}",
-                    self.schema_version.definitions_key(),
-                    crate::render::encode_ref_token(definition)
-                )),
-            );
+            let reference = Value::String(format!(
+                "#/{}/{}",
+                self.schema_version.definitions_key(),
+                crate::render::encode_ref_token(definition)
+            ));
+            if matches!(self.schema_version, SchemaVersion::Draft7) {
+                // Draft 7 ignores every sibling keyword of a top-level $ref,
+                // including the definitions the reference points at.
+                root.insert(
+                    "allOf".to_string(),
+                    Value::Array(vec![Value::Object(Map::from_iter([(
+                        "$ref".to_string(),
+                        reference,
+                    )]))]),
+                );
+            } else {
+                root.insert("$ref".to_string(), reference);
+            }
         }
 
         Ok(schema)
