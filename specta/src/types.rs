@@ -1,6 +1,7 @@
 use std::{
     collections::hash_map,
     fmt,
+    ops::Range,
     panic::{self, AssertUnwindSafe},
 };
 
@@ -46,6 +47,15 @@ pub struct Types {
     /// inline definition has recursively reached itself, so resolution can emit
     /// a recursive reference instead of expanding forever.
     pub(crate) stack: Vec<InlineResolutionFrame>,
+
+    /// Generic-argument identities of the frames in [`Self::stack`].
+    ///
+    /// All frames share this buffer so that a frame push does not need an
+    /// allocation of its own. Each frame records the range that belongs to it.
+    stack_identities: Vec<&'static str>,
+
+    /// Generic arguments of the frames in [`Self::stack`], shared the same way.
+    stack_generics: Vec<(Generic, DataType)>,
 
     /// Whether named types discovered in the current context should be inlined.
     ///
@@ -216,29 +226,22 @@ impl GenericSubstitutionSlot {
 #[derive(Debug, Clone)]
 pub(crate) struct InlineResolutionFrame {
     pub(crate) id: NamedId,
-    /// Concrete type names of the generic arguments.
+    /// Range of this frame's generic-argument identities in
+    /// [`Types::stack_identities`].
+    ///
+    /// Kept as a range rather than a `Vec` so pushing a frame does not need its
+    /// own allocation: frames are pushed and popped for every inline use site
+    /// and the arguments are tiny.
+    identities: Range<usize>,
+    /// Range of this frame's generic arguments in [`Types::stack_generics`].
     ///
     /// Needed because an inlined generic type records its arguments as
     /// placeholders, so two different instantiations can carry identical
     /// [`DataType`] arguments.
-    pub(crate) generic_identities: Vec<&'static str>,
-    pub(crate) generics: Vec<(Generic, DataType)>,
+    generics: Range<usize>,
 }
 
 impl InlineResolutionFrame {
-    /// Records a use site of `id` with its concrete generic arguments.
-    pub(crate) fn new(
-        id: NamedId,
-        generic_identities: &[&'static str],
-        generics: &[(Generic, DataType)],
-    ) -> Self {
-        Self {
-            id,
-            generic_identities: generic_identities.to_vec(),
-            generics: generics.to_vec(),
-        }
-    }
-
     /// Whether this frame is the same use site as `id` with `generics`.
     ///
     /// This replaces the previous hashed comparison: comparing the identity and
@@ -247,17 +250,24 @@ impl InlineResolutionFrame {
     /// cycle that did not exist.
     pub(crate) fn is_use_site(
         &self,
+        types: &Types,
         id: &NamedId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) -> bool {
         // Cheapest comparisons first; the datatypes are the expensive part.
-        self.id == *id && self.generic_identities == generic_identities && self.generics == generics
+        self.id == *id
+            && types.stack_identities[self.identities.clone()] == *generic_identities
+            && types.stack_generics[self.generics.clone()] == *generics
     }
 
     /// Renders this frame's description for a reported cycle.
     pub(crate) fn describe(&self, types: &Types) -> RecursiveInlineFrame {
-        RecursiveInlineFrame::describe(types, &self.id, &self.generics)
+        RecursiveInlineFrame::describe(
+            types,
+            &self.id,
+            &types.stack_generics[self.generics.clone()],
+        )
     }
 }
 
@@ -545,6 +555,50 @@ impl Types {
             Ok(result) => result,
             Err(payload) => panic::resume_unwind(payload),
         }
+    }
+
+    /// Records `id` with its generic arguments as an inline use site that is
+    /// currently being expanded.
+    pub(crate) fn push_inline_frame(
+        &mut self,
+        id: NamedId,
+        generic_identities: &[&'static str],
+        generics: &[(Generic, DataType)],
+    ) {
+        let identities = self.stack_identities.len();
+        self.stack_identities.extend_from_slice(generic_identities);
+        let arguments = self.stack_generics.len();
+        self.stack_generics.extend_from_slice(generics);
+
+        self.stack.push(InlineResolutionFrame {
+            id,
+            identities: identities..self.stack_identities.len(),
+            generics: arguments..self.stack_generics.len(),
+        });
+    }
+
+    /// Removes the most recently pushed inline use site.
+    pub(crate) fn pop_inline_frame(&mut self) {
+        let Some(frame) = self.stack.pop() else {
+            return;
+        };
+
+        self.stack_identities.truncate(frame.identities.start);
+        self.stack_generics.truncate(frame.generics.start);
+    }
+
+    /// Returns the oldest frame that is the same use site as `id` with
+    /// `generic_identities` and `generics`, if the current expansion is
+    /// recursively reaching itself.
+    pub(crate) fn inline_cycle_start(
+        &self,
+        id: &NamedId,
+        generic_identities: &[&'static str],
+        generics: &[(Generic, DataType)],
+    ) -> Option<usize> {
+        self.stack
+            .iter()
+            .position(|frame| frame.is_use_site(self, id, generic_identities, generics))
     }
 
     /// Returns the concrete datatypes explicitly registered as top-level roots.

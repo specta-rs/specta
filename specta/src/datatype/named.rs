@@ -11,7 +11,6 @@ use crate::{
         DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
         RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
     },
-    types::InlineResolutionFrame,
 };
 
 /// Resolves any named types created by `func` as inline references.
@@ -232,13 +231,11 @@ impl NamedDataType {
         }
 
         if inline {
-            if let Some(cycle_start) = types.stack.iter().position(|frame| {
-                frame.is_use_site(
-                    &id,
-                    instantiation_generic_identities,
-                    instantiation_generics,
-                )
-            }) {
+            if let Some(cycle_start) = types.inline_cycle_start(
+                &id,
+                instantiation_generic_identities,
+                instantiation_generics,
+            ) {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
                 if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
@@ -278,16 +275,16 @@ impl NamedDataType {
             let child_inline = passthrough && caller_inline;
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
-            types.stack.push(InlineResolutionFrame::new(
+            types.push_inline_frame(
                 id.clone(),
                 instantiation_generic_identities,
                 instantiation_generics,
-            ));
+            );
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
             if let Some(prev_inline) = prev_inline {
                 types.should_inline = prev_inline;
             };
-            types.stack.pop();
+            types.pop_inline_frame();
             let dt = match result {
                 Ok(DataType::Reference(reference)) if passthrough && !caller_inline => {
                     return reference;
