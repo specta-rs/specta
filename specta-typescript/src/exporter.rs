@@ -516,21 +516,17 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
+fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
+    let mapped = format
         .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?
-    {
-        Cow::Borrowed(_) => types.clone(),
-        Cow::Owned(types) => types,
-    };
-    let mut mapped = mapped;
+        .map_err(|err| Error::format("type graph formatter failed", err))?;
 
     // Bodies are formatted against the pre-format graph, so the results can be
     // computed from a shared borrow of it and applied afterwards. Mapping in a
     // single `iter_mut` pass instead needs the graph to also be readable while
     // it is written, which would force a deep clone of every named datatype.
     let mut bodies = Vec::with_capacity(mapped.len());
+    let mut changed = matches!(mapped, Cow::Owned(_));
     let mut error = None;
 
     for ndt in mapped.into_unsorted_iter() {
@@ -549,7 +545,12 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             match path.with(segment, |path| {
                 map_datatype_format(Some(format), &mapped, default, path)
             }) {
-                Ok(default) => defaults.push((idx, default.into_owned())),
+                Ok(default) => {
+                    if let Cow::Owned(default) = default {
+                        changed = true;
+                        defaults.push((idx, default));
+                    }
+                }
                 Err(source) => {
                     error = Some(source.with_named_datatype(ndt));
                     break;
@@ -566,7 +567,16 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &mut path))
             .transpose();
         match datatype {
-            Ok(datatype) => bodies.push((defaults, datatype.map(Cow::into_owned))),
+            Ok(datatype) => {
+                let datatype = match datatype {
+                    Some(Cow::Owned(datatype)) => {
+                        changed = true;
+                        Some(datatype)
+                    }
+                    _ => None,
+                };
+                bodies.push((defaults, datatype));
+            }
             Err(source) => error = Some(source.with_named_datatype(ndt)),
         }
     }
@@ -575,8 +585,16 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
         return Err(error);
     }
 
+    // A format that left every body untouched (the identity case, or one that
+    // only annotates) needs no owned graph at all: the input is already the
+    // finished graph.
+    if !changed {
+        return Ok(mapped);
+    }
+
+    let mut output = mapped.into_owned();
     let mut bodies = bodies.into_iter();
-    mapped.iter_mut(|ndt| {
+    output.iter_mut(|ndt| {
         let Some((defaults, datatype)) = bodies.next() else {
             return;
         };
@@ -587,10 +605,12 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
                 generic.default = Some(default);
             }
         }
-        ndt.ty = datatype;
+        if let Some(datatype) = datatype {
+            ndt.ty = Some(datatype);
+        }
     });
 
-    Ok(Cow::Owned(mapped))
+    Ok(Cow::Owned(output))
 }
 
 fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {
