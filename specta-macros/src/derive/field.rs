@@ -2,12 +2,32 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-use crate::r#type::attr::deprecated_as_tokens;
+use crate::derive::attr::{
+    deprecated_as_tokens, parse_attrs_with_filter, reject_unknown_specta_attrs,
+};
 
-use crate::utils::invisible;
+use crate::derive::attr::parse::invisible;
+
+/// Parses a field's attributes, erroring on any `#[specta(...)]` key the derive
+/// does not consume.
+pub fn decode_field_attrs<'a>(
+    field: &'a syn::Field,
+    skip_attrs: &[String],
+) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
+    crate::phase!("field:decode");
+
+    // We pass all the attributes at the start and when decoding them pop them off the list.
+    // This means at the end we can check for any that weren't consumed and throw an error.
+    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
+    let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
+
+    reject_unknown_specta_attrs(&attrs, Scope::Field)?;
+
+    Ok((field_attrs, &field.attrs))
+}
 
 use super::{
-    Names,
+    FieldAttr, Names, Scope,
     generics::{BuildKind, resolve_ty_expr, type_with_inferred_lifetimes},
     r#struct::FieldInfo,
 };

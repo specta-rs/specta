@@ -1,10 +1,7 @@
-use crate::{
-    r#type::field::{FieldTokens, construct_field},
-    utils::{parse_attrs_with_filter, unraw_raw_ident},
-};
+use crate::derive::field::{FieldTokens, construct_field, decode_field_attrs};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{DataStruct, Field, Fields, spanned::Spanned};
+use syn::{DataStruct, Fields, spanned::Spanned};
 
 use super::{
     AttributeScope, Names, attr::*, build_runtime_attributes, generics::BuildKind,
@@ -138,22 +135,6 @@ fn decode_fields(
             })
         })
         .collect()
-}
-
-pub fn decode_field_attrs<'a>(
-    field: &'a Field,
-    skip_attrs: &[String],
-) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
-    crate::phase!("field:decode");
-
-    // We pass all the attributes at the start and when decoding them pop them off the list.
-    // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
-    let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
-
-    reject_unknown_specta_attrs(&attrs, Scope::Field)?;
-
-    Ok((field_attrs, &field.attrs))
 }
 
 /// Lowers a struct to the expression that builds its datatype.

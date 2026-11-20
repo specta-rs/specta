@@ -3,7 +3,7 @@ use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
 use super::AttributeScope;
-use crate::utils::invisible;
+use crate::derive::attr::parse::invisible;
 
 #[derive(Clone)]
 struct ConversionType {
@@ -132,7 +132,7 @@ pub(super) fn lower_runtime_attributes<'a>(
     scope: AttributeScope,
     target: AttributeTarget,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
-    generics: Option<crate::r#type::GenericsContext<'_>>,
+    generics: Option<crate::derive::GenericsContext<'_>>,
 ) -> Result<Option<TokenStream>> {
     Ok(match scope {
         AttributeScope::Container => parse_container_attrs(raw_attrs)?
@@ -439,7 +439,7 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
 fn container_entries(
     type_trait: &syn::Ident,
     attrs: ContainerAttrs,
-    generics: Option<crate::r#type::GenericsContext<'_>>,
+    generics: Option<crate::derive::GenericsContext<'_>>,
 ) -> Vec<AttributeEntry> {
     let mut entries = Vec::new();
     push_opt_string(
@@ -659,7 +659,7 @@ fn push_opt_conversion(
     src_key: &'static str,
     resolved_key: &'static str,
     value: &Option<ConversionType>,
-    generics: Option<crate::r#type::GenericsContext<'_>>,
+    generics: Option<crate::derive::GenericsContext<'_>>,
 ) {
     let Some(value) = value else {
         return;

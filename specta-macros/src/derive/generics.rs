@@ -8,7 +8,7 @@ use syn::{
     visit_mut::VisitMut,
 };
 
-use crate::utils::invisible;
+use crate::derive::attr::parse::invisible;
 
 use super::{
     Names,

@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Lit, Result};
 
-use crate::utils::{Attribute, AttributeValue};
+use crate::derive::attr::parse::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
 #[derive(Clone)]

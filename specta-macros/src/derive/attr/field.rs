@@ -1,6 +1,6 @@
 use syn::{Result, Type};
 
-use crate::utils::{AttrExtract, Attribute};
+use crate::derive::attr::parse::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 

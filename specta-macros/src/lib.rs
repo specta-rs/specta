@@ -1,6 +1,6 @@
 //! Easily export your Rust types to other languages
 //!
-//! This crate contains the macro which are reexported by the `specta` crate.
+//! This crate contains the macros re-exported by the `specta` crate.
 //! You shouldn't need to use this crate directly.
 //! Checkout [Specta](https://docs.rs/specta).
 #![doc(
@@ -31,17 +31,11 @@ macro_rules! phase {
 #[cfg(not(test))]
 pub(crate) use phase;
 
-#[cfg(feature = "DO_NOT_USE_function")]
-mod specta;
-mod r#type;
-mod utils;
+mod derive;
 
 #[cfg(test)]
 mod alloc;
 
-// Only installed for `cargo test`; see `alloc.rs`. It records the allocation
-// count and bytes in thread-local cells so the harness can report what a derive
-// costs without changing what it does.
 #[cfg(test)]
 #[global_allocator]
 static ALLOCATOR: alloc::CountingAllocator = alloc::CountingAllocator;
@@ -240,35 +234,7 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let source_suffix = source_position_suffix(&input);
-    r#type::derive_tokens(input.into(), &source_suffix)
-        .unwrap_or_else(|err| err.into_compile_error())
-        .into()
-}
-
-/// Builds an identifier suffix unique to this declaration's source position.
-///
-/// `module_path!()` does not distinguish declarations in separate function or
-/// block scopes, so its result is not a unique type identity on its own. This
-/// hashes the declaration's file, line and column instead; the derive appends it
-/// to the sentinel and diagnostics strip it back off.
-///
-/// Only the `proc_macro` boundary can read a span's position, so this runs here
-/// and the suffix is passed down to [`r#type::derive_tokens`].
-fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
-    use std::hash::{DefaultHasher, Hash, Hasher};
-
-    let span = input
-        .clone()
-        .into_iter()
-        .next()
-        .map_or_else(proc_macro::Span::call_site, |token| token.span());
-    let mut hasher = DefaultHasher::new();
-    span.file().hash(&mut hasher);
-    span.line().hash(&mut hasher);
-    span.column().hash(&mut hasher);
-
-    format!("{:x}", hasher.finish())
+    derive::expand(input)
 }
 
 /// Parses a string literal into a Rust type token stream.
@@ -285,23 +251,4 @@ pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenS
             .to_compile_error()
             .into(),
     }
-}
-
-/// Prepares a function to have its types extracted using `specta::function::fn_datatype!`
-///
-/// ## Example
-///
-/// ```ignore
-/// #[specta::specta]
-/// fn my_function(arg1: i32, arg2: bool) -> &'static str {
-///     "Hello World"
-/// }
-/// ```
-#[proc_macro_attribute]
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn specta(
-    attr: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    specta::attribute(attr, item).unwrap_or_else(|err| err.into_compile_error().into())
 }

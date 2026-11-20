@@ -9,7 +9,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DataEnum, Fields, spanned::Spanned};
 
-use crate::utils::invisible;
+use crate::derive::attr::parse::invisible;
 
 /// Lowers an enum to the expression that builds its datatype.
 ///

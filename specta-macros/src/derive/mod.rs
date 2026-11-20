@@ -5,7 +5,7 @@ use quote::{ToTokens, format_ident, quote};
 use r#struct::{ContainerItems, decode_items, parse_struct};
 use syn::{Data, DeriveInput, GenericParam, parse2};
 
-use crate::utils::{AttrExtract, invisible, parse_attrs, unraw_raw_ident};
+use crate::derive::attr::parse::{AttrExtract, invisible, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     BuildKind, TypeScan, add_type_to_where_clause, all_type_param_idents, build_where_clause,
@@ -146,10 +146,43 @@ fn generic_type_and_const_args(
         })
 }
 
+/// The derive's entry point.
+///
+/// `proc_macro`-typed because the declaration's source position, which gives a
+/// type its identity suffix, is only readable through [`proc_macro::Span`].
+pub(crate) fn expand(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let source_suffix = source_position_suffix(&input);
+    derive_tokens(input.into(), &source_suffix)
+        .unwrap_or_else(|err| err.into_compile_error())
+        .into()
+}
+
+/// Builds an identifier suffix unique to this declaration's source position.
+///
+/// `module_path!()` does not distinguish declarations in separate function or
+/// block scopes, so its result is not a unique type identity on its own. This
+/// hashes the declaration's file, line and column instead; the derive appends it
+/// to the sentinel and diagnostics strip it back off.
+fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let span = input
+        .clone()
+        .into_iter()
+        .next()
+        .map_or_else(proc_macro::Span::call_site, |token| token.span());
+    let mut hasher = DefaultHasher::new();
+    span.file().hash(&mut hasher);
+    span.line().hash(&mut hasher);
+    span.column().hash(&mut hasher);
+
+    format!("{:x}", hasher.finish())
+}
+
 /// Lowers one `#[derive(Type)]` input to the tokens it expands to.
 ///
-/// Split from [`crate::derive_type`]'s `proc_macro` bridge so the expansion can
-/// be exercised (and its allocations counted) from a test.
+/// Split from [`expand`]'s `proc_macro` bridge so the expansion can be
+/// exercised, and its allocations counted, from a test.
 pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenStream> {
     let parsed = {
         crate::phase!("parse (syn)");
