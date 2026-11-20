@@ -30,7 +30,6 @@ quote = "1"
 syn = { version = "2", default-features = false, features = [
   "clone-impls",
   "derive",
-  "full",
   "parsing",
   "printing",
   "proc-macro",
