@@ -1,11 +1,13 @@
 use std::{
     any::Any,
     borrow::Cow,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::hash_map::DefaultHasher,
     fmt,
     hash::{Hash, Hasher},
     sync::Arc,
 };
+
+use crate::hash::FastHashMap;
 
 trait DynAttributeValue: Send + Sync {
     fn value_any(&self) -> &dyn Any;
@@ -54,7 +56,7 @@ where
 /// part of the surrounding datatype graph.
 ///
 #[derive(Default)]
-pub struct Attributes(HashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
+pub struct Attributes(FastHashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
 
 impl Clone for Attributes {
     fn clone(&self) -> Self {
@@ -116,7 +118,7 @@ impl Attributes {
     /// Returns the raw type-erased value for a named attribute.
     ///
     /// This is useful when the expected type is not known until runtime.
-    /// Prefer [`Attributes::get_named_as`] when you know the concrete type.
+    /// Prefer [`Attributes::get_as`] when you know the concrete type.
     ///
     pub fn get(&self, key: &str) -> Option<&dyn Any> {
         self.0.get(key).map(|value| value.value_any())

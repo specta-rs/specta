@@ -1,6 +1,6 @@
 use std::{
+    any::TypeId,
     borrow::Cow,
-    hash::Hash,
     mem,
     panic::{self, AssertUnwindSafe, Location},
     sync::Arc,
@@ -9,12 +9,10 @@ use std::{
 use crate::{
     Types,
     datatype::{
-        Attributes, DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference,
-        generic::GenericDefinition,
-        reference::{NamedId, NamedTypeId},
+        Attributes, DataType, Generic, NamedReference, NamedReferenceType, NamedTypeId,
+        RecursiveInlineFrame, RecursiveInlineType, Reference, generic::GenericDefinition,
+        reference::NamedId,
     },
-    types::InlineResolutionFrame,
 };
 
 /// Resolves any named types created by `func` as inline references.
@@ -69,16 +67,51 @@ pub struct NamedDataType {
     pub ty: Option<DataType>,
 }
 
-impl NamedDataType {
-    /// Stable identity of this declaration within the type graph.
-    ///
-    /// Two declarations compare equal only when they are the same declaration;
-    /// a copy of the graph keeps the same identities. The value is process-local
-    /// and must not be used as a persistence key or as a stable sort tiebreaker.
-    pub fn id(&self) -> &NamedTypeId {
-        &self.id
+/// Identity a named declaration is registered under.
+///
+/// Built-in implementations pass their stable Rust path; generated code passes
+/// a key built from the marker type emitted next to the derive.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct NamedKey {
+    label: &'static str,
+    nominal: Option<TypeId>,
+}
+
+impl NamedKey {
+    /// A key identified by its stable `module_path::TypeName`.
+    pub const fn label(label: &'static str) -> Self {
+        Self {
+            label,
+            nominal: None,
+        }
     }
 
+    /// A key identified by the `TypeId` of the declaration's marker type.
+    pub const fn nominal(label: &'static str, id: TypeId) -> Self {
+        Self {
+            label,
+            nominal: Some(id),
+        }
+    }
+
+    /// Human-readable identity used in diagnostics.
+    pub(crate) const fn label_str(&self) -> &'static str {
+        self.label
+    }
+
+    pub(crate) fn id(&self) -> NamedTypeId {
+        NamedTypeId(match self.nominal {
+            Some(id) => NamedId::Nominal {
+                label: self.label,
+                id,
+            },
+            None => NamedId::Static(self.label),
+        })
+    }
+}
+
+impl NamedDataType {
     /// Constructs a new named datatype and register it into the [`Types`] collection.
     #[track_caller]
     pub fn new(
@@ -111,7 +144,16 @@ impl NamedDataType {
         ndt
     }
 
-    /// Initializes a named type using a static sentinel as its identity.
+    /// Stable identity of this declaration within the type graph.
+    ///
+    /// Two declarations compare equal only when they are the same declaration;
+    /// a copy of the graph keeps the same identities. The value is process-local
+    /// and must not be used as a persistence key or as a stable sort tiebreaker.
+    pub fn id(&self) -> &NamedTypeId {
+        &self.id
+    }
+
+    /// Initializes a named type using a stable key as its identity.
     ///
     /// This is used by `#[derive(Type)]` and the built-in `Type` implementation macros and must be used carefully.
     ///
@@ -157,8 +199,7 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        sentinel: &'static str,
-        nominal: Option<std::any::TypeId>,
+        key: NamedKey,
         instantiation_generics: &[(Generic, DataType)],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -166,21 +207,65 @@ impl NamedDataType {
         generic_substitution_base: usize,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
+        build_ty: fn(&mut Types) -> DataType,
+    ) -> Reference {
+        Self::init(
+            key,
+            instantiation_generics.to_vec(),
+            instantiation_generic_identities,
+            has_const_param,
+            passthrough,
+            generic_substitution_base,
+            Location::caller().to_owned(),
+            types,
+            &build_ndt,
+            build_ty,
+        )
+    }
+
+    /// The shared body of [`NamedDataType::init_with_sentinel`].
+    ///
+    /// `build_ndt` is a `&dyn Fn` rather than a `fn` pointer so
+    /// [`Types::define_named`] can pass a closure that captures the metadata it
+    /// was given. Taking it by reference (instead of `impl Fn`) keeps this
+    /// function non-generic, so it is compiled once in this crate instead of
+    /// once per distinct closure type in every crate that derives `Type`.
+    ///
+    /// `location` is passed in rather than read here because callers such as
+    /// [`Types::define_instantiation_params`] run this from inside a closure,
+    /// which `#[track_caller]` cannot see through.
+    #[track_caller]
+    pub(crate) fn init(
+        key: NamedKey,
+        instantiation_generics: Vec<(Generic, DataType)>,
+        instantiation_generic_identities: &[&'static str],
+        has_const_param: bool,
+        passthrough: bool,
+        generic_substitution_base: usize,
+        location: Location<'static>,
+        types: &mut Types,
+        build_ndt: &dyn Fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
-        let id = NamedTypeId(
-            nominal.map_or(NamedId::Static(sentinel), |id| NamedId::Nominal {
-                label: sentinel,
-                id,
-            }),
-        );
-        let location = Location::caller().to_owned();
+        let id = key.id();
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
 
-        // If we have never encountered this type, register it to type map
-        if !types.types.contains_key(&id) {
+        // If we have never encountered this type, register it to type map.
+        //
+        // A single `entry` probe both answers "is this type known?" and installs
+        // the in-progress placeholder, which keeps the common repeat use site to
+        // one hash lookup instead of a `contains_key` followed by an `insert`.
+        let vacant = match types.types.entry(id.clone()) {
+            std::collections::hash_map::Entry::Occupied(_) => false,
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert(None);
+                true
+            }
+        };
+
+        if vacant {
             let mut ndt = NamedDataType {
                 id: id.clone(),
                 location,
@@ -193,8 +278,6 @@ impl NamedDataType {
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
             };
-
-            types.types.insert(id.clone(), None);
 
             let prev_inline = mem::replace(&mut types.should_inline, false);
             let prev_has_const_params = mem::replace(&mut types.has_const_params, has_const_param);
@@ -225,43 +308,34 @@ impl NamedDataType {
                 }
             }
 
-            types.types.insert(id.clone(), Some(ndt));
-            types.len += 1;
+            // `build_ndt` may already have completed this entry, for example by
+            // merging a collection that contains it through `Types::extend`.
+            // Only count the entry when the placeholder we installed is still a
+            // placeholder, otherwise `Types::len` would report more entries than
+            // the map holds.
+            let already_complete = types
+                .types
+                .insert(id.clone(), Some(ndt))
+                .is_some_and(|slot| slot.is_some());
+            types.len += usize::from(!already_complete);
 
             // We patch the Tauri `Type` implementation.
             if is_tauri_type {
                 return Reference::Named(NamedReference {
                     id,
                     inner: NamedReferenceType::Reference {
-                        generics: instantiation_generics.to_owned(),
+                        generics: instantiation_generics,
                     },
                 });
             }
         }
 
         if inline {
-            let current_ty = types
-                .types
-                .get(&id)
-                .and_then(|ndt| ndt.as_ref())
-                .map(|ndt| RecursiveInlineFrame::new(types, ndt, instantiation_generics))
-                .unwrap_or_else(|| {
-                    RecursiveInlineFrame::from_type_path(
-                        types,
-                        sentinel.into(),
-                        instantiation_generics,
-                    )
-                });
-
-            // Exact identity, not a hash: a hash collision must not be mistaken
-            // for a recursive inline expansion.
-            let cycle_start = types.stack.iter().position(|frame| {
-                frame.id == id
-                    && frame.generics == instantiation_generics
-                    && frame.identities == instantiation_generic_identities
-            });
-
-            if let Some(cycle_start) = cycle_start {
+            if let Some(cycle_start) = types.inline_cycle_start(
+                &id,
+                instantiation_generic_identities,
+                &instantiation_generics,
+            ) {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
                 if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
@@ -275,14 +349,20 @@ impl NamedDataType {
                     }
                 }
 
+                let mut cycle = types.stack[cycle_start..]
+                    .iter()
+                    .map(|frame| frame.describe(types))
+                    .collect::<Vec<_>>();
+                cycle.push(RecursiveInlineFrame::describe(
+                    types,
+                    &id,
+                    &instantiation_generics,
+                ));
+
                 return Reference::Named(NamedReference {
                     id,
                     inner: NamedReferenceType::Recursive(RecursiveInlineType::from_cycle(
-                        types.stack[cycle_start..]
-                            .iter()
-                            .map(|frame| frame.ty.clone())
-                            .chain(std::iter::once(current_ty))
-                            .collect(),
+                        cycle,
                         instantiation_generics.to_vec(),
                     )),
                 });
@@ -295,17 +375,16 @@ impl NamedDataType {
             let child_inline = passthrough && caller_inline;
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
-            types.stack.push(InlineResolutionFrame {
-                id: id.clone(),
-                generics: instantiation_generics.to_vec(),
-                identities: instantiation_generic_identities.to_vec(),
-                ty: current_ty,
-            });
+            types.push_inline_frame(
+                id.clone(),
+                instantiation_generic_identities,
+                &instantiation_generics,
+            );
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
             if let Some(prev_inline) = prev_inline {
                 types.should_inline = prev_inline;
             };
-            types.stack.pop();
+            types.pop_inline_frame();
             let dt = match result {
                 Ok(DataType::Reference(reference)) if passthrough && !caller_inline => {
                     return reference;
@@ -322,7 +401,7 @@ impl NamedDataType {
             Reference::Named(NamedReference {
                 id,
                 inner: NamedReferenceType::Reference {
-                    generics: instantiation_generics.to_owned(),
+                    generics: instantiation_generics,
                 },
             })
         }
@@ -362,7 +441,11 @@ impl Deprecated {
     /// Constructs deprecation metadata with a note.
     ///
     /// Corresponds to `#[deprecated = "Use something else"]`.
-    pub fn with_note(note: Cow<'static, str>) -> Self {
+    ///
+    /// `const` so a generated implementation can keep the metadata in a
+    /// `static` and pass a reference to it, instead of building a temporary in
+    /// every monomorphised `definition`.
+    pub const fn with_note(note: Cow<'static, str>) -> Self {
         Self {
             note: Some(note),
             since: None,
@@ -372,7 +455,12 @@ impl Deprecated {
     /// Constructs deprecation metadata with a note and optional `since` version.
     ///
     /// Corresponds to `#[deprecated(since = "1.0.0", note = "Use something else")]`.
-    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+    ///
+    /// `const` for the same reason as [`Deprecated::with_note`].
+    pub const fn with_since_note(
+        since: Option<Cow<'static, str>>,
+        note: Cow<'static, str>,
+    ) -> Self {
         Self {
             note: Some(note),
             since,
@@ -424,8 +512,7 @@ mod tests {
 
         let mut types = Types::default();
         super::NamedDataType::init_with_sentinel(
-            "test::Dup",
-            None,
+            super::NamedKey::label("test::Dup"),
             &[],
             &[],
             false,
@@ -439,8 +526,7 @@ mod tests {
         // It must reuse the first definition instead of exporting another type
         // with the same name.
         super::NamedDataType::init_with_sentinel(
-            "test::Dup",
-            None,
+            super::NamedKey::label("test::Dup"),
             &[],
             &[],
             false,
@@ -457,6 +543,69 @@ mod tests {
             .next()
             .expect("the definition is registered");
         assert_eq!(ndt.name, "Dup");
+    }
+
+    #[test]
+    fn extending_during_resolution_counts_the_entry_once() {
+        use std::cell::RefCell;
+
+        thread_local! {
+            static OTHER: RefCell<Types> = RefCell::new(Types::default());
+        }
+
+        const SENTINEL: &str = "test::ExtendDuringResolution";
+
+        fn metadata(ndt: &mut super::NamedDataType) {
+            ndt.name = std::borrow::Cow::Borrowed("ExtendDuringResolution");
+            ndt.module_path = std::borrow::Cow::Borrowed("test");
+            ndt.ty = Some(crate::datatype::Primitive::str.into());
+        }
+
+        fn build(_: &mut Types, ndt: &mut super::NamedDataType) {
+            metadata(ndt);
+        }
+
+        // A definition that merges another collection into the one being built,
+        // as an exporter that has already collected this type would.
+        fn build_while_extending(types: &mut Types, ndt: &mut super::NamedDataType) {
+            metadata(ndt);
+            OTHER.with(|other| types.extend(&other.borrow()));
+        }
+
+        fn inline(_: &mut Types) -> DataType {
+            unreachable!("the definition is registered up front")
+        }
+
+        OTHER.with(|other| {
+            super::NamedDataType::init_with_sentinel(
+                super::NamedKey::label(SENTINEL),
+                &[],
+                &[],
+                false,
+                false,
+                0,
+                &mut other.borrow_mut(),
+                build,
+                inline,
+            );
+        });
+
+        let mut types = Types::default();
+        super::NamedDataType::init_with_sentinel(
+            super::NamedKey::label(SENTINEL),
+            &[],
+            &[],
+            false,
+            false,
+            0,
+            &mut types,
+            build_while_extending,
+            inline,
+        );
+
+        // `Types::len` checks its count against the map, so a double count
+        // shows up here rather than as a wrong length in an exporter.
+        assert_eq!(types.len(), 1);
     }
 
     #[test]

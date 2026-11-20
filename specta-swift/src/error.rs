@@ -24,6 +24,21 @@ pub enum Error {
         second: String,
     },
 
+    /// Multiple members of one Rust type render as the same Swift identifier.
+    #[error(
+        "Duplicate Swift member name {name:?} in {type_name}: {first:?} and {second:?} both export as {name}"
+    )]
+    DuplicateMemberName {
+        /// The Rust type whose members collide.
+        type_name: String,
+        /// The colliding Swift property or case name.
+        name: String,
+        /// Wire name of the first member.
+        first: String,
+        /// Wire name of the second member.
+        second: String,
+    },
+
     /// Circular reference detected in type definitions.
     #[error("Circular reference detected")]
     CircularReference,

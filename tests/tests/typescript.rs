@@ -3,12 +3,16 @@ use std::{
     collections::HashMap,
     iter,
     path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, SystemTime},
 };
 
 use specta::{
     Format, Type, Types,
-    datatype::{DataType, NamedDataType, Primitive, Reference},
+    datatype::{DataType, Fields, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::{
     ErrorTraceFrame, Exporter, Layout, Typescript, primitives, semantic::Configuration,
@@ -1798,4 +1802,68 @@ fn files_layout_refuses_to_delete_an_existing_regular_file() {
 
     assert!(error.to_string().contains("Refusing to delete it"));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "hand-written file");
+}
+
+/// A format whose `map_type` maps the whole subtree it is given, like
+/// `specta_serde::Format` does, and which is *not* idempotent: `u8` becomes
+/// `str` and a second visit turns that into `bool`.
+struct RecursiveNonIdempotent(Arc<AtomicUsize>);
+
+impl Format for RecursiveNonIdempotent {
+    fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
+    }
+
+    fn map_type(&self, _: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, specta::FormatError> {
+        self.0.fetch_add(1, Ordering::Relaxed);
+        Ok(Cow::Owned(map_subtree(dt.clone())))
+    }
+}
+
+fn map_subtree(dt: DataType) -> DataType {
+    match dt {
+        DataType::Primitive(Primitive::u8) => DataType::Primitive(Primitive::str),
+        DataType::Primitive(Primitive::str) => DataType::Primitive(Primitive::bool),
+        DataType::Struct(mut strct) => {
+            if let Fields::Named(named) = &mut strct.fields {
+                for (_, field) in &mut named.fields {
+                    if let Some(ty) = field.ty.take() {
+                        field.ty = Some(map_subtree(ty));
+                    }
+                }
+            }
+            DataType::Struct(strct)
+        }
+        dt => dt,
+    }
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct FormatsEachDatatypeOnce {
+    value: u8,
+}
+
+#[test]
+fn map_type_is_not_reapplied_inside_its_own_result() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let output = Typescript::default()
+        .export(
+            &Types::default().register::<FormatsEachDatatypeOnce>(),
+            RecursiveNonIdempotent(calls.clone()),
+        )
+        .unwrap();
+
+    assert!(output.contains("value: string"), "{output}");
+    assert!(
+        !output.contains("value: boolean"),
+        "the already-mapped subtree was formatted a second time:\n{output}"
+    );
+    // The root reference and the named definition body. Roots are formatted
+    // too, so an anonymous root is never rendered unformatted.
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        2,
+        "the root and each named definition should be formatted exactly once:\n{output}"
+    );
 }

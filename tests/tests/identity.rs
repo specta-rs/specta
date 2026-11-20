@@ -67,6 +67,7 @@ fn named_type_ids_survive_graph_copies() {
     );
 }
 
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct IdentityItem {

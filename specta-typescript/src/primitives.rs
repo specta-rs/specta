@@ -117,6 +117,37 @@ fn inner_comments(
     out
 }
 
+/// Write `docs` and `deprecated` as comment lines prefixed with `prefix`.
+///
+/// Matches what [`inner_comments`] produces, without materialising the
+/// combined text first.
+fn push_comments(
+    s: &mut String,
+    deprecated: Option<&Deprecated>,
+    docs: &str,
+    start_with_newline: bool,
+    prefix: &str,
+) {
+    if docs.is_empty() && deprecated.is_none() {
+        return;
+    }
+
+    let mut comments = String::new();
+    js_doc(&mut comments, docs, deprecated);
+    if comments.is_empty() {
+        return;
+    }
+
+    if start_with_newline {
+        s.push('\n');
+    }
+    for line in comments.lines() {
+        s.push_str(prefix);
+        s.push_str(line);
+        s.push('\n');
+    }
+}
+
 pub(crate) fn is_identifier(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
@@ -163,40 +194,42 @@ fn push_unicode_escape(s: &mut String, ch: char) {
     s.push(HEX[(value & 0xF) as usize] as char);
 }
 
-fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
-    if force_string || !is_identifier(&field_name) {
-        format!(r#""{}""#, escape_typescript_string_literal(&field_name)).into()
+fn sanitise_key<'a>(field_name: &'a str, force_string: bool) -> Cow<'a, str> {
+    if force_string || !is_identifier(field_name) {
+        format!(r#""{}""#, escape_typescript_string_literal(field_name)).into()
     } else {
-        field_name
+        field_name.into()
     }
 }
 
-fn sanitise_type_name(location: &[Cow<'static, str>], ident: &str) -> Result<String, Error> {
-    let path = path_string(location);
+fn sanitise_type_name<'a>(ndt: &NamedDataType, ident: &'a str) -> Result<&'a str, Error> {
+    // The Rust path is only needed to describe a failure, so it is rendered
+    // from the name rather than built for every exported type.
+    let path = || rust_type_path(ndt);
 
     if ident.is_empty() {
-        return Err(Error::empty_name(path));
+        return Err(Error::empty_name(path().into_owned()));
     }
 
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        return Err(Error::forbidden_name(path, name));
+        return Err(Error::forbidden_name(path().into_owned(), name));
     }
 
     if let Some(first_char) = ident.chars().next()
         && !first_char.is_alphabetic()
         && first_char != '_'
     {
-        return Err(Error::invalid_name(path, ident.to_string()));
+        return Err(Error::invalid_name(path().into_owned(), ident.to_string()));
     }
 
     if ident
         .find(|c: char| !c.is_alphanumeric() && c != '_')
         .is_some()
     {
-        return Err(Error::invalid_name(path, ident.to_string()));
+        return Err(Error::invalid_name(path().into_owned(), ident.to_string()));
     }
 
-    Ok(ident.to_string())
+    Ok(ident)
 }
 
 pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&Deprecated>) {
@@ -342,8 +375,8 @@ fn export_single_internal(
     }
 
     let raw_name = exported_type_name(exporter, ndt);
-    let name = sanitise_type_name(&[rust_type_path(ndt)], &raw_name)
-        .map_err(|err| err.with_named_datatype(ndt))?;
+    let name =
+        sanitise_type_name(ndt, raw_name.as_ref()).map_err(|err| err.with_named_datatype(ndt))?;
 
     let mut comments = String::new();
     js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref());
@@ -357,7 +390,7 @@ fn export_single_internal(
 
     s.push_str(indent);
     s.push_str("export type ");
-    s.push_str(&name);
+    s.push_str(name);
     write_generic_parameters(s, exporter, types, &[rust_type_path(ndt)], &ndt.generics)?;
     s.push_str(" = ");
 
@@ -845,15 +878,15 @@ fn named_reference_ty<'a>(
     r: &'a NamedReference,
     location: &[Cow<'static, str>],
 ) -> Result<&'a DataType, Error> {
-    let path = path_string(location);
     match &r.inner {
-        NamedReferenceType::Reference { .. } => types
-            .get(r)
-            .and_then(|ndt| ndt.ty.as_ref())
-            .ok_or_else(|| Error::dangling_named_reference(path, format!("{r:?}"))),
+        NamedReferenceType::Reference { .. } => {
+            types.get(r).and_then(|ndt| ndt.ty.as_ref()).ok_or_else(|| {
+                Error::dangling_named_reference(path_string(location), format!("{r:?}"))
+            })
+        }
         NamedReferenceType::Inline { dt, .. } => Ok(dt),
         NamedReferenceType::Recursive(cycle) => Err(Error::infinite_recursive_inline_type(
-            path,
+            path_string(location),
             format!("{r:?}"),
             cycle.clone(),
         )),
@@ -1552,7 +1585,7 @@ fn inline_struct_with_generics(
                 s.push('\n');
                 s.push_str(prefix);
                 s.push('\t');
-                s.push_str(&sanitise_key(key.clone(), false));
+                s.push_str(&sanitise_key(key, false));
                 if field.optional {
                     s.push('?');
                 }
@@ -1946,29 +1979,37 @@ fn struct_dt(
             false,
         )?,
         Fields::Named(named) => {
-            let fields = named
-                .fields
-                .iter()
-                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
-                .collect::<Vec<_>>();
-
-            if fields.is_empty() {
+            if named.fields.iter().all(|(_, field)| field.ty.is_none()) {
                 s.push_str("Record<string, never>");
                 return Ok(());
             }
 
-            let mut unflattened_fields = Vec::with_capacity(fields.len());
-            for (key, (field, ty)) in fields {
-                let field_prefix = format!("{prefix}\t");
-                let mut other = String::new();
+            let mut field_prefix = String::with_capacity(prefix.len() + 1);
+            field_prefix.push_str(prefix);
+            field_prefix.push('\t');
+
+            s.push('{');
+            for (key, field) in &named.fields {
+                let Some(ty) = field.ty.as_ref() else {
+                    continue;
+                };
+
+                s.push('\n');
+                push_comments(
+                    s,
+                    field.deprecated.as_ref(),
+                    &field.docs,
+                    false,
+                    &field_prefix,
+                );
                 let mut field_location = location.clone();
                 field_location.push(key.clone());
                 object_field_to_ts(
-                    &mut other,
+                    s,
                     exporter,
                     format,
                     types,
-                    key.clone(),
+                    key,
                     (field, ty),
                     field_location,
                     parent_name,
@@ -1977,22 +2018,9 @@ fn struct_dt(
                     false,
                     None,
                 )?;
-
-                unflattened_fields.push(inner_comments(
-                    field.deprecated.as_ref(),
-                    &field.docs,
-                    other,
-                    false,
-                    &field_prefix,
-                ));
-            }
-
-            s.push('{');
-            for field in unflattened_fields {
-                s.push('\n');
-                s.push_str(&field);
                 s.push(',');
             }
+
             s.push('\n');
             s.push_str(prefix);
             s.push('}');
@@ -2007,7 +2035,7 @@ fn object_field_to_ts(
     exporter: &Exporter,
     format: Option<&dyn Format>,
     types: &Types,
-    key: Cow<'static, str>,
+    key: &str,
     (field, ty): (&Field, &DataType),
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
@@ -2016,37 +2044,28 @@ fn object_field_to_ts(
     force_inline: bool,
     ty_override: Option<&str>,
 ) -> Result<(), Error> {
-    let field_name_safe = sanitise_key(key, false);
-    let key = if field.optional {
-        format!("{field_name_safe}?").into()
-    } else {
-        field_name_safe
-    };
-
-    let value = match ty_override {
-        Some(ty_override) => ty_override.to_string(),
-        None => {
-            let mut value = String::new();
-            datatype_with_inline_attr(
-                &mut value,
-                exporter,
-                format,
-                types,
-                ty,
-                location,
-                parent_name,
-                prefix,
-                generics,
-                force_inline,
-            )?;
-            value
-        }
-    };
-
     s.push_str(prefix);
-    s.push_str(&key);
+    s.push_str(&sanitise_key(key, false));
+    if field.optional {
+        s.push('?');
+    }
     s.push_str(": ");
-    s.push_str(&value);
+
+    match ty_override {
+        Some(ty_override) => s.push_str(ty_override),
+        None => datatype_with_inline_attr(
+            s,
+            exporter,
+            format,
+            types,
+            ty,
+            location,
+            parent_name,
+            prefix,
+            generics,
+            force_inline,
+        )?,
+    }
 
     Ok(())
 }
@@ -2057,9 +2076,9 @@ struct EnumVariantOutput {
 }
 
 #[derive(Debug, Clone)]
-struct DiscriminatorAnalysis {
-    key: String,
-    known_literals: Vec<String>,
+struct DiscriminatorAnalysis<'a> {
+    key: &'a str,
+    known_literals: Vec<&'a str>,
     fallback_variant_idx: Option<usize>,
 }
 
@@ -2069,32 +2088,32 @@ struct VariantTypeOverride<'a> {
     ty: &'a str,
 }
 
-#[derive(Debug, Clone)]
-enum DiscriminatorValue {
-    StringLiteral(String),
+#[derive(Debug, Clone, Copy)]
+enum DiscriminatorValue<'a> {
+    StringLiteral(&'a str),
     String,
 }
 
-fn analyze_discriminator(
-    variants: &[&(Cow<'static, str>, Variant)],
-) -> Option<DiscriminatorAnalysis> {
+fn analyze_discriminator<'a>(
+    variants: &[&'a (Cow<'static, str>, Variant)],
+) -> Option<DiscriminatorAnalysis<'a>> {
     if variants.iter().any(|(name, _)| name.is_empty()) {
         return None;
     }
 
-    let mut key = None::<String>;
+    let mut key = None::<&'a str>;
     let mut known_literals = BTreeSet::new();
     let mut fallback_variant_idx = None;
 
     for (idx, (_, variant)) in variants.iter().enumerate() {
         let (variant_key, value) = variant_discriminator(variant)?;
 
-        if let Some(expected) = &key {
-            if expected != &variant_key {
+        if let Some(expected) = key {
+            if expected != variant_key {
                 return None;
             }
         } else {
-            key = Some(variant_key.clone());
+            key = Some(variant_key);
         }
 
         match value {
@@ -2120,7 +2139,7 @@ fn analyze_discriminator(
     })
 }
 
-fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValue)> {
+fn variant_discriminator<'a>(variant: &'a Variant) -> Option<(&'a str, DiscriminatorValue<'a>)> {
     let Fields::Named(named) = &variant.fields else {
         return None;
     };
@@ -2129,14 +2148,14 @@ fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValu
     let ty = field.ty.as_ref()?;
 
     if matches!(ty, DataType::Primitive(Primitive::str)) {
-        return Some((name.to_string(), DiscriminatorValue::String));
+        return Some((name.as_ref(), DiscriminatorValue::String));
     }
 
     string_literal_datatype_value(ty)
-        .map(|value| (name.to_string(), DiscriminatorValue::StringLiteral(value)))
+        .map(|value| (name.as_ref(), DiscriminatorValue::StringLiteral(value)))
 }
 
-fn string_literal_datatype_value(ty: &DataType) -> Option<String> {
+fn string_literal_datatype_value(ty: &DataType) -> Option<&str> {
     let DataType::Enum(enm) = ty else {
         return None;
     };
@@ -2147,30 +2166,30 @@ fn string_literal_datatype_value(ty: &DataType) -> Option<String> {
         return None;
     }
 
-    Some(name.to_string())
+    Some(name.as_ref())
 }
 
-fn exclude_known_literals_type(literals: &[String]) -> Option<String> {
+fn exclude_known_literals_type(literals: &[&str]) -> Option<String> {
     if literals.is_empty() {
         return None;
     }
 
     let known = literals
         .iter()
-        .map(|value| format!("\"{}\"", escape_typescript_string_literal(value.as_str())))
+        .map(|value| format!("\"{}\"", escape_typescript_string_literal(value)))
         .collect::<Vec<_>>()
         .join(" | ");
 
     Some(format!("Exclude<string, {known}>"))
 }
 
-fn fallback_discriminator_override(
-    discriminator: Option<&DiscriminatorAnalysis>,
-) -> Option<(usize, &str, String)> {
+fn fallback_discriminator_override<'a>(
+    discriminator: Option<&'a DiscriminatorAnalysis<'a>>,
+) -> Option<(usize, &'a str, String)> {
     let discriminator = discriminator?;
     discriminator.fallback_variant_idx.and_then(|idx| {
         exclude_known_literals_type(&discriminator.known_literals)
-            .map(|ty| (idx, discriminator.key.as_str(), ty))
+            .map(|ty| (idx, discriminator.key, ty))
     })
 }
 
@@ -2183,7 +2202,7 @@ fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
                     field
                         .ty
                         .as_ref()
-                        .map(|_| sanitise_key(name.clone(), false).to_string())
+                        .map(|_| sanitise_key(name, false).to_string())
                 })
                 .collect(),
         ),
@@ -2231,16 +2250,23 @@ fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
 }
 
 fn push_union(s: &mut String, variants: Vec<String>) {
-    let mut seen = BTreeSet::new();
-    let variants = variants
-        .into_iter()
-        .filter(|variant| seen.insert(variant.clone()))
-        .collect::<Vec<_>>();
+    let mut seen = HashSet::with_capacity(variants.len());
+    let mut first = true;
 
-    if variants.is_empty() {
+    for variant in &variants {
+        if !seen.insert(variant.as_str()) {
+            continue;
+        }
+        if !first {
+            s.push_str(" | ");
+        } else {
+            first = false;
+        }
+        s.push_str(variant);
+    }
+
+    if first {
         s.push_str(NEVER);
-    } else {
-        s.push_str(&variants.join(" | "));
     }
 }
 
@@ -2260,7 +2286,7 @@ fn enum_variant_datatype(
         // serializes a unit variant as the empty string, which renders as the
         // `""` literal. The diagnostic is kept for the anonymous named-field
         // shape, which has no tag to render.
-        Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
+        Fields::Unit => Ok(Some(sanitise_key(&name, true).to_string())),
         Fields::Named(_) if name.is_empty() => Err(Error::unsupported_anonymous_enum_variant(
             path_string(&location),
             "named-field",
@@ -2289,7 +2315,7 @@ fn enum_variant_datatype(
                     exporter,
                     format,
                     types,
-                    field_name.clone(),
+                    field_name,
                     (field, ty),
                     field_location,
                     None,
@@ -3366,6 +3392,10 @@ fn enum_dt(
 
     let discriminator = analyze_discriminator(&filtered_variants);
     let fallback_override = fallback_discriminator_override(discriminator.as_ref());
+    // Strict key sets are only read by `strictify_enum_variants`, so a
+    // discriminated enum (or one with an anonymous variant) must not pay to
+    // collect them.
+    let strictify = discriminator.is_none() && !has_anonymous_variant(&filtered_variants);
 
     let mut rendered_variants = Vec::with_capacity(filtered_variants.len());
     for (idx, (variant_name, variant)) in filtered_variants.iter().enumerate() {
@@ -3394,7 +3424,11 @@ fn enum_dt(
 
         rendered_variants.push(EnumVariantOutput {
             value: ts_values.unwrap_or_else(|| NEVER.to_string()),
-            strict_keys: untagged_strict_keys(variant),
+            strict_keys: if strictify {
+                untagged_strict_keys(variant)
+            } else {
+                None
+            },
         });
     }
 
@@ -3404,7 +3438,7 @@ fn enum_dt(
         return Ok(());
     }
 
-    if discriminator.is_none() && !has_anonymous_variant(&filtered_variants) {
+    if strictify {
         strictify_enum_variants(&mut rendered_variants);
     }
 
@@ -3673,18 +3707,24 @@ fn reference_named_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
-    let path = path_string(&location);
+    // The location is only needed to describe a dangling reference.
     let ndt = types
         .get(r)
-        .ok_or_else(|| Error::dangling_named_reference(path.clone(), format!("{r:?}")))?;
+        .ok_or_else(|| Error::dangling_named_reference(path_string(&location), format!("{r:?}")))?;
     // We check it's valid before tracking
     crate::references::track_nr(r);
 
     let name = referenced_type_name(exporter, ndt);
 
-    let (rendered_generics, omit_generics, scoped_generics) =
-        resolved_reference_generics(ndt, r, generics)
-            .ok_or_else(|| Error::dangling_named_reference(path, format!("{r:?}")))?;
+    // References to a type without parameters never render a parameter list, so
+    // the resolution (which clones generic arguments and defaults) is skipped.
+    let (rendered_generics, omit_generics, scoped_generics) = if ndt.generics.is_empty() {
+        (Vec::new(), true, Vec::new())
+    } else {
+        resolved_reference_generics(ndt, r, generics).ok_or_else(|| {
+            Error::dangling_named_reference(path_string(&location), format!("{r:?}"))
+        })?
+    };
 
     s.push_str(&name);
     if !omit_generics && !rendered_generics.is_empty() {

@@ -152,3 +152,142 @@ fn the_formatter_runs_once_per_node() {
     // The root reference, the Item declaration body, and its single field.
     assert_eq!(records.calls.get(), 3, "{:?}", records.nodes.borrow());
 }
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Leaves {
+    values: Vec<u8>,
+}
+
+/// A formatter that clones every node but only rewrites one leaf must still
+/// reach that leaf. An owned result equal to its input is unchanged.
+#[test]
+fn an_owned_unchanged_node_is_still_descended_into() {
+    struct LeafRewrite;
+
+    impl Format for LeafRewrite {
+        fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, FormatError> {
+            Ok(Cow::Owned(types.clone()))
+        }
+
+        fn map_type<'a>(
+            &'a self,
+            _: &'a Types,
+            dt: &'a DataType,
+        ) -> Result<Cow<'a, DataType>, FormatError> {
+            Ok(Cow::Owned(match dt {
+                DataType::Primitive(Primitive::u8) => DataType::Primitive(Primitive::str),
+                _ => dt.clone(),
+            }))
+        }
+    }
+
+    let formatted = Types::default()
+        .register::<Leaves>()
+        .format(&LeafRewrite)
+        .expect("formatting succeeds");
+
+    let body = formatted
+        .iter_sorted()
+        .find(|ndt| ndt.name == "Leaves")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("Leaves is exported");
+    let DataType::Struct(data) = body else {
+        panic!("expected a struct, got {body:?}");
+    };
+    let specta::datatype::Fields::Named(named) = &data.fields else {
+        panic!("expected named fields");
+    };
+    let field = named
+        .fields
+        .iter()
+        .find(|(name, _)| name == "values")
+        .and_then(|(_, field)| field.ty.as_ref())
+        .expect("values field");
+    let DataType::List(list) = inline_datatype(field) else {
+        panic!("expected a list, got {field:?}");
+    };
+    assert_eq!(*list.ty, DataType::Primitive(Primitive::str));
+}
+
+/// A formatter that rewrites a whole subtree owns its result; the traversal
+/// must not format the result again.
+#[test]
+fn an_owned_changed_node_is_not_formatted_again() {
+    struct SubtreeRewrite;
+
+    impl Format for SubtreeRewrite {
+        fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, FormatError> {
+            Ok(Cow::Owned(types.clone()))
+        }
+
+        fn map_type<'a>(
+            &'a self,
+            _: &'a Types,
+            dt: &'a DataType,
+        ) -> Result<Cow<'a, DataType>, FormatError> {
+            let mut dt = dt.clone();
+            rewrite_leaves(&mut dt);
+            Ok(Cow::Owned(dt))
+        }
+    }
+
+    fn rewrite_leaves(dt: &mut DataType) {
+        match dt {
+            DataType::Primitive(Primitive::u8) => *dt = DataType::Primitive(Primitive::str),
+            DataType::Primitive(Primitive::str) => *dt = DataType::Primitive(Primitive::bool),
+            DataType::Struct(data) => {
+                if let specta::datatype::Fields::Named(named) = &mut data.fields {
+                    for (_, field) in &mut named.fields {
+                        if let Some(ty) = &mut field.ty {
+                            rewrite_leaves(ty);
+                        }
+                    }
+                }
+            }
+            DataType::List(list) => rewrite_leaves(&mut list.ty),
+            _ => {}
+        }
+    }
+
+    let formatted = Types::default()
+        .register::<Leaves>()
+        .format(&SubtreeRewrite)
+        .expect("formatting succeeds");
+
+    let body = formatted
+        .iter_sorted()
+        .find(|ndt| ndt.name == "Leaves")
+        .and_then(|ndt| ndt.ty.as_ref())
+        .expect("Leaves is exported");
+    let DataType::Struct(data) = body else {
+        panic!("expected a struct, got {body:?}");
+    };
+    let specta::datatype::Fields::Named(named) = &data.fields else {
+        panic!("expected named fields");
+    };
+    let field = named
+        .fields
+        .iter()
+        .find(|(name, _)| name == "values")
+        .and_then(|(_, field)| field.ty.as_ref())
+        .expect("values field");
+    let DataType::List(list) = inline_datatype(field) else {
+        panic!("expected a list, got {field:?}");
+    };
+    assert_eq!(
+        *list.ty,
+        DataType::Primitive(Primitive::str),
+        "the formatter's rewritten subtree was formatted a second time"
+    );
+}
+
+/// Unwraps the inline reference a passthrough container such as Vec produces.
+fn inline_datatype(ty: &DataType) -> &DataType {
+    if let DataType::Reference(specta::datatype::Reference::Named(reference)) = ty
+        && let specta::datatype::NamedReferenceType::Inline { dt, .. } = &reference.inner
+    {
+        return dt;
+    }
+    ty
+}

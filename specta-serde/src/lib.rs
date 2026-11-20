@@ -198,9 +198,19 @@ impl specta::Format for Format {
         Ok(Cow::Owned(out))
     }
 
-    fn map_type(&'_ self, types: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> Result<Cow<'a, DataType>, FormatError> {
         if datatype_is_registered_definition(types, dt) {
             return Ok(Cow::Owned(dt.clone()));
+        }
+
+        // A primitive carries no attributes or children, so neither the
+        // validation walk nor the phase rewrite can change it.
+        if matches!(dt, DataType::Primitive(_)) {
+            return Ok(Cow::Borrowed(dt));
         }
 
         validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
@@ -3314,7 +3324,7 @@ fn select_phase_string<'a>(
     })
 }
 
-fn select_phase_rule(
+pub(crate) fn select_phase_rule(
     mode: PhaseRewrite,
     serialize: Option<RenameRule>,
     deserialize: Option<RenameRule>,
