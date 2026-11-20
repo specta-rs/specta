@@ -224,6 +224,28 @@ fn variant_wrapper_name(enum_name: &str, variant_name: &str) -> String {
     format!("{}{}Data", enum_name, to_pascal_case(variant_name))
 }
 
+/// The wrapper structs `export_type` will declare for a named enum, paired
+/// with the variant that produces each one.
+///
+/// The caller uses these to reserve the generated names when validating the
+/// file's top-level declarations: a wrapper shares the file's namespace and
+/// must not shadow (or be shadowed by) an ordinary exported type.
+pub(crate) fn variant_wrapper_names(
+    exporter: &Swift,
+    ndt: &specta::datatype::NamedDataType,
+) -> Vec<(String, String)> {
+    let Some(DataType::Enum(enm)) = &ndt.ty else {
+        return Vec::new();
+    };
+
+    let enum_name = exporter.naming.convert(&ndt.name);
+    enm.variants
+        .iter()
+        .filter(|(name, variant)| !variant.skip && wrapper_fields(name, variant).is_some())
+        .map(|(name, _)| (variant_wrapper_name(&enum_name, name), name.to_string()))
+        .collect()
+}
+
 /// The named fields a variant's generated wrapper struct holds.
 ///
 /// Returns `None` when the variant is not represented by a wrapper struct (its
@@ -694,8 +716,8 @@ pub fn export_type(
             .map(ToString::to_string)
             .unwrap_or_else(|| "This type is deprecated".to_string());
         result.push_str(&format!(
-            "@available(*, deprecated, message: \"{}\")\n",
-            message
+            "@available(*, deprecated, message: {})\n",
+            swift_string_literal(&message)
         ));
     }
 
@@ -1530,6 +1552,11 @@ fn keyed_fields<'a>(
         let Some(original) = field.ty.as_ref() else {
             continue;
         };
+        if unsupported_payload_field(field) {
+            return Err(Error::UnsupportedType(format!(
+                "field {name:?} of a named struct has a type Swift's `Codable` cannot encode"
+            )));
+        }
         let rust_nullable = field.attributes.contains_key("specta:nullable");
         let property_type = format!(
             "{}{}",

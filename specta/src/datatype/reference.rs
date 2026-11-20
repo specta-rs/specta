@@ -128,6 +128,19 @@ impl RecursiveInlineFrame {
         Self::new_inner(types, type_name, generics)
     }
 
+    /// Describes the `id` use site with `generics`.
+    ///
+    /// This is only called when a cycle is actually reported, so the (allocating)
+    /// path rendering and generic formatting stay off the common resolution path.
+    pub(crate) fn describe(types: &Types, id: &NamedId, generics: &[(Generic, DataType)]) -> Self {
+        match types.types.get(id).and_then(|ndt| ndt.as_ref()) {
+            Some(ndt) => Self::new(types, ndt, generics),
+            // The entry can only disappear if the definition is being rebuilt
+            // after a panic; fall back to the identity itself.
+            None => Self::from_type_path(types, id.static_path(), generics),
+        }
+    }
+
     fn new_inner(
         types: &Types,
         type_name: Cow<'static, str>,
@@ -398,6 +411,16 @@ impl PartialEq for NamedId {
     }
 }
 impl Eq for NamedId {}
+
+impl NamedId {
+    /// Best-effort path for diagnostics when the name itself is unavailable.
+    pub(crate) fn static_path(&self) -> Cow<'static, str> {
+        match self {
+            NamedId::Static(s) => Cow::Borrowed(s),
+            NamedId::Dynamic(p) => Cow::Owned(format!("d{:p}", Arc::as_ptr(p))),
+        }
+    }
+}
 
 impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {

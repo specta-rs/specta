@@ -1,11 +1,13 @@
 use std::{
     any::Any,
     borrow::Cow,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::hash_map::DefaultHasher,
     fmt,
     hash::{Hash, Hasher},
     sync::Arc,
 };
+
+use crate::hash::FastHashMap;
 
 trait DynAttributeValue: Send + Sync {
     fn value_any(&self) -> &dyn Any;
@@ -54,7 +56,7 @@ where
 /// part of the surrounding datatype graph.
 ///
 #[derive(Default)]
-pub struct Attributes(HashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
+pub struct Attributes(FastHashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
 
 impl Clone for Attributes {
     fn clone(&self) -> Self {

@@ -2612,3 +2612,228 @@ fn duplicate_swift_type_names_are_rejected() {
     assert!(message.contains("same_name_a::Item"));
     assert!(message.contains("same_name_b::Item"));
 }
+
+/// A deprecation note is placed inside a Swift string literal, so quotes and
+/// backslashes in it must be escaped rather than ending the attribute early.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[deprecated(note = "use \"New\" instead, not C:\\old")]
+struct DeprecatedQuote {
+    value: String,
+}
+
+#[test]
+#[allow(deprecated)]
+fn swift_deprecation_message_is_escaped() {
+    let note = "use \"New\" instead, not C:\\old";
+    let rendered = Swift::default()
+        .export(
+            &Types::default().register::<DeprecatedQuote>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    let expected = format!(
+        "@available(*, deprecated, message: {})",
+        swift_literal(note)
+    );
+    assert!(rendered.contains(&expected), "{rendered}");
+
+    run_swift(&rendered, "print(\"SWIFT-OK\")");
+}
+
+/// Two wire names can convert to one Swift identifier: the exporter's default
+/// naming convention turns both `foo_bar` and `fooBar` into `fooBar`. Swift
+/// rejects the duplicate property/case as an invalid redeclaration, so the
+/// exporter must report the collision instead of emitting uncompilable source.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DuplicateFieldNames {
+    #[serde(rename = "foo_bar")]
+    first: String,
+    #[serde(rename = "fooBar")]
+    second: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "camelCase")]
+enum DuplicateVariantNames {
+    FooBar,
+    Foo_Bar,
+}
+
+#[test]
+fn swift_duplicate_member_names_are_rejected() {
+    let struct_error = Swift::default()
+        .export(
+            &Types::default().register::<DuplicateFieldNames>(),
+            specta_serde::Format,
+        )
+        .expect_err("two Swift properties cannot share a name");
+    let struct_message = struct_error.to_string();
+    assert!(struct_message.contains("fooBar"), "{struct_message}");
+    assert!(struct_message.contains("foo_bar"), "{struct_message}");
+    assert!(
+        struct_message.contains("DuplicateFieldNames"),
+        "{struct_message}"
+    );
+
+    let enum_error = Swift::default()
+        .export(
+            &Types::default().register::<DuplicateVariantNames>(),
+            specta_serde::Format,
+        )
+        .expect_err("two Swift enum cases cannot share a name");
+    let enum_message = enum_error.to_string();
+    assert!(enum_message.contains("fooBar"), "{enum_message}");
+    assert!(enum_message.contains("foo_Bar"), "{enum_message}");
+    assert!(
+        enum_message.contains("DuplicateVariantNames"),
+        "{enum_message}"
+    );
+}
+
+/// Swift identifiers cannot contain spaces or start with a digit, but serde
+/// renames and Specta renames can produce either. The exporter must reject the
+/// name instead of writing a declaration that does not parse.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SpaceInFieldName {
+    #[serde(rename = "has space")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DigitLeadingFieldName {
+    #[serde(rename = "1st")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SpaceInTypeName {
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpaceInVariantName {
+    #[serde(rename = "has space")]
+    Value,
+}
+
+#[test]
+fn swift_invalid_identifiers_are_rejected() {
+    let field_error = Swift::default()
+        .export(
+            &Types::default().register::<SpaceInFieldName>(),
+            specta_serde::Format,
+        )
+        .expect_err("a property name cannot contain a space");
+    let field_message = field_error.to_string();
+    assert!(
+        field_message.contains("Invalid identifier"),
+        "{field_message}"
+    );
+    assert!(field_message.contains("has space"), "{field_message}");
+
+    let digit_error = Swift::default()
+        .export(
+            &Types::default().register::<DigitLeadingFieldName>(),
+            specta_serde::Format,
+        )
+        .expect_err("a property name cannot start with a digit");
+    assert!(
+        digit_error.to_string().contains("Invalid identifier"),
+        "{digit_error}"
+    );
+
+    let variant_error = Swift::default()
+        .export(
+            &Types::default().register::<SpaceInVariantName>(),
+            specta_serde::Format,
+        )
+        .expect_err("an enum case cannot contain a space");
+    assert!(
+        variant_error.to_string().contains("Invalid identifier"),
+        "{variant_error}"
+    );
+
+    // Rename the type to one Swift cannot declare. The field names stay valid.
+    let mut types = Types::default().register::<SpaceInTypeName>();
+    types.iter_mut(|ndt| ndt.name = "Has Space".into());
+    let type_error = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect_err("a Swift type name cannot contain a space");
+    assert!(
+        type_error.to_string().contains("Invalid identifier"),
+        "{type_error}"
+    );
+}
+
+/// A tuple field has no Codable representation: Swift renders it as a Swift
+/// tuple, which does not conform to either protocol. The exporter has to reject
+/// it like it already rejects tuple payloads, instead of emitting source that
+/// cannot compile.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftKeyedTupleField {
+    pair: (u8, u8),
+}
+
+/// A unit field serializes as null, but Void is not Codable.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SwiftKeyedUnitField {
+    unit: (),
+}
+
+#[test]
+fn swift_keyed_tuple_and_unit_fields_report_errors() {
+    let tuple = Swift::default()
+        .export(
+            &Types::default().register::<SwiftKeyedTupleField>(),
+            specta_serde::Format,
+        )
+        .expect_err("a tuple-valued keyed field cannot be expressed in Swift");
+    assert!(tuple.to_string().contains("cannot encode"), "{tuple}");
+
+    let unit = Swift::default()
+        .export(
+            &Types::default().register::<SwiftKeyedUnitField>(),
+            specta_serde::Format,
+        )
+        .expect_err("a unit keyed field cannot be expressed in Swift");
+    assert!(unit.to_string().contains("cannot encode"), "{unit}");
+}
+
+/// A named-field variant is emitted as a generated wrapper struct. Its name is
+/// derived from the enum and variant, so it can collide with an ordinary
+/// exported type (or another wrapper) and produce an invalid redeclaration.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct EVData {
+    y: u8,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum E {
+    V { x: u8 },
+}
+
+#[test]
+fn swift_generated_variant_wrapper_names_are_validated() {
+    let error = Swift::default()
+        .export(
+            &Types::default().register::<EVData>().register::<E>(),
+            specta_serde::Format,
+        )
+        .expect_err("the generated wrapper collides with an exported type");
+    let message = error.to_string();
+    assert!(message.contains("Duplicate Swift type name"), "{message}");
+    assert!(message.contains("EVData"), "{message}");
+    assert!(message.contains("generated variant wrapper"), "{message}");
+}

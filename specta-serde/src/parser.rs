@@ -224,6 +224,83 @@ impl SerdeFieldAttrs {
     }
 }
 
+/// One-flag probes for the questions the validation walk asks most often.
+///
+/// Building a full `SerdeContainerAttrs`/`SerdeVariantAttrs`/`SerdeFieldAttrs`
+/// scans every known key of that kind and clones each rename/alias string it
+/// finds, which is wasted work when the caller only needs a boolean. Each
+/// probe hashes just the key it is asked about (and nothing at all for a node
+/// carrying no attributes).
+impl SerdeVariantAttrs {
+    /// Whether the variant is serde-skipped, as `(serialize, deserialize)`.
+    pub fn skip_flags(attributes: &Attributes) -> (bool, bool) {
+        if attributes.is_empty() {
+            return (false, false);
+        }
+        (
+            has_attr(attributes, "serde:variant:skip_serializing"),
+            has_attr(attributes, "serde:variant:skip_deserializing"),
+        )
+    }
+
+    /// Whether the variant is `#[serde(untagged)]`.
+    pub fn is_untagged(attributes: &Attributes) -> bool {
+        has_attr(attributes, "serde:variant:untagged")
+    }
+
+    /// Whether the variant is `#[serde(other)]`.
+    pub fn is_other(attributes: &Attributes) -> bool {
+        has_attr(attributes, "serde:variant:other")
+    }
+
+    /// The variant's codec attributes, as `(serialize_with, deserialize_with, with)`.
+    pub fn codec_flags(attributes: &Attributes) -> (bool, bool, bool) {
+        if attributes.is_empty() {
+            return (false, false, false);
+        }
+        (
+            has_attr(attributes, "serde:variant:has_serialize_with"),
+            has_attr(attributes, "serde:variant:has_deserialize_with"),
+            has_attr(attributes, "serde:variant:has_with"),
+        )
+    }
+}
+
+impl SerdeFieldAttrs {
+    /// Whether the field is serde-skipped, as `(serialize, deserialize)`.
+    pub fn skip_flags(attributes: &Attributes) -> (bool, bool) {
+        if attributes.is_empty() {
+            return (false, false);
+        }
+        (
+            has_attr(attributes, "serde:field:skip_serializing"),
+            has_attr(attributes, "serde:field:skip_deserializing"),
+        )
+    }
+
+    /// Whether the field is `#[serde(flatten)]`.
+    pub fn is_flatten(attributes: &Attributes) -> bool {
+        has_attr(attributes, "serde:field:flatten")
+    }
+
+    /// Whether the field carries a `skip_serializing_if` condition.
+    pub fn has_skip_serializing_if(attributes: &Attributes) -> bool {
+        has_attr(attributes, "serde:field:skip_serializing_if")
+    }
+
+    /// The field's codec attributes, as `(serialize_with, deserialize_with, with)`.
+    pub fn codec_flags(attributes: &Attributes) -> (bool, bool, bool) {
+        if attributes.is_empty() {
+            return (false, false, false);
+        }
+        (
+            has_attr(attributes, "serde:field:has_serialize_with"),
+            has_attr(attributes, "serde:field:has_deserialize_with"),
+            has_attr(attributes, "serde:field:has_with"),
+        )
+    }
+}
+
 fn get_string(attributes: &Attributes, key: &str) -> Option<String> {
     attributes.get_named_as::<String>(key).cloned()
 }
@@ -253,5 +330,7 @@ fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRu
 }
 
 fn has_any_attr(attributes: &Attributes, keys: &[&str]) -> bool {
-    keys.iter().copied().any(|key| attributes.contains_key(key))
+    // Most datatype nodes carry no serde metadata at all; the empty check is a
+    // single length test, while the key scan below hashes every known key.
+    !attributes.is_empty() && keys.iter().copied().any(|key| attributes.contains_key(key))
 }
