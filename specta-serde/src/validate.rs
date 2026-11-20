@@ -790,19 +790,21 @@ fn validate_variant_attributes(
     path: String,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
+    if variant.attributes.is_empty() {
         return Ok(());
-    };
+    }
 
     let has_type_override = has_type_override(&variant.attributes);
 
-    if serde_attrs.has_serialize_with {
+    let (has_serialize_with, has_deserialize_with, has_with) =
+        SerdeVariantAttrs::codec_flags(&variant.attributes);
+    if has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
-    if serde_attrs.has_deserialize_with {
+    if has_deserialize_with {
         ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
-    if serde_attrs.has_with {
+    if has_with {
         ensure_codec_override(has_type_override, &path, "with")?;
     }
 
@@ -810,10 +812,8 @@ fn validate_variant_attributes(
     // *effective* per-direction names/keys in `validate_variant_key` and
     // `validate_named_field_keys` (see `inner`'s enum arm), not the raw attrs.
 
-    if mode == ApplyMode::Unified
-        && !variant.skip
-        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
-    {
+    let (skip_serializing, skip_deserializing) = SerdeVariantAttrs::skip_flags(&variant.attributes);
+    if mode == ApplyMode::Unified && !variant.skip && skip_serializing != skip_deserializing {
         // Applies regardless of `untagged`: a mismatched skip means serde
         // constructs/emits this variant on one side but not the other
         // (`variant_is_skipped_for_mode` would otherwise drop it from the
@@ -823,8 +823,8 @@ fn validate_variant_attributes(
         return Err(Error::incompatible_skip(
             "variant skip",
             path,
-            serde_attrs.skip_serializing,
-            serde_attrs.skip_deserializing,
+            skip_serializing,
+            skip_deserializing,
         ));
     }
 
@@ -974,8 +974,20 @@ fn validate_variant_key(
         return Ok(());
     }
 
-    if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
-    {
+    if SerdeVariantAttrs::is_untagged(&variant.attributes) {
+        return Ok(());
+    }
+
+    // Without a per-variant rename and without a container `rename_all` rule in
+    // either direction, both phases emit the variant's own name: no need to
+    // build (and allocate) the two effective names just to compare them.
+    let renamed = SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| {
+        attrs.rename_serialize.is_some() || attrs.rename_deserialize.is_some()
+    });
+    let rule = container_attrs.as_ref().is_some_and(|attrs| {
+        attrs.rename_all_serialize.is_some() || attrs.rename_all_deserialize.is_some()
+    });
+    if !renamed && !rule {
         return Ok(());
     }
 
@@ -1067,8 +1079,8 @@ fn variant_is_rendered(variant: &Variant) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    Ok(!SerdeVariantAttrs::from_attributes(&variant.attributes)?
-        .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing))
+    let (skip_serializing, skip_deserializing) = SerdeVariantAttrs::skip_flags(&variant.attributes);
+    Ok(!(skip_serializing && skip_deserializing))
 }
 
 fn variant_is_serialized(variant: &Variant) -> Result<bool, Error> {
@@ -1076,8 +1088,7 @@ fn variant_is_serialized(variant: &Variant) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    Ok(!SerdeVariantAttrs::from_attributes(&variant.attributes)?
-        .is_some_and(|attrs| attrs.skip_serializing))
+    Ok(!SerdeVariantAttrs::skip_flags(&variant.attributes).0)
 }
 
 /// Whether a named field's *key* is part of the local wire shape: excludes
@@ -1095,13 +1106,8 @@ fn field_has_live_key(field: &Field) -> Result<bool, Error> {
         return Ok(true);
     }
 
-    Ok(!(field.attributes.contains_key("serde:field:flatten")
-        || field
-            .attributes
-            .contains_key("serde:field:skip_serializing")
-            && field
-                .attributes
-                .contains_key("serde:field:skip_deserializing")))
+    let (skip_serializing, skip_deserializing) = SerdeFieldAttrs::skip_flags(&field.attributes);
+    Ok(!(SerdeFieldAttrs::is_flatten(&field.attributes) || skip_serializing && skip_deserializing))
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
@@ -1113,12 +1119,7 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         return Ok(());
     }
 
-    let skip_serializing = field
-        .attributes
-        .contains_key("serde:field:skip_serializing");
-    let skip_deserializing = field
-        .attributes
-        .contains_key("serde:field:skip_deserializing");
+    let (skip_serializing, skip_deserializing) = SerdeFieldAttrs::skip_flags(&field.attributes);
 
     if mode == ApplyMode::Unified
         && !field
@@ -1141,19 +1142,16 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
 
     let has_type_override = has_type_override(&field.attributes);
 
-    if field
-        .attributes
-        .contains_key("serde:field:has_serialize_with")
-    {
+    let (has_serialize_with, has_deserialize_with, has_with) =
+        SerdeFieldAttrs::codec_flags(&field.attributes);
+
+    if has_serialize_with {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
-    if field
-        .attributes
-        .contains_key("serde:field:has_deserialize_with")
-    {
+    if has_deserialize_with {
         ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
-    if field.attributes.contains_key("serde:field:has_with") {
+    if has_with {
         ensure_codec_override(has_type_override, &path, "with")?;
     }
 
@@ -1177,9 +1175,7 @@ fn validate_unnamed_conditional_omission(
             ));
         }
 
-        let has_skip_serializing_if = field
-            .attributes
-            .contains_key("serde:field:skip_serializing_if");
+        let has_skip_serializing_if = SerdeFieldAttrs::has_skip_serializing_if(&field.attributes);
         if has_skip_serializing_if {
             conditional_omission = Some(idx);
         }
@@ -1193,9 +1189,7 @@ fn unnamed_field_is_absent_from_serialization(field: &Field) -> Result<bool, Err
         return Ok(true);
     }
 
-    Ok(field
-        .attributes
-        .contains_key("serde:field:skip_serializing"))
+    Ok(SerdeFieldAttrs::skip_flags(&field.attributes).0)
 }
 
 /// Validates a `#[serde(flatten)]`-ed field's own type, independent of the
@@ -1212,7 +1206,7 @@ fn validate_flatten_field(
     container: FlattenDirections,
     env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
-    if !field.attributes.contains_key("serde:field:flatten") {
+    if !SerdeFieldAttrs::is_flatten(&field.attributes) {
         return Ok(());
     }
 
@@ -1227,15 +1221,10 @@ fn validate_flatten_field(
     // liveness (an enum variant's own one-sided skips - see
     // `filter_enum_variants_for_phase`) ANDs in: a phase the variant doesn't
     // exist in can't flatten any of its fields.
+    let (skip_serializing, skip_deserializing) = SerdeFieldAttrs::skip_flags(&field.attributes);
     let directions = FlattenDirections {
-        serialize: container.serialize
-            && !field
-                .attributes
-                .contains_key("serde:field:skip_serializing"),
-        deserialize: container.deserialize
-            && !field
-                .attributes
-                .contains_key("serde:field:skip_deserializing"),
+        serialize: container.serialize && !skip_serializing,
+        deserialize: container.deserialize && !skip_deserializing,
     };
 
     let live = match mode {
@@ -1311,13 +1300,10 @@ impl FlattenDirections {
         {
             return Ok(Self::LIVE);
         }
+        let (skip_serializing, skip_deserializing) = SerdeFieldAttrs::skip_flags(&field.attributes);
         Ok(Self {
-            serialize: !field
-                .attributes
-                .contains_key("serde:field:skip_serializing"),
-            deserialize: !field
-                .attributes
-                .contains_key("serde:field:skip_deserializing"),
+            serialize: !skip_serializing,
+            deserialize: !skip_deserializing,
         })
     }
 
@@ -1332,10 +1318,11 @@ impl FlattenDirections {
             });
         }
 
-        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
+        let (skip_serializing, skip_deserializing) =
+            SerdeVariantAttrs::skip_flags(&variant.attributes);
         Ok(Self {
-            serialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_serializing),
-            deserialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_deserializing),
+            serialize: !skip_serializing,
+            deserialize: !skip_deserializing,
         })
     }
 }
@@ -1925,9 +1912,11 @@ fn validate_adjacent_collapsed_newtype_variants(
         // `#[serde(untagged)]` variants bypass the tag/content representation
         // entirely (they serialize as their bare payload), so there is no
         // `content` key to be asymmetric about.
-        if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| {
-            attrs.untagged || (attrs.skip_serializing && attrs.skip_deserializing)
-        }) {
+        let (skip_serializing, skip_deserializing) =
+            SerdeVariantAttrs::skip_flags(&variant.attributes);
+        if SerdeVariantAttrs::is_untagged(&variant.attributes)
+            || (skip_serializing && skip_deserializing)
+        {
             continue;
         }
 
@@ -1941,9 +1930,8 @@ fn validate_adjacent_collapsed_newtype_variants(
         // Only serde-level symmetric skips exhibit the asymmetry (one-sided
         // skips are already rejected by the field-level check; specta-only
         // skips are invisible to serde).
-        if !SerdeFieldAttrs::from_attributes(&field.attributes)?
-            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
-        {
+        let (skip_serializing, skip_deserializing) = SerdeFieldAttrs::skip_flags(&field.attributes);
+        if !(skip_serializing && skip_deserializing) {
             continue;
         }
 
@@ -1966,8 +1954,7 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<(), Error> {
     let mut seen_untagged = false;
 
     for (name, variant) in &enm.variants {
-        let is_untagged = SerdeVariantAttrs::from_attributes(&variant.attributes)?
-            .is_some_and(|attrs| attrs.untagged);
+        let is_untagged = SerdeVariantAttrs::is_untagged(&variant.attributes);
 
         if is_untagged {
             seen_untagged = true;
@@ -1996,10 +1983,7 @@ fn validate_other_variant(
 ) -> Result<(), Error> {
     let mut other_variants = Vec::new();
     for (name, variant) in &enm.variants {
-        if variant_is_rendered(variant)?
-            && SerdeVariantAttrs::from_attributes(&variant.attributes)?
-                .is_some_and(|attrs| attrs.other)
-        {
+        if variant_is_rendered(variant)? && SerdeVariantAttrs::is_other(&variant.attributes) {
             other_variants.push((name, variant));
         }
     }
@@ -2052,16 +2036,14 @@ fn externally_tagged_unit_enum(enm: &Enum, repr: &EnumRepr) -> Result<bool, Erro
     }
 
     for (_, variant) in &enm.variants {
-        let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
-        if attrs
-            .as_ref()
-            .is_some_and(|attrs| attrs.skip_serializing && attrs.skip_deserializing)
-        {
+        let (skip_serializing, skip_deserializing) =
+            SerdeVariantAttrs::skip_flags(&variant.attributes);
+        if skip_serializing && skip_deserializing {
             continue;
         }
 
         if !matches!(variant.fields, Fields::Unit)
-            || attrs.as_ref().is_some_and(|attrs| attrs.untagged)
+            || SerdeVariantAttrs::is_untagged(&variant.attributes)
         {
             return Ok(false);
         }
@@ -2109,8 +2091,7 @@ fn validate_internally_tag_variant(
     }
 
     let _ = enm;
-    if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
-    {
+    if SerdeVariantAttrs::is_untagged(&variant.attributes) {
         return Ok(());
     }
 
