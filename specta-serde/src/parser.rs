@@ -253,5 +253,7 @@ fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRu
 }
 
 fn has_any_attr(attributes: &Attributes, keys: &[&str]) -> bool {
-    keys.iter().copied().any(|key| attributes.contains_key(key))
+    // Most datatype nodes carry no serde metadata at all; the empty check is a
+    // single length test, while the key scan below hashes every known key.
+    !attributes.is_empty() && keys.iter().copied().any(|key| attributes.contains_key(key))
 }
