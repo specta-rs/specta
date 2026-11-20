@@ -30,6 +30,10 @@ derive = ["dep:specta-macros"]
 ## Support for collecting up a global type map
 collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
 
+#! Deprecated
+## Deprecated no-op retained for Tauri v2 compatibility. Function type collection has been removed.
+function = []
+
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json) 1.x
 serde_json1 = ["dep:serde_json"]

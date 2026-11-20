@@ -86,6 +86,10 @@ Core Features
 - `derive` - Derive macros
 - `collect` - Support for collecting up a global type map
 
+Deprecated
+
+- `function` - Deprecated no-op retained for Tauri v2 compatibility. Function type collection has been removed.
+
 Compatibility
 
 - `serde_json1` - Support for [serde-json](https://github.com/serde-rs/json) 1.x
