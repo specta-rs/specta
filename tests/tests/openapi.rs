@@ -1538,3 +1538,38 @@ fn a_user_type_can_use_the_probe_preferred_name() {
             .is_some()
     );
 }
+
+/// A status may carry several media types. Two declarations for the same
+/// status and media type are a mistake, not a silent overwrite.
+#[test]
+fn responses_with_the_same_status_merge_content_types() {
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/merged")
+                .response::<bool>(200, "Success")
+                .response_as::<String>(200, "Success", "text/plain"),
+        )
+        .export_document(&Types::default(), specta::Identity)
+        .expect("distinct content types merge");
+
+    let content = &document["paths"]["/merged"]["get"]["responses"]["200"]["content"];
+    assert!(content["application/json"]["schema"].is_object(), "{content}");
+    assert!(content["text/plain"]["schema"].is_object(), "{content}");
+}
+
+#[test]
+fn duplicate_responses_are_rejected() {
+    let error = OpenApi::default()
+        .operation(
+            Operation::get("/duplicate")
+                .response::<bool>(200, "First")
+                .response::<u32>(200, "Second"),
+        )
+        .export_document(&Types::default(), specta::Identity)
+        .expect_err("a duplicate status and media type must not be overwritten");
+
+    assert!(matches!(
+        error,
+        specta_openapi::Error::DuplicateResponse { status: 200, .. }
+    ));
+}
