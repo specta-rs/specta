@@ -18,9 +18,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
-      # No native packages are installed on purpose: nothing in the workspace
-      # links against system libraries. An inherited apt step that pulled the
-      # full GTK/WebKit stack spent 24 minutes on one runner doing nothing.
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal
       - name: Install Java 17
