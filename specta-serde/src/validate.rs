@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{BuildHasherDefault, Hasher},
+};
 
 use specta::{
     Types,
@@ -17,6 +20,53 @@ use crate::{
     repr::EnumRepr,
     serialized_variant_name,
 };
+
+/// A fast, non-cryptographic hasher for the walk's memo sets.
+///
+/// Their keys are references into the type graph - developer-authored Rust
+/// types, never attacker-controlled input - so `SipHash`'s DoS resistance buys
+/// nothing while its cost lands on the hottest maps of the pass.
+#[derive(Default, Clone, Copy)]
+struct ValidationHasher(u64);
+
+impl Hasher for ValidationHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        // rustc's FxHash step: multiply-xor over 8-byte words.
+        let (chunks, rest) = bytes.as_chunks::<8>();
+        for chunk in chunks {
+            self.add(u64::from_ne_bytes(*chunk));
+        }
+        if !rest.is_empty() {
+            let mut word = [0u8; 8];
+            word[..rest.len()].copy_from_slice(rest);
+            self.add(u64::from_ne_bytes(word));
+        }
+    }
+
+    #[inline]
+    fn write_u8(&mut self, value: u8) {
+        self.add(u64::from(value));
+    }
+
+    #[inline]
+    fn write_usize(&mut self, value: usize) {
+        self.add(value as u64);
+    }
+}
+
+impl ValidationHasher {
+    #[inline]
+    fn add(&mut self, word: u64) {
+        self.0 = (self.0.rotate_left(5) ^ word).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+type ValidationSet<T> = HashSet<T, BuildHasherDefault<ValidationHasher>>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ApplyMode {
@@ -105,16 +155,16 @@ pub(crate) fn validate_datatype_for_mode_shallow(
 /// ancestor whose remaining fields have not been checked yet.
 #[derive(Default)]
 struct ValidationVisits {
-    active_root: HashSet<(Reference, FlattenDirections)>,
+    active_root: ValidationSet<(Reference, FlattenDirections)>,
     candidates: Vec<(Reference, FlattenDirections)>,
-    completed: Option<HashSet<(Reference, FlattenDirections)>>,
+    completed: Option<ValidationSet<(Reference, FlattenDirections)>>,
     generic_context: bool,
 }
 
 impl ValidationVisits {
     fn batch() -> Self {
         Self {
-            completed: Some(HashSet::new()),
+            completed: Some(ValidationSet::default()),
             ..Self::default()
         }
     }
