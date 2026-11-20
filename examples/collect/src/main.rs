@@ -1,9 +1,10 @@
 //! Exports every type reachable through `specta::collect()` to TypeScript.
 
 #![allow(unused)]
-// The derive writes its generated bound in the impl position, which clippy
-// sees alongside this deliberately constrained example struct.
-#![allow(clippy::multiple_bound_locations)]
+// The derive must not declare a generic parameter's bounds in both the list and
+// a `where` clause; clippy reports that in the consuming crate, where it looks
+// like the user's own struct is at fault. `DisplayValue` below is the guard.
+#![deny(clippy::multiple_bound_locations)]
 
 use specta::Type;
 use specta_typescript::Typescript;

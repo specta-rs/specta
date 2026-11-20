@@ -9,8 +9,8 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
-    generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
+    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_only,
+    generics_with_ident_only, generics_with_ident_only_no_lifetimes, placeholder_ident,
     resolve_ty_expr, type_params_used_in, type_with_inferred_lifetimes, used_type_params,
 };
 
@@ -242,16 +242,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // `build` resolves field types with the *concrete* generic arguments (so any
     // bounds a field's own type declaration requires are satisfied) and the
     // declaration then rewrites those arguments back to `Generic` placeholders.
-    // It therefore needs the declared inline bounds on the parameter list plus
-    // the container's `where` clause, the `#[specta(bound = "...")]` override
-    // and the automatic `Type` predicates.
+    // It therefore needs the declared bounds, the container's `where` clause,
+    // the `#[specta(bound = "...")]` override and the automatic `Type`
+    // predicates. All of them live in this clause; the parameter list stays
+    // bare so no bound is declared in two places.
     let build_ty_where_bound = build_where_clause(
         &crate_ref,
         generics,
         container_attrs.bound.as_deref(),
         &used_generic_types,
     );
-    let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(&crate_ref, generics);
+    let build_ty_bounds = generics_with_ident_only_no_lifetimes(generics);
     let placeholder_params = used_generic_types
         .iter()
         .filter(|ident| !bounded.contains(&ident.to_string()))
