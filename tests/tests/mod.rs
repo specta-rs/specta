@@ -19,6 +19,7 @@ mod core_type_impls;
 mod csharp;
 mod errors;
 mod format_consistency;
+mod format_contract;
 mod go;
 mod identity;
 mod java;

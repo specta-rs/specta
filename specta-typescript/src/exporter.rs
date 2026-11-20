@@ -15,14 +15,6 @@ use specta::{
 
 use crate::{Branded, Error, primitives, references};
 
-fn rust_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
-    if ndt.module_path.is_empty() {
-        ndt.name.clone()
-    } else {
-        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
-    }
-}
-
 /// Allows configuring the format of the final types file
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Layout {
@@ -514,49 +506,11 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
-        .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?
-    {
-        Cow::Borrowed(_) => types.clone(),
-        Cow::Owned(types) => types,
-    };
-    let source = mapped.clone();
-    let mut output = mapped;
-    let mut error = None;
-
-    output.for_each_named_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-
-        let path = vec![rust_type_path(ndt)];
-        for generic in ndt.generics.to_mut() {
-            let Some(default) = generic.default.clone() else {
-                continue;
-            };
-            let mut generic_path = path.clone();
-            generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
-            match map_datatype_format(Some(format), &source, &default, &generic_path) {
-                Ok(default) => generic.default = Some(default),
-                Err(source) => {
-                    error = Some(source.with_named_datatype(ndt));
-                    return;
-                }
-            }
-        }
-
-        let Some(datatype) = ndt.ty.clone() else {
-            return;
-        };
-        match map_datatype_format(Some(format), &source, &datatype, &path) {
-            Ok(datatype) => ndt.ty = Some(datatype),
-            Err(source) => error = Some(source.with_named_datatype(ndt)),
-        }
-    });
-
-    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error>{
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {

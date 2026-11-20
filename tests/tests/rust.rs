@@ -536,7 +536,8 @@ fn formats_each_datatype_once() {
         .unwrap();
     assert!(output.contains("value: i16"), "{output}");
     assert!(!output.contains("value: i32"), "{output}");
-    assert_eq!(calls.load(Ordering::Relaxed), 2);
+    // The root reference, the declaration body, and its field.
+    assert_eq!(calls.load(Ordering::Relaxed), 3);
 }
 
 #[test]

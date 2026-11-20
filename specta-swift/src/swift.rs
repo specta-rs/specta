@@ -218,8 +218,11 @@ impl Swift {
     /// Export types to a Swift string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
+        // The graph is formatted once here; rendering must not apply the
+        // formatter a second time.
         let formatted_types = format_types(types, &format)?.into_owned();
         let raw_types = &formatted_types;
+        let format = specta::Identity;
         validate_type_names(&exporter, raw_types)?;
 
         let mut result = String::new();
@@ -315,9 +318,10 @@ fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
     Ok(())
 }
 
-fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
-    format
-        .map_types(types)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    types
+        .format(format)
+        .map(Cow::Owned)
         .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
