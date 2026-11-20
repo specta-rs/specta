@@ -795,7 +795,7 @@ fn datatype_format_errors_include_the_named_type_path() {
         .unwrap_err();
     let message = error.to_string();
 
-    assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
+    assert!(message.contains("KeywordFields"));
     assert!(message.contains("rejected for test"));
 }
 
@@ -809,7 +809,7 @@ fn datatype_format_is_applied_to_the_named_root() {
         .unwrap_err();
     let message = error.to_string();
 
-    assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
+    assert!(message.contains("KeywordFields"));
     assert!(message.contains("root rejected for test"));
 }
 

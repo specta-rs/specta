@@ -594,46 +594,11 @@ impl Valibot {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
-        .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?
-    {
-        Cow::Borrowed(_) => types.clone(),
-        Cow::Owned(types) => types,
-    };
-    let source = mapped.clone();
-    let mut output = mapped;
-    let mut error = None;
-
-    output.for_each_named_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-
-        for generic in ndt.generics.to_mut() {
-            let Some(default) = generic.default.clone() else {
-                continue;
-            };
-            match map_datatype_format(Some(format), &source, &default) {
-                Ok(default) => generic.default = Some(default),
-                Err(source) => {
-                    error = Some(source);
-                    return;
-                }
-            }
-        }
-
-        let Some(datatype) = ndt.ty.clone() else {
-            return;
-        };
-        match map_datatype_format(Some(format), &source, &datatype) {
-            Ok(datatype) => ndt.ty = Some(datatype),
-            Err(source) => error = Some(source),
-        }
-    });
-
-    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error>{
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 fn map_datatype_format(

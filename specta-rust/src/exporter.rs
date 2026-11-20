@@ -187,11 +187,10 @@ impl Rust {
         ty: &DataType,
         format: impl Format,
     ) -> Result<String, Error> {
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "<inline>", source))?;
-        let types = formatted.as_ref();
-        let ty = map_datatype(Some(&format), types, ty, "<inline>")?;
+        let types = &formatted;
+        let ty = map_datatype(Some(&specta::Identity), types, ty, "<inline>")?;
         render_datatype(self, None, types, &ty, "<inline>")
     }
 
@@ -213,10 +212,10 @@ impl Rust {
             return Err(Error::ExportRequiresExportTo(self.layout));
         }
 
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "", source))?;
-        let types = formatted.as_ref();
+        let types = &formatted;
+        let format = specta::Identity;
         validate_names(self, types)?;
 
         let mut out = render_header(self);
@@ -250,10 +249,10 @@ impl Rust {
                 .map_err(|source| Error::io("write generated file", path, source));
         }
 
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "", source))?;
-        let types = formatted.as_ref();
+        let types = &formatted;
+        let format = specta::Identity;
         validate_names(self, types)?;
         export_files(self, path, Some(&format), types)
     }

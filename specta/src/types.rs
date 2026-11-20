@@ -5,9 +5,10 @@ use std::{
 };
 
 use crate::{
-    Type,
+    Format, FormatError, Type,
     datatype::{
-        DataType, Generic, NamedDataType, NamedReference, NamedTypeId, RecursiveInlineFrame,
+        DataType, Fields, Generic, NamedDataType, NamedReference, NamedReferenceType, Reference,
+        RecursiveInlineFrame, NamedTypeId,
     },
 };
 
@@ -636,6 +637,89 @@ impl Types {
         }
     }
 
+    /// Applies `format` to this collection and returns the graph to render.
+    ///
+    /// This is the single formatting traversal shared by every exporter:
+    ///
+    /// - [`Format::map_types`] runs exactly once, and its result is the graph
+    ///   used for the rest of the walk, including the [`Types`] passed to
+    ///   [`Format::map_type`].
+    /// - [`Format::map_type`] runs once on each root and each named
+    ///   declaration body, then once on each structural child of the result:
+    ///   list elements, map keys and values, tuple elements, intersections,
+    ///   struct and enum fields, inline payloads, and the generic arguments of a
+    ///   named reference.
+    /// - [`DataType::Generic`] placeholders are never passed to the formatter;
+    ///   they are substituted by the declaration that owns them.
+    /// - A named reference is not followed; the referenced declaration's body is
+    ///   mapped once by the declaration walk instead of once per use.
+    ///
+    /// Exporters that need to render fragments outside a whole graph should
+    /// format the graph first and pass the result to their fragment renderer.
+    pub fn format(&self, format: &dyn Format) -> Result<Self, FormatError> {
+        let mapped = format.map_types(self)?;
+        let source = mapped.as_ref();
+        let mut output = source.clone();
+
+        let roots = std::mem::take(&mut output.roots);
+        let mut formatted_roots = Vec::with_capacity(roots.len());
+        for (index, root) in roots.iter().enumerate() {
+            formatted_roots.push(format_datatype(root, source, format).map_err(|err| {
+                // A root is often the reference produced by register, so name
+                // the declaration it targets instead of only its position.
+                let named = match root {
+                    DataType::Reference(Reference::Named(reference)) => source.get(reference),
+                    _ => None,
+                };
+                let context = named.map_or_else(
+                    || format!("root type #{index}"),
+                    |ndt| format!("root type {}", ndt.name),
+                );
+                crate::format::with_context(context, named.cloned(), err)
+            })?);
+        }
+        output.roots = formatted_roots;
+
+        let mut error = None;
+        output.for_each_named_mut(|ndt| {
+            if error.is_some() {
+                return;
+            }
+
+            for generic in ndt.generics.to_mut() {
+                if let Some(default) = &generic.default {
+                    match format_datatype(default, source, format) {
+                        Ok(formatted) => generic.default = Some(formatted),
+                        Err(err) => {
+                            error = Some(err);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            let Some(ty) = &ndt.ty else {
+                return;
+            };
+
+            match format_datatype(ty, source, format) {
+                Ok(formatted) => ndt.ty = Some(formatted),
+                Err(err) => {
+                    error = Some(crate::format::with_context(
+                        format!("named type `{}`", ndt.name),
+                        Some(ndt.clone()),
+                        err,
+                    ));
+                }
+            }
+        });
+
+        match error {
+            Some(err) => Err(err),
+            None => Ok(output),
+        }
+    }
+
     /// Transforms each [`NamedDataType`] in the collection.
     ///
     /// The named type's identity is preserved across the callback, including
@@ -652,6 +736,140 @@ impl Types {
             }
         }
         self
+    }
+}
+
+/// Applies `format` to `dt`, then to each structural child of the result.
+///
+/// See [`Types::format`] for the contract. Named references are not followed:
+/// their declaration body is mapped by the declaration walk.
+fn format_datatype(
+    dt: &DataType,
+    types: &Types,
+    format: &dyn Format,
+) -> Result<DataType, FormatError> {
+    if matches!(dt, DataType::Generic(_)) {
+        return Ok(dt.clone());
+    }
+
+    let mut node = match format.map_type(types, dt) {
+        Ok(mapped) => mapped.into_owned(),
+        Err(err) if contains_generic(dt) && crate::format::is_unresolved_generic(err.as_ref()) => {
+            dt.clone()
+        }
+        Err(err) => return Err(err),
+    };
+
+    match &mut node {
+        DataType::Primitive(_) | DataType::Generic(_) => {}
+        DataType::List(list) => {
+            list.ty = Box::new(format_datatype(&list.ty, types, format)?);
+        }
+        DataType::Map(map) => {
+            let key = format_datatype(map.key_ty(), types, format)?;
+            let value = format_datatype(map.value_ty(), types, format)?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = format_datatype(inner, types, format)?;
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                *element = format_datatype(element, types, format)?;
+            }
+        }
+        DataType::Intersection(parts) => {
+            for part in parts {
+                *part = format_datatype(part, types, format)?;
+            }
+        }
+        DataType::Struct(data) => format_fields(&mut data.fields, types, format)?,
+        DataType::Enum(data) => {
+            for (_, variant) in &mut data.variants {
+                format_fields(&mut variant.fields, types, format)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Inline { dt } => {
+                **dt = format_datatype(dt, types, format)?;
+            }
+            NamedReferenceType::Reference { generics } => {
+                for (_, ty) in generics {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Reference(Reference::Opaque(_)) => {}
+    }
+
+    Ok(node)
+}
+
+fn format_fields(
+    fields: &mut Fields,
+    types: &Types,
+    format: &dyn Format,
+) -> Result<(), FormatError> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = &mut field.ty {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = &mut field.ty {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether `dt` contains a [`DataType::Generic`] placeholder.
+fn contains_generic(dt: &DataType) -> bool {
+    match dt {
+        DataType::Generic(_) => true,
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::List(list) => contains_generic(&list.ty),
+        DataType::Map(map) => contains_generic(map.key_ty()) || contains_generic(map.value_ty()),
+        DataType::Nullable(inner) => contains_generic(inner),
+        DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic),
+        DataType::Intersection(parts) => parts.iter().any(contains_generic),
+        DataType::Struct(data) => fields_contain_generic(&data.fields),
+        DataType::Enum(data) => data
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain_generic(&variant.fields)),
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt } => contains_generic(dt),
+            NamedReferenceType::Reference { generics } => {
+                generics.iter().any(|(_, ty)| contains_generic(ty))
+            }
+            NamedReferenceType::Recursive(_) => false,
+        },
+    }
+}
+
+fn fields_contain_generic(fields: &Fields) -> bool {
+    match fields {
+        Fields::Unit => false,
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .any(contains_generic),
+        Fields::Named(named) => named
+            .fields
+            .iter()
+            .filter_map(|(_, field)| field.ty.as_ref())
+            .any(contains_generic),
     }
 }
 
