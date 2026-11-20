@@ -775,3 +775,80 @@ impl<'a> Iterator for UnsortedIter<'a> {
 }
 
 impl ExactSizeIterator for UnsortedIter<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datatype::{Generic, Primitive};
+
+    fn u32_slot() -> GenericSubstitutionSlot {
+        GenericSubstitutionSlot::Generic {
+            name: std::any::type_name::<u32>(),
+            generic: Generic::new("T".into()),
+        }
+    }
+
+    #[test]
+    fn empty_substitution_scope_still_hides_enclosing_scope() {
+        let mut types = Types::default();
+
+        // An empty scope is a barrier: a parameter of the enclosing scope must
+        // not leak into a nested declaration that does not mention it.
+        types.with_generic_substitution(&[u32_slot()], |types| {
+            assert_eq!(
+                types.with_generic_substitution(&[], |types| types.define::<u32>()),
+                DataType::Primitive(Primitive::u32)
+            );
+        });
+
+        // A nested scope that does hold the parameter still substitutes.
+        types.with_generic_substitution(&[u32_slot()], |types| {
+            assert_eq!(
+                types.with_generic_substitution(&[u32_slot()], |types| types.define::<u32>()),
+                DataType::Generic(Generic::new("T".into()))
+            );
+        });
+
+        // Outside any scope the parameter resolves concretely again.
+        assert_eq!(types.define::<u32>(), DataType::Primitive(Primitive::u32));
+    }
+
+    #[test]
+    fn inline_frames_share_storage_and_release_lifo() {
+        let mut types = Types::default();
+        let outer = NamedId::Static("test::Outer");
+        let inner = NamedId::Static("test::Inner");
+        let arguments = [(
+            Generic::new("T".into()),
+            DataType::Primitive(Primitive::u32),
+        )];
+
+        types.push_inline_frame(outer.clone(), &["u32"], &arguments);
+
+        // A use site is identified by its identity and its concrete arguments,
+        // so a different instantiation of the same type is not a cycle.
+        assert_eq!(
+            types.inline_cycle_start(&outer, &["u32"], &arguments),
+            Some(0)
+        );
+        assert_eq!(
+            types.inline_cycle_start(&outer, &["alloc::string::String"], &arguments),
+            None
+        );
+
+        types.push_inline_frame(inner.clone(), &["u32"], &arguments);
+        assert_eq!(
+            types.inline_cycle_start(&inner, &["u32"], &arguments),
+            Some(1)
+        );
+
+        types.pop_inline_frame();
+        types.pop_inline_frame();
+
+        // The shared storage is released with the frames that own it.
+        assert!(types.stack.is_empty());
+        assert!(types.stack_identities.is_empty());
+        assert!(types.stack_generics.is_empty());
+        assert_eq!(types.inline_cycle_start(&outer, &["u32"], &arguments), None);
+    }
+}
