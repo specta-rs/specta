@@ -121,6 +121,10 @@ impl RecursiveInlineFrame {
         type_name: Cow<'static, str>,
         generics: &[(Generic, DataType)],
     ) -> Self {
+        let type_name = match type_name {
+            Cow::Borrowed(name) => Cow::Owned(display_type_identity(name).to_owned()),
+            Cow::Owned(name) => Cow::Owned(display_type_identity(&name).to_owned()),
+        };
         Self::new_inner(types, type_name, generics)
     }
 
@@ -404,10 +408,19 @@ impl hash::Hash for NamedId {
     }
 }
 
+/// Removes the internal `#<hash>` declaration suffix from a type identity.
+///
+/// The suffix only distinguishes declarations that share a module path and
+/// name. Diagnostics and recursive-cycle descriptions should show the stable
+/// Rust path instead.
+fn display_type_identity(identity: &str) -> &str {
+    identity.split_once('#').map_or(identity, |(path, _)| path)
+}
+
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(s) => write!(f, "s:{}", s),
+            NamedId::Static(s) => write!(f, "s:{}", display_type_identity(s)),
             NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }

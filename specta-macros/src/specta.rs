@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use inflector::Inflector;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::{FnArg, ItemFn, Pat, Visibility, parse};
+use quote::{ToTokens, format_ident, quote};
+use syn::{FnArg, ItemFn, Pat, parse};
 
 use crate::{
     r#type::attr::deprecated_as_tokens,
@@ -96,11 +96,35 @@ fn parse_name_attrs(
     Ok(FunctionNameAttrs { rename, rename_all })
 }
 
+/// Builds an identifier suffix unique to this function's source position.
+///
+/// `macro_export` puts every exported macro in the crate root, so two public
+/// functions with the same name in different modules would otherwise define the
+/// same root macro. The source position distinguishes them while the module
+/// still re-exports the stable `__specta__fn__<name>` alias that `fn_datatype!`
+/// resolves.
+fn source_position_suffix(item: &proc_macro::TokenStream) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let span = item
+        .clone()
+        .into_iter()
+        .next()
+        .map_or_else(proc_macro::Span::call_site, |token| token.span());
+    let mut hasher = DefaultHasher::new();
+    span.file().hash(&mut hasher);
+    span.line().hash(&mut hasher);
+    span.column().hash(&mut hasher);
+
+    format!("{:x}", hasher.finish())
+}
+
 pub fn attribute(
     attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> syn::Result<proc_macro::TokenStream> {
     let crate_ref = quote!(specta);
+    let source_suffix = source_position_suffix(&item);
     let function = parse::<ItemFn>(item)?;
     let name_attrs = parse_name_attrs(attr, &function)?;
     let wrapper = format_fn_wrapper(&function.sig.ident);
@@ -120,14 +144,8 @@ pub fn attribute(
     }
 
     let visibility = &function.vis;
-    let maybe_macro_export = match &visibility {
-        Visibility::Public(_) => {
-            quote!(#[macro_export])
-        }
-        _ => Default::default(),
-    };
-
     let function_name = &function.sig.ident;
+    let unique_wrapper = format_ident!("{}_{}", wrapper, source_suffix);
     let mut function_name_str = unraw(&function_name.to_string()).to_string();
     if let Some(rule) = name_attrs.rename_all {
         function_name_str = rule.apply(&function_name_str);
@@ -222,9 +240,9 @@ pub fn attribute(
     Ok(quote! {
         #function
 
-        #maybe_macro_export
         #[doc(hidden)]
-        macro_rules! #wrapper {
+        #[macro_export]
+        macro_rules! #unique_wrapper {
             // We take in `$function` from the invocation so we have `fn_name::<concrete_generics_types>`
             (@export_fn; $function:path) => {{
                 use #crate_ref::datatype;
@@ -245,9 +263,11 @@ pub fn attribute(
             }}
         }
 
-        // allow the macro to be resolved with the same path as the function
+        // Allow the macro to be resolved with the same path as the function.
+        // The exported root macro is unique, while this alias is the stable
+        // name `fn_datatype!` derives from the function path.
         #[allow(unused_imports)]
-        #visibility use #wrapper;
+        #visibility use #unique_wrapper as #wrapper;
     }
     .into())
 }

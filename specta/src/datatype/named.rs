@@ -71,8 +71,9 @@ impl NamedDataType {
         build: impl FnOnce(&mut Types, &mut NamedDataType),
     ) -> Self {
         let location = Location::caller();
+        let id = NamedId::Dynamic(Arc::new(()));
         let mut ndt = Self {
-            id: NamedId::Dynamic(Arc::new(())),
+            id: id.clone(),
             name: name.into(),
             docs: Cow::Borrowed(""),
             deprecated: None,
@@ -84,7 +85,11 @@ impl NamedDataType {
             ty: None,
         };
         build(types, &mut ndt);
-        types.types.insert(ndt.id.clone(), Some(ndt.clone()));
+        // The closure receives the whole value, so it can replace it with a
+        // clone of another named type. Restore the identity the closure may
+        // have used for self-references before inserting.
+        ndt.id = id.clone();
+        types.types.insert(id, Some(ndt.clone()));
         types.len += 1;
         ndt
     }
@@ -179,6 +184,10 @@ impl NamedDataType {
                 }
                 panic::resume_unwind(payload);
             };
+            // `build_ndt` receives the whole value and may have replaced it
+            // with a clone of another type. The key is already registered as
+            // this sentinel's identity, so the stored value must match it.
+            ndt.id = id.clone();
 
             // Patch legacy Tauri channels, but preserve explicit opaque definitions.
             let is_tauri_type = ndt.name == "TAURI_CHANNEL"

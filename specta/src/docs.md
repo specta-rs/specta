@@ -108,7 +108,7 @@ External types
 - `rust_decimal1` - [rust_decimal](https://docs.rs/rust_decimal) 1.x
 - `indexmap2` - [indexmap](https://docs.rs/indexmap) 2.x
 - `ordered-float` - [ordered-float](https://docs.rs/ordered-float) 3.x through 5.x. The version range is the policy for this crate, so the feature name carries no major.
-- `heapless` - [heapless](https://docs.rs/heapless) 0.7.x through 0.9.x. The version range is the policy for this crate, so the feature name carries no major.
+- `heapless` - [heapless](https://docs.rs/heapless) 0.9.x. The supported API generation is the policy for this crate, so the feature name carries no major.
 - `semver1` - [semver](https://docs.rs/semver) 1.x
 - `smol_str03` - [smol_str](https://docs.rs/smol_str) 0.3.x
 - `arrayvec` - [arrayvec](https://docs.rs/arrayvec) 0.6.x and 0.7.x. The version range is the policy for this crate, so the feature name carries no major.

@@ -17,43 +17,52 @@ pub trait Format {
     ///
     /// Returns [`Cow::Borrowed`] when no changes are needed, or
     /// [`Cow::Owned`] when the formatter produces a transformed collection.
-    fn map_types(&'_ self, types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError>;
+    fn map_types<'a>(
+        &'a self,
+        types: &'a Types,
+    ) -> std::result::Result<Cow<'a, Types>, FormatError>;
 
     /// Map an individual [`DataType`] with access to the surrounding [`Types`].
     ///
     /// Returns [`Cow::Borrowed`] when no changes are needed, or
     /// [`Cow::Owned`] when the formatter produces a transformed datatype.
-    fn map_type(
-        &'_ self,
-        types: &Types,
-        dt: &DataType,
-    ) -> std::result::Result<Cow<'_, DataType>, FormatError>;
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> std::result::Result<Cow<'a, DataType>, FormatError>;
 }
 
 impl<T: Format + ?Sized> Format for &T {
-    fn map_types(&'_ self, types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+    fn map_types<'a>(
+        &'a self,
+        types: &'a Types,
+    ) -> std::result::Result<Cow<'a, Types>, FormatError> {
         (**self).map_types(types)
     }
 
-    fn map_type(
-        &'_ self,
-        types: &Types,
-        dt: &DataType,
-    ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> std::result::Result<Cow<'a, DataType>, FormatError> {
         (**self).map_type(types, dt)
     }
 }
 
 impl<T: Format + ?Sized> Format for Box<T> {
-    fn map_types(&'_ self, types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+    fn map_types<'a>(
+        &'a self,
+        types: &'a Types,
+    ) -> std::result::Result<Cow<'a, Types>, FormatError> {
         (**self).map_types(types)
     }
 
-    fn map_type(
-        &'_ self,
-        types: &Types,
-        dt: &DataType,
-    ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> std::result::Result<Cow<'a, DataType>, FormatError> {
         (**self).map_type(types, dt)
     }
 }

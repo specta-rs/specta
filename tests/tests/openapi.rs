@@ -1110,6 +1110,25 @@ fn request_body_examples_are_typed_values() {
             .get("example")
             .is_none()
     );
+
+    // Replacing the body must also discard an example belonging to the old
+    // type; otherwise the document pairs a valid example with the wrong schema.
+    let replaced = OpenApi::default()
+        .operation(
+            Operation::post("/v1/accounts")
+                .request_body_with_example("old".to_owned())
+                .request_body::<bool>()
+                .response::<SignupRequest>(201, "Created"),
+        )
+        .export_document(
+            &Types::default().register::<SignupRequest>(),
+            specta_serde::Format,
+        )
+        .expect("replaced bodies should export");
+    let media =
+        &replaced["paths"]["/v1/accounts"]["post"]["requestBody"]["content"]["application/json"];
+    assert_eq!(media["schema"]["type"], "boolean");
+    assert!(media.get("example").is_none());
 }
 
 /// Error responses can be served as `application/problem+json`, security
@@ -1488,5 +1507,34 @@ fn plain_option_fields_split_per_phase() {
     assert_eq!(
         schemas["Plain_Deserialize"]["required"],
         serde_json::json!(["id"])
+    );
+}
+
+#[derive(Type)]
+#[allow(non_camel_case_types)]
+#[specta(collect = false)]
+struct __specta_openapi_probe {
+    value: String,
+}
+
+#[test]
+fn a_user_type_can_use_the_probe_preferred_name() {
+    let types = Types::default().register::<__specta_openapi_probe>();
+    let document = OpenApi::default()
+        .operation(
+            Operation::get("/probe").response::<__specta_openapi_probe>(200, "The user's type"),
+        )
+        .export_document(&types, specta_serde::Format)
+        .expect("the internal probe must not reserve a user-visible name");
+
+    assert_eq!(
+        document["paths"]["/probe"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+            ["$ref"],
+        "#/components/schemas/__specta_openapi_probe"
+    );
+    assert!(
+        document["components"]["schemas"]
+            .get("__specta_openapi_probe")
+            .is_some()
     );
 }

@@ -392,19 +392,22 @@ impl specta::Format for PhasesFormat {
             }
         }
 
-        out.iter_mut(|ndt| {
-            for generated_types_for_phase in generated.values() {
-                if ndt.name == generated_types_for_phase.serialize.name {
-                    ndt.ty = generated_types_for_phase.serialize.ty.clone();
-                    return;
-                }
-
-                if ndt.name == generated_types_for_phase.deserialize.name {
-                    ndt.ty = generated_types_for_phase.deserialize.ty.clone();
-                    return;
+        // Update the registered generated entries by identity. Matching their
+        // display names previously copied one module's body into every type
+        // that happened to share the generated phase name.
+        for generated_types_for_phase in generated.values() {
+            for generated in [
+                &generated_types_for_phase.serialize,
+                &generated_types_for_phase.deserialize,
+            ] {
+                let Reference::Named(reference) = generated.reference(Vec::new()) else {
+                    unreachable!("named types always produce named references")
+                };
+                if let Some(registered) = out.get_mut(&reference) {
+                    registered.ty = generated.ty.clone();
                 }
             }
-        });
+        }
 
         let mut rewrite_err = None;
         out.iter_mut(|ndt| {
@@ -501,6 +504,7 @@ impl specta::Format for PhasesFormat {
             }
 
             let mut wrapper = Enum::default();
+            wrapper.attributes.insert("specta:phase_wrapper", true);
             wrapper
                 .variants
                 .push((Cow::Borrowed("Serialize"), serialize_variant));
@@ -679,6 +683,7 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 .as_ref()
                 .and_then(|ty| select_split_wrapper_variant(ty, phase))
             {
+                instantiate_phase_selection(&mut selected, named_reference_generics(reference));
                 select_phase_datatype_inner(&mut selected, types, phase);
                 *ty = selected;
                 return;
@@ -731,12 +736,16 @@ fn select_explicit_phased_type(ty: &DataType, phase: Phase) -> Option<DataType> 
     })
 }
 
+fn is_phase_wrapper(wrapper: &Enum) -> bool {
+    wrapper.attributes.contains_key("specta:phase_wrapper")
+}
+
 fn select_split_wrapper_variant(ty: &DataType, phase: Phase) -> Option<DataType> {
     let DataType::Enum(wrapper) = ty else {
         return None;
     };
 
-    if wrapper.variants.len() != 2 {
+    if !is_phase_wrapper(wrapper) || wrapper.variants.len() != 2 {
         return None;
     }
 
@@ -769,7 +778,7 @@ fn select_split_type_variant<'a>(
         return None;
     };
 
-    if wrapper.variants.len() != 2 {
+    if !is_phase_wrapper(wrapper) || wrapper.variants.len() != 2 {
         return None;
     }
 
@@ -793,6 +802,32 @@ fn select_split_type_variant<'a>(
     };
 
     types.get(reference)
+}
+
+/// Applies a use-site generic environment to a selected phase projection.
+///
+/// Generated wrappers store symbolic `Generic` arguments because their
+/// declaration is shared. Selecting one from a concrete reference must carry
+/// the concrete arguments across, or the projection escapes with an unbound T.
+fn instantiate_phase_selection(
+    selected: &mut DataType,
+    source_generics: &[(specta::datatype::Generic, DataType)],
+) {
+    let DataType::Reference(Reference::Named(reference)) = selected else {
+        return;
+    };
+    let NamedReferenceType::Reference { generics, .. } = &mut reference.inner else {
+        return;
+    };
+
+    for (generic, ty) in generics {
+        if matches!(ty, DataType::Generic(_))
+            && let Some((_, concrete)) =
+                source_generics.iter().find(|(source, _)| source == generic)
+        {
+            *ty = concrete.clone();
+        }
+    }
 }
 
 fn named_reference_generics(

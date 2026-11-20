@@ -2582,3 +2582,33 @@ print("SWIFT-OK")
 
     run_swift(&exported, &harness);
 }
+
+mod same_name_a {
+    #[derive(specta::Type)]
+    pub struct Item {
+        pub left: String,
+    }
+}
+
+mod same_name_b {
+    #[derive(specta::Type)]
+    pub struct Item {
+        pub right: bool,
+    }
+}
+
+#[test]
+fn duplicate_swift_type_names_are_rejected() {
+    let types = Types::default()
+        .register::<same_name_a::Item>()
+        .register::<same_name_b::Item>();
+
+    let error = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect_err("two Swift declarations cannot share a name");
+
+    let message = error.to_string();
+    assert!(message.contains("Duplicate Swift type name"));
+    assert!(message.contains("same_name_a::Item"));
+    assert!(message.contains("same_name_b::Item"));
+}

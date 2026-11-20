@@ -102,16 +102,6 @@ error: functions with `#[specta]` must take named arguments
 173 | pub fn invalid_destructure((): ()) {}
     |                            ^^^^^^
 
-error[E0255]: the name `__specta__fn__testing` is defined multiple times
-   --> tests/macro/compile_error.rs:160:8
-    |
-159 | #[specta]
-    | --------- previous definition of the macro `__specta__fn__testing` here
-160 | pub fn testing() {}
-    |        ^^^^^^^ `__specta__fn__testing` reimported here
-    |
-    = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
-
 error: cannot find attribute `serde` in this scope
   --> tests/macro/compile_error.rs:8:3
    |
