@@ -204,7 +204,7 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    derive::expand(input).unwrap_or_else(|err| err.into_compile_error().into())
+    derive::expand(input)
 }
 
 /// Parses a string literal into a Rust type token stream.

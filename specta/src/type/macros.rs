@@ -260,19 +260,17 @@ macro_rules! _impl_ndt {
 
     // Base implementation. Providing a where clause opts out of automatic Type bounds so
     // callers can use non-Specta impl generics.
-    ($inline:literal, $container:literal $module_path:literal $ty:ident $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? where { $($bounds:tt)* } as $as_ty:ty) => {
+    ($inline:tt, $container:tt $module_path:literal $ty:ident $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? where { $($bounds:tt)* } as $as_ty:ty) => {
         impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $ty $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body false stringify!($ty $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$ty $(< $( $generic ),* >)?], $module_path, $inline, $container, $as_ty, types)
             }
         }
     };
-    ($inline:literal, $container:literal $module_path:literal $ty:ident $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? as $as_ty:ty) => {
+    ($inline:tt, $container:tt $module_path:literal $ty:ident $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? as $as_ty:ty) => {
         impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $ty $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $(
@@ -280,25 +278,21 @@ macro_rules! _impl_ndt {
             )?
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body true stringify!($ty $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$ty $(< $( $generic ),* >)?], $module_path, $inline, $container, $as_ty, types)
             }
         }
     };
-    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? where { $($bounds:tt)* } as $as_ty:ty) => {
+    ($inline:tt, $container:tt $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? where { $($bounds:tt)* } as $as_ty:ty) => {
         impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body false stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$head :: $( $tail )::+ $(< $( $generic ),* >)?], impl_ndt!(@module_path $head :: $( $tail )::+), $inline, $container, $as_ty, types)
             }
         }
     };
-    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? as $as_ty:ty) => {
+    ($inline:tt, $container:tt $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? as $as_ty:ty) => {
         impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $(
@@ -306,8 +300,6 @@ macro_rules! _impl_ndt {
             )?
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body true stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$head :: $( $tail )::+ $(< $( $generic ),* >)?], impl_ndt!(@module_path $head :: $( $tail )::+), $inline, $container, $as_ty, types)
             }
         }
@@ -315,109 +307,131 @@ macro_rules! _impl_ndt {
 
     // Base implementation for types with const generics. Const generics are part of the Rust
     // implementation but not Specta generic definitions.
-    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] where { $($bounds:tt)* } as $as_ty:ty) => {
+    ($inline:tt, $container:tt [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] where { $($bounds:tt)* } as $as_ty:ty) => {
         impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
         where
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body_const false stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
     };
-    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] as $as_ty:ty) => {
+    ($inline:tt, $container:tt [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] as $as_ty:ty) => {
         impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
         where
             $($generic: Type,)*
         {
             fn definition(types: &mut Types) -> DataType {
-                use $crate::datatype;
-
                 impl_ndt!(@definition_body_const true stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
     };
 
-    (@definition_body $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
+    (@definition_body $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
         impl_ndt!(@definition_body_inner false, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
     }};
-    (@definition_body_const $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
+    (@definition_body_const $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
         impl_ndt!(@definition_body_inner true, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
     }};
 
     // Helpers for determining NDT name
-    (@definition_body_inner $has_const_param:literal, $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
-        static SENTINEL: &str = $sentinel;
-        static GENERICS: &[datatype::GenericDefinition] = &[
+    (@definition_body_inner $has_const_param:literal, $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
+        // Shared by every monomorphisation of this `definition`: a static inside
+        // a generic function is one item, so a `&'static [GenericDefinition]`
+        // costs the instantiation two loads instead of an array, a `Cow` and
+        // their drop glue.
+        static __SPECTA_GENERICS: &[$crate::datatype::GenericDefinition] = &[
             $(
-                datatype::GenericDefinition::new(
+                $crate::datatype::GenericDefinition::new(
                     ::std::borrow::Cow::Borrowed(stringify!($generic)),
                     None,
                 ),
             )*
         ];
 
-        let definition = |types: &mut Types| {
-            let __specta_generic_base = types.generic_substitution_cursor();
-            let __specta_instantiation_generics = &[
-                $(
-                    (
-                        datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
-                        impl_ndt!(@generic_dt $typed_generics $inline $generic types),
-                    ),
-                )*
-            ];
-            let __specta_generic_after = types.generic_substitution_cursor();
+        let (__specta_build_ty, __specta_build_reference_ty) =
+            impl_ndt!(@builders $inline, $container [$($generic),*] $as_ty);
 
-            let reference = datatype::NamedDataType::init_with_sentinel(
-                SENTINEL,
-                __specta_instantiation_generics,
-                &[$(::std::any::type_name::<$generic>()),*],
-                $has_const_param,
-                $container,
-                __specta_generic_base,
-                types,
-                |types, ndt| {
-                    ndt.name = ::std::borrow::Cow::Borrowed(impl_ndt!(@type_name $($type_name)*));
-                    ndt.module_path = ::std::borrow::Cow::Borrowed($module_path);
-                    ndt.generics = ::std::borrow::Cow::Borrowed(GENERICS);
-                    if !$inline && !$container {
-                        $(
-                            #[allow(dead_code)]
-                            pub(crate) struct $generic;
-                            impl Type for $generic {
-                                fn definition(_: &mut Types) -> DataType {
-                                    datatype::Generic::new(
-                                        ::std::borrow::Cow::Borrowed(stringify!($generic))
-                                    ).into()
-                                }
-                            }
-                        )*
-                        ndt.ty = Some(types.define::<$as_ty>());
-                    }
-                },
-                |types| types.define::<$as_ty>(),
-            );
-
-            types.set_generic_substitution_cursor(__specta_generic_after);
-
-            DataType::Reference(reference)
-        };
-
-        if $inline {
-            datatype::inline($types, definition)
-        } else {
-            definition($types)
-        }
+        // Everything except the concrete `define` calls is shared by every
+        // instantiation, so it lives in `Types::define_instantiation_params`
+        // instead of being monomorphised once per concrete argument. The
+        // parameter table is `&'static` data plus one `fn` pointer per
+        // parameter, so a `Vec<X>` instantiation builds an array of words
+        // instead of a `(Generic, DataType)` array, a `Cow` and an
+        // `Option<Deprecated>` and the drop glue of all three.
+        $types.define_instantiation_params(
+            $sentinel,
+            impl_ndt!(@type_name $($type_name)*),
+            $module_path,
+            __SPECTA_GENERICS,
+            "",
+            ::core::option::Option::None,
+            impl_ndt!(@params $typed_generics, $inline [$($generic),*]),
+            &[$(::std::any::type_name::<$generic>()),*],
+            $has_const_param,
+            $inline,
+            $container,
+            __specta_build_ty,
+            __specta_build_reference_ty,
+        )
     }};
-    (@generic_dt $typed_generics:tt $inline:literal $generic:ident $types:ident) => {
-        if $inline && !$typed_generics {
-            datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))).into()
-        } else {
-            $types.define_param::<$generic>()
-        }
+
+    // The instantiation values of an implementation's parameters.
+    //
+    // An `inline` implementation with a `where` clause (only `Cow` today) does
+    // not resolve its parameters at all: its reference always reports the
+    // declaration's own `Generic` placeholders. The two flags arrive in the
+    // order `typed_generics, inline`.
+    (@params false, true [$($generic:ident),*]) => {
+        &[$($crate::InstantiationParam::Generic {
+            name: stringify!($generic),
+        }),*]
+    };
+    (@params $typed_generics:tt, $inline:tt [$($generic:ident),*]) => {
+        &[$($crate::InstantiationParam::Resolved {
+            name: stringify!($generic),
+            identity: ::std::any::type_name::<$generic>(),
+            definition: <$generic as $crate::Type>::definition,
+        }),*]
+    };
+
+    // The two datatype builders: the one used for inline expansion resolves the
+    // concrete arguments, and the one filling the canonical `NamedDataType::ty`
+    // of a named definition resolves them through placeholder types that shadow
+    // the parameters of the generated `definition` (and so must be in their own
+    // scope).
+    //
+    // Both are the function item `Types::define::<..>` rather than a closure
+    // around it: the method is monomorphised either way (it is what resolves the
+    // datatype), and the function item adds no closure body or `call_once` shim
+    // of its own.
+    (@builders false, false [$($generic:ident),*] $as_ty:ty) => {
+        (
+            $crate::Types::define::<$as_ty>,
+            {
+                $(
+                    #[allow(dead_code)]
+                    pub(crate) struct $generic;
+                    impl Type for $generic {
+                        fn definition(_: &mut Types) -> DataType {
+                            $crate::datatype::Generic::new(
+                                ::std::borrow::Cow::Borrowed(stringify!($generic))
+                            ).into()
+                        }
+                    }
+                )*
+
+                $crate::Types::define::<$as_ty>
+            },
+        )
+    };
+    (@builders $inline:tt, $container:tt [$($generic:ident),*] $as_ty:ty) => {
+        // Inline and passthrough definitions use the same datatype for both the
+        // inline expansion and the reference (the named kind above is the one
+        // that needs a placeholder-scoped second body), so one function serves
+        // both arguments.
+        ($crate::Types::define::<$as_ty>, $crate::Types::define::<$as_ty>)
     };
 
     // Helpers for determining NDT name

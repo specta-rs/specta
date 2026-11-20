@@ -25,7 +25,7 @@ pub use r#type::Type;
 pub use types::Types;
 
 #[doc(hidden)]
-pub use types::GenericSubstitutionSlot;
+pub use types::{GenericSubstitutionSlot, InstantiationParam};
 
 #[doc(inline)]
 #[cfg(feature = "collect")]

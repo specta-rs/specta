@@ -3,36 +3,36 @@ use quote::ToTokens;
 use syn::Result;
 use syn::Type;
 
-use super::{AttrExtract, Attribute};
+use crate::derive::attr::parse::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 
 #[derive(Default)]
 pub(crate) struct ContainerAttr {
-    pub(crate) r#type: Option<Type>,
-    pub(crate) crate_name: Option<TokenStream>,
-    pub(crate) inline: bool,
-    pub(crate) remote: Option<TokenStream>,
-    pub(crate) collect: Option<bool>,
-    pub(crate) skip_attrs: Vec<String>,
-    pub(crate) common: RustCAttr,
+    pub r#type: Option<Type>,
+    pub crate_name: Option<syn::Path>,
+    pub inline: bool,
+    pub remote: Option<TokenStream>,
+    pub collect: Option<bool>,
+    pub skip_attrs: Vec<String>,
+    pub common: RustCAttr,
 
     // Struct only (we pass it anyway so enums get nice errors)
-    pub(crate) transparent: bool,
+    pub transparent: bool,
 
     // Custom where clause bounds (None = automatic, Some(vec) = custom)
-    pub(crate) bound: Option<Vec<syn::WherePredicate>>,
+    pub bound: Option<Vec<syn::WherePredicate>>,
 }
 
 impl ContainerAttr {
-    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>, is_struct: bool) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>, is_struct: bool) -> Result<Self> {
         let mut result = Self {
             common: RustCAttr::from_attrs(attrs)?,
             ..Default::default()
         };
 
         if let Some(attr) = attrs.extract("specta", "crate") {
-            result.crate_name = Some(attr.parse_path()?.to_token_stream());
+            result.crate_name = Some(attr.parse_path()?);
         }
 
         if let Some(attr) = attrs.extract("specta", "type") {

@@ -3,6 +3,7 @@ use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
 use super::Scope;
+use crate::derive::attr::parse::invisible;
 
 #[derive(Clone)]
 struct ConversionType {
@@ -108,19 +109,59 @@ struct FieldAttrs {
     has_with: bool,
 }
 
-pub(super) fn lower_runtime_attributes<'a>(
-    crate_ref: &TokenStream,
+/// Where lowered attributes are written.
+pub(crate) enum AttributeTarget {
+    /// Append `#target.insert(key, value);` statements to the block being built.
+    ///
+    /// Used for containers and variants, whose attributes are written through a
+    /// place expression (`e.attributes`) on a value that is mutated in place.
+    Statements(TokenStream),
+    /// Append `.attribute(key, value)` calls to the expression being built.
+    ///
+    /// A field's whole value is one expression, so its metadata is chained onto
+    /// it instead of being bound to a `let mut` and mutated statement by
+    /// statement.
+    Chain,
+}
+
+/// One lowered runtime attribute: its key and the expression producing its value.
+type AttributeEntry = (&'static str, TokenStream);
+
+pub(crate) fn lower_runtime_attributes<'a>(
+    type_trait: &syn::Ident,
     scope: Scope,
+    target: AttributeTarget,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
-    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
+    generics: Option<crate::derive::GenericsContext<'_>>,
 ) -> Result<Option<TokenStream>> {
-    match scope {
-        Scope::Container => parse_container_attrs(raw_attrs)
-            .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs, generics))),
+    Ok(match scope {
+        Scope::Container => parse_container_attrs(raw_attrs)?
+            .map(|attrs| write(&target, container_entries(type_trait, attrs, generics))),
         Scope::Variant => {
-            parse_variant_attrs(raw_attrs).map(|attrs| attrs.map(lower_variant_attrs))
+            parse_variant_attrs(raw_attrs)?.map(|attrs| write(&target, variant_entries(attrs)))
         }
-        Scope::Field => parse_field_attrs(raw_attrs).map(|attrs| attrs.map(lower_field_attrs)),
+        Scope::Field => {
+            parse_field_attrs(raw_attrs)?.map(|attrs| write(&target, field_entries(attrs)))
+        }
+    })
+}
+
+/// Writes `entries` to `target`, as statements or as chained calls.
+fn write(target: &AttributeTarget, entries: Vec<AttributeEntry>) -> TokenStream {
+    let keys = entries.iter().map(|(key, _)| key);
+    let values = entries.iter().map(|(_, value)| value);
+
+    // Each entry is one token template rather than a `quote!` of its own that is
+    // then copied into this one: the values carry a string literal and a method
+    // call each, so the second pass doubled the cost of the common case.
+    match target {
+        AttributeTarget::Statements(target) => {
+            // A place expression like `e.attributes`, already a group so that
+            // interpolating it once per entry does not copy its tokens each time.
+            let target = invisible(target.clone());
+            quote!(#( #target.insert(#keys, #values); )*)
+        }
+        AttributeTarget::Chain => quote!(#( .attribute(#keys, #values) )*),
     }
 }
 
@@ -395,226 +436,230 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn lower_container_attrs(
-    crate_ref: &TokenStream,
+fn container_entries(
+    type_trait: &syn::Ident,
     attrs: ContainerAttrs,
-    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
-) -> TokenStream {
-    let mut inserts = Vec::new();
+    generics: Option<crate::derive::GenericsContext<'_>>,
+) -> Vec<AttributeEntry> {
+    let mut entries = Vec::new();
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_deserialize",
         &attrs.rename_deserialize,
     );
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_all_serialize",
         attrs.rename_all_serialize,
     );
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_all_deserialize",
         attrs.rename_all_deserialize,
     );
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_all_fields_serialize",
         attrs.rename_all_fields_serialize,
     );
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:container:rename_all_fields_deserialize",
         attrs.rename_all_fields_deserialize,
     );
-    push_opt_string(&mut inserts, "serde:container:tag", &attrs.tag);
-    push_opt_string(&mut inserts, "serde:container:content", &attrs.content);
-    push_bool(&mut inserts, "serde:container:untagged", attrs.untagged);
-    push_bool(&mut inserts, "serde:container:default", attrs.default);
+    push_opt_string(&mut entries, "serde:container:tag", &attrs.tag);
+    push_opt_string(&mut entries, "serde:container:content", &attrs.content);
+    push_bool(&mut entries, "serde:container:untagged", attrs.untagged);
+    push_bool(&mut entries, "serde:container:default", attrs.default);
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:container:transparent",
         attrs.transparent,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:container:deny_unknown_fields",
         attrs.deny_unknown_fields,
     );
     push_opt_conversion(
-        &mut inserts,
-        crate_ref,
+        &mut entries,
+        type_trait,
         "serde:container:from_type_src",
         "serde:container:from_resolved",
         &attrs.from,
         generics,
     );
     push_opt_conversion(
-        &mut inserts,
-        crate_ref,
+        &mut entries,
+        type_trait,
         "serde:container:try_from_type_src",
         "serde:container:try_from_resolved",
         &attrs.try_from,
         generics,
     );
     push_opt_conversion(
-        &mut inserts,
-        crate_ref,
+        &mut entries,
+        type_trait,
         "serde:container:into_type_src",
         "serde:container:into_resolved",
         &attrs.into,
         generics,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:container:variant_identifier",
         attrs.variant_identifier,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:container:field_identifier",
         attrs.field_identifier,
     );
 
-    quote!(#(#inserts)*)
+    entries
 }
 
-fn lower_variant_attrs(attrs: VariantAttrs) -> TokenStream {
-    let mut inserts = Vec::new();
+fn variant_entries(attrs: VariantAttrs) -> Vec<AttributeEntry> {
+    let mut entries = Vec::new();
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:variant:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:variant:rename_deserialize",
         &attrs.rename_deserialize,
     );
-    push_vec_string(&mut inserts, "serde:variant:aliases", &attrs.aliases);
+    push_vec_string(&mut entries, "serde:variant:aliases", &attrs.aliases);
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:variant:rename_all_serialize",
         attrs.rename_all_serialize,
     );
     push_opt_rename_rule(
-        &mut inserts,
+        &mut entries,
         "serde:variant:rename_all_deserialize",
         attrs.rename_all_deserialize,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:variant:skip_serializing",
         attrs.skip_serializing,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:variant:skip_deserializing",
         attrs.skip_deserializing,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:variant:has_serialize_with",
         attrs.has_serialize_with,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:variant:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_bool(&mut inserts, "serde:variant:has_with", attrs.has_with);
-    push_bool(&mut inserts, "serde:variant:other", attrs.other);
-    push_bool(&mut inserts, "serde:variant:untagged", attrs.untagged);
+    push_bool(&mut entries, "serde:variant:has_with", attrs.has_with);
+    push_bool(&mut entries, "serde:variant:other", attrs.other);
+    push_bool(&mut entries, "serde:variant:untagged", attrs.untagged);
 
-    quote!(#(#inserts)*)
+    entries
 }
 
-fn lower_field_attrs(attrs: FieldAttrs) -> TokenStream {
-    let mut inserts = Vec::new();
+fn field_entries(attrs: FieldAttrs) -> Vec<AttributeEntry> {
+    let mut entries = Vec::new();
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:field:rename_serialize",
         &attrs.rename_serialize,
     );
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:field:rename_deserialize",
         &attrs.rename_deserialize,
     );
-    push_vec_string(&mut inserts, "serde:field:aliases", &attrs.aliases);
-    push_bool(&mut inserts, "serde:field:default", attrs.default);
-    push_bool(&mut inserts, "serde:field:flatten", attrs.flatten);
+    push_vec_string(&mut entries, "serde:field:aliases", &attrs.aliases);
+    push_bool(&mut entries, "serde:field:default", attrs.default);
+    push_bool(&mut entries, "serde:field:flatten", attrs.flatten);
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:field:skip_serializing",
         attrs.skip_serializing,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:field:skip_deserializing",
         attrs.skip_deserializing,
     );
     push_opt_string(
-        &mut inserts,
+        &mut entries,
         "serde:field:skip_serializing_if",
         &attrs.skip_serializing_if,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:field:has_serialize_with",
         attrs.has_serialize_with,
     );
     push_bool(
-        &mut inserts,
+        &mut entries,
         "serde:field:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_bool(&mut inserts, "serde:field:has_with", attrs.has_with);
+    push_bool(&mut entries, "serde:field:has_with", attrs.has_with);
 
-    quote!(#(#inserts)*)
+    entries
 }
 
-fn push_opt_string(inserts: &mut Vec<TokenStream>, key: &str, value: &Option<String>) {
+fn push_opt_string(entries: &mut Vec<AttributeEntry>, key: &'static str, value: &Option<String>) {
     if let Some(value) = value {
-        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
+        entries.push((key, quote!(#value.to_owned())));
     }
 }
 
-fn push_vec_string(inserts: &mut Vec<TokenStream>, key: &str, value: &[String]) {
+fn push_vec_string(entries: &mut Vec<AttributeEntry>, key: &'static str, value: &[String]) {
     if value.is_empty() {
         return;
     }
 
-    let value = value
-        .iter()
-        .map(|value| quote!(::std::string::String::from(#value)));
-    inserts.push(quote!(attrs.insert(#key, vec![#(#value),*]);));
+    let value = value.iter().map(|value| quote!(#value.to_owned()));
+    // `Vec::from([..])` instead of `vec![..]` keeps the `vec!` box machinery out
+    // of every lowered attribute.
+    entries.push((key, quote!(::std::vec::Vec::from([#(#value),*]))));
 }
 
-fn push_bool(inserts: &mut Vec<TokenStream>, key: &str, value: bool) {
+fn push_bool(entries: &mut Vec<AttributeEntry>, key: &'static str, value: bool) {
     if value {
-        inserts.push(quote!(attrs.insert(#key, true);));
+        entries.push((key, quote!(true)));
     }
 }
 
-fn push_opt_rename_rule(inserts: &mut Vec<TokenStream>, key: &str, value: Option<RenameRule>) {
+fn push_opt_rename_rule(
+    entries: &mut Vec<AttributeEntry>,
+    key: &'static str,
+    value: Option<RenameRule>,
+) {
     if let Some(value) = value {
         let value = value.as_str();
-        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
+        entries.push((key, quote!(#value.to_owned())));
     }
 }
 
 fn push_opt_conversion(
-    inserts: &mut Vec<TokenStream>,
-    crate_ref: &TokenStream,
-    src_key: &str,
-    resolved_key: &str,
+    entries: &mut Vec<AttributeEntry>,
+    type_trait: &syn::Ident,
+    src_key: &'static str,
+    resolved_key: &'static str,
     value: &Option<ConversionType>,
-    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
+    generics: Option<crate::derive::GenericsContext<'_>>,
 ) {
     let Some(value) = value else {
         return;
@@ -622,13 +667,20 @@ fn push_opt_conversion(
 
     let type_src = &value.type_src;
     let ty = &value.ty;
+
+    // A conversion type may mention the container's parameters, as in
+    // serde(into = "Vec<T>"). Resolving it directly would bake in whichever
+    // instantiation registered first, so it goes through the same
+    // declaration/concrete substitution as a field type. A container without
+    // parameters needs no resolution.
     let resolve = match generics {
-        Some((used, bounded)) => {
-            super::generics::resolve_ty_expr(crate_ref, ty, used, bounded, true)
+        Some((names, used_generic_types, bounded_params, build)) => {
+            super::generics::resolve_ty_expr(names, ty, used_generic_types, bounded_params, build)
+                .tokens
         }
-        None => quote!(<#ty as #crate_ref::Type>::definition(types)),
+        None => quote!(<#ty as #type_trait>::definition(types)),
     };
 
-    inserts.push(quote!(attrs.insert(#src_key, ::std::string::String::from(#type_src));));
-    inserts.push(quote!(attrs.insert(#resolved_key, #resolve);));
+    entries.push((src_key, quote!(#type_src.to_owned())));
+    entries.push((resolved_key, resolve));
 }

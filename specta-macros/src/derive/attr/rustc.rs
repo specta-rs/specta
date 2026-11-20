@@ -4,23 +4,46 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Lit, Result};
 
-use super::{Attribute, AttributeValue};
+use crate::derive::attr::parse::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
-#[derive(Default)]
+#[derive(Clone)]
 pub(crate) struct Deprecated {
     note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
 
+impl Deprecated {
+    pub const fn new() -> Self {
+        Self {
+            note: None,
+            since: None,
+        }
+    }
+
+    pub fn with_note(note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since: None,
+        }
+    }
+
+    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since,
+        }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct RustCAttr {
-    pub(crate) doc: String,
-    pub(crate) deprecated: Option<Deprecated>,
+    pub doc: String,
+    pub deprecated: Option<Deprecated>,
 }
 
 impl RustCAttr {
-    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let doc = attrs
             .extract_if(.., |attr| {
                 attr.key == "doc" && matches!(attr.value, Some(AttributeValue::Lit(Lit::Str(_))))
@@ -36,17 +59,16 @@ impl RustCAttr {
 
         let mut deprecated = None;
         if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
-            let attr_value = attrs[pos].clone();
+            // Removed rather than cloned: an `Attribute` owns an `Ident` and a
+            // nested attribute list, and the value is not used again.
+            let attr_value = attrs.swap_remove(pos);
 
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
-                    deprecated = Some(Deprecated {
-                        note: Some(match lit {
-                            Lit::Str(s) => s.value().into(),
-                            _ => return Err(syn::Error::new_spanned(lit, "expected string")),
-                        }),
-                        since: None,
-                    });
+                    deprecated = Some(Deprecated::with_note(match lit {
+                        Lit::Str(s) => s.value().into(),
+                        _ => return Err(syn::Error::new_spanned(lit, "expected string")),
+                    }));
                 }
                 Some(AttributeValue::Path(_)) => {
                     unreachable!("deprecated attribute can't be a path!")
@@ -55,15 +77,13 @@ impl RustCAttr {
                     unreachable!("deprecated attribute can't be an expression or type!")
                 }
                 Some(AttributeValue::Attribute { attr, .. }) => {
-                    deprecated = Some(Deprecated {
-                        note: Some(parse_deprecated_string_attr(attr, "note")?.unwrap_or_default()),
-                        since: parse_deprecated_string_attr(attr, "since")?,
-                    });
-                }
-                None => deprecated = Some(Deprecated::default()),
-            }
+                    let since = parse_deprecated_string_attr(attr, "since")?;
+                    let note = parse_deprecated_string_attr(attr, "note")?.unwrap_or_default();
 
-            attrs.swap_remove(pos);
+                    deprecated = Some(Deprecated::with_since_note(since, note));
+                }
+                None => deprecated = Some(Deprecated::new()),
+            }
         };
 
         Ok(RustCAttr { doc, deprecated })
@@ -87,15 +107,50 @@ fn parse_deprecated_string_attr(
     }
 }
 
-pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> TokenStream {
+/// `dt` is the path the generated code uses for the `datatype` module.
+pub(crate) fn deprecated_as_tokens(
+    dt: &syn::Ident,
+    Deprecated { note, since }: &Deprecated,
+) -> TokenStream {
     let since = since
+        .as_deref()
         .map(|v| quote!(Some(#v.into())))
         .unwrap_or(quote!(None));
 
-    let note = match note {
-        Some(note) => quote!(Some(#note.into())),
-        None => quote!(None),
-    };
+    // `with_since_note` takes a `Cow`, so an empty note is an empty `&str`
+    // converted into one, without needing `Cow` in the generated scope. The
+    // empty case interpolates a `&str` rather than writing a literal in the
+    // template, which `quote!` would have to lex.
+    let empty = "";
+    let note = note
+        .as_deref()
+        .map(|note| quote!(#note.into()))
+        .unwrap_or(quote!(#empty.into()));
 
-    quote!(Some(datatype::Deprecated::with_since_note(#since, #note.unwrap_or_default())))
+    quote!(Some(#dt::Deprecated::with_since_note(#since, #note)))
+}
+
+/// The same value as [`deprecated_as_tokens`], as a `const` expression.
+///
+/// The generated code keeps it in a `static` and passes a reference to it, so a
+/// `definition` body does not build an owned `Option<Deprecated>` temporary (and
+/// the drop flag, drop glue and cleanup path that come with it) once per
+/// monomorphisation. `Into::into` is not callable in a const context, so the
+/// `Cow` is built directly.
+pub(crate) fn deprecated_as_const_tokens(
+    dt: &syn::Ident,
+    Deprecated { note, since }: &Deprecated,
+) -> TokenStream {
+    let since = since
+        .as_deref()
+        .map(|v| quote!(::core::option::Option::Some(::std::borrow::Cow::Borrowed(#v))))
+        .unwrap_or(quote!(::core::option::Option::None));
+
+    let empty = "";
+    let note = note
+        .as_deref()
+        .map(|note| quote!(::std::borrow::Cow::Borrowed(#note)))
+        .unwrap_or(quote!(::std::borrow::Cow::Borrowed(#empty)));
+
+    quote!(#dt::Deprecated::with_since_note(#since, #note))
 }
