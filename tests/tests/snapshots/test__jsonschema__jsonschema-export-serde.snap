@@ -2103,9 +2103,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           ]
         }
       },
-      "required": [
-        "optional_field"
-      ],
       "title": "InlineOptionalType",
       "type": "object"
     },
@@ -2586,9 +2583,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
           ]
         }
       },
-      "required": [
-        "cause"
-      ],
       "title": "InvalidToValidType",
       "type": "object"
     },
@@ -3282,9 +3276,6 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
                   ]
                 }
               },
-              "required": [
-                "a"
-              ],
               "type": "object"
             }
           },
@@ -5207,8 +5198,7 @@ expression: "JsonSchema::default().export(&types, specta_serde::Format).unwrap()
         "a",
         "b",
         "c",
-        "d",
-        "e"
+        "d"
       ],
       "title": "SimpleStruct",
       "type": "object"

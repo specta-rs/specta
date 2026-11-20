@@ -13,7 +13,7 @@ type ApiResponse[T any] struct {
 	// UserID — Stable resource identifier.
 	UserID  uint64           `json:"user_id"`
 	Payload T                `json:"payload"`
-	NextURL *string          `json:"next_url"`
+	NextURL *string          `json:"next_url,omitempty"`
 	Values  map[string]int32 `json:"values"`
 	Huge    *big.Int         `json:"huge"`
 }
@@ -51,7 +51,7 @@ type Metadata struct {
 
 type Node struct {
 	Value  string    `json:"value"`
-	Child  *Node     `json:"child"`
+	Child  *Node     `json:"child,omitempty"`
 	Status JobStatus `json:"status"`
 	Event  Event     `json:"event"`
 }

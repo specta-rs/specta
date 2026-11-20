@@ -49,6 +49,7 @@ mod serde_enum_variant_flatten;
 mod serde_flatten_option;
 mod serde_identifiers;
 mod serde_internal_tag_payloads;
+mod serde_option_unified;
 mod serde_other;
 mod serde_phase_provenance;
 mod serde_unified_asymmetry;

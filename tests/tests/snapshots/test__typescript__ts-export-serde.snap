@@ -396,7 +396,7 @@ export type InlineFlattenGenericsG<T> = {
 };
 
 export type InlineOptionalType = {
-	optional_field: {
+	optional_field?: {
 	a: string,
 } | null,
 };
@@ -476,7 +476,7 @@ export type InternallyTaggedM = { type: "A" };
 export type InternallyTaggedMInner = null;
 
 export type InvalidToValidType = {
-	cause: null,
+	cause?: null,
 };
 
 export type Issue221External = ({ A: {
@@ -561,7 +561,7 @@ export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
 export type NonOptional = string | null;
 
 export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	a: string | null,
+	a?: string | null,
 } }) & { A?: never; C?: never } | ({ C: {
 	a?: string | null,
 } }) & { A?: never; B?: never };
@@ -908,7 +908,7 @@ export type SimpleStruct = {
 	b: string,
 	c: [number, string, number],
 	d: string[],
-	e: string | null,
+	e?: string | null,
 };
 
 /**  Some single-line comment */

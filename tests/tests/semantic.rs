@@ -1132,14 +1132,15 @@ fn semantic_absent_proto_key_does_not_leak_object_prototype_on_deserialize() {
         .expect("optional prototype-named field deserialization should require a transform");
     assert_eq!(
         deserialize,
-        "({...value,[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value==null?Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value:new URL(Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value),site:new URL(value.site)})"
+        "({...value,...(Object.prototype.hasOwnProperty.call(value,\"__proto__\")?{[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value==null?Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value:new URL(Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value)}:{}),site:new URL(value.site)})"
     );
 
-    // Key absent: must not throw, and the field stays undefined.
+    // Key absent: must not throw, and the field stays absent (reading it would
+    // find Object.prototype, which is exactly what the guard prevents).
     assert_runtime_js(
         &deserialize,
         "{ site: \"https://example.com/s\" }",
-        "out[\"__proto__\"] === undefined && out.site instanceof URL && Object.getPrototypeOf(out) === Object.prototype",
+        "!Object.prototype.hasOwnProperty.call(out,\"__proto__\") && out.site instanceof URL && Object.getPrototypeOf(out) === Object.prototype",
     );
     // Key present: still rewritten.
     assert_runtime_js(

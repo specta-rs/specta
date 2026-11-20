@@ -7,5 +7,5 @@ export type NumberPayload = {
 	id: bigint,
 	signed: bigint,
 	scores: number[],
-	maybe_score: number | null,
+	maybe_score?: number | null,
 };
