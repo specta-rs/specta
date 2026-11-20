@@ -466,6 +466,13 @@ impl Types {
         }
     }
 
+    /// Whether any active scope holds a slot that could be matched.
+    fn has_possible_substitution(&self) -> bool {
+        self.generic_substitutions
+            .iter()
+            .any(|scope| !scope.slots.is_empty())
+    }
+
     /// Returns the cursor of the innermost active substitution scope.
     ///
     /// Used by the derive and the built-in impl macros to rewind a scope to the
@@ -520,6 +527,13 @@ impl Types {
         substitutions: &[GenericSubstitutionSlot],
         f: impl FnOnce(&mut Types) -> R,
     ) -> R {
+        // An empty scope exists only to hide enclosing scopes. When no enclosing
+        // scope can match anything the scope is a no-op, which is the common case
+        // for field types that do not mention a parameter.
+        if substitutions.is_empty() && !self.has_possible_substitution() {
+            return f(self);
+        }
+
         self.generic_substitutions.push(GenericSubstitution {
             consumed: vec![false; substitutions.len()],
             slots: substitutions.to_vec(),
