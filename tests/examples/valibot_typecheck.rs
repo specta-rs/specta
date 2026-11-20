@@ -564,7 +564,7 @@ fn main() {
         .framework_runtime(|exporter| {
             let manual = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ManualNamespaceType");
             Ok(Cow::Owned(format!(
                 "{}\nexport const AdaptedManualNamespaceTypeSchema = ManualNamespaceTypeSchema;",
@@ -617,7 +617,7 @@ fn main() {
         .framework_runtime(|exporter| {
             let manual = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ManualNested");
             Ok(Cow::Owned(exporter.export(manual, "")?))
         })

@@ -1021,7 +1021,7 @@ fn zod_inline_recursive_generics_keep_schema_arguments() {
     let mut types = Types::default();
     let holder = ConcreteHolder::definition(&mut types);
     let ty = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "GenericNode")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("generic node definition should be registered");
@@ -1384,7 +1384,7 @@ fn zod_framework_export_formats_generic_named_datatypes() {
         .framework_runtime(|exporter| {
             let generic_defaults = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ZodGenericDefaults");
             Ok(Cow::Owned(exporter.export(generic_defaults, "")?))
         })

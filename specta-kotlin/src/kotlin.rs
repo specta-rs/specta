@@ -244,7 +244,7 @@ impl Kotlin {
         let mut filenames = BTreeSet::new();
         let mut casefolded_filenames = BTreeSet::new();
         let mut files = Vec::new();
-        for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+        for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
             let filename = format!("{}.kt", render::filename(self, &ndt.name)?);
             if !filenames.insert(filename.clone())
                 || !casefolded_filenames.insert(filename.to_lowercase())

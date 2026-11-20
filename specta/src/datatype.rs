@@ -15,7 +15,7 @@ mod tuple;
 pub use attributes::Attributes;
 pub use r#enum::{Enum, Variant, VariantBuilder};
 pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
-pub use generic::{Generic, Generic as GenericReference, GenericDefinition};
+pub use generic::{Generic, GenericDefinition};
 pub use list::List;
 // pub use literal::Literal;
 pub use map::Map;

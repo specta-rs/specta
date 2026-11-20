@@ -901,7 +901,7 @@ struct Module<'a> {
 }
 
 fn build_module_graph(types: &Types) -> Module<'_> {
-    types.into_unsorted_iter().fold(
+    types.iter_unsorted().fold(
         Module {
             types: Default::default(),
             children: Default::default(),
@@ -1058,7 +1058,7 @@ fn render_types(
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            render_flat_types(s, exporter, format, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, format, types, types.iter_sorted(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.

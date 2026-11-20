@@ -234,13 +234,13 @@ impl Types {
     ///
     /// This consumes and returns `self`, making it convenient to chain multiple
     /// registrations.
-    pub fn register<T: Type>(mut self) -> Self {
+    pub fn register<T: Type + ?Sized>(mut self) -> Self {
         self.register_mut::<T>();
         self
     }
 
     /// Registers `T` and its named dependencies with the collection in-place.
-    pub fn register_mut<T: Type>(&mut self) -> &mut Self {
+    pub fn register_mut<T: Type + ?Sized>(&mut self) -> &mut Self {
         let root = T::definition(self);
         self.roots.push(root);
         self
@@ -550,15 +550,14 @@ impl Types {
         self.len
     }
 
-    /// Returns `true` when the typemap has no entries at all.
+    /// Returns `true` when the collection holds no named datatypes and no
+    /// registered roots.
+    ///
+    /// This is deliberately not `len() == 0`: registering an anonymous root
+    /// such as a primitive adds no named datatype, but the collection still has
+    /// something to export.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(
-            self.len,
-            self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
-            "Types count logic mismatch"
-        );
-
-        self.len == 0
+        self.len() == 0 && self.roots.is_empty()
     }
 
     /// Merges types from another collection into this one.
@@ -595,8 +594,8 @@ impl Types {
     /// so that between multiple runs of the exporter you get the same type in the same order in the file.
     ///
     /// This method allocates a temporary vector to sort the collection. Prefer
-    /// [`Types::into_unsorted_iter`] if the order does not matter.
-    pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
+    /// [`Types::iter_unsorted`] if the order does not matter.
+    pub fn iter_sorted(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
             .types
             .values()
@@ -613,7 +612,7 @@ impl Types {
     }
 
     /// Returns an unsorted iterator over completed named datatypes.
-    pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
+    pub fn iter_unsorted(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
         UnsortedIter {
             iter: self.types.iter(),
             count: self.len,

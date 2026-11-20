@@ -758,7 +758,7 @@ fn dynamic_self_cycle(
     arg: impl Fn(usize) -> specta::datatype::DataType,
 ) -> Types {
     use specta::datatype::{
-        DataType, Enum, Field, GenericDefinition, GenericReference, NamedDataType, Variant,
+        DataType, Enum, Field, GenericDefinition, Generic, NamedDataType, Variant,
     };
 
     let mut types = Types::default();
@@ -779,7 +779,7 @@ fn dynamic_self_cycle(
         e.variants.push((
             "Terminal".into(),
             Variant::unnamed()
-                .field(Field::new(DataType::Generic(GenericReference::new(
+                .field(Field::new(DataType::Generic(Generic::new(
                     "T".into(),
                 ))))
                 .build(),
@@ -829,10 +829,10 @@ fn large_finite_instantiation_set_reaches_its_fixed_point() {
 /// illegal TS2456 alias.
 #[test]
 fn divergent_instantiation_set_still_fails_honestly() {
-    use specta::datatype::{DataType, GenericReference};
+    use specta::datatype::{DataType, Generic};
 
     let types = dynamic_self_cycle("Diverge", 1, |_| {
-        DataType::Nullable(Box::new(DataType::Generic(GenericReference::new(
+        DataType::Nullable(Box::new(DataType::Generic(Generic::new(
             "T".into(),
         ))))
     });

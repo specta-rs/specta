@@ -451,7 +451,7 @@ mod tests {
 
         assert_eq!(types.len(), 1);
         let ndt = types
-            .into_sorted_iter()
+            .iter_sorted()
             .next()
             .expect("the definition is registered");
         assert_eq!(ndt.name, "Dup");

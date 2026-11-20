@@ -60,7 +60,7 @@ fn a_borrowed_replacement_graph_is_honoured() {
         .expect("formatting succeeds");
 
     assert!(
-        formatted.into_sorted_iter().any(|ndt| ndt.name == "Other"),
+        formatted.iter_sorted().any(|ndt| ndt.name == "Other"),
         "the graph returned by map_types must be the graph that is rendered"
     );
 }

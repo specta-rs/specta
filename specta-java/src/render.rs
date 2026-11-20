@@ -18,7 +18,7 @@ pub(crate) fn flat_file(java: &Java, types: &Types) -> Result<String, Error> {
     validate_package(java.package.as_deref())?;
     let class_name = class_name(java)?;
     validate_unique_names(java, types, false)?;
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         if rendered_type_name(java, ndt)? == class_name {
             return Err(Error::duplicate_type(
                 class_name,
@@ -33,7 +33,7 @@ pub(crate) fn flat_file(java: &Java, types: &Types) -> Result<String, Error> {
     writeln!(out, "    private {class_name}() {{}}").expect("writing to String cannot fail");
 
     let mut first = true;
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         if first {
             out.push('\n');
             first = false;
@@ -79,7 +79,7 @@ pub(crate) fn files(java: &Java, root: &Path, types: &Types) -> Result<(), Error
     validate_unique_names(java, types, true)?;
     let mut outputs = BTreeMap::new();
 
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let module_package = module_package(&ndt.module_path)?;
         let package = join_package(java.package.as_deref(), &module_package);
         let directory = package
@@ -900,7 +900,7 @@ fn nested_type_identifier(ctx: &Context<'_>, name: &str, path: &str) -> Result<S
     let base = type_identifier(name, path)?;
     let mut occupied = ctx
         .types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|datatype| datatype.ty.is_some())
         .map(|datatype| rendered_type_name(ctx.java, datatype))
         .collect::<Result<BTreeSet<_>, _>>()?;
@@ -1081,7 +1081,7 @@ fn generic_bindings(
     validate_names(base_names.iter().cloned().map(Ok), &rust_path(ndt))?;
 
     let mut occupied = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|datatype| datatype.ty.is_some())
         .map(|datatype| rendered_type_name(java, datatype))
         .collect::<Result<BTreeSet<_>, _>>()?;
@@ -1255,7 +1255,7 @@ fn escape_javadoc(value: &str) -> String {
 
 fn validate_unique_names(java: &Java, types: &Types, include_modules: bool) -> Result<(), Error> {
     let mut seen = BTreeMap::<String, String>::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let mut name =
             rendered_type_name(java, ndt).map_err(|error| error.with_named_datatype(ndt))?;
         if include_modules {

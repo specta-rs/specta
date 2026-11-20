@@ -26,7 +26,7 @@ pub enum ApplyMode {
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     let mut checked_references = ValidationVisits::batch();
-    for ndt in types.into_unsorted_iter() {
+    for ndt in types.iter_unsorted() {
         let Some(ty) = &ndt.ty else {
             continue;
         };
@@ -1825,7 +1825,7 @@ fn ensure_codec_override(
 
 fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
     attributes
-        .get_named_as::<bool>("specta:type_override")
+        .get_as::<bool>("specta:type_override")
         .copied()
         .unwrap_or(false)
 }
