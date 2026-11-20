@@ -1242,6 +1242,21 @@ fn validate_variant_aliases(
         return Ok(());
     }
 
+    // Aliases are the only thing this check can reject: without one, the
+    // occupied-name table can't collide with anything. When no variant
+    // declares any serde metadata and the container applies no `rename_all`
+    // rule (so every accepted name is the variant's own), there is nothing to
+    // build or compare.
+    if container_attrs.as_ref().is_none_or(|attrs| {
+        attrs.rename_all_serialize.is_none() && attrs.rename_all_deserialize.is_none()
+    }) && enm
+        .variants
+        .iter()
+        .all(|(_, variant)| variant.attributes.is_empty())
+    {
+        return Ok(());
+    }
+
     let mut occupied_deserialize_names = HashMap::new();
     for (name, variant) in &enm.variants {
         let attrs = SerdeVariantAttrs::from_attributes(&variant.attributes)?;
