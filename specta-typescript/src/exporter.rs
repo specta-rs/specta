@@ -10,7 +10,9 @@ use std::{
 
 use specta::{
     Format, Types,
-    datatype::{DataType, Fields, NamedDataType, NamedReference, NamedReferenceType, Reference},
+    datatype::{
+        DataType, Fields, Map, NamedDataType, NamedReference, NamedReferenceType, Reference, Tuple,
+    },
 };
 
 use crate::{Branded, Error, primitives, references};
@@ -545,7 +547,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             let mut generic_path = path.clone();
             generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
             match map_datatype_format(Some(format), &mapped, default, &generic_path) {
-                Ok(default) => defaults.push((idx, default)),
+                Ok(default) => defaults.push((idx, default.into_owned())),
                 Err(source) => {
                     error = Some(source.with_named_datatype(ndt));
                     break;
@@ -562,7 +564,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
             .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &path))
             .transpose();
         match datatype {
-            Ok(datatype) => bodies.push((defaults, datatype)),
+            Ok(datatype) => bodies.push((defaults, datatype.map(Cow::into_owned))),
             Err(source) => error = Some(source.with_named_datatype(ndt)),
         }
     }
@@ -618,32 +620,68 @@ fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> 
 ///
 /// Each datatype in a named body is therefore formatted exactly once, matching
 /// the single-pass contract the other exporters follow.
-fn map_datatype_format(
-    format: Option<&dyn Format>,
-    types: &Types,
-    dt: &DataType,
+fn map_datatype_format<'a>(
+    format: Option<&'a dyn Format>,
+    types: &'a Types,
+    dt: &'a DataType,
     path: &[Cow<'static, str>],
-) -> Result<DataType, Error> {
+) -> Result<Cow<'a, DataType>, Error> {
     if matches!(dt, DataType::Generic(_)) {
-        return Ok(dt.clone());
+        return Ok(Cow::Borrowed(dt));
     }
 
-    // Without a format there is nothing to map, and the recursion would only
-    // rebuild (deep clone) the datatype it was given.
+    // Without a format there is nothing to map, and descending would only
+    // rebuild the datatype it was given.
     let Some(format) = format else {
-        return Ok(dt.clone());
+        return Ok(Cow::Borrowed(dt));
     };
 
-    fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
-        Ok(match dt {
-            DataType::Primitive(_) => false,
-            DataType::List(list) => contains_generic_reference(&list.ty)?,
-            DataType::Map(map) => {
-                contains_generic_reference(map.key_ty())?
-                    || contains_generic_reference(map.value_ty())?
+    match format.map_type(types, dt) {
+        Ok(Cow::Owned(dt)) => Ok(Cow::Owned(dt)),
+        Ok(Cow::Borrowed(dt)) => map_datatype_format_children(format, types, dt, path),
+        Err(err) => {
+            // Formats commonly reject an unresolved generic, so a rejected node
+            // is still offered to the format child by child.
+            if is_unresolved_generic_format_error(err.as_ref()) && contains_generic_reference(dt)? {
+                return map_datatype_format_children(format, types, dt, path);
             }
-            DataType::Nullable(inner) => contains_generic_reference(inner)?,
-            DataType::Struct(strct) => match &strct.fields {
+            Err(Error::format_at(
+                "datatype formatter failed",
+                path.join("."),
+                err,
+            ))
+        }
+    }
+}
+
+/// Whether `dt` contains an unresolved generic, which formats commonly reject.
+fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
+    Ok(match dt {
+        DataType::Primitive(_) => false,
+        DataType::List(list) => contains_generic_reference(&list.ty)?,
+        DataType::Map(map) => {
+            contains_generic_reference(map.key_ty())? || contains_generic_reference(map.value_ty())?
+        }
+        DataType::Nullable(inner) => contains_generic_reference(inner)?,
+        DataType::Struct(strct) => match &strct.fields {
+            Fields::Unit => false,
+            Fields::Unnamed(unnamed) => unnamed
+                .fields
+                .iter()
+                .filter_map(|field| field.ty.as_ref())
+                .try_fold(false, |found, ty| {
+                    Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                })?,
+            Fields::Named(named) => named
+                .fields
+                .iter()
+                .filter_map(|(_, field)| field.ty.as_ref())
+                .try_fold(false, |found, ty| {
+                    Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                })?,
+        },
+        DataType::Enum(enm) => enm.variants.iter().try_fold(false, |found, (_, variant)| {
+            let variant_found = match &variant.fields {
                 Fields::Unit => false,
                 Fields::Unnamed(unnamed) => unnamed
                     .fields
@@ -659,77 +697,28 @@ fn map_datatype_format(
                     .try_fold(false, |found, ty| {
                         Ok::<_, Error>(found || contains_generic_reference(ty)?)
                     })?,
-            },
-            DataType::Enum(enm) => enm.variants.iter().try_fold(false, |found, (_, variant)| {
-                let variant_found = match &variant.fields {
-                    Fields::Unit => false,
-                    Fields::Unnamed(unnamed) => unnamed
-                        .fields
-                        .iter()
-                        .filter_map(|field| field.ty.as_ref())
-                        .try_fold(false, |found, ty| {
-                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
-                        })?,
-                    Fields::Named(named) => named
-                        .fields
-                        .iter()
-                        .filter_map(|(_, field)| field.ty.as_ref())
-                        .try_fold(false, |found, ty| {
-                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
-                        })?,
-                };
+            };
 
-                Ok::<_, Error>(found || variant_found)
-            })?,
-            DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
-                Ok::<_, Error>(found || contains_generic_reference(ty)?)
-            })?,
-            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-                NamedReferenceType::Reference { generics, .. } => {
-                    generics.iter().try_fold(false, |found, (_, dt)| {
-                        Ok::<_, Error>(found || contains_generic_reference(dt)?)
-                    })?
-                }
-                NamedReferenceType::Inline { .. } => false,
-                NamedReferenceType::Recursive(_) => false,
-            },
-            DataType::Generic(_) => true,
-            DataType::Reference(Reference::Opaque(_)) => false,
-            DataType::Intersection(types) => types.iter().try_fold(false, |found, ty| {
-                Ok::<_, Error>(found || contains_generic_reference(ty)?)
-            })?,
-        })
-    }
-
-    if contains_generic_reference(dt)? {
-        // Formats commonly reject an unresolved generic, so a rejected node is
-        // still offered to the format child by child.
-        match format.map_type(types, dt) {
-            Ok(Cow::Borrowed(dt)) => {
-                return map_datatype_format_children(Some(format), types, dt.clone(), path);
+            Ok::<_, Error>(found || variant_found)
+        })?,
+        DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
+            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+        })?,
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Reference { generics, .. } => {
+                generics.iter().try_fold(false, |found, (_, dt)| {
+                    Ok::<_, Error>(found || contains_generic_reference(dt)?)
+                })?
             }
-            Ok(Cow::Owned(dt)) => return Ok(dt),
-            Err(err) if is_unresolved_generic_format_error(err.as_ref()) => {
-                return map_datatype_format_children(Some(format), types, dt.clone(), path);
-            }
-            Err(err) => {
-                return Err(Error::format_at(
-                    "datatype formatter failed",
-                    path.join("."),
-                    err,
-                ));
-            }
-        }
-    }
-
-    let mapped = format
-        .map_type(types, dt)
-        .map_err(|err| Error::format_at("datatype formatter failed", path.join("."), err))?;
-
-    match mapped {
-        Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone(), path),
-        Cow::Owned(dt) => Ok(dt),
-    }
+            NamedReferenceType::Inline { .. } => false,
+            NamedReferenceType::Recursive(_) => false,
+        },
+        DataType::Generic(_) => true,
+        DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::Intersection(types) => types.iter().try_fold(false, |found, ty| {
+            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+        })?,
+    })
 }
 
 fn is_unresolved_generic_format_error(err: &(dyn std::error::Error + 'static)) -> bool {
@@ -739,69 +728,195 @@ fn is_unresolved_generic_format_error(err: &(dyn std::error::Error + 'static)) -
     err.to_string().contains("Unresolved generic reference")
 }
 
-fn map_datatype_format_children(
-    format: Option<&dyn Format>,
-    types: &Types,
-    mut dt: DataType,
+/// Formats the children of a node whose own `map_type` result was `Borrowed`.
+///
+/// `Cow::Borrowed` means no child changed, so the caller can keep borrowing the
+/// node: a format that leaves a subtree untouched never pays to own a copy of
+/// it.
+fn map_datatype_format_children<'a>(
+    format: &'a dyn Format,
+    types: &'a Types,
+    dt: &'a DataType,
     path: &[Cow<'static, str>],
-) -> Result<DataType, Error> {
-    match &mut dt {
-        DataType::Primitive(_) => {}
-        DataType::List(list) => {
-            let child_path = format_path(path, "<list_item>");
-            *list.ty = map_datatype_format(format, types, &list.ty, &child_path)?;
-        }
+) -> Result<Cow<'a, DataType>, Error> {
+    match dt {
+        DataType::Primitive(_) | DataType::Generic(_) => Ok(Cow::Borrowed(dt)),
+        DataType::List(list) => Ok(
+            match map_datatype_format(
+                Some(format),
+                types,
+                &list.ty,
+                &format_path(path, "<list_item>"),
+            )? {
+                Cow::Borrowed(_) => Cow::Borrowed(dt),
+                Cow::Owned(ty) => {
+                    let mut list = list.clone();
+                    list.ty = Box::new(ty);
+                    Cow::Owned(DataType::List(list))
+                }
+            },
+        ),
         DataType::Map(map) => {
             let key_path = format_path(path, "<map_key>");
             let value_path = format_path(path, "<map_value>");
-            let key = map_datatype_format(format, types, map.key_ty(), &key_path)?;
-            let value = map_datatype_format(format, types, map.value_ty(), &value_path)?;
-            map.set_key_ty(key);
-            map.set_value_ty(value);
-        }
-        DataType::Nullable(inner) => {
-            **inner = map_datatype_format(format, types, inner, path)?;
-        }
-        DataType::Struct(strct) => map_datatype_fields(format, types, &mut strct.fields, path)?,
-        DataType::Enum(enm) => {
-            for (variant_name, variant) in &mut enm.variants {
-                let variant_path = format_path(path, variant_name.clone());
-                map_datatype_fields(format, types, &mut variant.fields, &variant_path)?;
+            let key = map_datatype_format(Some(format), types, map.key_ty(), &key_path)?;
+            let value = map_datatype_format(Some(format), types, map.value_ty(), &value_path)?;
+            if matches!((&key, &value), (Cow::Borrowed(_), Cow::Borrowed(_))) {
+                return Ok(Cow::Borrowed(dt));
             }
+            Ok(Cow::Owned(DataType::Map(Map::new(
+                key.into_owned(),
+                value.into_owned(),
+            ))))
+        }
+        DataType::Nullable(inner) => Ok(
+            match map_datatype_format(Some(format), types, inner, path)? {
+                Cow::Borrowed(_) => Cow::Borrowed(dt),
+                Cow::Owned(inner) => Cow::Owned(DataType::Nullable(Box::new(inner))),
+            },
+        ),
+        DataType::Struct(strct) => Ok(
+            match map_datatype_fields(format, types, &strct.fields, path)? {
+                None => Cow::Borrowed(dt),
+                Some(changes) => {
+                    let mut strct = strct.clone();
+                    apply_field_changes(&mut strct.fields, changes);
+                    Cow::Owned(DataType::Struct(strct))
+                }
+            },
+        ),
+        DataType::Enum(enm) => {
+            let mut changed: Option<Vec<(usize, Vec<(usize, DataType)>)>> = None;
+            for (idx, (variant_name, variant)) in enm.variants.iter().enumerate() {
+                let variant_path = format_path(path, variant_name.clone());
+                if let Some(changes) =
+                    map_datatype_fields(format, types, &variant.fields, &variant_path)?
+                {
+                    changed.get_or_insert_with(Vec::new).push((idx, changes));
+                }
+            }
+
+            Ok(match changed {
+                None => Cow::Borrowed(dt),
+                Some(changed) => {
+                    let mut enm = enm.clone();
+                    for (idx, changes) in changed {
+                        if let Some((_, variant)) = enm.variants.get_mut(idx) {
+                            apply_field_changes(&mut variant.fields, changes);
+                        }
+                    }
+                    Cow::Owned(DataType::Enum(enm))
+                }
+            })
         }
         DataType::Tuple(tuple) => {
-            for (idx, element) in tuple.elements.iter_mut().enumerate() {
-                let element_path = format_path(path, idx.to_string());
-                *element = map_datatype_format(format, types, element, &element_path)?;
+            let mut changed: Option<Vec<(usize, DataType)>> = None;
+            for (idx, element) in tuple.elements.iter().enumerate() {
+                if let Cow::Owned(element) = map_datatype_format(
+                    Some(format),
+                    types,
+                    element,
+                    &format_path(path, idx.to_string()),
+                )? {
+                    changed.get_or_insert_with(Vec::new).push((idx, element));
+                }
             }
+
+            Ok(match changed {
+                None => Cow::Borrowed(dt),
+                Some(changed) => {
+                    let mut elements = tuple.elements.clone();
+                    for (idx, element) in changed {
+                        if let Some(slot) = elements.get_mut(idx) {
+                            *slot = element;
+                        }
+                    }
+                    Cow::Owned(DataType::Tuple(Tuple::new(elements)))
+                }
+            })
         }
-        DataType::Intersection(types_) => {
-            for ty in types_ {
-                *ty = map_datatype_format(format, types, ty, path)?;
+        DataType::Intersection(elements) => {
+            let mut changed: Option<Vec<(usize, DataType)>> = None;
+            for (idx, element) in elements.iter().enumerate() {
+                if let Cow::Owned(element) =
+                    map_datatype_format(Some(format), types, element, path)?
+                {
+                    changed.get_or_insert_with(Vec::new).push((idx, element));
+                }
             }
+
+            Ok(match changed {
+                None => Cow::Borrowed(dt),
+                Some(changed) => {
+                    let mut elements = elements.clone();
+                    for (idx, element) in changed {
+                        if let Some(slot) = elements.get_mut(idx) {
+                            *slot = element;
+                        }
+                    }
+                    Cow::Owned(DataType::Intersection(elements))
+                }
+            })
         }
         DataType::Reference(Reference::Named(reference)) => {
-            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
-                **dt = map_datatype_format(format, types, dt, path)?;
+            let mut changed: Option<Vec<(usize, DataType)>> = None;
+
+            let inline_changed = match &reference.inner {
+                NamedReferenceType::Inline { dt: inline, .. } => {
+                    match map_datatype_format(Some(format), types, inline, path)? {
+                        Cow::Borrowed(_) => None,
+                        Cow::Owned(inline) => Some(inline),
+                    }
+                }
+                _ => None,
+            };
+
+            let generics = match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
+                _ => &[],
+            };
+            for (idx, (_, ty)) in generics.iter().enumerate() {
+                if let Cow::Owned(ty) = map_datatype_format(Some(format), types, ty, path)? {
+                    changed.get_or_insert_with(Vec::new).push((idx, ty));
+                }
             }
 
-            for (_, dt) in named_reference_generics_mut(reference) {
-                *dt = map_datatype_format(format, types, dt, path)?;
+            if inline_changed.is_none() && changed.is_none() {
+                return Ok(Cow::Borrowed(dt));
             }
+
+            let mut reference = reference.clone();
+            if let Some(inline) = inline_changed
+                && let NamedReferenceType::Inline { dt: slot, .. } = &mut reference.inner
+            {
+                **slot = inline;
+            }
+            if let Some(changed) = changed {
+                let generics = named_reference_generics_mut(&mut reference);
+                for (idx, ty) in changed {
+                    if let Some((_, slot)) = generics.get_mut(idx) {
+                        *slot = ty;
+                    }
+                }
+            }
+
+            Ok(Cow::Owned(DataType::Reference(Reference::Named(reference))))
         }
-        DataType::Generic(_) => {}
         DataType::Reference(Reference::Opaque(reference)) => {
-            if let Some(branded) = reference.downcast_ref::<Branded>() {
-                dt = Reference::opaque(Branded::new(
-                    branded.brand().clone(),
-                    map_datatype_format(format, types, branded.ty(), path)?,
-                ))
-                .into();
-            }
+            let Some(branded) = reference.downcast_ref::<Branded>() else {
+                return Ok(Cow::Borrowed(dt));
+            };
+
+            Ok(
+                match map_datatype_format(Some(format), types, branded.ty(), path)? {
+                    Cow::Borrowed(_) => Cow::Borrowed(dt),
+                    Cow::Owned(ty) => Cow::Owned(
+                        Reference::opaque(Branded::new(branded.brand().clone(), ty)).into(),
+                    ),
+                },
+            )
         }
     }
-
-    Ok(dt)
 }
 
 fn format_path(
@@ -822,33 +937,65 @@ fn named_reference_generics_mut(
     }
 }
 
+/// Formats every field type in `fields`, returning the changed ones by index.
+///
+/// `None` means the format left all of them unchanged, so the caller can keep
+/// borrowing the node instead of cloning it.
 fn map_datatype_fields(
-    format: Option<&dyn Format>,
+    format: &dyn Format,
     types: &Types,
-    fields: &mut Fields,
+    fields: &Fields,
     path: &[Cow<'static, str>],
-) -> Result<(), Error> {
+) -> Result<Option<Vec<(usize, DataType)>>, Error> {
+    let mut changed: Option<Vec<(usize, DataType)>> = None;
+
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
-            for (idx, field) in unnamed.fields.iter_mut().enumerate() {
-                if let Some(ty) = field.ty.as_mut() {
-                    let field_path = format_path(path, idx.to_string());
-                    *ty = map_datatype_format(format, types, ty, &field_path)?;
+            for (idx, field) in unnamed.fields.iter().enumerate() {
+                let Some(ty) = field.ty.as_ref() else {
+                    continue;
+                };
+                let field_path = format_path(path, idx.to_string());
+                if let Cow::Owned(ty) = map_datatype_format(Some(format), types, ty, &field_path)? {
+                    changed.get_or_insert_with(Vec::new).push((idx, ty));
                 }
             }
         }
         Fields::Named(named) => {
-            for (name, field) in &mut named.fields {
-                if let Some(ty) = field.ty.as_mut() {
-                    let field_path = format_path(path, name.clone());
-                    *ty = map_datatype_format(format, types, ty, &field_path)?;
+            for (idx, (name, field)) in named.fields.iter().enumerate() {
+                let Some(ty) = field.ty.as_ref() else {
+                    continue;
+                };
+                let field_path = format_path(path, name.clone());
+                if let Cow::Owned(ty) = map_datatype_format(Some(format), types, ty, &field_path)? {
+                    changed.get_or_insert_with(Vec::new).push((idx, ty));
                 }
             }
         }
     }
 
-    Ok(())
+    Ok(changed)
+}
+
+fn apply_field_changes(fields: &mut Fields, changes: Vec<(usize, DataType)>) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for (idx, ty) in changes {
+                if let Some(field) = unnamed.fields.get_mut(idx) {
+                    field.ty = Some(ty);
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (idx, ty) in changes {
+                if let Some((_, field)) = named.fields.get_mut(idx) {
+                    field.ty = Some(ty);
+                }
+            }
+        }
+    }
 }
 
 impl AsRef<Exporter> for Exporter {
