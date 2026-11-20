@@ -206,6 +206,14 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 ///  - Const generics will not be exported within user-defined types which define const generics
 ///  - Associated constants or types can't be used
+///  - A bounded generic parameter whose concrete type is shared with another parameter
+///    cannot be traced through a type alias that reorders the arguments. For example,
+///    with [`type Swap<X, Y> = Pair<Y, X>`], `struct Bounded<X: Clone, Y: Clone>`
+///    holding a `Swap<X, Y>` exports the argument order correctly only when `X` and
+///    `Y` are instantiated with distinct types. The declaration is built from a
+///    concrete instantiation, so two equal concrete types leave the two parameters
+///    indistinguishable. Use distinct newtypes, or state the shape with
+///    [`#[specta(type = ...)]`] on the field, when that happens.
 ///
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
