@@ -1,0 +1,15 @@
+[package]
+name = "example-readme"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive", "collect"] }
+specta-serde = { path = "../../specta-serde" }
+specta-typescript = { path = "../../specta-typescript" }
+specta-swift = { path = "../../specta-swift" }
+serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

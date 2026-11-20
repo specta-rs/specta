@@ -26,16 +26,22 @@ Specta is designed to be able to export from Rust to any other language.
 | Language                                               | Status        |
 | ------------------------------------------------------ | ------------- |
 | [specta-typescript](https://docs.rs/specta-typescript) | **stable**    |
-| [specta-go](https://docs.rs/specta-go)                 | alpha         |
-| [specta-swift](https://docs.rs/specta-swift)           | alpha         |
-| [specta-openapi](https://docs.rs/specta-openapi)       | wip           |
-| [specta-jsonschema](https://docs.rs/specta-jsonschema) | wip           |
-| [specta-java](https://docs.rs/specta-java)             | alpha         |
-| [specta-zod](https://docs.rs/specta-zod)               | wip           |
-| [specta-valibot](https://docs.rs/specta-valibot)       | wip           |
-| [specta-kotlin](https://docs.rs/specta-kotlin)         | alpha         |
-| specta-jsdoc                                           | _coming soon_ |
-| specta-rust                                            | _coming soon_ |
+| [specta-swift](https://docs.rs/specta-swift)           | **stable**    |
+| [specta-rust](https://docs.rs/specta-rust)             | experimental  |
+| [specta-openapi](https://docs.rs/specta-openapi)       | experimental  |
+| [specta-jsonschema](https://docs.rs/specta-jsonschema) | experimental  |
+| [specta-go](https://docs.rs/specta-go)                 | experimental  |
+| [specta-java](https://docs.rs/specta-java)             | experimental  |
+| [specta-kotlin](https://docs.rs/specta-kotlin)         | experimental  |
+| [specta-python](https://docs.rs/specta-python)         | experimental  |
+| [specta-csharp](https://docs.rs/specta-csharp)         | experimental  |
+| [specta-zod](https://docs.rs/specta-zod)               | experimental  |
+| [specta-valibot](https://docs.rs/specta-valibot)       | experimental  |
+| [specta-elm](https://docs.rs/specta-elm)               | experimental  |
+| [specta-rescript](https://docs.rs/specta-rescript)     | experimental  |
+
+Experimental exporters are pre-1.0 and support different subsets of Rust and
+Serde shapes. Check each crate's documentation for what it supports.
 
 ## Formats
 
@@ -72,6 +78,14 @@ datetimes natively instead. Specta has no target-format-aware lowering, so the
 JSON/serde-data-model shape above is what gets exported and the native encodings
 are **not** emitted; an exporter that needs a native encoding must special-case
 these types.
+
+A built-in mapping describes the type's own Serde implementation, so the
+dependency's Serde support must be enabled in the dependency graph for that
+shape to exist. Where the encoding is configurable, Specta models the common
+one: `time` types are exported as RFC 3339 strings, which requires
+`time/serde-well-known` (plain `time/serde` serializes them as tuples).
+Override a field with `#[specta(type = ...)]` when your program selects a
+different encoding.
 
 ## Feature flags
 
