@@ -3,7 +3,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt,
     ops::Deref,
-    panic::Location,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -318,7 +317,7 @@ impl Exporter {
                     references::with_module_path(module.module_path.as_ref(), || {
                         references::collect_references(|| {
                             let mut rendered = String::new();
-                            let exports = render_flat_types(
+                            let exported = render_flat_types(
                                 &mut rendered,
                                 exporter,
                                 format,
@@ -326,10 +325,10 @@ impl Exporter {
                                 module.types.iter().copied(),
                                 "",
                             )?;
-                            Ok::<_, Error>((rendered, exports))
+                            Ok::<_, Error>((rendered, exported))
                         })
                     });
-                let (rendered_types, exports) = rendered_types_result?;
+                let (rendered_types, exported) = rendered_types_result?;
 
                 let import_paths = referenced_types
                     .into_iter()
@@ -372,7 +371,7 @@ impl Exporter {
                     }
                 }
 
-                Ok(!exports.is_empty())
+                Ok(exported != 0)
             }
 
             let mut files = HashMap::new();
@@ -1362,6 +1361,7 @@ fn render_types(
 
 // Implementation of `Layout::ModulePrefixedName | Layout::FlatFile`,
 // but is used by `Layout::Namespace` and `Layout::Files`
+/// Renders `ndts` and returns how many of them were exported.
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
@@ -1369,24 +1369,28 @@ fn render_flat_types<'a>(
     types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
-) -> Result<HashMap<String, Location<'static>>, Error> {
-    let mut exports = HashMap::with_capacity(ndts.len());
+) -> Result<usize, Error> {
+    // Keys borrow the exported name, so the common layouts do not allocate a
+    // String per type just to detect duplicates.
+    let mut locations = HashMap::with_capacity(ndts.len());
+    let mut exported = Vec::with_capacity(ndts.len());
 
-    let ndts = ndts
-        .filter(|ndt| ndt.ty.is_some())
-        .map(|ndt| {
-            let export_name = exported_type_name(exporter, ndt);
-            if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
-                return Err(Error::duplicate_type_name(export_name, ndt.location, other));
-            }
+    for ndt in ndts.filter(|ndt| ndt.ty.is_some()) {
+        let export_name = exported_type_name(exporter, ndt);
+        if let Some(other) = locations.get(export_name.as_ref()) {
+            return Err(Error::duplicate_type_name(
+                Cow::Owned(export_name.as_ref().to_string()),
+                ndt.location,
+                *other,
+            ));
+        }
+        locations.insert(export_name, ndt.location);
+        exported.push(ndt);
+    }
 
-            Ok(ndt)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    primitives::export_internal(s, exporter, format, types, exported.into_iter(), indent)?;
 
-    primitives::export_internal(s, exporter, format, types, ndts.into_iter(), indent)?;
-
-    Ok(exports)
+    Ok(locations.len())
 }
 
 /// Collect all TypeScript/JavaScript files in a directory recursively
