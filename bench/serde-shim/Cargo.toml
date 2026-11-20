@@ -1,0 +1,13 @@
+[package]
+name = "serde-shim"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone workspace so the fixture never joins the repository workspace.
+[workspace]
+
+[lib]
+proc-macro = true
+
+[dependencies]

@@ -1,9 +1,10 @@
 //! Field types are used by both enums and structs.
 
+use std::{any::Any, borrow::Cow, fmt::Debug, hash::Hash};
+
 use crate::datatype::Struct;
 
 use super::{Attributes, DataType, Deprecated};
-use std::borrow::Cow;
 
 /// Field layout for a struct or enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -61,6 +62,66 @@ impl Field {
             attributes: Attributes::default(),
         }
     }
+
+    /// Marks the field as optional.
+    ///
+    /// This is the consuming form of setting `Field::optional`, so a field can be
+    /// built as one expression. Exporters render an optional field as a property
+    /// that may be absent; `#[specta(optional)]` and `#[serde(default)]` record it
+    /// for you on a derived type.
+    pub fn optional(mut self) -> Self {
+        self.optional = true;
+        self
+    }
+
+    /// Sets `Field::deprecated`, the consuming form of the assignment.
+    pub fn deprecated(mut self, deprecated: Option<Deprecated>) -> Self {
+        self.deprecated = deprecated;
+        self
+    }
+
+    /// Sets `Field::docs` from a `'static` string, which is what a
+    /// `///` doc comment produces.
+    pub fn docs(mut self, docs: &'static str) -> Self {
+        self.docs = Cow::Borrowed(docs);
+        self
+    }
+
+    /// Inserts one runtime attribute, like [`Attributes::insert`], and returns
+    /// the field.
+    ///
+    /// Keys beginning with `specta:` or `serde:` are reserved for the derive
+    /// and the exporters that read them; give application metadata its own
+    /// prefix.
+    pub fn attribute<T>(mut self, key: &'static str, value: T) -> Self
+    where
+        T: Any + Clone + Eq + Hash + Debug + Send + Sync + 'static,
+    {
+        self.attributes.insert(key, value);
+        self
+    }
+
+    /// Records that the field was declared as `Option<T>`.
+    ///
+    /// This is the `specta:nullable` runtime attribute, which consumers such as
+    /// `specta-serde` and `specta-swift` read to tell a missing value apart from
+    /// an absent field. The derive sets it on every field declared as an `Option`;
+    /// a hand-written implementation can set it when the exported datatype alone
+    /// doesn't say it (an overridden type, or a `#[specta(skip)]` field).
+    ///
+    /// The flag is advisory and syntactic: it describes what the source declared,
+    /// not what the datatype contains.
+    pub fn nullable(mut self) -> Self {
+        self.attributes.insert("specta:nullable", true);
+        self
+    }
+}
+
+impl From<DataType> for Field {
+    /// Constructs a field with the given type, exactly like [`Field::new`].
+    fn from(ty: DataType) -> Self {
+        Self::new(ty)
+    }
 }
 
 /// Fields for an unnamed tuple struct or tuple enum variant.
@@ -90,14 +151,14 @@ pub struct StructBuilder<F = ()> {
 
 impl StructBuilder<NamedFields> {
     /// Adds a named field and returns the updated builder.
-    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        self.fields.fields.push((name.into(), field));
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: impl Into<Field>) -> Self {
+        self.fields.fields.push((name.into(), field.into()));
         self
     }
 
     /// Adds a named field in-place.
-    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
-        self.fields.fields.push((name.into(), field));
+    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: impl Into<Field>) {
+        self.fields.fields.push((name.into(), field.into()));
     }
 
     /// Finalizes this builder into a [`DataType::Struct`] with named fields.
@@ -111,14 +172,14 @@ impl StructBuilder<NamedFields> {
 
 impl StructBuilder<UnnamedFields> {
     /// Adds an unnamed field and returns the updated builder.
-    pub fn field(mut self, field: Field) -> Self {
-        self.fields.fields.push(field);
+    pub fn field(mut self, field: impl Into<Field>) -> Self {
+        self.fields.fields.push(field.into());
         self
     }
 
     /// Adds an unnamed field in-place.
-    pub fn field_mut(&mut self, field: Field) {
-        self.fields.fields.push(field);
+    pub fn field_mut(&mut self, field: impl Into<Field>) {
+        self.fields.fields.push(field.into());
     }
 
     /// Finalizes this builder into a [`DataType::Struct`] with unnamed fields.

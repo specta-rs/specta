@@ -1,19 +1,19 @@
 use syn::{Result, Type};
 
-use super::{AttrExtract, Attribute};
+use crate::derive::attr::parse::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 
 #[derive(Default)]
-pub(crate) struct VariantAttr {
-    pub(crate) r#type: Option<Type>,
-    pub(crate) skip: bool,
-    pub(crate) inline: bool,
-    pub(crate) common: RustCAttr,
+pub struct VariantAttr {
+    pub r#type: Option<Type>,
+    pub skip: bool,
+    pub inline: bool,
+    pub common: RustCAttr,
 }
 
 impl VariantAttr {
-    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self {
             common: RustCAttr::from_attrs(attrs)?,
             ..Default::default()
