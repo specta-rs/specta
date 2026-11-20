@@ -20,6 +20,11 @@ all-features = true
 [features]
 default = ["std"]
 
+# TODO(v3): Remove this. A no-op kept only so Tauri v2 manifests that enable
+# `function` keep resolving; it is intentionally left out of the documented
+# feature list in `src/docs.md`.
+function = []
+
 #! Core Features
 ## Enable support for the Rust standard library. Enabled by default.
 std = []
@@ -29,10 +34,6 @@ derive = ["dep:specta-macros"]
 
 ## Support for collecting up a global type map
 collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
-
-#! Deprecated
-## Deprecated no-op retained for Tauri v2 compatibility. Function type collection has been removed.
-function = []
 
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json) 1.x
