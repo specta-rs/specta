@@ -22,27 +22,17 @@ mod generics;
 mod serde;
 mod r#struct;
 
-#[cfg(test)]
-mod alloc_test;
-
 /// The generic context a container's runtime attributes are lowered in.
 ///
 /// A `serde(from)`/`try_from`/`into` conversion type may mention the container's
 /// type parameters, so it is resolved exactly like a field type: through the
 /// declaration/concrete substitution of the build it lands in.
-pub(super) type GenericsContext<'a> = (
+pub(crate) type GenericsContext<'a> = (
     &'a Names,
     &'a [&'a syn::Ident],
     &'a [&'a syn::Ident],
     BuildKind,
 );
-
-#[derive(Copy, Clone)]
-pub(super) enum AttributeScope {
-    Container,
-    Variant,
-    Field,
-}
 
 /// The paths the generated code uses.
 ///
@@ -56,9 +46,9 @@ pub(super) enum AttributeScope {
 /// `where` clause), `build`'s predicates and the collected registration keep
 /// [`Names::crate_ref`], so a compiler message a user sees never names one of
 /// them.
-pub(super) struct Names {
+pub(crate) struct Names {
     /// The real path of the `specta` crate.
-    pub(super) crate_ref: syn::Path,
+    pub(crate) crate_ref: syn::Path,
     /// The aliased `Type` trait. All three aliases are single-segment paths, so
     /// they are idents: `parse_quote!` would lex and re-parse a token stream per
     /// name, which is an order of magnitude more work than `Ident::new`.
@@ -104,19 +94,14 @@ impl Names {
 /// never depended on `specta-serde` silently lost every `rename`/`rename_all`/`untagged`
 /// attribute. Interpretation stays in `specta-serde`. See
 /// https://github.com/specta-rs/specta/issues/590.
-pub(super) fn build_runtime_attributes(
+pub(crate) fn build_runtime_attributes(
     names: &Names,
-    scope: AttributeScope,
+    scope: Scope,
     target: AttributeTarget,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
     generics: Option<GenericsContext<'_>>,
 ) -> syn::Result<Option<TokenStream>> {
-    crate::phase!(match scope {
-        AttributeScope::Container => "container:serde",
-        AttributeScope::Variant => "variant:serde",
-        AttributeScope::Field => "field:serde",
-    });
     let raw_attrs = raw_attrs.iter().filter(|attr| {
         !attr
             .path()
@@ -152,7 +137,7 @@ fn generic_type_and_const_args(
 /// type its identity suffix, is only readable through [`proc_macro::Span`].
 pub(crate) fn expand(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let source_suffix = source_position_suffix(&input);
-    derive_tokens(input.into(), &source_suffix)
+    expand_tokens(input.into(), &source_suffix)
         .unwrap_or_else(|err| err.into_compile_error())
         .into()
 }
@@ -181,13 +166,10 @@ fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
 
 /// Lowers one `#[derive(Type)]` input to the tokens it expands to.
 ///
-/// Split from [`expand`]'s `proc_macro` bridge so the expansion can be
-/// exercised, and its allocations counted, from a test.
-pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenStream> {
-    let parsed = {
-        crate::phase!("parse (syn)");
-        parse2::<DeriveInput>(input)?
-    };
+/// Split from [`expand`] so the expansion works on `proc_macro2` tokens, which
+/// the `proc_macro` entry point only converts at its boundary.
+fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenStream> {
+    let parsed = parse2::<DeriveInput>(input)?;
     let DeriveInput {
         ident: raw_ident,
         generics,
@@ -200,14 +182,12 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     // This means at the end we can check for any that weren't consumed and throw an error.
     let raw_attrs = attrs; // Preserve raw attrs before parse_attrs shadows the variable
     let (attrs, container_attrs) = {
-        crate::phase!("container:attrs");
         let mut attrs = parse_attrs(attrs)?;
         let container_attrs =
             ContainerAttr::from_attrs(&mut attrs, matches!(data, Data::Struct(_)))?;
         (attrs, container_attrs)
     };
     let (crate_ref, names, ident, name) = {
-        crate::phase!("container:setup");
         let crate_ref = container_attrs
             .crate_name
             .clone()
@@ -229,7 +209,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         let name = unraw_raw_ident(raw_ident);
 
         {
-            crate::phase!("container:reject");
             reject_unknown_specta_attrs(&attrs, Scope::Container)?;
         }
 
@@ -247,19 +226,13 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     // The scan runs before the container attributes are lowered: a serde
     // conversion type resolves through the same generic context a field type
     // does, so the context has to exist first.
-    let items = {
-        crate::phase!("items:decode");
-        decode_items(&names, &container_attrs, data)?
-    };
+    let items = { decode_items(&names, &container_attrs, data)? };
 
-    let used_type_params = {
-        crate::phase!("generics:scan");
-        used_type_params(generics, data, container_attrs.r#type.as_ref(), &items)?
-    };
+    let used_type_params =
+        { used_type_params(generics, data, container_attrs.r#type.as_ref(), &items)? };
     let used_generic_types = &used_type_params.idents;
 
     let (bounded, has_const_param) = {
-        crate::phase!("generics:bounds");
         let bounded = bounded_params(
             generics,
             container_attrs.bound.as_deref(),
@@ -288,8 +261,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     // resolution it was built with into both.
     let container_applies =
         |build: BuildKind| -> syn::Result<(Option<TokenStream>, Option<TokenStream>)> {
-            crate::phase!("container:apply");
-
             let generics_ctx = (!used_generic_types.is_empty()).then_some((
                 &names,
                 used_generic_types.as_slice(),
@@ -304,7 +275,7 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
                     // keep matching both container shapes.
                     let struct_attrs = build_runtime_attributes(
                         &names,
-                        AttributeScope::Container,
+                        Scope::Container,
                         AttributeTarget::Statements(quote!(s.attributes)),
                         raw_attrs,
                         &container_attrs.skip_attrs,
@@ -312,7 +283,7 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
                     )?;
                     let enum_attrs = build_runtime_attributes(
                         &names,
-                        AttributeScope::Container,
+                        Scope::Container,
                         AttributeTarget::Statements(quote!(en.attributes)),
                         raw_attrs,
                         &container_attrs.skip_attrs,
@@ -330,7 +301,7 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
                 } else if matches!(data, Data::Struct(_)) {
                     build_runtime_attributes(
                         &names,
-                        AttributeScope::Container,
+                        Scope::Container,
                         AttributeTarget::Statements(quote!(s.attributes)),
                         raw_attrs,
                         &container_attrs.skip_attrs,
@@ -346,7 +317,7 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
                 } else {
                     enum_attrs_apply = build_runtime_attributes(
                         &names,
-                        AttributeScope::Container,
+                        Scope::Container,
                         AttributeTarget::Statements(quote!(e.attributes)),
                         raw_attrs,
                         &container_attrs.skip_attrs,
@@ -475,8 +446,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     // container: nothing `build` runs can consume a slot of the enclosing scope,
     // so the cursor it observes is the one it leaves behind.
     let wrap_body = |dt_expr: TokenStream, build: BuildKind| -> syn::Result<TokenStream> {
-        crate::phase!("scaffold:body");
-
         let (container_attrs_apply, _) = container_applies(build)?;
         let dt_expr = if let Some(apply) = &container_attrs_apply {
             quote! {{
@@ -526,15 +495,8 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         };
 
     let (bounds, type_args, where_bound, build_ty_where_bound, build_ty_bounds) = {
-        crate::phase!("generics:where");
-        let bounds = {
-            crate::phase!("generics:bounds-tokens");
-            generics_with_ident_and_bounds_only(generics)
-        };
-        let type_args = {
-            crate::phase!("generics:type-args");
-            generics_with_ident_only(generics)
-        };
+        let bounds = { generics_with_ident_and_bounds_only(generics) };
+        let type_args = { generics_with_ident_only(generics) };
         let where_bound = add_type_to_where_clause(
             &crate_ref,
             generics,
@@ -548,7 +510,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         // the container's `where` clause, the `#[specta(bound = "...")]` override
         // and the automatic `Type` predicates.
         let build_ty_where_bound = {
-            crate::phase!("generics:where-clause");
             build_where_clause(
                 &crate_ref,
                 generics,
@@ -557,7 +518,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
             )
         };
         let build_ty_bounds = {
-            crate::phase!("generics:build-bounds");
             // Quoted once per build fn and interpolated again as an argument;
             // a group makes every use after the first a reference-count bump.
             generics_with_ident_only_no_lifetimes(generics).map(invisible)
@@ -580,17 +540,12 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     // types, the per-parameter declaration table, the build fns and the
     // `definition` body.
     let (definition, cow_import, collect, build_placeholders, build_fns) = {
-        crate::phase!("scaffold");
-
         let placeholder_params = used_generic_types
             .iter()
             .filter(|ident| !bounded.contains(*ident))
             .copied()
             .collect::<Vec<_>>();
-        let build_placeholders = {
-            crate::phase!("scaffold:placeholders");
-            placeholder_definitions(&names, &placeholder_params)
-        };
+        let build_placeholders = { placeholder_definitions(&names, &placeholder_params) };
 
         // `build` keeps its parameter list even when the exported declaration
         // erases them: the field types still name them, so the call has to
@@ -607,8 +562,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         let mut instantiation_params: Vec<TokenStream> = Vec::new();
 
         for param in &generics.params {
-            crate::phase!("scaffold:params");
-
             let GenericParam::Type(t) = param else {
                 continue;
             };
@@ -780,7 +733,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         // scope (or names a const parameter) it carries the container's own generics
         // instead, and is instantiated per concrete argument.
         let (declaration_generics, declaration_args) = {
-            crate::phase!("scaffold:decl-generics");
             if !needs_declaration {
                 (None, None)
             } else if declaration_uses_params || has_const_param {
@@ -799,7 +751,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         };
 
         let build_fns = invisible({
-            crate::phase!("scaffold:build-fns");
             if needs_declaration {
                 let declaration_fn = declaration_dt_expr.map(|declaration_dt_expr| {
                 let declaration_where = if declaration_uses_params || has_const_param {
@@ -834,7 +785,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         // Both builds are `fn` items, so they coerce to the `fn` pointers
         // `Types::define_instantiation_params` takes without a closure being
         // monomorphised per instantiation.
-        crate::phase!("scaffold:build-index");
         let build_fn = invisible(quote!(build #build_ty_passthrough_args));
         let (build_ty_arg, build_reference_arg) = if needs_declaration {
             let concrete = invisible(quote!(__concrete #build_ty_passthrough_args));
@@ -890,7 +840,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
         // collapses to one `define_named` call; the branches below cover the two
         // remaining shapes.
         let definition = {
-            crate::phase!("scaffold:definition");
             if uses_define_named {
                 let docs = &container_attrs.common.doc;
                 let deprecated_arg = deprecated_arg();
@@ -1065,7 +1014,6 @@ pub(crate) fn derive_tokens(input: TokenStream, source_suffix: &str) -> syn::Res
     let imports = invisible(names.imports());
 
     let emitted = {
-        crate::phase!("scaffold:emit");
         quote! {
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {

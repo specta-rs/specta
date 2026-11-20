@@ -5,7 +5,7 @@ use crate::derive::attr::parse::{AttrExtract, Attribute};
 use super::RustCAttr;
 
 #[derive(Default)]
-pub struct FieldAttr {
+pub(crate) struct FieldAttr {
     pub r#type: Option<Type>,
     pub inline: bool,
     pub skip: bool,

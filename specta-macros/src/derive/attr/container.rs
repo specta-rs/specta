@@ -8,7 +8,7 @@ use crate::derive::attr::parse::{AttrExtract, Attribute};
 use super::RustCAttr;
 
 #[derive(Default)]
-pub struct ContainerAttr {
+pub(crate) struct ContainerAttr {
     pub r#type: Option<Type>,
     pub crate_name: Option<syn::Path>,
     pub inline: bool,

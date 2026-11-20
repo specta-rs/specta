@@ -8,37 +8,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-/// Attributes allocations to `label` for the rest of the enclosing block.
-///
-/// The allocation harness (`alloc.rs`) needs to know which part of an expansion
-/// spent an allocation, and the only accurate way to know is to let the code say
-/// so. The guard is an RAII scope: it counts until the end of the block it is
-/// opened in, nesting included. Outside `cargo test` it expands to nothing, so
-/// it has no cost in a real build and cannot change the emitted tokens.
-#[cfg(test)]
-macro_rules! phase {
-    ($label:expr) => {
-        let _phase_guard = $crate::alloc::guard($label);
-    };
-}
-#[cfg(test)]
-pub(crate) use phase;
-
-#[cfg(not(test))]
-macro_rules! phase {
-    ($label:expr) => {};
-}
-#[cfg(not(test))]
-pub(crate) use phase;
-
 mod derive;
-
-#[cfg(test)]
-mod alloc;
-
-#[cfg(test)]
-#[global_allocator]
-static ALLOCATOR: alloc::CountingAllocator = alloc::CountingAllocator;
 
 use quote::quote;
 use syn::{Error, LitStr, Type, parse_macro_input};

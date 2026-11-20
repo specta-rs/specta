@@ -4,8 +4,7 @@ use quote::quote;
 use syn::{DataStruct, Fields, spanned::Spanned};
 
 use super::{
-    AttributeScope, Names, attr::*, build_runtime_attributes, generics::BuildKind,
-    serde::AttributeTarget,
+    Names, attr::*, build_runtime_attributes, generics::BuildKind, serde::AttributeTarget,
 };
 
 /// One field's metadata, decoded once for the whole derive.
@@ -19,7 +18,7 @@ use super::{
 /// for the same reason: [`build_runtime_attributes`] resolves the types written
 /// in the attributes, which the placeholder rewrite never touches, so both builds
 /// emit the identical tokens.
-pub struct FieldInfo {
+pub(crate) struct FieldInfo {
     pub attrs: FieldAttr,
     pub runtime_attrs: Option<TokenStream>,
     /// The exported name; `None` for a tuple field.
@@ -27,7 +26,7 @@ pub struct FieldInfo {
 }
 
 /// One variant's metadata, decoded once for the whole derive. See [`FieldInfo`].
-pub struct VariantInfo {
+pub(crate) struct VariantInfo {
     pub attrs: VariantAttr,
     pub runtime_attrs: Option<TokenStream>,
     pub name: String,
@@ -38,14 +37,14 @@ pub struct VariantInfo {
 }
 
 /// Every item of a container, with its attributes already decoded.
-pub enum ContainerItems {
+pub(crate) enum ContainerItems {
     Struct(Vec<FieldInfo>),
     Enum(Vec<VariantInfo>),
     Union,
 }
 
 /// Decodes the attributes of every field and variant of `data` exactly once.
-pub fn decode_items(
+pub(crate) fn decode_items(
     names: &Names,
     container_attrs: &ContainerAttr,
     data: &syn::Data,
@@ -79,7 +78,7 @@ pub fn decode_items(
 
                 let runtime_attrs = build_runtime_attributes(
                     names,
-                    AttributeScope::Variant,
+                    Scope::Variant,
                     AttributeTarget::Statements(quote!(#binding.attributes)),
                     &variant.attrs,
                     &container_attrs.skip_attrs,
@@ -121,7 +120,7 @@ fn decode_fields(
             let name = field.ident.as_ref().map(unraw_raw_ident);
             let runtime_attrs = build_runtime_attributes(
                 names,
-                AttributeScope::Field,
+                Scope::Field,
                 AttributeTarget::Chain,
                 raw_attrs,
                 &container_attrs.skip_attrs,
@@ -144,7 +143,7 @@ fn decode_fields(
 /// Also reports whether that expression names one of the container's type
 /// parameters, so the caller knows whether the function holding it must be
 /// generic.
-pub fn parse_struct(
+pub(crate) fn parse_struct(
     names: &Names,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
@@ -153,8 +152,6 @@ pub fn parse_struct(
     bounded_params: &[&syn::Ident],
     build: BuildKind,
 ) -> syn::Result<(TokenStream, bool)> {
-    crate::phase!("struct:build");
-
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(

@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
-use super::AttributeScope;
+use super::Scope;
 use crate::derive::attr::parse::invisible;
 
 #[derive(Clone)]
@@ -127,20 +127,20 @@ pub(crate) enum AttributeTarget {
 /// One lowered runtime attribute: its key and the expression producing its value.
 type AttributeEntry = (&'static str, TokenStream);
 
-pub(super) fn lower_runtime_attributes<'a>(
+pub(crate) fn lower_runtime_attributes<'a>(
     type_trait: &syn::Ident,
-    scope: AttributeScope,
+    scope: Scope,
     target: AttributeTarget,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
     generics: Option<crate::derive::GenericsContext<'_>>,
 ) -> Result<Option<TokenStream>> {
     Ok(match scope {
-        AttributeScope::Container => parse_container_attrs(raw_attrs)?
+        Scope::Container => parse_container_attrs(raw_attrs)?
             .map(|attrs| write(&target, container_entries(type_trait, attrs, generics))),
-        AttributeScope::Variant => {
+        Scope::Variant => {
             parse_variant_attrs(raw_attrs)?.map(|attrs| write(&target, variant_entries(attrs)))
         }
-        AttributeScope::Field => {
+        Scope::Field => {
             parse_field_attrs(raw_attrs)?.map(|attrs| write(&target, field_entries(attrs)))
         }
     })

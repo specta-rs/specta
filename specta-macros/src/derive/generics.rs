@@ -15,7 +15,7 @@ use super::{
     r#struct::{ContainerItems, FieldInfo},
 };
 
-pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
             use GenericParam::*;
@@ -68,7 +68,7 @@ fn bound_uses_lifetime(bound: &syn::TypeParamBound) -> bool {
 }
 
 /// Whether a `where` predicate mentions any lifetime.
-pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
+pub(crate) fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
     mentions_lifetime(|finder| finder.visit_where_predicate(predicate))
 }
 
@@ -161,7 +161,7 @@ fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &Path) -> bool {
 /// would trip `clippy::multiple_bound_locations` in every crate that derives a
 /// bounded generic type, and the copied bound tokens carry the user's spans, so
 /// the warning would point at their struct.
-pub fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -234,7 +234,7 @@ fn type_bound(crate_ref: &Path) -> syn::TypeParamBound {
 /// Lifetime bounds are dropped: `build` cannot name the container's lifetime
 /// parameters, and field types use inferred `'_' lifetimes so they are never
 /// required.
-pub fn build_where_clause(
+pub(crate) fn build_where_clause(
     crate_ref: &Path,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
@@ -301,7 +301,7 @@ pub fn build_where_clause(
     (!predicates.is_empty()).then(|| where_clause(predicates))
 }
 
-pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
             use GenericParam::*;
@@ -318,7 +318,7 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
 ///
 /// The AST is only cloned when it names a lifetime at all: walking it is much
 /// cheaper than cloning every node only to find nothing to rewrite.
-pub fn type_with_inferred_lifetimes(ty: &Type) -> Cow<'_, Type> {
+pub(crate) fn type_with_inferred_lifetimes(ty: &Type) -> Cow<'_, Type> {
     if !mentions_lifetime(|finder| finder.visit_type(ty)) {
         return Cow::Borrowed(ty);
     }
@@ -336,7 +336,7 @@ impl VisitMut for InferredLifetimeVisitor {
     }
 }
 
-pub fn all_type_param_idents(generics: &Generics) -> Vec<&syn::Ident> {
+pub(crate) fn all_type_param_idents(generics: &Generics) -> Vec<&syn::Ident> {
     generics
         .params
         .iter()
@@ -350,7 +350,7 @@ pub fn all_type_param_idents(generics: &Generics) -> Vec<&syn::Ident> {
 /// The type parameters of the container that its fields mention, plus whether
 /// any field type is opaque (a `macro!`/`Verbatim` node whose expansion the
 /// derive cannot see).
-pub struct UsedTypeParams<'a> {
+pub(crate) struct UsedTypeParams<'a> {
     /// Borrowed from the container's `Generics`, which outlives every use.
     pub idents: Vec<&'a syn::Ident>,
     /// An opaque field mentions every parameter and can never be rewritten to a
@@ -359,7 +359,7 @@ pub struct UsedTypeParams<'a> {
 }
 
 // Code adopted from ts-rs. Thanks to it's original author!
-pub fn used_type_params<'a>(
+pub(crate) fn used_type_params<'a>(
     generics: &'a Generics,
     data: &Data,
     container_type: Option<&Type>,
@@ -421,7 +421,7 @@ pub fn used_type_params<'a>(
 ///
 /// `index` is the parameter's position in the container's unbounded parameter
 /// list, which both the placeholder declarations and the rewrite read.
-pub fn placeholder_ident(index: usize) -> syn::Ident {
+pub(crate) fn placeholder_ident(index: usize) -> syn::Ident {
     quote::format_ident!("__P{}", index)
 }
 
@@ -429,7 +429,10 @@ pub fn placeholder_ident(index: usize) -> syn::Ident {
 /// placeholder type, so the declaration is built with `Generic` placeholders
 /// instead of the concrete arguments. Also reports whether any path named one
 /// of `params`.
-pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[&syn::Ident]) -> (Type, bool) {
+pub(crate) fn rewrite_generics_with_placeholders(
+    ty: &Type,
+    params: &[&syn::Ident],
+) -> (Type, bool) {
     struct Rewrite<'a> {
         params: &'a [&'a syn::Ident],
         rewritten: bool,
@@ -468,7 +471,7 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[&syn::Ident]) -> 
 /// instead of paying for a scope per field. A generic container keeps the
 /// per-field scope for the fields that mention no parameter, because its other
 /// fields must still see the enclosing declaration's scope (issue #613).
-pub fn shares_field_isolation(used_generic_types: &[&syn::Ident]) -> bool {
+pub(crate) fn shares_field_isolation(used_generic_types: &[&syn::Ident]) -> bool {
     used_generic_types.is_empty()
 }
 
@@ -483,7 +486,7 @@ pub fn shares_field_isolation(used_generic_types: &[&syn::Ident]) -> bool {
 /// idents in it. They are separate so a caller can build the slice locally
 /// (`used_type_params` does) while the reported idents still borrow from the
 /// container's `Generics`.
-pub struct TypeScan<'c, 'i> {
+pub(crate) struct TypeScan<'c, 'i> {
     candidates: &'c [&'i syn::Ident],
     /// Which of `candidates` were mentioned, parallel to it.
     mentioned: Mentioned,
@@ -652,7 +655,7 @@ impl Visit<'_> for TypeScan<'_, '_> {
 /// helpers each half needs, so only the concrete build is monomorphised per
 /// instantiation.
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub enum BuildKind {
+pub(crate) enum BuildKind {
     /// The canonical declaration: parameters become placeholders.
     Declaration,
     /// A concrete instantiation: each parameter is resolved as written.
@@ -661,7 +664,7 @@ pub enum BuildKind {
 
 /// The expression [`resolve_ty_expr`] built, plus whether it names one of the
 /// container's type parameters.
-pub struct ResolvedExpression {
+pub(crate) struct ResolvedExpression {
     pub tokens: TokenStream,
     /// Whether `tokens` mentions a generic parameter. A declaration expression
     /// only does when it resolves through a generic-substitution scope, which
@@ -681,15 +684,13 @@ pub struct ResolvedExpression {
 /// scoped generic substitution on [`specta::Types`] instead. Parameters with no
 /// declared bounds cannot be required by any field type (the container would not
 /// compile otherwise), so the precise placeholder path is used for them.
-pub fn resolve_ty_expr(
+pub(crate) fn resolve_ty_expr(
     names: &Names,
     ty: &Type,
     used_generic_types: &[&syn::Ident],
     bounded_params: &[&syn::Ident],
     build: BuildKind,
 ) -> ResolvedExpression {
-    crate::phase!("field:resolve");
-
     // One walk answers every question this function asks of the type.
     let scan = TypeScan::of(ty, used_generic_types);
 
@@ -817,7 +818,7 @@ pub fn resolve_ty_expr(
 /// parameters of the same concrete type is still ambiguous — but it preserves
 /// the previous behaviour for opaque fields rather than baking the concrete
 /// argument in.
-pub fn generic_substitution_slots(
+pub(crate) fn generic_substitution_slots(
     names: &Names,
     ty: &Type,
     substituted: &[&syn::Ident],
@@ -928,7 +929,7 @@ fn visit_field_type(visitor: &mut TypeScan<'_, '_>, field: &syn::Field, info: &F
     }
 }
 
-pub fn add_type_to_where_clause(
+pub(crate) fn add_type_to_where_clause(
     crate_ref: &Path,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
