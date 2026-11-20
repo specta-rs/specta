@@ -108,10 +108,10 @@ struct FieldAttrs {
     has_with: bool,
 }
 
-pub(super) fn lower_runtime_attributes(
+pub(super) fn lower_runtime_attributes<'a>(
     crate_ref: &TokenStream,
     scope: Scope,
-    raw_attrs: &[Attribute],
+    raw_attrs: impl Iterator<Item = &'a Attribute>,
     generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
 ) -> Result<Option<TokenStream>> {
     match scope {
@@ -124,11 +124,13 @@ pub(super) fn lower_runtime_attributes(
     }
 }
 
-fn parse_container_attrs(attrs: &[Attribute]) -> Result<Option<ContainerAttrs>> {
+fn parse_container_attrs<'a>(
+    attrs: impl Iterator<Item = &'a Attribute>,
+) -> Result<Option<ContainerAttrs>> {
     let mut parsed = ContainerAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
@@ -140,11 +142,13 @@ fn parse_container_attrs(attrs: &[Attribute]) -> Result<Option<ContainerAttrs>> 
     Ok(found.then_some(parsed))
 }
 
-fn parse_variant_attrs(attrs: &[Attribute]) -> Result<Option<VariantAttrs>> {
+fn parse_variant_attrs<'a>(
+    attrs: impl Iterator<Item = &'a Attribute>,
+) -> Result<Option<VariantAttrs>> {
     let mut parsed = VariantAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };
@@ -156,11 +160,11 @@ fn parse_variant_attrs(attrs: &[Attribute]) -> Result<Option<VariantAttrs>> {
     Ok(found.then_some(parsed))
 }
 
-fn parse_field_attrs(attrs: &[Attribute]) -> Result<Option<FieldAttrs>> {
+fn parse_field_attrs<'a>(attrs: impl Iterator<Item = &'a Attribute>) -> Result<Option<FieldAttrs>> {
     let mut parsed = FieldAttrs::default();
     let mut found = false;
 
-    for attr in attrs.iter().filter(|attr| attr.path().is_ident("serde")) {
+    for attr in attrs.filter(|attr| attr.path().is_ident("serde")) {
         let Meta::List(list) = &attr.meta else {
             continue;
         };

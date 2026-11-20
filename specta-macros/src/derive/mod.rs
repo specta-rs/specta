@@ -42,17 +42,14 @@ pub(super) fn build_runtime_attributes(
     let serde_insert = serde::lower_runtime_attributes(
         crate_ref,
         scope,
-        &raw_attrs
-            .iter()
-            .filter(|attr| {
-                !attr
+        raw_attrs.iter().filter(|attr| {
+            skip_attrs.is_empty()
+                || !attr
                     .path()
                     .segments
                     .last()
-                    .is_some_and(|segment| skip_attrs.contains(&segment.ident.to_string()))
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
+                    .is_some_and(|segment| skip_attrs.iter().any(|skip| segment.ident == *skip))
+        }),
         generics,
     )?;
 
@@ -116,7 +113,7 @@ pub(crate) fn expand(input: proc_macro::TokenStream) -> syn::Result<proc_macro::
         .clone()
         .unwrap_or_else(|| raw_ident.to_token_stream());
 
-    let name = unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream();
+    let name = unraw_raw_ident(raw_ident).to_token_stream();
 
     reject_unknown_specta_attrs(&attrs, Scope::Container)?;
 
