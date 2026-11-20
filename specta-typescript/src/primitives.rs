@@ -202,7 +202,7 @@ fn sanitise_key<'a>(field_name: &'a str, force_string: bool) -> Cow<'a, str> {
     }
 }
 
-fn sanitise_type_name(ndt: &NamedDataType, ident: &str) -> Result<String, Error> {
+fn sanitise_type_name<'a>(ndt: &NamedDataType, ident: &'a str) -> Result<&'a str, Error> {
     // The Rust path is only needed to describe a failure, so it is rendered
     // from the name rather than built for every exported type.
     let path = || rust_type_path(ndt);
@@ -229,7 +229,7 @@ fn sanitise_type_name(ndt: &NamedDataType, ident: &str) -> Result<String, Error>
         return Err(Error::invalid_name(path().into_owned(), ident.to_string()));
     }
 
-    Ok(ident.to_string())
+    Ok(ident)
 }
 
 pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&Deprecated>) {
@@ -375,7 +375,8 @@ fn export_single_internal(
     }
 
     let raw_name = exported_type_name(exporter, ndt);
-    let name = sanitise_type_name(ndt, &raw_name).map_err(|err| err.with_named_datatype(ndt))?;
+    let name =
+        sanitise_type_name(ndt, raw_name.as_ref()).map_err(|err| err.with_named_datatype(ndt))?;
 
     let mut comments = String::new();
     js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref());
@@ -389,7 +390,7 @@ fn export_single_internal(
 
     s.push_str(indent);
     s.push_str("export type ");
-    s.push_str(&name);
+    s.push_str(name);
     write_generic_parameters(s, exporter, types, &[rust_type_path(ndt)], &ndt.generics)?;
     s.push_str(" = ");
 
