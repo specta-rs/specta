@@ -1,5 +1,0 @@
-enums/256/jsdoc                      median_us=    1411.560 min_us=    1406.666 max_us=    1437.620 bytes=31568 fnv1a=7d35de73f83c0e7c
-generic-api/512/prepared-flat        median_us=     551.007 min_us=     532.224 max_us=     569.154 bytes=42601 fnv1a=75822e7bf7376438
-maps/1024/prepared-flat              median_us=    3359.418 min_us=    3312.843 max_us=    3412.553 bytes=156978 fnv1a=cd854525a600bc91
-chain/1024/prepared-flat             median_us=    1210.503 min_us=    1186.938 max_us=    1228.349 bytes=44103 fnv1a=4f41987f3a92dc94
-cycle/128/prepared-flat              median_us=   16128.401 min_us=   15859.466 max_us=   17169.694 bytes=4042 fnv1a=75654f59c29b29f0
