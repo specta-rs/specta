@@ -224,6 +224,7 @@ impl Swift {
         let raw_types = &formatted_types;
         let format = specta::Identity;
         validate_type_names(&exporter, raw_types)?;
+        validate_member_names(&exporter, raw_types)?;
 
         let mut result = String::new();
 
@@ -306,12 +307,100 @@ fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
             format!("{}::{}", ndt.module_path, ndt.name)
         };
 
+        if !is_valid_swift_identifier(&name) {
+            return Err(Error::InvalidIdentifier(format!(
+                "type {identity:?} renders as Swift type name {name:?}"
+            )));
+        }
+
         if let Some(first) = names.insert(name.clone(), identity.clone()) {
             return Err(Error::DuplicateTypeName {
                 name,
                 first,
                 second: identity,
             });
+        }
+
+        // A named-field variant is declared as a wrapper struct in the same
+        // file namespace, so its generated name has to be reserved too.
+        for (wrapper, variant) in crate::primitives::variant_wrapper_names(exporter, ndt) {
+            let wrapper_identity = format!("{identity}::{variant} (generated variant wrapper)");
+            if let Some(first) = names.insert(wrapper.clone(), wrapper_identity.clone()) {
+                return Err(Error::DuplicateTypeName {
+                    name: wrapper,
+                    first,
+                    second: wrapper_identity,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Whether `name` is a plain Swift identifier.
+///
+/// A keyword wrapped in backticks is still a valid identifier; the backticks
+/// are part of the generated source but not the name.
+fn is_valid_swift_identifier(name: &str) -> bool {
+    let name = name
+        .strip_prefix('`')
+        .and_then(|name| name.strip_suffix('`'))
+        .unwrap_or(name);
+    let mut chars = name.chars();
+    chars
+        .next()
+        .is_some_and(|first| first == '_' || first.is_alphabetic())
+        && chars.all(|character| character == '_' || character.is_alphanumeric())
+}
+
+/// Reject two members of one type that render as the same Swift identifier.
+///
+/// A naming convention can collapse distinct wire names (`foo_bar` and
+/// `fooBar` both become `fooBar` under camelCase). Swift rejects the
+/// duplicate property or enum case, so report the collision rather than emit
+/// source that cannot compile.
+fn validate_member_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
+    for ndt in types.iter_sorted() {
+        let Some(ty) = &ndt.ty else {
+            continue;
+        };
+
+        let members = match ty {
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Named(fields) => fields
+                    .fields
+                    .iter()
+                    .filter(|(_, field)| field.ty.is_some())
+                    .map(|(name, _)| (exporter.naming.convert_field(name), name.as_ref()))
+                    .collect::<Vec<_>>(),
+                Fields::Unit | Fields::Unnamed(_) => continue,
+            },
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .filter(|(_, variant)| !variant.skip)
+                .map(|(name, _)| (exporter.naming.convert_enum_case(name), name.as_ref()))
+                .collect::<Vec<_>>(),
+            _ => continue,
+        };
+
+        let mut seen = HashMap::<String, String>::new();
+        for (swift_name, wire_name) in members {
+            if !is_valid_swift_identifier(&swift_name) {
+                return Err(Error::InvalidIdentifier(format!(
+                    "member {wire_name:?} of {:?} renders as Swift identifier {swift_name:?}",
+                    ndt.name
+                )));
+            }
+            if let Some(first) = seen.insert(swift_name.clone(), wire_name.to_string()) {
+                return Err(Error::DuplicateMemberName {
+                    type_name: ndt.name.to_string(),
+                    name: swift_name,
+                    first,
+                    second: wire_name.to_string(),
+                });
+            }
         }
     }
 

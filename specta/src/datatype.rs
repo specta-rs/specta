@@ -19,7 +19,7 @@ pub use generic::{Generic, GenericDefinition};
 pub use list::List;
 // pub use literal::Literal;
 pub use map::Map;
-pub use named::{Deprecated, NamedDataType, inline};
+pub use named::{Deprecated, NamedDataType, NamedKey, inline};
 pub use primitive::Primitive;
 pub use reference::{
     NamedReference, NamedReferenceType, NamedTypeId, OpaqueReference, RecursiveInlineType,

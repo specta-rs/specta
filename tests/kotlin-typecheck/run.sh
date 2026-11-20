@@ -51,10 +51,14 @@ artifact() {
     if [ ! -f "$path" ]; then
         echo "downloading $name $KOTLINX_SERIALIZATION_VERSION" >&2
         local artifact_path="org/jetbrains/kotlinx/kotlinx-serialization-$name-jvm/$KOTLINX_SERIALIZATION_VERSION/kotlinx-serialization-$name-jvm-$KOTLINX_SERIALIZATION_VERSION.jar"
-        curl --fail --silent --show-error --location --retry 3 \
-            --output "$path.tmp" "https://repo.maven.apache.org/maven2/$artifact_path" ||
-            curl --fail --silent --show-error --location --retry 3 \
-                --output "$path.tmp" "https://repo1.maven.org/maven2/$artifact_path" || return
+        # Maven Central rate-limits bursty CI traffic (HTTP 429). Retry with
+        # backoff and swap mirror order before giving up.
+        curl --fail --silent --show-error --location \
+            --retry 6 --retry-delay 5 --retry-max-time 180 --retry-all-errors \
+            --output "$path.tmp" "https://repo1.maven.org/maven2/$artifact_path" ||
+            curl --fail --silent --show-error --location \
+                --retry 6 --retry-delay 5 --retry-max-time 180 --retry-all-errors \
+                --output "$path.tmp" "https://repo.maven.apache.org/maven2/$artifact_path" || return
         mv "$path.tmp" "$path" || return
     fi
     printf '%s\n' "$path"

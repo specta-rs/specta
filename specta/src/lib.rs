@@ -13,6 +13,7 @@
 pub mod collect;
 pub mod datatype;
 mod format;
+mod hash;
 mod r#type;
 mod types;
 
@@ -27,7 +28,7 @@ pub use r#type::Type;
 pub use types::Types;
 
 #[doc(hidden)]
-pub use types::GenericSubstitutionSlot;
+pub use types::{GenericSubstitutionSlot, InstantiationParam};
 
 #[doc(inline)]
 #[cfg(feature = "collect")]
