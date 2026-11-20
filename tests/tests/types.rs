@@ -2960,9 +2960,13 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
 }
 
 /// named_len counts declarations only; is_empty answers whether the graph has
-/// anything to export at all, which includes registered roots.
+/// no declarations and no roots.
 #[test]
 fn emptiness_accounts_for_roots_but_named_len_does_not() {
+    let types = Types::default();
+    assert_eq!(types.named_len(), 0);
+    assert!(types.is_empty());
+
     let types = Types::default().register::<bool>();
     assert_eq!(
         types.named_len(),
@@ -2970,20 +2974,21 @@ fn emptiness_accounts_for_roots_but_named_len_does_not() {
         "an anonymous root adds no named datatype"
     );
     assert_eq!(types.roots().len(), 1);
-    assert!(
-        !types.is_empty(),
-        "a registered root is still something to export"
-    );
+    assert!(!types.is_empty(), "a registered root is not empty");
 
-    let types = Types::default();
-    assert_eq!(types.named_len(), 0);
-    assert!(types.is_empty());
+    // A named declaration without a root is not empty either.
+    let mut types = Types::default();
+    let _ = <SimpleStruct as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
 
-    #[derive(Type)]
-    #[specta(collect = false)]
-    struct OnlyOne;
-
-    let types = Types::default().register::<OnlyOne>();
-    assert_eq!(types.named_len(), 1);
+    // A container-inline declaration (Vec resolves to an entry with no body)
+    // counts as an entry and keeps the graph non-empty, even though it has no
+    // standalone declaration.
+    let mut types = Types::default();
+    let _ = <Vec<u8> as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
     assert!(!types.is_empty());
 }

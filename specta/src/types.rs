@@ -1209,12 +1209,16 @@ impl Types {
         self.len
     }
 
-    /// Returns `true` when there is nothing to export: no named datatypes and
-    /// no registered roots.
+    /// Returns `true` when the collection holds no named datatypes and no
+    /// registered roots.
     ///
-    /// Registering an anonymous root such as a primitive adds no named
-    /// datatype, so [`Types::named_len`] stays zero, but the collection still
-    /// has something to export. This is not `named_len() == 0` for that reason.
+    /// This is not `named_len() == 0`: registering an anonymous root such as a
+    /// primitive adds no named datatype, but the root is still part of the graph
+    /// an exporter may render.
+    ///
+    /// Every named entry counts, including a container-inline declaration such
+    /// as `Vec`'s, whose body is `None` and which therefore has no standalone
+    /// declaration to render.
     pub fn is_empty(&self) -> bool {
         self.named_len() == 0 && self.roots.is_empty()
     }
