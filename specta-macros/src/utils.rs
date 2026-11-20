@@ -31,6 +31,9 @@ pub enum AttributeValue {
     /// Expression value for values that are not valid paths.
     /// This allows us to later parse richer forms such as tuple/array/reference types.
     Expr(Expr),
+    /// A Rust type parsed where the value grammar is ambiguous, such as a
+    /// reference with an explicit lifetime.
+    Type(Type),
     /// A nested attribute. Eg. the `deprecated(note = "some note") in `#[specta(deprecated(note = "some note"))]`
     Attribute { span: Span, attr: Vec<Attribute> },
 }
@@ -41,6 +44,7 @@ impl AttributeValue {
             Self::Lit(lit) => lit.span(),
             Self::Path(path) => path.span(),
             Self::Expr(expr) => expr.span(),
+            Self::Type(ty) => ty.span(),
             Self::Attribute { span, .. } => *span,
         }
     }
@@ -171,6 +175,7 @@ impl Attribute {
 
     pub fn parse_type(&self) -> Result<Type> {
         match &self.value {
+            Some(AttributeValue::Type(ty)) => Ok(ty.clone()),
             Some(AttributeValue::Path(path)) => Ok(Type::Path(TypePath {
                 qself: None,
                 path: path.clone(),
@@ -307,6 +312,7 @@ impl NestedAttributeList {
                 } else {
                     let key = input.call(Ident::parse_any)?;
                     let key_span = key.span();
+                    let value_is_type = key == "type";
 
                     attrs.push(Attribute {
                         source: source.clone(),
@@ -326,7 +332,11 @@ impl NestedAttributeList {
                             }
                             _ if input.peek(Token![=]) => {
                                 input.parse::<Token![=]>()?;
-                                Some(input.parse()?)
+                                if value_is_type {
+                                    Some(AttributeValue::Type(input.parse()?))
+                                } else {
+                                    Some(input.parse()?)
+                                }
                             }
                             _ => None,
                         },

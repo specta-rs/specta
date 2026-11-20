@@ -51,7 +51,7 @@ macro_rules! branded {
         impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
             fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
                 let ty = types.define::<$ty>();
-                let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
+                let brand: &'static str = $crate::branded!(@brand $ident $( $ts_name )?);
 
                 specta::datatype::DataType::Reference(
                     specta::datatype::Reference::opaque(
@@ -73,7 +73,7 @@ macro_rules! branded {
         impl specta::Type for $ident {
             fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
                 let ty = types.define::<$ty>();
-                let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
+                let brand: &'static str = $crate::branded!(@brand $ident $( $ts_name )?);
 
                 specta::datatype::DataType::Reference(
                     specta::datatype::Reference::opaque(

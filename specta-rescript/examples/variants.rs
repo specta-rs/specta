@@ -1,3 +1,7 @@
+//! Shows how Rust enums map to ReScript variants.
+
+#![allow(dead_code)] // The types are only exercised through their `Type` impls.
+
 use specta::{Type, Types};
 
 /// Example showcasing ReScript's enum/variant representation.
@@ -108,6 +112,7 @@ enum DrawCommand {
     Close,
 }
 
+/// Register the example types with a fresh registry.
 pub fn types() -> Types {
     Types::default()
         .register::<Status>()

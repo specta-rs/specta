@@ -25,6 +25,7 @@ pub enum ApplyMode {
 }
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
+    let mut checked_references = ValidationVisits::batch();
     for ndt in types.into_unsorted_iter() {
         let Some(ty) = &ndt.ty else {
             continue;
@@ -33,13 +34,14 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
         inner(
             ty,
             types,
-            &mut HashSet::new(),
+            &mut checked_references,
             ndt.name.to_string(),
             mode,
             true,
             None,
             FlattenDirections::LIVE,
         )?;
+        checked_references.finish_root();
     }
 
     // Generic definitions are necessarily conditional: an internally tagged
@@ -50,13 +52,14 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
         inner(
             root,
             types,
-            &mut HashSet::new(),
+            &mut checked_references,
             "<root>".to_string(),
             mode,
             true,
             None,
             FlattenDirections::LIVE,
         )?;
+        checked_references.finish_root();
     }
 
     Ok(())
@@ -70,7 +73,7 @@ pub(crate) fn validate_datatype_for_mode(
     inner(
         dt,
         types,
-        &mut HashSet::new(),
+        &mut ValidationVisits::default(),
         "<top-level>".to_string(),
         mode,
         true,
@@ -88,7 +91,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     inner(
         dt,
         types,
-        &mut HashSet::new(),
+        &mut ValidationVisits::default(),
         "<top-level>".to_string(),
         mode,
         false,
@@ -97,10 +100,76 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     )
 }
 
+/// A root's cycle guard is not a proof until the whole root succeeds. Keep it
+/// separate from reusable proofs, including when a cycle points back into an
+/// ancestor whose remaining fields have not been checked yet.
+#[derive(Default)]
+struct ValidationVisits {
+    active_root: HashSet<(Reference, FlattenDirections)>,
+    candidates: Vec<(Reference, FlattenDirections)>,
+    completed: Option<HashSet<(Reference, FlattenDirections)>>,
+    generic_context: bool,
+}
+
+impl ValidationVisits {
+    fn batch() -> Self {
+        Self {
+            completed: Some(HashSet::new()),
+            ..Self::default()
+        }
+    }
+
+    fn enter(
+        &mut self,
+        reference: &NamedReference,
+        env: Option<&GenericEnv<'_>>,
+        directions: FlattenDirections,
+    ) -> bool {
+        // Only closed, ordinary references have context-independent bodies and
+        // reset their diagnostic path to the declaration name. Inline bodies,
+        // recursive placeholders, and all generic contexts retain the original
+        // per-root algorithm, including its bounded substitution fallback.
+        let closed = matches!(&reference.inner, NamedReferenceType::Reference { generics, .. } if generics.is_empty())
+            && env.is_none_or(|env| !env.has_bindings);
+        self.generic_context |= !closed;
+        let reusable = self.completed.is_some() && closed;
+        let key = (resolved_reference_key(reference, env), directions);
+        if reusable
+            && self
+                .completed
+                .as_ref()
+                .is_some_and(|set| set.contains(&key))
+        {
+            return false;
+        }
+        if !reusable {
+            return self.active_root.insert(key);
+        }
+        if !self.active_root.insert(key.clone()) {
+            return false;
+        }
+        self.candidates.push(key);
+        true
+    }
+
+    fn finish_root(&mut self) {
+        // A bounded generic-key fallback elsewhere in this root could have
+        // influenced its cycle guard. Do not promote any of that root's visits.
+        if !self.generic_context
+            && let Some(completed) = &mut self.completed
+        {
+            completed.extend(self.candidates.drain(..));
+        }
+        self.candidates.clear();
+        self.active_root.clear();
+        self.generic_context = false;
+    }
+}
+
 fn inner(
     dt: &DataType,
     types: &Types,
-    checked_references: &mut HashSet<(Reference, FlattenDirections)>,
+    checked_references: &mut ValidationVisits,
     path: String,
     mode: ApplyMode,
     follow_named_references: bool,
@@ -503,39 +572,38 @@ fn inner(
                 // a phase-dead field can't mask a later live visit; liveness
                 // only shrinks along a path and has four values, so the key
                 // space stays finite.
-                let reference_key = (resolved_reference_key(reference, env), root_directions);
-                if follow_named_references && !checked_references.contains(&reference_key) {
-                    checked_references.insert(reference_key);
-                    if let Some(ty) = named_reference_ty(reference, types) {
-                        let name = types
-                            .get(reference)
-                            .map(|ndt| ndt.name.to_string())
-                            .unwrap_or_else(|| path.clone());
-                        // A resolved definition's `Generic` placeholders are
-                        // bound by *this* reference's concrete arguments,
-                        // which were written in the current scope - hence a
-                        // new frame with `parent: env`. Inline datatypes were
-                        // written at the use site, so they keep the current
-                        // scope.
-                        let reference_frame = match &reference.inner {
-                            NamedReferenceType::Reference { generics, .. } => Some(GenericEnv {
-                                map: generics,
-                                parent: env,
-                            }),
-                            NamedReferenceType::Inline { .. }
-                            | NamedReferenceType::Recursive(_) => None,
-                        };
-                        inner(
-                            ty,
-                            types,
-                            checked_references,
-                            name,
-                            mode,
-                            follow_named_references,
-                            reference_frame.as_ref().or(env),
-                            root_directions,
-                        )?;
-                    }
+                if follow_named_references
+                    && checked_references.enter(reference, env, root_directions)
+                    && let Some(ty) = named_reference_ty(reference, types)
+                {
+                    let name = types
+                        .get(reference)
+                        .map(|ndt| ndt.name.to_string())
+                        .unwrap_or_else(|| path.clone());
+                    // A resolved definition's `Generic` placeholders are
+                    // bound by *this* reference's concrete arguments,
+                    // which were written in the current scope - hence a
+                    // new frame with `parent: env`. Inline datatypes were
+                    // written at the use site, so they keep the current
+                    // scope.
+                    let reference_frame = match &reference.inner {
+                        NamedReferenceType::Reference { generics, .. } => {
+                            Some(GenericEnv::new(generics, env))
+                        }
+                        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive(_) => {
+                            None
+                        }
+                    };
+                    inner(
+                        ty,
+                        types,
+                        checked_references,
+                        name,
+                        mode,
+                        follow_named_references,
+                        reference_frame.as_ref().or(env),
+                        root_directions,
+                    )?;
                 }
             }
             Reference::Opaque(reference) => {
@@ -640,7 +708,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    checked_references: &mut HashSet<(Reference, FlattenDirections)>,
+    checked_references: &mut ValidationVisits,
     path: &str,
     mode: ApplyMode,
     env: Option<&GenericEnv<'_>>,
@@ -815,6 +883,19 @@ fn validate_named_field_keys(
     mode: ApplyMode,
 ) -> Result<(), Error> {
     if mode != ApplyMode::Unified || !declared_deserialize_live {
+        return Ok(());
+    }
+
+    // With no key transformations or aliases, both directions use the field's
+    // original name. Avoid allocating two copies and an occupied-key table for
+    // the common case. Fields with any metadata keep the full validation path.
+    if rule_serialize.is_none()
+        && rule_deserialize.is_none()
+        && named
+            .fields
+            .iter()
+            .all(|(_, field)| field.attributes.is_empty())
+    {
         return Ok(());
     }
 
@@ -1246,6 +1327,19 @@ impl FlattenDirections {
 struct GenericEnv<'a> {
     map: &'a [(Generic, DataType)],
     parent: Option<&'a GenericEnv<'a>>,
+    // Cache the whole scope chain's emptiness; scanning its parents at every
+    // reference would make even a monomorphic chain quadratic again.
+    has_bindings: bool,
+}
+
+impl<'a> GenericEnv<'a> {
+    fn new(map: &'a [(Generic, DataType)], parent: Option<&'a Self>) -> Self {
+        Self {
+            map,
+            parent,
+            has_bindings: !map.is_empty() || parent.is_some_and(|env| env.has_bindings),
+        }
+    }
 }
 
 /// Upper bound on the number of datatype nodes materialized while resolving a
@@ -1568,10 +1662,7 @@ fn validate_flatten_target(
                             types,
                             path,
                             seen,
-                            Some(&GenericEnv {
-                                map: generics,
-                                parent: env,
-                            }),
+                            Some(&GenericEnv::new(generics, env)),
                             directions,
                         )
                     }),
@@ -2230,10 +2321,7 @@ fn validate_internally_tag_enum_datatype(
                                 &path,
                                 variant_name,
                                 seen,
-                                Some(&GenericEnv {
-                                    map: generics,
-                                    parent: env,
-                                }),
+                                Some(&GenericEnv::new(generics, env)),
                                 reject_contextual_generic_argument,
                                 directions,
                             )

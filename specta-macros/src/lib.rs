@@ -72,7 +72,9 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 /// - `#[specta(remote = path::ToType)]` implements `Type` for a remote type instead of the
 ///   local derive input name.
 /// - `#[specta(collect)]` or `#[specta(collect = true)]` enables collection for this type when
-///   the `collect` feature is used. Use `#[specta(collect = false)]` to prevent collection.
+///   the `collect` feature is used. Generic declarations are not collected automatically
+///   because they need a concrete instantiation; register those explicitly. Use
+///   `#[specta(collect = false)]` to prevent collection.
 /// - `#[specta(skip_attr = "attr_name")]` ignores attributes named `attr_name` while parsing and
 ///   while collecting runtime attributes. This may be repeated.
 /// - `#[specta(transparent)]` or `#[specta(transparent = true)]` treats a struct as its single
@@ -238,9 +240,35 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    r#type::derive_tokens(input.into())
+    let source_suffix = source_position_suffix(&input);
+    r#type::derive_tokens(input.into(), &source_suffix)
         .unwrap_or_else(|err| err.into_compile_error())
         .into()
+}
+
+/// Builds an identifier suffix unique to this declaration's source position.
+///
+/// `module_path!()` does not distinguish declarations in separate function or
+/// block scopes, so its result is not a unique type identity on its own. This
+/// hashes the declaration's file, line and column instead; the derive appends it
+/// to the sentinel and diagnostics strip it back off.
+///
+/// Only the `proc_macro` boundary can read a span's position, so this runs here
+/// and the suffix is passed down to [`r#type::derive_tokens`].
+fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let span = input
+        .clone()
+        .into_iter()
+        .next()
+        .map_or_else(proc_macro::Span::call_site, |token| token.span());
+    let mut hasher = DefaultHasher::new();
+    span.file().hash(&mut hasher);
+    span.line().hash(&mut hasher);
+    span.column().hash(&mut hasher);
+
+    format!("{:x}", hasher.finish())
 }
 
 /// Parses a string literal into a Rust type token stream.

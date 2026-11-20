@@ -45,6 +45,11 @@ enum ErrorKind {
         path: PathBuf,
         source: io::Error,
     },
+    /// The files layout requires a directory, but the output path is an
+    /// ordinary file. That file is left untouched rather than deleted.
+    ExpectedDirectory {
+        path: PathBuf,
+    },
     RemoveFile {
         path: PathBuf,
         source: io::Error,
@@ -152,6 +157,12 @@ impl Error {
     pub(crate) fn metadata(path: PathBuf, source: io::Error) -> Self {
         Self {
             kind: ErrorKind::Metadata { path, source },
+        }
+    }
+
+    pub(crate) fn expected_directory(path: PathBuf) -> Self {
+        Self {
+            kind: ErrorKind::ExpectedDirectory { path },
         }
     }
 
@@ -267,6 +278,11 @@ impl fmt::Display for Error {
                     path.display()
                 )
             }
+            ErrorKind::ExpectedDirectory { path } => write!(
+                f,
+                "The files layout requires '{}' to be a directory, but it is an existing file. Refusing to delete it.",
+                path.display()
+            ),
             ErrorKind::RemoveFile { path, source } => {
                 write!(f, "Failed to remove file '{}': {source}", path.display())
             }

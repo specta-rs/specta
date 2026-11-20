@@ -391,6 +391,7 @@ macro_rules! _impl_ndt {
     (@params $typed_generics:tt, $inline:tt [$($generic:ident),*]) => {
         &[$($crate::InstantiationParam::Resolved {
             name: stringify!($generic),
+            identity: ::std::any::type_name::<$generic>(),
             definition: <$generic as $crate::Type>::definition,
         }),*]
     };

@@ -139,8 +139,8 @@ impl VariantBuilder<UnnamedFields> {
         self
     }
 
-    /// Adds an unnamed field to the variant and returns the updated builder.
-    pub fn field_mut(mut self, field: impl Into<Field>) -> Self {
+    /// Adds an unnamed field in-place.
+    pub fn field_mut(&mut self, field: impl Into<Field>) -> &mut Self {
         self.variant.fields.push(field.into());
         self
     }
@@ -159,12 +159,12 @@ impl VariantBuilder<NamedFields> {
         self
     }
 
-    /// Adds a named field to the variant and returns the updated builder.
+    /// Adds a named field in-place.
     pub fn field_mut(
-        mut self,
+        &mut self,
         name: impl Into<Cow<'static, str>>,
         field: impl Into<Field>,
-    ) -> Self {
+    ) -> &mut Self {
         self.variant.fields.push((name.into(), field.into()));
         self
     }

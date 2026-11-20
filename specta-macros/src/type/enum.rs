@@ -51,7 +51,27 @@ pub fn parse_enum(
         let attrs = &info.attrs;
         let binding = &info.binding;
 
-        let variant_value = if let Some(ref variant_ty) = attrs.r#type {
+        // A skipped variant is not exported, so resolving its override would add
+        // an unnecessary `Type` bound to the container. It still keeps the Rust
+        // field layout with untyped fields, because Serde may serialize that
+        // payload even when Specta hides it, and specta-serde reads the layout to
+        // recognise the wire shape.
+        let variant_value = if attrs.skip {
+            let dt = &names.dt;
+            let calls = info
+                .fields
+                .iter()
+                .map(|field| (field.name.as_deref(), quote!(#dt::Field::default())))
+                .collect::<Vec<_>>();
+            // A unit variant is already a value; the other shapes need the
+            // builder to be finalised.
+            let variant = match &variant.fields {
+                Fields::Unit => quote!(#dt::Variant::unit()),
+                Fields::Unnamed(_) => variant_builder(quote!(#dt::Variant::unnamed()), calls),
+                Fields::Named(_) => variant_builder(quote!(#dt::Variant::named()), calls),
+            };
+            invisible(variant)
+        } else if let Some(ref variant_ty) = attrs.r#type {
             let variant_ty = type_with_inferred_lifetimes(variant_ty);
             let resolved = resolve_ty_expr(
                 names,

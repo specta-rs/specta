@@ -79,3 +79,78 @@ fn references() {
         assert!(!b.ty_eq(&a));
     }
 }
+
+fn tauri_channel_reference(types: &mut Types, opaque: bool) -> Reference {
+    use specta::datatype::NamedDataType;
+
+    fn build(types: &mut Types, ndt: &mut NamedDataType, opaque: bool) {
+        ndt.name = "TAURI_CHANNEL".into();
+        ndt.module_path = "tauri::ipc::channel".into();
+        ndt.ty = Some(if opaque {
+            Reference::opaque("channel metadata").into()
+        } else {
+            String::definition(types)
+        });
+    }
+
+    NamedDataType::init_with_sentinel(
+        if opaque {
+            "opaque_channel"
+        } else {
+            "legacy_channel"
+        },
+        &[],
+        &[],
+        false,
+        false,
+        0,
+        types,
+        if opaque {
+            |types, ndt| build(types, ndt, true)
+        } else {
+            |types, ndt| build(types, ndt, false)
+        },
+        |_| Reference::opaque("channel metadata").into(),
+    )
+}
+
+#[test]
+fn tauri_channel_preserves_opaque_definition() {
+    let mut types = Types::default();
+    for _ in 0..2 {
+        let Reference::Named(reference) = tauri_channel_reference(&mut types, true) else {
+            panic!("expected a named reference");
+        };
+        assert_eq!(
+            types.get(&reference).unwrap().ty,
+            Some(Reference::opaque("channel metadata").into())
+        );
+    }
+}
+
+#[test]
+fn tauri_channel_keeps_legacy_patch() {
+    let mut types = Types::default();
+    for _ in 0..2 {
+        let Reference::Named(reference) = tauri_channel_reference(&mut types, false) else {
+            panic!("expected a named reference");
+        };
+        assert!(types.get(&reference).unwrap().ty.is_none());
+    }
+}
+
+#[test]
+fn tauri_channel_inlines_opaque_definition() {
+    let mut types = Types::default();
+    for _ in 0..2 {
+        let reference =
+            specta::datatype::inline(&mut types, |types| tauri_channel_reference(types, true));
+        let Reference::Named(reference) = reference else {
+            panic!("expected an inline named reference");
+        };
+        let specta::datatype::NamedReferenceType::Inline { dt, .. } = reference.inner else {
+            panic!("expected an inline opaque definition");
+        };
+        assert_eq!(*dt, Reference::opaque("channel metadata").into());
+    }
+}

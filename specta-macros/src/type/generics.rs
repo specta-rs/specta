@@ -107,7 +107,7 @@ fn strip_lifetime_bounds(predicate: &syn::WherePredicate) -> Option<syn::WherePr
 }
 
 /// `crate_ref::Type`, the bound [`build_where_clause`] adds and
-/// [`generics_with_ident_and_bounds_no_lifetimes`] drops.
+/// [`generics_with_ident_only_no_lifetimes`] drops.
 fn type_bound_path(crate_ref: &Path) -> Path {
     let mut path = crate_ref.clone();
     path.segments.push(syn::PathSegment::from(syn::Ident::new(
@@ -156,14 +156,12 @@ fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &Path) -> bool {
 /// The `build` fn parameter list.
 ///
 /// `build` is a nested fn, so it cannot name the container's lifetime
-/// parameters; lifetime bounds and `crate_ref::Type` bounds are dropped. The
-/// former are never needed because field types are rewritten to inferred `'_`
-/// lifetimes, and the latter are re-added to the `where` clause by
-/// [`build_where_clause`].
-pub fn generics_with_ident_and_bounds_no_lifetimes(
-    crate_ref: &Path,
-    generics: &Generics,
-) -> Option<TokenStream> {
+/// parameters; lifetime parameters are dropped and every bound is carried by the
+/// `where` clause from [`build_where_clause`]. Declaring them in both places
+/// would trip `clippy::multiple_bound_locations` in every crate that derives a
+/// bounded generic type, and the copied bound tokens carry the user's spans, so
+/// the warning would point at their struct.
+pub fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -172,19 +170,7 @@ pub fn generics_with_ident_and_bounds_no_lifetimes(
             use GenericParam::*;
 
             generics.params.iter().filter_map(|param| match param {
-                Type(TypeParam { ident, bounds, .. }) => {
-                    let bounds = bounds
-                        .iter()
-                        .filter(|bound| {
-                            !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref)
-                        })
-                        .collect::<Vec<_>>();
-                    if bounds.is_empty() {
-                        Some(quote!(#ident))
-                    } else {
-                        Some(quote!(#ident: #(#bounds)+*))
-                    }
-                }
+                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
                 Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
@@ -208,6 +194,14 @@ fn where_clause(predicates: impl IntoIterator<Item = syn::WherePredicate>) -> Wh
 
 /// The `#ident: #bound` predicate.
 fn param_predicate(ident: &syn::Ident, bound: syn::TypeParamBound) -> syn::WherePredicate {
+    param_predicate_with(ident, std::iter::once(bound))
+}
+
+/// The `#ident: #bounds` predicate.
+fn param_predicate_with(
+    ident: &syn::Ident,
+    bounds: impl IntoIterator<Item = syn::TypeParamBound>,
+) -> syn::WherePredicate {
     syn::WherePredicate::Type(syn::PredicateType {
         lifetimes: None,
         bounded_ty: Type::Path(syn::TypePath {
@@ -215,7 +209,7 @@ fn param_predicate(ident: &syn::Ident, bound: syn::TypeParamBound) -> syn::Where
             path: Path::from(ident.clone()),
         }),
         colon_token: Default::default(),
-        bounds: std::iter::once(bound).collect(),
+        bounds: bounds.into_iter().collect(),
     })
 }
 
@@ -233,9 +227,13 @@ fn type_bound(crate_ref: &Path) -> syn::TypeParamBound {
 ///
 /// It carries the container's declared bounds (so `build`'s body type-checks
 /// wherever it mentions a bounded field type) plus the automatic `Type`
-/// predicates. Lifetime bounds are dropped: `build` cannot name the container's
-/// lifetime parameters, and field types use inferred `'_` lifetimes so they are
-/// never required.
+/// predicates. Bounds are collected here rather than on the parameter list so
+/// each bound has exactly one location, which keeps the generated code clean
+/// under `clippy::multiple_bound_locations`.
+///
+/// Lifetime bounds are dropped: `build` cannot name the container's lifetime
+/// parameters, and field types use inferred `'_' lifetimes so they are never
+/// required.
 pub fn build_where_clause(
     crate_ref: &Path,
     generics: &Generics,
@@ -243,6 +241,27 @@ pub fn build_where_clause(
     used_generic_types: &[&syn::Ident],
 ) -> Option<WhereClause> {
     let mut predicates: Vec<syn::WherePredicate> = Vec::new();
+
+    // A parameter's inline bounds belong here, not on `build`'s parameter list:
+    // a bound declared in both places trips `clippy::multiple_bound_locations`
+    // in the deriving crate, where the warning points at the user's struct. The
+    // `Type` bound is the exception, because [`add_type_to_where_clause`]
+    // re-adds it from the automatic predicates.
+    for param in &generics.params {
+        let GenericParam::Type(param) = param else {
+            continue;
+        };
+
+        let bounds = param
+            .bounds
+            .iter()
+            .filter(|bound| !bound_uses_lifetime(bound) && !is_type_bound(bound, crate_ref))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !bounds.is_empty() {
+            predicates.push(param_predicate_with(&param.ident, bounds));
+        }
+    }
 
     if let Some(where_clause) = &generics.where_clause {
         predicates.extend(
@@ -259,20 +278,24 @@ pub fn build_where_clause(
     let mut seen = HashSet::new();
     predicates.retain(|predicate| seen.insert(quote!(#predicate).to_string()));
 
-    // Building the bound clones the `specta` path, so it is only built for a
-    // container that actually has a used parameter to predicate on.
-    let mut bound = None;
-    for ident in used_generic_types {
-        let predicate = param_predicate(
-            ident,
-            bound.get_or_insert_with(|| type_bound(crate_ref)).clone(),
-        );
-        // Parameters are unique, so the automatic predicates can only collide
-        // with one of the user predicates above.
-        if !seen.is_empty() && !seen.insert(quote!(#predicate).to_string()) {
-            continue;
+    // `#[specta(bound = "...")]` replaces the inferred `Type` bounds, and an
+    // empty string explicitly asks for none.
+    if custom_bounds.is_none() {
+        // Building the bound clones the `specta` path, so it is only built for a
+        // container that actually has a used parameter to predicate on.
+        let mut bound = None;
+        for ident in used_generic_types {
+            let predicate = param_predicate(
+                ident,
+                bound.get_or_insert_with(|| type_bound(crate_ref)).clone(),
+            );
+            // Parameters are unique, so the automatic predicates can only collide
+            // with one of the user predicates above.
+            if !seen.is_empty() && !seen.insert(quote!(#predicate).to_string()) {
+                continue;
+            }
+            predicates.push(predicate);
         }
-        predicates.push(predicate);
     }
 
     (!predicates.is_empty()).then(|| where_clause(predicates))
@@ -313,7 +336,7 @@ impl VisitMut for InferredLifetimeVisitor {
     }
 }
 
-fn all_type_param_idents(generics: &Generics) -> Vec<&syn::Ident> {
+pub fn all_type_param_idents(generics: &Generics) -> Vec<&syn::Ident> {
     generics
         .params
         .iter()
@@ -460,7 +483,7 @@ pub fn shares_field_isolation(used_generic_types: &[&syn::Ident]) -> bool {
 /// idents in it. They are separate so a caller can build the slice locally
 /// (`used_type_params` does) while the reported idents still borrow from the
 /// container's `Generics`.
-struct TypeScan<'c, 'i> {
+pub struct TypeScan<'c, 'i> {
     candidates: &'c [&'i syn::Ident],
     /// Which of `candidates` were mentioned, parallel to it.
     mentioned: Mentioned,
@@ -528,7 +551,7 @@ impl<'c, 'i> TypeScan<'c, 'i> {
         }
     }
 
-    fn of(ty: &Type, candidates: &'c [&'i syn::Ident]) -> Self {
+    pub fn of(ty: &Type, candidates: &'c [&'i syn::Ident]) -> Self {
         let mut scan = Self::new(candidates);
         // Without candidates there is nothing to record, and no field of a
         // container without used parameters needs the answer.
@@ -545,7 +568,7 @@ impl<'c, 'i> TypeScan<'c, 'i> {
 
     /// The mentioned parameters in declaration order, or every candidate when
     /// the type is opaque.
-    fn mentioned(&self) -> Vec<&'i syn::Ident> {
+    pub fn mentioned(&self) -> Vec<&'i syn::Ident> {
         self.candidates
             .iter()
             .enumerate()
@@ -911,8 +934,10 @@ pub fn add_type_to_where_clause(
     custom_bounds: Option<&[syn::WherePredicate]>,
     used_generic_types: &[&syn::Ident],
 ) -> Option<WhereClause> {
-    if let Some(where_clause) = merge_custom_bounds(generics, custom_bounds) {
-        return Some(where_clause);
+    // A custom bound replaces the automatically inferred `Type` predicates,
+    // including the empty bound which explicitly requests no inference.
+    if custom_bounds.is_some() {
+        return merge_custom_bounds(generics, custom_bounds);
     }
 
     if used_generic_types.is_empty() {

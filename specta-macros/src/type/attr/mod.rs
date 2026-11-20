@@ -24,7 +24,8 @@ pub fn reject_unknown_specta_attrs(attrs: &[Attribute], scope: Scope) -> syn::Re
         None
         | Some(AttributeValue::Lit(_))
         | Some(AttributeValue::Path(_))
-        | Some(AttributeValue::Expr(_)) => Err(syn::Error::new(
+        | Some(AttributeValue::Expr(_))
+        | Some(AttributeValue::Type(_)) => Err(syn::Error::new(
             attr.key.span(),
             "specta: invalid formatted attribute",
         )),

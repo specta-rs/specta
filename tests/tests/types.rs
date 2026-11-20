@@ -82,6 +82,7 @@ macro_rules! types {
     }};
 }
 
+/// The primitive types paired with the wire representation they export as.
 #[rustfmt::skip]
 pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
@@ -415,6 +416,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     )
 }
 
+/// Types whose wire representation differs between the serde phases.
 #[rustfmt::skip]
 pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
     let mut types = Types::default();
@@ -2738,4 +2740,219 @@ fn phased_mixed_untagged_variants_split_per_phase() {
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);
+}
+
+#[test]
+fn variant_builder_field_mut_borrows_the_builder() {
+    let mut named = specta::datatype::Variant::named();
+    named.field_mut(
+        "value",
+        specta::datatype::Field::new(specta::datatype::Primitive::str.into()),
+    );
+    assert!(matches!(
+        named.build().fields,
+        specta::datatype::Fields::Named(fields) if fields.fields.len() == 1
+    ));
+
+    let mut unnamed = specta::datatype::Variant::unnamed();
+    unnamed.field_mut(specta::datatype::Field::new(
+        specta::datatype::Primitive::bool.into(),
+    ));
+    assert!(matches!(
+        unnamed.build().fields,
+        specta::datatype::Fields::Unnamed(fields) if fields.fields.len() == 1
+    ));
+}
+
+#[derive(Type)]
+#[specta(type = &'static str)]
+struct TypeOverrideReference;
+
+#[test]
+fn type_override_accepts_reference_types_with_explicit_lifetimes() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <TypeOverrideReference as Type>::definition(&mut types)
+    else {
+        panic!("the override should be exported as a named type");
+    };
+    assert_eq!(
+        types.get(&reference).and_then(|ndt| ndt.ty.as_ref()),
+        Some(&DataType::Primitive(specta::datatype::Primitive::str))
+    );
+}
+
+#[derive(Type)]
+enum SkippedVariantOverride {
+    #[specta(skip, type = NotAType)]
+    Hidden(NotAType),
+    Visible,
+}
+
+struct NotAType;
+
+#[test]
+fn skipped_variant_does_not_resolve_its_type_override() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <SkippedVariantOverride as Type>::definition(&mut types)
+    else {
+        panic!("the enum should be exported as a named type");
+    };
+    let Some(DataType::Enum(enumeration)) = types.get(&reference).and_then(|ndt| ndt.ty.as_ref())
+    else {
+        panic!("the definition should be an enum");
+    };
+    let (_, hidden) = enumeration
+        .variants
+        .iter()
+        .find(|(name, _)| name == "Hidden")
+        .expect("the skipped variant should remain in the graph");
+    assert!(hidden.skip);
+    let specta::datatype::Fields::Unnamed(fields) = &hidden.fields else {
+        panic!("the skipped variant should keep its Rust payload layout");
+    };
+    assert_eq!(fields.fields.len(), 1);
+    assert!(fields.fields[0].ty.is_none());
+}
+
+#[test]
+fn named_type_mutation_preserves_graph_identity() {
+    use specta::datatype::{NamedDataType, Primitive};
+
+    let mut types = Types::default();
+    let a = NamedDataType::new("A", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::str.into());
+    });
+    NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
+    assert_eq!(types.len(), 2);
+
+    let a_reference = a.reference(Vec::new());
+    let mut types = types.map(|_| a.clone());
+    assert_eq!(
+        types
+            .get(match &a_reference {
+                specta::datatype::Reference::Named(reference) => reference,
+                _ => unreachable!(),
+            })
+            .map(|ndt| ndt.name.as_ref()),
+        Some("A")
+    );
+
+    types.iter_mut(|ndt| *ndt = a.clone());
+    assert_eq!(types.len(), 2);
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct DefaultReferencesSkipped<T, U = T> {
+    #[specta(skip)]
+    marker: std::marker::PhantomData<T>,
+    value: U,
+}
+
+#[test]
+fn generic_defaults_do_not_reference_erased_parameters() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <DefaultReferencesSkipped<String> as Type>::definition(&mut types)
+    else {
+        panic!("the outer type should be a named reference");
+    };
+    let ndt = types.get(&reference).expect("the named type should exist");
+    assert_eq!(ndt.generics.len(), 1);
+    assert_eq!(ndt.generics[0].name, "U");
+    assert!(
+        ndt.generics[0].default.is_none(),
+        "a default referencing an erased parameter must be dropped"
+    );
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct SerdeSkippedNewtype<T: Serialize>(#[serde(skip)] T);
+
+#[test]
+fn serde_ignored_newtype_skip_still_requires_type_on_its_parameter() {
+    let mut types = Types::default();
+    let DataType::Reference(specta::datatype::Reference::Named(reference)) =
+        <SerdeSkippedNewtype<String> as Type>::definition(&mut types)
+    else {
+        panic!("the newtype should be a named reference");
+    };
+    let Some(DataType::Struct(structure)) = types.get(&reference).and_then(|ndt| ndt.ty.as_ref())
+    else {
+        panic!("the newtype definition should be a struct");
+    };
+    let specta::datatype::Fields::Unnamed(fields) = &structure.fields else {
+        panic!("the newtype definition should have an unnamed field");
+    };
+    assert_eq!(fields.fields.len(), 1);
+    assert!(fields.fields[0].ty.is_some());
+}
+
+#[derive(Type)]
+struct AliasPair<A, B> {
+    a: A,
+    b: B,
+}
+
+type FlippedPair<X, Y> = AliasPair<Y, X>;
+
+#[derive(Type)]
+struct UsesFlippedAlias<T, U> {
+    pair: FlippedPair<T, U>,
+}
+
+#[test]
+fn generic_aliases_keep_parameter_meaning_when_reordered() {
+    let output = specta_typescript::Typescript::default()
+        .export(
+            &Types::default().register::<UsesFlippedAlias<String, bool>>(),
+            specta_serde::Format,
+        )
+        .expect("the alias should export");
+
+    assert!(
+        output.contains("pair: AliasPair<U, T>"),
+        "the alias flips the arguments, so Pair's parameters must flip too:\n{output}"
+    );
+}
+
+fn register_local_a(types: &mut Types) {
+    #[derive(Type)]
+    struct Local {
+        a: String,
+    }
+    types.register_mut::<Local>();
+}
+
+fn register_local_b(types: &mut Types) {
+    #[derive(Type)]
+    struct Local {
+        b: bool,
+    }
+    types.register_mut::<Local>();
+}
+
+#[test]
+fn same_named_types_in_different_function_scopes_stay_distinct() {
+    let mut types = Types::default();
+    register_local_a(&mut types);
+    register_local_b(&mut types);
+
+    let fields = types
+        .into_sorted_iter()
+        .filter(|ndt| ndt.name == "Local")
+        .map(|ndt| {
+            let Some(DataType::Struct(structure)) = &ndt.ty else {
+                panic!("both locals should be structs");
+            };
+            match &structure.fields {
+                specta::datatype::Fields::Named(fields) => fields.fields[0].0.to_string(),
+                _ => panic!("both locals should have named fields"),
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(fields, ["a", "b"]);
 }

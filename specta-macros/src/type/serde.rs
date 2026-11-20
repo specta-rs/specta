@@ -132,10 +132,11 @@ pub(super) fn lower_runtime_attributes<'a>(
     scope: AttributeScope,
     target: AttributeTarget,
     raw_attrs: impl Iterator<Item = &'a Attribute>,
+    generics: Option<crate::r#type::GenericsContext<'_>>,
 ) -> Result<Option<TokenStream>> {
     Ok(match scope {
         AttributeScope::Container => parse_container_attrs(raw_attrs)?
-            .map(|attrs| write(&target, container_entries(type_trait, attrs))),
+            .map(|attrs| write(&target, container_entries(type_trait, attrs, generics))),
         AttributeScope::Variant => {
             parse_variant_attrs(raw_attrs)?.map(|attrs| write(&target, variant_entries(attrs)))
         }
@@ -435,7 +436,11 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn container_entries(type_trait: &syn::Ident, attrs: ContainerAttrs) -> Vec<AttributeEntry> {
+fn container_entries(
+    type_trait: &syn::Ident,
+    attrs: ContainerAttrs,
+    generics: Option<crate::r#type::GenericsContext<'_>>,
+) -> Vec<AttributeEntry> {
     let mut entries = Vec::new();
     push_opt_string(
         &mut entries,
@@ -487,6 +492,7 @@ fn container_entries(type_trait: &syn::Ident, attrs: ContainerAttrs) -> Vec<Attr
         "serde:container:from_type_src",
         "serde:container:from_resolved",
         &attrs.from,
+        generics,
     );
     push_opt_conversion(
         &mut entries,
@@ -494,6 +500,7 @@ fn container_entries(type_trait: &syn::Ident, attrs: ContainerAttrs) -> Vec<Attr
         "serde:container:try_from_type_src",
         "serde:container:try_from_resolved",
         &attrs.try_from,
+        generics,
     );
     push_opt_conversion(
         &mut entries,
@@ -501,6 +508,7 @@ fn container_entries(type_trait: &syn::Ident, attrs: ContainerAttrs) -> Vec<Attr
         "serde:container:into_type_src",
         "serde:container:into_resolved",
         &attrs.into,
+        generics,
     );
     push_bool(
         &mut entries,
@@ -651,14 +659,28 @@ fn push_opt_conversion(
     src_key: &'static str,
     resolved_key: &'static str,
     value: &Option<ConversionType>,
+    generics: Option<crate::r#type::GenericsContext<'_>>,
 ) {
-    if let Some(value) = value {
-        let type_src = &value.type_src;
-        let ty = &value.ty;
-        entries.push((src_key, quote!(#type_src.to_owned())));
-        entries.push((
-            resolved_key,
-            quote!(<#ty as #type_trait>::definition(types)),
-        ));
-    }
+    let Some(value) = value else {
+        return;
+    };
+
+    let type_src = &value.type_src;
+    let ty = &value.ty;
+
+    // A conversion type may mention the container's parameters, as in
+    // serde(into = "Vec<T>"). Resolving it directly would bake in whichever
+    // instantiation registered first, so it goes through the same
+    // declaration/concrete substitution as a field type. A container without
+    // parameters needs no resolution.
+    let resolve = match generics {
+        Some((names, used_generic_types, bounded_params, build)) => {
+            super::generics::resolve_ty_expr(names, ty, used_generic_types, bounded_params, build)
+                .tokens
+        }
+        None => quote!(<#ty as #type_trait>::definition(types)),
+    };
+
+    entries.push((src_key, quote!(#type_src.to_owned())));
+    entries.push((resolved_key, resolve));
 }

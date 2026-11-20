@@ -270,8 +270,12 @@ impl Operation {
     }
 
     /// Declares the JSON request body as `T`.
+    ///
+    /// This replaces any example set by a previous body declaration, so an
+    /// example can never describe a different schema.
     pub fn request_body<T: Type>(mut self) -> Self {
         self.request_body = Some(capture::<T>());
+        self.request_body_example = None;
         self
     }
 

@@ -77,7 +77,7 @@ fn sample(src: &str) -> Sample {
     // and parse measurements above opened a guard of their own.
     let _ = take_log();
 
-    let (expanded, total) = measure(|| derive_tokens(tokens).expect("derive should succeed"));
+    let (expanded, total) = measure(|| derive_tokens(tokens, "0").expect("derive should succeed"));
     assert!(!expanded.is_empty(), "derive produced nothing for {src}");
     let phases = take_log();
     let idents = count_idents(&expanded);

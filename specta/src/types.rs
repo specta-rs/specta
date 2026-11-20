@@ -139,15 +139,45 @@ pub struct Types {
 #[derive(Clone)]
 pub(crate) struct GenericSubstitution {
     pub(crate) slots: Vec<GenericSubstitutionSlot>,
+    /// Which slots have been taken, so a slot can be taken by name out of
+    /// order (a type alias may reorder or fix arguments) without being handed
+    /// out twice. Rewinding the cursor clears it from there onwards.
+    pub(crate) consumed: Vec<bool>,
     pub(crate) cursor: usize,
 }
 
 impl GenericSubstitution {
     /// Takes the slot at the cursor, advancing past it.
+    fn skip_consumed(&mut self) {
+        while self
+            .consumed
+            .get(self.cursor)
+            .is_some_and(|consumed| *consumed)
+        {
+            self.cursor += 1;
+        }
+    }
+
+    /// Takes the first unconsumed slot at or after the cursor.
     fn take_slot(&mut self) -> Option<GenericSubstitutionSlot> {
+        self.skip_consumed();
         let slot = self.slots.get(self.cursor)?.clone();
+        self.consumed[self.cursor] = true;
         self.cursor += 1;
         Some(slot)
+    }
+
+    /// Takes a specific unconsumed slot.
+    fn take_index(&mut self, index: usize) -> Option<GenericSubstitutionSlot> {
+        if self.consumed.get(index).copied().unwrap_or(true) {
+            return None;
+        }
+
+        self.consumed[index] = true;
+        if index >= self.cursor {
+            self.cursor = index + 1;
+        }
+        self.slots.get(index).cloned()
     }
 }
 
@@ -182,14 +212,6 @@ impl GenericSubstitutionSlot {
             _ => None,
         }
     }
-
-    /// The `Generic` this slot rewrites to, if any.
-    fn generic(&self) -> Option<&Generic> {
-        match self {
-            Self::Generic { generic, .. } => Some(generic),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -211,6 +233,12 @@ pub enum InstantiationParam {
     Resolved {
         /// The parameter's name, as written.
         name: &'static str,
+        /// [`std::any::type_name`] of the concrete argument.
+        ///
+        /// Resolution matches a substitution slot by concrete type when exactly
+        /// one slot names it, which is what keeps a type alias that reorders or
+        /// fixes its arguments aligned (see [`Types::define_param`]).
+        identity: &'static str,
         /// `<T as Type>::definition`.
         definition: fn(&mut Types) -> DataType,
     },
@@ -586,10 +614,14 @@ impl Types {
 
         for param in params {
             match param {
-                InstantiationParam::Resolved { name, definition } => {
+                InstantiationParam::Resolved {
+                    name,
+                    identity,
+                    definition,
+                } => {
                     instantiation_generics.push((
                         Generic::new((*name).into()),
-                        self.define_param_with(*definition),
+                        self.define_param_with(identity, *definition),
                     ));
                 }
                 InstantiationParam::Generic { name } => {
@@ -695,22 +727,64 @@ impl Types {
     /// parameters stay aligned.
     #[doc(hidden)]
     pub fn define_param<T: Type + ?Sized>(&mut self) -> DataType {
-        self.define_param_with(T::definition)
+        self.define_param_with(std::any::type_name::<T>(), T::definition)
     }
 
     /// The non-generic body of [`Types::define_param`].
-    fn define_param_with(&mut self, f: fn(&mut Types) -> DataType) -> DataType {
+    fn define_param_with(&mut self, name: &'static str, f: fn(&mut Types) -> DataType) -> DataType {
         let nested = {
             let Some(scope) = self.generic_substitutions.last_mut() else {
                 return f(self);
             };
 
-            match scope.take_slot() {
-                Some(GenericSubstitutionSlot::Generic { generic, .. }) => {
-                    return DataType::Generic(generic);
+            // A type alias can reorder or fix arguments without changing the
+            // field's source syntax. Match a concrete parameter by name when
+            // exactly one unconsumed slot names it; duplicate concrete types
+            // stay positional because their names cannot distinguish them.
+            let matches = scope
+                .slots
+                .iter()
+                .enumerate()
+                .filter(|(index, slot)| {
+                    !scope.consumed.get(*index).copied().unwrap_or(true)
+                        && slot.name() == Some(name)
+                })
+                .map(|(index, _)| index)
+                .collect::<Vec<_>>();
+
+            if let [index] = matches.as_slice() {
+                return match scope.take_index(*index) {
+                    Some(GenericSubstitutionSlot::Generic { generic, .. }) => {
+                        DataType::Generic(generic)
+                    }
+                    _ => unreachable!("a name-matched slot is always a generic"),
+                };
+            }
+
+            scope.skip_consumed();
+            let next = scope.slots.get(scope.cursor).cloned();
+            match next {
+                Some(GenericSubstitutionSlot::Generic {
+                    name: slot_name, ..
+                }) if matches.is_empty() && slot_name != name => {
+                    // This slot belongs to a different enclosing parameter.
+                    // An alias may have inserted an argument that has no slot.
+                    None
                 }
-                Some(GenericSubstitutionSlot::Nested(slots)) => Some(slots),
-                _ => None,
+                Some(GenericSubstitutionSlot::Generic { .. }) => match scope.take_slot() {
+                    Some(GenericSubstitutionSlot::Generic { generic, .. }) => {
+                        return DataType::Generic(generic);
+                    }
+                    _ => unreachable!("selected a generic slot"),
+                },
+                Some(GenericSubstitutionSlot::Nested(_)) => match scope.take_slot() {
+                    Some(GenericSubstitutionSlot::Nested(slots)) => Some(slots),
+                    _ => unreachable!("selected a nested slot"),
+                },
+                Some(GenericSubstitutionSlot::Skip) | None => {
+                    scope.take_slot();
+                    None
+                }
             }
         };
 
@@ -734,40 +808,33 @@ impl Types {
     /// Takes the slot at the cursor if it is a compound argument's nested scope.
     fn take_nested_slot(&mut self) -> Option<Vec<GenericSubstitutionSlot>> {
         let scope = self.generic_substitutions.last_mut()?;
+        scope.skip_consumed();
 
-        let Some(GenericSubstitutionSlot::Nested(slots)) = scope.slots.get(scope.cursor) else {
+        let Some(GenericSubstitutionSlot::Nested(_)) = scope.slots.get(scope.cursor) else {
             return None;
         };
 
-        let slots = slots.clone();
-        scope.cursor += 1;
-        Some(slots)
+        match scope.take_slot() {
+            Some(GenericSubstitutionSlot::Nested(slots)) => Some(slots),
+            _ => unreachable!("checked the current slot is nested"),
+        }
     }
 
-    /// Takes the innermost slot whose concrete type name is `name`, advancing
-    /// the scope's cursor past it. Falls back to searching the whole scope when
-    /// no slot at or after the cursor matches, so distinct concrete types stay
-    /// order-independent.
+    /// Takes the first unconsumed innermost slot whose concrete type name is
+    /// `name`. Distinct concrete types stay order-independent, and a slot
+    /// consumed out of order is never handed out twice.
     fn take_substitution(&mut self, name: &'static str) -> Option<Generic> {
         let scope = self.generic_substitutions.last_mut()?;
 
-        let start = scope.cursor.min(scope.slots.len());
-        let forward = scope.slots[start..]
-            .iter()
-            .position(|slot| slot.name() == Some(name))
-            .map(|offset| start + offset);
-        let index = forward.or_else(|| {
-            scope
-                .slots
-                .iter()
-                .position(|slot| slot.name() == Some(name))
+        let index = scope.slots.iter().enumerate().find_map(|(index, slot)| {
+            (!scope.consumed.get(index).copied().unwrap_or(true) && slot.name() == Some(name))
+                .then_some(index)
         })?;
 
-        let generic = scope.slots[index].generic().cloned()?;
-        if forward.is_some() {
-            scope.cursor = index + 1;
+        match scope.take_index(index)? {
+            GenericSubstitutionSlot::Generic { generic, .. } => Some(generic),
+            _ => None,
         }
-        Some(generic)
     }
 
     /// Returns the cursor of the innermost active substitution scope.
@@ -789,6 +856,12 @@ impl Types {
     pub fn set_generic_substitution_cursor(&mut self, cursor: usize) {
         if let Some(scope) = self.generic_substitutions.last_mut() {
             scope.cursor = cursor.min(scope.slots.len());
+            // Re-resolving from an earlier point must make those slots
+            // available again, including slots consumed out of order by a
+            // name match.
+            for consumed in &mut scope.consumed[scope.cursor..] {
+                *consumed = false;
+            }
         }
     }
 
@@ -822,6 +895,7 @@ impl Types {
     ) -> R {
         self.generic_substitutions.push(GenericSubstitution {
             slots: substitutions.to_vec(),
+            consumed: vec![false; substitutions.len()],
             cursor: 0,
         });
         let result = panic::catch_unwind(AssertUnwindSafe(|| f(self)));
@@ -849,6 +923,19 @@ impl Types {
         self.with_generic_substitution(substitutions, f)
     }
 
+    /// Transforms the explicitly registered top-level roots.
+    ///
+    /// Graph transformations that change datatypes must use this in addition
+    /// to [`Types::map`], otherwise a root can keep referring to the
+    /// pre-transformation shape.
+    pub fn map_roots<F>(mut self, f: F) -> Self
+    where
+        F: FnMut(DataType) -> DataType,
+    {
+        self.roots = std::mem::take(&mut self.roots).into_iter().map(f).collect();
+        self
+    }
+
     /// Returns the concrete datatypes explicitly registered as top-level roots.
     ///
     /// Named dependencies discovered while resolving a root are available
@@ -863,6 +950,14 @@ impl Types {
     /// internal placeholder entry.
     pub fn get(&self, r: &NamedReference) -> Option<&NamedDataType> {
         self.types.get(&r.id)?.as_ref()
+    }
+
+    /// Gets the named datatype targeted by a [`NamedReference`] mutably.
+    ///
+    /// The entry's identity cannot change; mutating the returned value updates
+    /// the same graph node that the reference resolves to.
+    pub fn get_mut(&mut self, r: &NamedReference) -> Option<&mut NamedDataType> {
+        self.types.get_mut(&r.id)?.as_mut()
     }
 
     /// Returns the number of completed named datatypes in the collection.

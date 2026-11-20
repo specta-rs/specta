@@ -144,19 +144,25 @@ impl Remapper {
 
     /// Applies the remap operation to every datatype in a [`Types`] collection, returning the remapped collection.
     pub fn remap_types(&self, types: Types) -> Types {
-        types.map(|mut ndt| {
-            ndt.generics.to_mut().iter_mut().for_each(|generic| {
-                if let Some(dt) = &mut generic.default {
+        types
+            .map_roots(|mut dt| {
+                let active_rules = vec![false; self.rules.len()];
+                self.remap_internal(&mut dt, &active_rules);
+                dt
+            })
+            .map(|mut ndt| {
+                ndt.generics.to_mut().iter_mut().for_each(|generic| {
+                    if let Some(dt) = &mut generic.default {
+                        let active_rules = vec![false; self.rules.len()];
+                        self.remap_internal(dt, &active_rules);
+                    }
+                });
+                if let Some(dt) = &mut ndt.ty {
                     let active_rules = vec![false; self.rules.len()];
                     self.remap_internal(dt, &active_rules);
                 }
-            });
-            if let Some(dt) = &mut ndt.ty {
-                let active_rules = vec![false; self.rules.len()];
-                self.remap_internal(dt, &active_rules);
-            }
-            ndt
-        })
+                ndt
+            })
     }
 
     fn remap_internal(&self, dt: &mut DataType, active_rules: &[bool]) {
@@ -355,6 +361,29 @@ mod tests {
         assert_eq!(
             remapper.remap_dt(Primitive::f128.into()),
             Primitive::f128.into()
+        );
+    }
+}
+
+#[cfg(test)]
+mod root_tests {
+    use specta::{
+        Types,
+        datatype::{DataType, Primitive},
+    };
+
+    use super::Remapper;
+
+    #[test]
+    fn remaps_registered_roots() {
+        let types = Types::default().register::<u32>();
+        let remapped = Remapper::new()
+            .rule(Primitive::u32.into(), Primitive::str.into())
+            .remap_types(types);
+
+        assert_eq!(
+            remapped.roots().cloned().collect::<Vec<_>>(),
+            vec![DataType::Primitive(Primitive::str)]
         );
     }
 }

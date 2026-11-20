@@ -1,3 +1,5 @@
+//! Exports a small set of types to TypeScript.
+
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_typescript::Typescript;
@@ -7,6 +9,7 @@ use specta_typescript::Typescript;
 // `Serialize` and `Deserialize` are not required by Specta itself, but they are
 // common in real applications and allow Specta to understand serde attributes
 // when exporting through `specta_serde::Format` below.
+/// A user of the example application.
 #[derive(Serialize, Deserialize, Type)]
 pub struct User {
     id: u32,
@@ -21,6 +24,7 @@ pub struct User {
     avatar_url: Option<String>,
 }
 
+/// A post written by a [`User`].
 #[derive(Serialize, Deserialize, Type)]
 pub struct Post {
     id: u32,
@@ -30,11 +34,15 @@ pub struct Post {
     status: PostStatus,
 }
 
+/// The publication state of a [`Post`].
 #[derive(Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum PostStatus {
+    /// The post is still being written.
     Draft,
+    /// The post is awaiting review.
     InReview,
+    /// The post is publicly visible.
     Published,
 }
 

@@ -29,8 +29,9 @@ use specta_serde::{Phase, select_phase_datatype};
 
 use crate::{Error, OasVersion, SchemaMode, operation::Operation, transform::components};
 
-/// Name of the probe definition. Carries a prefix no derived type will produce, so it cannot collide
-/// with a real definition and change how the real ones are named.
+/// Preferred name of the probe definition. It is only a hint: the resolver
+/// checks the exported component names and picks another name if a user type
+/// already occupies it.
 const PROBE: &str = "__specta_openapi_probe";
 
 /// What an operation's types are exported as, per side: a `$ref` to a component, or a schema in
@@ -56,17 +57,16 @@ impl Resolved {
 struct Premapped<F>(F);
 
 impl<F: Format> Format for Premapped<F> {
-    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        // The returned borrow is tied to `&self`, not `types`, so identity
-        // still clones - the same cost class as the probe collection clone.
-        Ok(Cow::Owned(types.clone()))
+    fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
+        // Mapping has already run, so the prepared collection can be borrowed.
+        Ok(Cow::Borrowed(types))
     }
 
-    fn map_type(
-        &'_ self,
-        types: &Types,
-        dt: &DataType,
-    ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+    fn map_type<'a>(
+        &'a self,
+        types: &'a Types,
+        dt: &'a DataType,
+    ) -> Result<Cow<'a, DataType>, specta::FormatError> {
         self.0.map_type(types, dt)
     }
 }
@@ -123,9 +123,11 @@ pub(crate) fn resolve(
         }
     }
 
+    let existing_components = components(&mapped, Premapped(&format), mode, version)?;
+
     if probe_fields.is_empty() {
         return Ok((
-            components(&mapped, Premapped(format), mode, version)?,
+            existing_components,
             Resolved {
                 request: HashMap::new(),
                 response: HashMap::new(),
@@ -133,18 +135,25 @@ pub(crate) fn resolve(
         ));
     }
 
+    // Pick a name the formatted graph does not already export. Checking the
+    // final component names covers container renames, not just Rust type names.
+    let probe_name = std::iter::once(PROBE.to_owned())
+        .chain((0..).map(|index| format!("{PROBE}_{index}")))
+        .find(|name| !existing_components.contains_key(name))
+        .ok_or(Error::UnresolvedOperationTypes)?;
+
     let mut probe_types = mapped.clone();
     let mut probe = Struct::named();
     for (index, dt) in probe_fields.iter().enumerate() {
         probe = probe.field(field_name(index), Field::new(dt.clone()));
     }
     let body = probe.build();
-    NamedDataType::new(PROBE, &mut probe_types, |_, ndt| {
+    NamedDataType::new(probe_name.clone(), &mut probe_types, |_, ndt| {
         ndt.ty = Some(body.clone());
     });
 
-    let mut components = components(&probe_types, Premapped(format), mode, version)?;
-    let Some(probe) = components.remove(PROBE) else {
+    let mut components = components(&probe_types, Premapped(&format), mode, version)?;
+    let Some(probe) = components.remove(&probe_name) else {
         return Err(Error::UnresolvedOperationTypes);
     };
 

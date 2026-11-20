@@ -86,6 +86,7 @@ pub fn decode_items(
                     AttributeTarget::Statements(quote!(#binding.attributes)),
                     &variant.attrs,
                     &container_attrs.skip_attrs,
+                    None,
                 )?;
 
                 let mut fields = decode_fields(names, container_attrs, &variant.fields)?;
@@ -127,6 +128,7 @@ fn decode_fields(
                 AttributeTarget::Chain,
                 raw_attrs,
                 &container_attrs.skip_attrs,
+                None,
             )?;
 
             Ok(FieldInfo {
