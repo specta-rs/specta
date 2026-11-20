@@ -2693,3 +2693,82 @@ fn swift_duplicate_member_names_are_rejected() {
         "{enum_message}"
     );
 }
+
+/// Swift identifiers cannot contain spaces or start with a digit, but serde
+/// renames and Specta renames can produce either. The exporter must reject the
+/// name instead of writing a declaration that does not parse.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SpaceInFieldName {
+    #[serde(rename = "has space")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DigitLeadingFieldName {
+    #[serde(rename = "1st")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SpaceInTypeName {
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SpaceInVariantName {
+    #[serde(rename = "has space")]
+    Value,
+}
+
+#[test]
+fn swift_invalid_identifiers_are_rejected() {
+    let field_error = Swift::default()
+        .export(
+            &Types::default().register::<SpaceInFieldName>(),
+            specta_serde::Format,
+        )
+        .expect_err("a property name cannot contain a space");
+    let field_message = field_error.to_string();
+    assert!(
+        field_message.contains("Invalid identifier"),
+        "{field_message}"
+    );
+    assert!(field_message.contains("has space"), "{field_message}");
+
+    let digit_error = Swift::default()
+        .export(
+            &Types::default().register::<DigitLeadingFieldName>(),
+            specta_serde::Format,
+        )
+        .expect_err("a property name cannot start with a digit");
+    assert!(
+        digit_error.to_string().contains("Invalid identifier"),
+        "{digit_error}"
+    );
+
+    let variant_error = Swift::default()
+        .export(
+            &Types::default().register::<SpaceInVariantName>(),
+            specta_serde::Format,
+        )
+        .expect_err("an enum case cannot contain a space");
+    assert!(
+        variant_error.to_string().contains("Invalid identifier"),
+        "{variant_error}"
+    );
+
+    // Rename the type to one Swift cannot declare. The field names stay valid.
+    let mut types = Types::default().register::<SpaceInTypeName>();
+    types.iter_mut(|ndt| ndt.name = "Has Space".into());
+    let type_error = Swift::default()
+        .export(&types, specta_serde::Format)
+        .expect_err("a Swift type name cannot contain a space");
+    assert!(
+        type_error.to_string().contains("Invalid identifier"),
+        "{type_error}"
+    );
+}
