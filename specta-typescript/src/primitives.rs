@@ -285,6 +285,7 @@ pub(crate) fn export_internal<'a>(
     indent: &str,
 ) -> Result<(), Error> {
     let ndts = ndts.filter(|ndt| ndt.ty.is_some());
+    let mut alias_cycles = AliasCycles::default();
 
     if exporter.jsdoc {
         let mut ndts = ndts.peekable();
@@ -301,7 +302,7 @@ pub(crate) fn export_internal<'a>(
                 s.push_str("\t*\n");
             }
 
-            append_typedef_body(s, exporter, format, types, ndt, indent)?;
+            append_typedef_body(s, exporter, format, types, ndt, indent, &mut alias_cycles)?;
         }
 
         s.push_str(indent);
@@ -314,7 +315,7 @@ pub(crate) fn export_internal<'a>(
             s.push('\n');
         }
 
-        export_single_internal(s, exporter, format, types, ndt, indent)?;
+        export_single_internal(s, exporter, format, types, ndt, indent, &mut alias_cycles)?;
     }
 
     Ok(())
@@ -327,6 +328,7 @@ fn export_single_internal(
     types: &Types,
     ndt: &NamedDataType,
     indent: &str,
+    alias_cycles: &mut AliasCycles,
 ) -> Result<(), Error> {
     if exporter.jsdoc {
         let mut typedef = String::new();
@@ -359,7 +361,7 @@ fn export_single_internal(
     write_generic_parameters(s, exporter, types, &[rust_type_path(ndt)], &ndt.generics)?;
     s.push_str(" = ");
 
-    let body = resolve_named_export_body(types, ndt)?;
+    let body = resolve_named_export_body(types, ndt, alias_cycles)?;
     datatype(
         s,
         exporter,
@@ -418,7 +420,15 @@ pub(crate) fn typedef_internal(
     dt: &NamedDataType,
 ) -> Result<(), Error> {
     s.push_str("/**\n");
-    append_typedef_body(s, exporter, format, types, dt, "")?;
+    append_typedef_body(
+        s,
+        exporter,
+        format,
+        types,
+        dt,
+        "",
+        &mut AliasCycles::default(),
+    )?;
 
     s.push_str("\t*/");
 
@@ -602,6 +612,7 @@ fn append_typedef_body(
     types: &Types,
     dt: &NamedDataType,
     indent: &str,
+    alias_cycles: &mut AliasCycles,
 ) -> Result<(), Error> {
     let name = &dt.name;
     let mut type_name = String::from(name.as_ref());
@@ -615,7 +626,7 @@ fn append_typedef_body(
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
-    let body = resolve_named_export_body(types, dt)?;
+    let body = resolve_named_export_body(types, dt, alias_cycles)?;
     datatype(
         &mut typedef_ty,
         exporter,
@@ -2499,6 +2510,149 @@ fn transparent_export_hop<'t, 'r>(
     transparent_reference(types, transparent_export_position(ndt)?)
 }
 
+/// Batch-local proof that an export cannot participate in an alias cycle.
+///
+/// The collapse walk below must track generic instantiations, clone payloads,
+/// and preserve discovery order. None of that is needed to prove a monomorphic
+/// graph acyclic. Discover that graph using borrowed bodies and dense indices,
+/// then remove sinks in reverse topological order. Each removed node is safe,
+/// including nodes reached by later exports in the same batch.
+///
+/// Generic declarations are barriers: substitution can reveal edges that this
+/// raw graph cannot see. They and their predecessors retain the existing full
+/// analysis, as do cycles. No collapsed bodies or generic substitutions are
+/// cached across roots.
+#[derive(Default)]
+struct AliasCycles {
+    // All declarations remain borrowed/alive throughout `export_internal` (or
+    // the single `typedef_internal` call). Pointer identity avoids conflating
+    // distinct declarations with equal names supplied to primitives::export.
+    // The pointers are never dereferenced and this cache never escapes a batch.
+    outcomes: HashMap<*const NamedDataType, bool>,
+    identities: HashMap<AliasId, *const NamedDataType>,
+}
+
+impl AliasCycles {
+    fn may_cycle<'a>(&mut self, types: &'a Types, root: &'a NamedDataType) -> bool {
+        let Some(enm) = node_enum(root) else {
+            return false;
+        };
+        if let Some(&outcome) = self.outcomes.get(&std::ptr::from_ref(root)) {
+            return outcome;
+        }
+
+        // Under the root's identity substitution a bare generic stays generic.
+        // Without a raw first hop no effective cycle can start, even on a
+        // generic root. This also keeps ordinary tagged enums allocation-free.
+        let Some(hop) = enm
+            .variants
+            .iter()
+            .filter(|(_, variant)| !variant.skip)
+            .find_map(|(_, variant)| transparent_variant_hop(types, variant))
+        else {
+            return false;
+        };
+        // A direct self-cycle needs the full collapse, not another graph walk.
+        if !root.generics.is_empty()
+            || (hop.target.module_path == root.module_path && hop.target.name == root.name)
+        {
+            return true;
+        }
+        // primitives::export can supply a modified clone whose alias identity
+        // matches a declaration inside a previously proved tail. Reusing that
+        // tail would hide a back edge to the clone under the legacy name-based
+        // cycle rules. Only reuse proofs under the same root identity/body.
+        if let Some(&previous) = self.identities.get(&alias_id(root))
+            && previous != std::ptr::from_ref(root)
+        {
+            return true;
+        }
+
+        let mut indices = HashMap::from([((root.module_path.as_ref(), root.name.as_ref()), 0)]);
+        let mut nodes = vec![root];
+        let mut reverse = vec![Vec::new()];
+        let mut pending = vec![0_usize];
+        let mut barriers = vec![false];
+        let mut cursor = 0;
+
+        while cursor < nodes.len() {
+            let ndt = nodes[cursor];
+            let cached = self.outcomes.get(&std::ptr::from_ref(ndt)).copied();
+            if let Some(outcome) = cached {
+                barriers[cursor] |= outcome;
+            } else if !ndt.generics.is_empty() {
+                barriers[cursor] = true;
+            } else {
+                let mut add_edge = |target: &'a NamedDataType| {
+                    let index = *indices
+                        .entry((target.module_path.as_ref(), target.name.as_ref()))
+                        .or_insert_with(|| {
+                            let index = nodes.len();
+                            nodes.push(target);
+                            reverse.push(Vec::new());
+                            pending.push(0);
+                            barriers.push(false);
+                            index
+                        });
+                    // The legacy collapse identifies aliases by module/name.
+                    // If those collide, retain its analysis rather than prove
+                    // anything using a different declaration's body.
+                    if !std::ptr::eq(nodes[index], target) {
+                        barriers[index] = true;
+                    }
+                    reverse[index].push(cursor);
+                    pending[cursor] += 1;
+                };
+
+                if let Some(enm) = node_enum(ndt) {
+                    for (_, variant) in &enm.variants {
+                        if !variant.skip
+                            && let Some(hop) = transparent_variant_hop(types, variant)
+                        {
+                            add_edge(hop.target);
+                        }
+                    }
+                } else if let Some(hop) = transparent_export_hop(types, ndt) {
+                    add_edge(hop.target);
+                }
+            }
+            cursor += 1;
+        }
+
+        let mut sinks = pending
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &count)| (count == 0 && !barriers[i]).then_some(i))
+            .collect::<Vec<_>>();
+        while let Some(index) = sinks.pop() {
+            self.outcomes
+                .insert(std::ptr::from_ref(nodes[index]), false);
+            for &source in &reverse[index] {
+                pending[source] -= 1;
+                if pending[source] == 0 && !barriers[source] {
+                    sinks.push(source);
+                }
+            }
+        }
+        for (index, ndt) in nodes.iter().enumerate() {
+            let pointer = std::ptr::from_ref(*ndt);
+            self.identities
+                .entry(alias_id(ndt))
+                .and_modify(|previous| {
+                    if *previous != pointer {
+                        // Neither declaration may reuse this ambiguous identity.
+                        *previous = std::ptr::null();
+                    }
+                })
+                .or_insert(pointer);
+            if pending[index] != 0 || barriers[index] {
+                self.outcomes.insert(pointer, true);
+            }
+        }
+        self.outcomes[&std::ptr::from_ref(root)]
+    }
+}
+
 /// A named export participating in the alias-transparent reference graph.
 struct AliasNode<'a> {
     ndt: &'a NamedDataType,
@@ -3175,8 +3329,12 @@ fn collapse_untagged_alias_cycle(
 fn resolve_named_export_body<'a>(
     types: &Types,
     ndt: &'a NamedDataType,
+    alias_cycles: &mut AliasCycles,
 ) -> Result<Cow<'a, DataType>, Error> {
     let ty = ndt.ty.as_ref().expect("named datatype must have a body");
+    if !alias_cycles.may_cycle(types, ndt) {
+        return Ok(Cow::Borrowed(ty));
+    }
     match collapse_untagged_alias_cycle(types, ndt) {
         Ok(Some(collapsed)) => Ok(Cow::Owned(DataType::Enum(collapsed))),
         Ok(None) => Ok(Cow::Borrowed(ty)),
