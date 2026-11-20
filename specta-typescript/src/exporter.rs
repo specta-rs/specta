@@ -576,6 +576,18 @@ fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> 
     runtime
 }
 
+/// Apply `format` to `dt`, descending into its children only where the format
+/// left the node unchanged.
+///
+/// A `Cow::Owned` result is the format's complete rendering of that position:
+/// formats which rewrite a container (`specta_serde::Format` maps every field
+/// itself) return the whole subtree already mapped, so descending into it would
+/// format those nodes a second time. `Cow::Borrowed` means "unchanged", so the
+/// children are offered to the format in turn - that is what lets a leaf-only
+/// format (say, `u32` -> `str`) reach primitives nested in a struct.
+///
+/// Each datatype in a named body is therefore formatted exactly once, matching
+/// the single-pass contract the other exporters follow.
 fn map_datatype_format(
     format: Option<&dyn Format>,
     types: &Types,
@@ -585,6 +597,12 @@ fn map_datatype_format(
     if matches!(dt, DataType::Generic(_)) {
         return Ok(dt.clone());
     }
+
+    // Without a format there is nothing to map, and the recursion would only
+    // rebuild (deep clone) the datatype it was given.
+    let Some(format) = format else {
+        return Ok(dt.clone());
+    };
 
     fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
         Ok(match dt {
@@ -654,17 +672,13 @@ fn map_datatype_format(
     }
 
     if contains_generic_reference(dt)? {
-        let Some(format) = format else {
-            return map_datatype_format_children(None, types, dt.clone(), path);
-        };
-
+        // Formats commonly reject an unresolved generic, so a rejected node is
+        // still offered to the format child by child.
         match format.map_type(types, dt) {
             Ok(Cow::Borrowed(dt)) => {
                 return map_datatype_format_children(Some(format), types, dt.clone(), path);
             }
-            Ok(Cow::Owned(dt)) => {
-                return map_datatype_format_children(Some(format), types, dt, path);
-            }
+            Ok(Cow::Owned(dt)) => return Ok(dt),
             Err(err) if is_unresolved_generic_format_error(err.as_ref()) => {
                 return map_datatype_format_children(Some(format), types, dt.clone(), path);
             }
@@ -678,17 +692,13 @@ fn map_datatype_format(
         }
     }
 
-    let Some(format) = format else {
-        return Ok(dt.clone());
-    };
-
     let mapped = format
         .map_type(types, dt)
         .map_err(|err| Error::format_at("datatype formatter failed", path.join("."), err))?;
 
     match mapped {
         Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone(), path),
-        Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt, path),
+        Cow::Owned(dt) => Ok(dt),
     }
 }
 
