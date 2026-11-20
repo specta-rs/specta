@@ -1967,7 +1967,7 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
     let mut types = Types::default()
         .register::<FilesManualRoot>()
         .register::<FilesRemainingRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if matches!(ndt.name.as_ref(), "FilesManualRoot" | "FilesRemainingRoot") {
             ndt.module_path = "".into();
         }
@@ -2105,7 +2105,7 @@ fn valibot_files_framework_runtime_deduplicates_body_imports() {
     }
 
     let mut types = Types::default().register::<FrameworkRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "FrameworkRoot" {
             ndt.module_path = Cow::Borrowed("");
         }

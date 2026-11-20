@@ -67,6 +67,39 @@ fn named_type_ids_survive_graph_copies() {
     );
 }
 
+/// Replacing a node's contents must not redirect references to it at another
+/// declaration. The collection deliberately does not hand out a mutable
+/// reference to a whole node.
+#[test]
+fn editing_a_named_type_keeps_its_identity() {
+    use specta::datatype::{NamedDataType, Primitive, Reference};
+
+    let mut types = Types::default();
+    let a = NamedDataType::new("A", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::bool.into());
+    });
+    let b = NamedDataType::new("B", &mut types, |_, ndt| {
+        ndt.ty = Some(Primitive::u32.into());
+    });
+
+    let (Reference::Named(a_ref), Reference::Named(b_ref)) =
+        (a.reference(vec![]), b.reference(vec![]))
+    else {
+        unreachable!("named datatypes produce named references");
+    };
+
+    assert!(types.edit(&a_ref, |ndt| *ndt = b.clone()));
+
+    let edited = types.get(&a_ref).expect("A is still registered");
+    assert_eq!(edited.name, "B", "the edit replaced the contents");
+    assert_eq!(edited.id(), a.id(), "the edit kept A's identity");
+    assert_eq!(
+        types.get(&b_ref).map(|ndt| ndt.id()),
+        Some(b.id()),
+        "B is unchanged"
+    );
+}
+
 #[derive(Type)]
 #[specta(collect = false)]
 struct IdentityItem {

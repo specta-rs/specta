@@ -520,12 +520,22 @@ impl Types {
         self.types.get(&r.id)?.as_ref()
     }
 
-    /// Gets the named datatype targeted by a [`NamedReference`] mutably.
+    /// Edits the named datatype targeted by a [`NamedReference`].
     ///
-    /// The entry's identity cannot change; mutating the returned value updates
-    /// the same graph node that the reference resolves to.
-    pub fn get_mut(&mut self, r: &NamedReference) -> Option<&mut NamedDataType> {
-        self.types.get_mut(&r.id)?.as_mut()
+    /// The entry's identity is restored after `f` returns, including when it
+    /// unwinds, so replacing the whole value cannot make references to this
+    /// entry resolve to a different declaration. This is why the collection does
+    /// not hand out a mutable reference to a whole [`NamedDataType`].
+    ///
+    /// Returns `false` when the reference is unknown or currently only has an
+    /// internal placeholder entry.
+    pub fn edit(&mut self, r: &NamedReference, f: impl FnOnce(&mut NamedDataType)) -> bool {
+        let Some(ndt) = self.types.get_mut(&r.id).and_then(Option::as_mut) else {
+            return false;
+        };
+
+        with_identity(ndt, f);
+        true
     }
 
     /// Returns the number of completed named datatypes in the collection.
@@ -612,16 +622,16 @@ impl Types {
     /// Mutably modifies each [`NamedDataType`] in the collection.
     ///
     /// The named type's identity is preserved across the callback, including
-    /// when the callback replaces the whole value. References to the type
-    /// therefore keep resolving to this entry.
-    pub fn iter_mut<F>(&mut self, mut f: F)
+    /// when the callback replaces the whole value or unwinds. References to the
+    /// type therefore keep resolving to this entry.
+    pub fn for_each_named_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
     {
         for (id, slot) in &mut self.types {
             if let Some(ndt) = slot {
-                f(ndt);
-                ndt.id = id.clone();
+                with_identity(ndt, &mut f);
+                debug_assert_eq!(&ndt.id, id, "named type identity changed");
             }
         }
     }
@@ -643,6 +653,40 @@ impl Types {
         }
         self
     }
+}
+
+/// Runs `f` over `ndt` and restores its identity afterwards, including on unwind.
+fn with_identity<R>(ndt: &mut NamedDataType, f: impl FnOnce(&mut NamedDataType) -> R) -> R {
+    struct IdentityGuard<'a> {
+        ndt: &'a mut NamedDataType,
+        id: NamedTypeId,
+    }
+
+    impl std::ops::Deref for IdentityGuard<'_> {
+        type Target = NamedDataType;
+
+        fn deref(&self) -> &Self::Target {
+            self.ndt
+        }
+    }
+
+    impl std::ops::DerefMut for IdentityGuard<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.ndt
+        }
+    }
+
+    impl Drop for IdentityGuard<'_> {
+        fn drop(&mut self) {
+            self.ndt.id = self.id.clone();
+        }
+    }
+
+    let mut guard = IdentityGuard {
+        id: ndt.id.clone(),
+        ndt,
+    };
+    f(&mut guard)
 }
 
 struct UnsortedIter<'a> {

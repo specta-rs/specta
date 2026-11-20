@@ -196,7 +196,7 @@ fn map_datatypes(types: Cow<'_, Types>, format: &dyn Format) -> Result<Types, Er
     let original = types.as_ref();
     let mut mapped = original.clone();
     let mut error = None;
-    mapped.iter_mut(|ndt| {
+    mapped.for_each_named_mut(|ndt| {
         if error.is_some() {
             return;
         }

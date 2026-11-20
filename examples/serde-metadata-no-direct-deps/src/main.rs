@@ -40,7 +40,7 @@ struct MiniSerdeFormat;
 impl Format for MiniSerdeFormat {
     fn map_types(&self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
         let mut types = types.clone();
-        types.iter_mut(apply_metadata);
+        types.for_each_named_mut(apply_metadata);
         Ok(Cow::Owned(types))
     }
 

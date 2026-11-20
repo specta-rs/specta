@@ -1490,7 +1490,7 @@ fn zod_files_framework_runtime_deduplicates_body_imports() {
     }
 
     let mut types = Types::default().register::<FrameworkRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "FrameworkRoot" {
             ndt.module_path = Cow::Borrowed("");
         }
