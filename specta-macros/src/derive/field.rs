@@ -1,16 +1,43 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
-use syn::Type;
-
-use crate::r#type::attr::deprecated_as_tokens;
+use syn::{Type, spanned::Spanned};
 
 use super::{
-    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
+    ContainerAttr, FieldAttr, Scope,
+    attr::{
+        deprecated_as_tokens, parse_attrs_with_filter, reject_unknown_specta_attrs, unraw_raw_ident,
+    },
+    build_runtime_attributes,
     generics::{resolve_ty_expr, type_with_inferred_lifetimes},
 };
 
-pub fn construct_field(
+/// Parses a field's attributes, erroring on any `#[specta(...)]` key the derive
+/// does not consume.
+pub(crate) fn decode_field_attrs<'a>(
+    field: &'a syn::Field,
+    skip_attrs: &[String],
+) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
+    // We pass all the attributes at the start and when decoding them pop them off the list.
+    // This means at the end we can check for any that weren't consumed and throw an error.
+    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
+    let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
+
+    reject_unknown_specta_attrs(&attrs, Scope::Field)?;
+
+    Ok((field_attrs, &field.attrs))
+}
+
+/// The field's name without its raw-ident prefix.
+pub(crate) fn named_field_ident(field: &syn::Field) -> syn::Result<String> {
+    field
+        .ident
+        .as_ref()
+        .map(unraw_raw_ident)
+        .ok_or_else(|| syn::Error::new(field.span(), "specta: named field must have an identifier"))
+}
+
+pub(crate) fn construct_field(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
@@ -31,7 +58,7 @@ pub fn construct_field(
     )
 }
 
-pub fn construct_field_with_variant_skip(
+pub(crate) fn construct_field_with_variant_skip(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
@@ -50,7 +77,7 @@ pub fn construct_field_with_variant_skip(
 
     let runtime_attrs = build_runtime_attributes(
         crate_ref,
-        AttributeScope::Field,
+        Scope::Field,
         quote!(field.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,

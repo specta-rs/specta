@@ -8,11 +8,9 @@ use syn::{
     visit_mut::VisitMut,
 };
 
-use crate::utils::parse_attrs_with_filter;
+use super::{FieldAttr, VariantAttr, parse_attrs_with_filter};
 
-use super::{FieldAttr, VariantAttr};
-
-pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
             use GenericParam::*;
@@ -64,11 +62,6 @@ fn bound_uses_lifetime(bound: &syn::TypeParamBound) -> bool {
     mentions_lifetime(|finder| finder.visit_type_param_bound(bound))
 }
 
-/// Whether a `where` predicate mentions any lifetime.
-pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
-    mentions_lifetime(|finder| finder.visit_where_predicate(predicate))
-}
-
 /// Reduce a `where` predicate to the bounds [`build_where_clause`] can keep.
 ///
 /// `build` is a nested fn and so cannot mention the container's lifetime
@@ -77,7 +70,8 @@ pub fn predicate_uses_lifetime(predicate: &syn::WherePredicate) -> bool {
 /// dropped; `None` comes back when nothing usable remains.
 fn strip_lifetime_bounds(predicate: &syn::WherePredicate) -> Option<syn::WherePredicate> {
     let syn::WherePredicate::Type(bounded) = predicate else {
-        return (!predicate_uses_lifetime(predicate)).then(|| predicate.clone());
+        return (!mentions_lifetime(|finder| finder.visit_where_predicate(predicate)))
+            .then(|| predicate.clone());
     };
 
     // A lifetime inside the bounded type itself (`&'a T: Trait`) cannot be
@@ -123,7 +117,7 @@ fn is_type_bound(bound: &syn::TypeParamBound, crate_ref: &TokenStream) -> bool {
 /// the `where` clause from [`build_where_clause`]. Declaring them in both places
 /// would trip `clippy::multiple_bound_locations` in every crate that derives a
 /// bounded generic type.
-pub fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<TokenStream> {
     generics
         .params
         .iter()
@@ -155,7 +149,7 @@ pub fn generics_with_ident_only_no_lifetimes(generics: &Generics) -> Option<Toke
 /// under `clippy::multiple_bound_locations`. Lifetime bounds are dropped:
 /// `build` cannot name the container's lifetime parameters, and field types use
 /// inferred `'_` lifetimes so they are never required.
-pub fn build_where_clause(
+pub(crate) fn build_where_clause(
     crate_ref: &TokenStream,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
@@ -209,7 +203,7 @@ pub fn build_where_clause(
     (!predicates.is_empty()).then(|| parse_quote!(where #(#predicates),*))
 }
 
-pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
+pub(crate) fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
             use GenericParam::*;
@@ -222,7 +216,7 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn type_with_inferred_lifetimes(ty: &Type) -> Type {
+pub(crate) fn type_with_inferred_lifetimes(ty: &Type) -> Type {
     let mut ty = ty.clone();
     InferredLifetimeVisitor.visit_type_mut(&mut ty);
     ty
@@ -248,7 +242,7 @@ fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
 }
 
 // Code adopted from ts-rs. Thanks to it's original author!
-pub fn used_type_params(
+pub(crate) fn used_type_params(
     generics: &Generics,
     data: &Data,
     container_type: Option<&Type>,
@@ -325,14 +319,14 @@ pub fn used_type_params(
 
 /// The placeholder type used to stand in for a generic parameter while the
 /// canonical declaration of a type is being built.
-pub fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
+pub(crate) fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
     quote::format_ident!("__SPECTA_GENERIC_PLACEHOLDER_{}", ident)
 }
 
 /// Rewrites single-segment paths that name one of `params` to their
 /// placeholder type, so the declaration is built with `Generic` placeholders
 /// instead of the concrete arguments.
-pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
+pub(crate) fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
     struct Rewrite<'a> {
         params: &'a [syn::Ident],
     }
@@ -370,7 +364,7 @@ pub fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> T
 /// scoped generic substitution on [`specta::Types`] instead. Parameters with no
 /// declared bounds cannot be required by any field type (the container would not
 /// compile otherwise), so the precise placeholder path is used for them.
-pub fn resolve_ty_expr(
+pub(crate) fn resolve_ty_expr(
     crate_ref: &TokenStream,
     ty: &Type,
     used_generic_types: &[syn::Ident],
@@ -451,7 +445,7 @@ pub fn resolve_ty_expr(
 ///
 /// Used to scope declaration-time generic substitution to the parameters a
 /// given field actually mentions.
-pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ident> {
+pub(crate) fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ident> {
     if candidates.is_empty() {
         return Vec::new();
     }
@@ -492,7 +486,7 @@ pub fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<syn::Ide
 /// parameters of the same concrete type is still ambiguous — but it preserves
 /// the previous behaviour for opaque fields rather than baking the concrete
 /// argument in.
-pub fn generic_substitution_slots(
+pub(crate) fn generic_substitution_slots(
     crate_ref: &TokenStream,
     ty: &Type,
     substituted: &[syn::Ident],
@@ -635,7 +629,7 @@ fn visit_field_type(
     Ok(())
 }
 
-pub fn add_type_to_where_clause(
+pub(crate) fn add_type_to_where_clause(
     ty: &TokenStream,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,

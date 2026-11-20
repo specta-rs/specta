@@ -3,29 +3,29 @@ use quote::ToTokens;
 use syn::Result;
 use syn::Type;
 
-use crate::utils::{AttrExtract, Attribute};
+use super::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 
 #[derive(Default)]
-pub struct ContainerAttr {
-    pub r#type: Option<Type>,
-    pub crate_name: Option<TokenStream>,
-    pub inline: bool,
-    pub remote: Option<TokenStream>,
-    pub collect: Option<bool>,
-    pub skip_attrs: Vec<String>,
-    pub common: RustCAttr,
+pub(crate) struct ContainerAttr {
+    pub(crate) r#type: Option<Type>,
+    pub(crate) crate_name: Option<TokenStream>,
+    pub(crate) inline: bool,
+    pub(crate) remote: Option<TokenStream>,
+    pub(crate) collect: Option<bool>,
+    pub(crate) skip_attrs: Vec<String>,
+    pub(crate) common: RustCAttr,
 
     // Struct only (we pass it anyway so enums get nice errors)
-    pub transparent: bool,
+    pub(crate) transparent: bool,
 
     // Custom where clause bounds (None = automatic, Some(vec) = custom)
-    pub bound: Option<Vec<syn::WherePredicate>>,
+    pub(crate) bound: Option<Vec<syn::WherePredicate>>,
 }
 
 impl ContainerAttr {
-    pub fn from_attrs(attrs: &mut Vec<Attribute>, is_struct: bool) -> Result<Self> {
+    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>, is_struct: bool) -> Result<Self> {
         let mut result = Self {
             common: RustCAttr::from_attrs(attrs)?,
             ..Default::default()

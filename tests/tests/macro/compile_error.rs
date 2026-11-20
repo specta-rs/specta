@@ -1,6 +1,6 @@
 //! This file is run with the `trybuild` crate to assert compilation errors in the Specta macros.
 
-use specta::{Type, specta};
+use specta::Type;
 
 // Invalid inflection
 #[derive(Type)]
@@ -153,23 +153,11 @@ pub struct InvalidSpectaAttribute1;
 #[specta = "todo"]
 pub struct InvalidSpectaAttribute2;
 
-use wasm_bindgen::prelude::wasm_bindgen;
-
-#[wasm_bindgen]
-#[specta]
-pub fn testing() {}
-
-#[specta(rename_all = "camelCase123")]
-pub fn invalid_function_rename_all() {}
-
 #[derive(Type)]
 #[specta(collect = false)]
 struct InvalidExplicitBool {
     #[specta(skip = "yes")]
     value: String,
 }
-
-#[specta]
-pub fn invalid_destructure((): ()) {}
 
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test

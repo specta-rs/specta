@@ -1,32 +1,26 @@
-use attr::*;
-use r#enum::parse_enum;
+use std::collections::HashSet;
+
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
-use std::collections::HashSet;
-use r#struct::parse_struct;
 use syn::{Data, DeriveInput, GenericParam, parse};
 
-use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
-
-use self::generics::{
-    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, generics_with_ident_only_no_lifetimes, placeholder_ident,
-    resolve_ty_expr, type_params_used_in, type_with_inferred_lifetimes, used_type_params,
+use self::{
+    attr::*,
+    r#enum::parse_enum,
+    generics::{
+        add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_only,
+        generics_with_ident_only, generics_with_ident_only_no_lifetimes, placeholder_ident,
+        resolve_ty_expr, type_params_used_in, type_with_inferred_lifetimes, used_type_params,
+    },
+    r#struct::parse_struct,
 };
 
-pub(crate) mod attr;
+mod attr;
 mod r#enum;
 mod field;
 mod generics;
 mod serde;
 mod r#struct;
-
-#[derive(Copy, Clone)]
-pub(super) enum AttributeScope {
-    Container,
-    Variant,
-    Field,
-}
 
 /// Lower the Serde attributes of a container, variant or field into the inert `serde:*` runtime
 /// attributes.
@@ -39,7 +33,7 @@ pub(super) enum AttributeScope {
 /// https://github.com/specta-rs/specta/issues/590.
 pub(super) fn build_runtime_attributes(
     crate_ref: &TokenStream,
-    scope: AttributeScope,
+    scope: Scope,
     attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
@@ -72,25 +66,6 @@ pub(super) fn build_runtime_attributes(
     })))
 }
 
-fn generic_type_and_const_args(
-    generics: &syn::Generics,
-    type_arg: impl Fn(&syn::TypeParam) -> TokenStream,
-) -> Option<TokenStream> {
-    generics
-        .params
-        .iter()
-        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
-        .then(|| {
-            let args = generics.params.iter().filter_map(|param| match param {
-                GenericParam::Lifetime(_) => None,
-                GenericParam::Const(param) => Some(param.ident.to_token_stream()),
-                GenericParam::Type(param) => Some(type_arg(param)),
-            });
-
-            quote!(::<#(#args),*>)
-        })
-}
-
 /// Builds an identifier suffix unique to this declaration's source position.
 ///
 /// `module_path!()` does not distinguish declarations in separate function or
@@ -111,7 +86,7 @@ fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
     format!("{:x}", hasher.finish())
 }
 
-pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
+pub(crate) fn expand(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let source_suffix = source_position_suffix(&input);
     let DeriveInput {
         ident: raw_ident,
@@ -161,7 +136,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let generic_context = Some((used_generic_types.as_slice(), &bounded));
     let container_runtime_attrs = build_runtime_attributes(
         &crate_ref,
-        AttributeScope::Container,
+        Scope::Container,
         quote!(s.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
@@ -169,7 +144,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     )?;
     let enum_runtime_attrs = build_runtime_attributes(
         &crate_ref,
-        AttributeScope::Container,
+        Scope::Container,
         quote!(en.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
@@ -260,8 +235,19 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .collect::<Vec<_>>();
     let build_placeholders = placeholder_definitions(&crate_ref, &placeholder_params);
 
-    let build_ty_passthrough_args =
-        generic_type_and_const_args(generics, |ty| ty.ident.to_token_stream());
+    let build_ty_passthrough_args = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
+        .then(|| {
+            let args = generics.params.iter().filter_map(|param| match param {
+                GenericParam::Lifetime(_) => None,
+                GenericParam::Const(param) => Some(param.ident.to_token_stream()),
+                GenericParam::Type(param) => Some(param.ident.to_token_stream()),
+            });
+
+            quote!(::<#(#args),*>)
+        });
 
     // `generics_for_ndt` is the declaration's generic list; `instantiation_steps`
     // resolves the type's own arguments in parameter order. Unused parameters

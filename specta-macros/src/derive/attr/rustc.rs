@@ -4,45 +4,23 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Lit, Result};
 
-use crate::utils::{Attribute, AttributeValue};
+use super::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
-pub struct Deprecated {
+#[derive(Default)]
+pub(crate) struct Deprecated {
     note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
 
-impl Deprecated {
-    pub const fn new() -> Self {
-        Self {
-            note: None,
-            since: None,
-        }
-    }
-
-    pub fn with_note(note: Cow<'static, str>) -> Self {
-        Self {
-            note: Some(note),
-            since: None,
-        }
-    }
-
-    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
-        Self {
-            note: Some(note),
-            since,
-        }
-    }
-}
-
 #[derive(Default)]
-pub struct RustCAttr {
-    pub doc: String,
-    pub deprecated: Option<Deprecated>,
+pub(crate) struct RustCAttr {
+    pub(crate) doc: String,
+    pub(crate) deprecated: Option<Deprecated>,
 }
 
 impl RustCAttr {
-    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
+    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let doc = attrs
             .extract_if(.., |attr| {
                 attr.key == "doc" && matches!(attr.value, Some(AttributeValue::Lit(Lit::Str(_))))
@@ -62,10 +40,13 @@ impl RustCAttr {
 
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
-                    deprecated = Some(Deprecated::with_note(match lit {
-                        Lit::Str(s) => s.value().into(),
-                        _ => return Err(syn::Error::new_spanned(lit, "expected string")),
-                    }));
+                    deprecated = Some(Deprecated {
+                        note: Some(match lit {
+                            Lit::Str(s) => s.value().into(),
+                            _ => return Err(syn::Error::new_spanned(lit, "expected string")),
+                        }),
+                        since: None,
+                    });
                 }
                 Some(AttributeValue::Path(_)) => {
                     unreachable!("deprecated attribute can't be a path!")
@@ -74,12 +55,12 @@ impl RustCAttr {
                     unreachable!("deprecated attribute can't be an expression or type!")
                 }
                 Some(AttributeValue::Attribute { attr, .. }) => {
-                    let since = parse_deprecated_string_attr(attr, "since")?;
-                    let note = parse_deprecated_string_attr(attr, "note")?.unwrap_or_default();
-
-                    deprecated = Some(Deprecated::with_since_note(since, note));
+                    deprecated = Some(Deprecated {
+                        note: Some(parse_deprecated_string_attr(attr, "note")?.unwrap_or_default()),
+                        since: parse_deprecated_string_attr(attr, "since")?,
+                    });
                 }
-                None => deprecated = Some(Deprecated::new()),
+                None => deprecated = Some(Deprecated::default()),
             }
 
             attrs.swap_remove(pos);

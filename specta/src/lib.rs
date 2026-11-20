@@ -13,11 +13,6 @@
 pub mod collect;
 pub mod datatype;
 mod format;
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
-pub mod function;
-#[doc(hidden)]
-pub mod internal;
 mod r#type;
 mod types;
 
@@ -46,10 +41,31 @@ pub use specta_macros::Type;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use specta_macros::parse_type_from_lit;
 
-#[doc(inline)]
-#[cfg(all(feature = "derive", feature = "function"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
-pub use specta_macros::specta;
+// TODO(v3): Remove this. Tauri v2's `specta` feature implements this trait for its
+// `State`, `AppHandle`, `Window`, `Webview`, and `WebviewWindow` command arguments.
+// Function type collection itself has been removed, so only this shim remains.
+#[cfg(feature = "function")]
+#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
+#[doc(hidden)]
+pub mod function {
+    use crate::{Type, Types, datatype::DataType};
+
+    /// Deprecated compatibility shim for Tauri v2.
+    #[deprecated(
+        note = "function type collection has been removed; this trait only exists for Tauri v2 compatibility"
+    )]
+    pub trait FunctionArg {
+        /// Returns the argument's datatype, or `None` to omit it.
+        fn to_datatype(types: &mut Types) -> Option<DataType>;
+    }
+
+    #[allow(deprecated)]
+    impl<T: Type> FunctionArg for T {
+        fn to_datatype(types: &mut Types) -> Option<DataType> {
+            Some(T::definition(types))
+        }
+    }
+}
 
 // TODO(v3): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
 #[doc(hidden)]

@@ -19,7 +19,6 @@ mod core_type_impls;
 mod csharp;
 mod errors;
 mod format_consistency;
-mod functions;
 mod go;
 mod java;
 mod jsdoc;

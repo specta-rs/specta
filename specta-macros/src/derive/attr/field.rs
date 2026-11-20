@@ -1,22 +1,22 @@
 use syn::{Result, Type};
 
-use crate::utils::{AttrExtract, Attribute};
+use super::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 
 #[derive(Default)]
-pub struct FieldAttr {
-    pub r#type: Option<Type>,
-    pub inline: bool,
-    pub skip: bool,
-    pub serde_skip: bool,
-    pub serde_newtype_skip_ignored: bool,
-    pub optional: bool,
-    pub common: RustCAttr,
+pub(crate) struct FieldAttr {
+    pub(crate) r#type: Option<Type>,
+    pub(crate) inline: bool,
+    pub(crate) skip: bool,
+    pub(crate) serde_skip: bool,
+    pub(crate) serde_newtype_skip_ignored: bool,
+    pub(crate) optional: bool,
+    pub(crate) common: RustCAttr,
 }
 
 impl FieldAttr {
-    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
+    pub(crate) fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self {
             common: RustCAttr::from_attrs(attrs)?,
             ..Default::default()

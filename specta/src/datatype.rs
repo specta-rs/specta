@@ -3,7 +3,6 @@
 mod attributes;
 mod r#enum;
 mod fields;
-mod function;
 mod generic;
 mod list;
 mod map;
@@ -16,7 +15,6 @@ mod tuple;
 pub use attributes::Attributes;
 pub use r#enum::{Enum, Variant, VariantBuilder};
 pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
-pub use function::Function;
 pub use generic::{Generic, Generic as GenericReference, GenericDefinition};
 pub use list::List;
 // pub use literal::Literal;

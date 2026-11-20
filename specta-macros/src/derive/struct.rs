@@ -1,29 +1,14 @@
-use crate::{
-    r#type::field::construct_field,
-    utils::{parse_attrs_with_filter, unraw_raw_ident},
-};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use std::collections::HashSet;
-use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
+use syn::{DataStruct, Fields, Type, spanned::Spanned};
 
-use super::attr::*;
+use super::{
+    attr::*,
+    field::{construct_field, decode_field_attrs, named_field_ident},
+};
 
-pub fn decode_field_attrs<'a>(
-    field: &'a Field,
-    skip_attrs: &[String],
-) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
-    // We pass all the attributes at the start and when decoding them pop them off the list.
-    // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
-    let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
-
-    reject_unknown_specta_attrs(&attrs, Scope::Field)?;
-
-    Ok((field_attrs, &field.attrs))
-}
-
-pub fn parse_struct(
+pub(crate) fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
@@ -82,14 +67,7 @@ pub fn parse_struct(
                     let (field_attrs, raw_attrs) =
                         decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                    let field_ident_str =
-                        unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
-                            syn::Error::new(
-                                field.span(),
-                                "specta: named field must have an identifier",
-                            )
-                        })?);
-                    let field_name = field_ident_str.to_token_stream();
+                    let field_name = named_field_ident(field)?.to_token_stream();
 
                     let inner = construct_field(
                         crate_ref,

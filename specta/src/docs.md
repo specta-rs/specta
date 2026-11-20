@@ -7,7 +7,6 @@ Specta provides a system for type introspection and a set of language exporters 
 ## Features
 
 - Export structs and enums to [Typescript](https://www.typescriptlang.org)
-- Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`.
  
@@ -86,10 +85,6 @@ Core Features
 - `std` - Enable support for the Rust standard library. Enabled by default.
 - `derive` - Derive macros
 - `collect` - Support for collecting up a global type map
-
-Features
-
-- `function` - Support for exporting the types of Rust functions.
 
 Compatibility
 

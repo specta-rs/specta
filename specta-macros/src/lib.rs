@@ -1,6 +1,6 @@
 //! Easily export your Rust types to other languages
 //!
-//! This crate contains the macro which are reexported by the `specta` crate.
+//! This crate contains the macros re-exported by the `specta` crate.
 //! You shouldn't need to use this crate directly.
 //! Checkout [Specta](https://docs.rs/specta).
 #![doc(
@@ -8,10 +8,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-#[cfg(feature = "DO_NOT_USE_function")]
-mod specta;
-mod r#type;
-mod utils;
+mod derive;
 
 use quote::quote;
 use syn::{Error, LitStr, Type, parse_macro_input};
@@ -207,7 +204,7 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
+    derive::expand(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
 /// Parses a string literal into a Rust type token stream.
@@ -224,23 +221,4 @@ pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenS
             .to_compile_error()
             .into(),
     }
-}
-
-/// Prepares a function to have its types extracted using `specta::function::fn_datatype!`
-///
-/// ## Example
-///
-/// ```ignore
-/// #[specta::specta]
-/// fn my_function(arg1: i32, arg2: bool) -> &'static str {
-///     "Hello World"
-/// }
-/// ```
-#[proc_macro_attribute]
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn specta(
-    attr: proc_macro::TokenStream,
-    item: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    specta::attribute(attr, item).unwrap_or_else(|err| err.into_compile_error().into())
 }

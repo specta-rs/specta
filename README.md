@@ -15,7 +15,6 @@
 ## Features
 
 - Export structs and enums to multiple languages
-- Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`
 

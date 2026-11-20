@@ -9,7 +9,7 @@ use syn::{
 };
 
 #[derive(Clone)]
-pub enum AttributeValue {
+pub(crate) enum AttributeValue {
     /// Literal value. Eg. `#[specta(name = "hello")]` or `#[specta(name = u32)]`
     Lit(Lit),
     /// Path value. Eg. `#[specta(type = String)]` or `#[specta(type = ::std::string::String)]`
@@ -23,18 +23,6 @@ pub enum AttributeValue {
     Type(Type),
     /// A nested attribute. Eg. the `deprecated(note = "some note") in `#[specta(deprecated(note = "some note"))]`
     Attribute { span: Span, attr: Vec<Attribute> },
-}
-
-impl AttributeValue {
-    fn span(&self) -> Span {
-        match self {
-            Self::Lit(lit) => lit.span(),
-            Self::Path(path) => path.span(),
-            Self::Expr(expr) => expr.span(),
-            Self::Type(ty) => ty.span(),
-            Self::Attribute { span, .. } => *span,
-        }
-    }
 }
 
 impl Parse for AttributeValue {
@@ -52,35 +40,31 @@ impl Parse for AttributeValue {
     }
 }
 
-fn attribute_value_from_expr(expr: &Expr) -> AttributeValue {
-    match expr {
-        Expr::Lit(expr_lit) => AttributeValue::Lit(expr_lit.lit.clone()),
-        Expr::Path(expr_path) => AttributeValue::Path(expr_path.path.clone()),
-        expr => AttributeValue::Expr(expr.clone()),
-    }
-}
-
 #[derive(Clone)]
-pub struct Attribute {
+pub(crate) struct Attribute {
     /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
-    pub source: String,
+    pub(crate) source: String,
     /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
-    pub key: Ident,
+    pub(crate) key: Ident,
     /// Value of the item. Eg. `String` in `#[specta(type = String)]`
-    pub value: Option<AttributeValue>,
+    pub(crate) value: Option<AttributeValue>,
 }
 
 impl Attribute {
     /// Span of they value. Eg. `String` in `#[specta(type = String)]`
     /// Will fallback to the key span if no value is present.
-    pub fn value_span(&self) -> Span {
+    pub(crate) fn value_span(&self) -> Span {
         match &self.value {
-            Some(v) => v.span(),
+            Some(AttributeValue::Lit(lit)) => lit.span(),
+            Some(AttributeValue::Path(path)) => path.span(),
+            Some(AttributeValue::Expr(expr)) => expr.span(),
+            Some(AttributeValue::Type(ty)) => ty.span(),
+            Some(AttributeValue::Attribute { span, .. }) => *span,
             None => self.key.span(),
         }
     }
 
-    pub fn parse_string(&self) -> Result<String> {
+    pub(crate) fn parse_string(&self) -> Result<String> {
         match &self.value {
             Some(AttributeValue::Lit(Lit::Str(string))) => Ok(string.value()),
             _ => Err(syn::Error::new(
@@ -90,7 +74,7 @@ impl Attribute {
         }
     }
 
-    pub fn parse_bool_or_true(&self) -> Result<bool> {
+    pub(crate) fn parse_bool_or_true(&self) -> Result<bool> {
         match &self.value {
             None => Ok(true),
             Some(AttributeValue::Lit(Lit::Bool(b))) => Ok(b.value()),
@@ -101,7 +85,7 @@ impl Attribute {
         }
     }
 
-    pub fn parse_path(&self) -> Result<Path> {
+    pub(crate) fn parse_path(&self) -> Result<Path> {
         match &self.value {
             Some(AttributeValue::Path(path)) => Ok(path.clone()),
             Some(AttributeValue::Expr(Expr::Path(path))) => Ok(path.path.clone()),
@@ -112,7 +96,7 @@ impl Attribute {
         }
     }
 
-    pub fn parse_type(&self) -> Result<Type> {
+    pub(crate) fn parse_type(&self) -> Result<Type> {
         match &self.value {
             Some(AttributeValue::Type(ty)) => Ok(ty.clone()),
             Some(AttributeValue::Path(path)) => Ok(Type::Path(TypePath {
@@ -133,7 +117,7 @@ impl Attribute {
     }
 }
 
-pub trait AttrExtract {
+pub(crate) trait AttrExtract {
     fn extract(&mut self, source: &str, key: &str) -> Option<Attribute>;
     fn extract_all(&mut self, source: &str, key: &str) -> Vec<Attribute>;
 }
@@ -221,6 +205,15 @@ impl AttrExtract for Vec<Attribute> {
     }
 }
 
+/// Skips an argument the generic metadata parser cannot interpret, such as the
+/// format string of an unrelated attribute.
+fn skip_unstructured_argument(input: ParseStream) -> Result<()> {
+    while !input.is_empty() && !input.peek(Token![,]) {
+        let _ = input.parse::<TokenTree>()?;
+    }
+    Ok(())
+}
+
 struct NestedAttributeList {
     attrs: Vec<Attribute>,
     unstructured_argument: Option<Span>,
@@ -292,22 +285,15 @@ impl Parse for NestedAttributeList {
     }
 }
 
-fn skip_unstructured_argument(input: ParseStream) -> Result<()> {
-    while !input.is_empty() && !input.peek(Token![,]) {
-        let _ = input.parse::<TokenTree>()?;
-    }
-    Ok(())
-}
-
 /// pass all of the attributes into a single structure.
 /// We can then remove them from the struct while passing an any left over must be invalid and an error can be thrown.
-pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
+pub(crate) fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
     parse_attrs_with_filter(attrs, &[])
 }
 
 /// Same as `parse_attrs` but allows skipping attributes by name.
 /// This is useful for skipping attributes that may have non-standard syntax that we can't parse.
-pub fn parse_attrs_with_filter(
+pub(crate) fn parse_attrs_with_filter(
     attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> syn::Result<Vec<Attribute>> {
@@ -361,10 +347,16 @@ pub fn parse_attrs_with_filter(
                 }]
             }
             Meta::NameValue(meta) => {
+                let value = match &meta.value {
+                    Expr::Lit(lit) => AttributeValue::Lit(lit.lit.clone()),
+                    Expr::Path(path) => AttributeValue::Path(path.path.clone()),
+                    expr => AttributeValue::Expr(expr.clone()),
+                };
+
                 vec![Attribute {
                     source: attr_name.clone(),
                     key: ident.clone(),
-                    value: Some(attribute_value_from_expr(&meta.value)),
+                    value: Some(value),
                 }]
             }
         });
@@ -373,18 +365,13 @@ pub fn parse_attrs_with_filter(
     Ok(result)
 }
 
-pub fn unraw_raw_ident(ident: &Ident) -> String {
+pub(crate) fn unraw_raw_ident(ident: &Ident) -> String {
     let ident = ident.to_string();
     if ident.starts_with("r#") {
         ident.trim_start_matches("r#").to_owned()
     } else {
         ident
     }
-}
-
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn format_fn_wrapper(function: &Ident) -> Ident {
-    quote::format_ident!("__specta__fn__{}", function)
 }
 
 #[cfg(test)]

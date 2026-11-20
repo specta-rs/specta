@@ -3,12 +3,6 @@
 version = 4
 
 [[package]]
-name = "Inflector"
-version = "0.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
-
-[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1528,12 +1522,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2024,7 +2012,6 @@ dependencies = [
  "jiff",
  "mac_address",
  "ordered-float",
- "paste",
  "rust_decimal",
  "rustc_version",
  "semver",
@@ -2108,7 +2095,6 @@ dependencies = [
 name = "specta-macros"
 version = "2.0.0-rc.28"
 dependencies = [
- "Inflector",
  "proc-macro2",
  "quote",
  "syn 2.0.118",
@@ -2225,7 +2211,6 @@ dependencies = [
  "ulid",
  "url",
  "uuid",
- "wasm-bindgen",
 ]
 
 [[package]]
