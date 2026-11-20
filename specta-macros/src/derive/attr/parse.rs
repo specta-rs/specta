@@ -17,12 +17,12 @@ use syn::{
 /// while cloning a group is a reference-count bump; the derive nests its body
 /// several levels deep on the way to the output, so wrapping the large
 /// fragments before they are interpolated avoids most of that copying.
-pub fn invisible(tokens: TokenStream) -> TokenStream {
+pub(crate) fn invisible(tokens: TokenStream) -> TokenStream {
     TokenStream::from(TokenTree::Group(Group::new(Delimiter::None, tokens)))
 }
 
 #[derive(Clone)]
-pub enum AttributeValue {
+pub(crate) enum AttributeValue {
     /// Literal value. Eg. `#[specta(name = "hello")]` or `#[specta(name = u32)]`
     Lit(Lit),
     /// Path value. Eg. `#[specta(type = String)]` or `#[specta(type = ::std::string::String)]`
@@ -74,7 +74,7 @@ fn attribute_value_from_expr(expr: &Expr) -> AttributeValue {
 }
 
 #[derive(Clone)]
-pub struct Attribute {
+pub(crate) struct Attribute {
     /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
     pub source: AttributeSource,
     /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
@@ -91,7 +91,7 @@ pub struct Attribute {
 /// list doesn't know about still works: the `#[specta]` function macro reads
 /// `#[command(rename_all = ...)]`.
 #[derive(Clone, PartialEq, Eq)]
-pub enum AttributeSource {
+pub(crate) enum AttributeSource {
     Specta,
     Serde,
     Doc,
@@ -194,7 +194,7 @@ impl Attribute {
     }
 }
 
-pub trait AttrExtract {
+pub(crate) trait AttrExtract {
     fn extract(&mut self, source: &str, key: &str) -> Option<Attribute>;
     fn extract_all(&mut self, source: &str, key: &str) -> Vec<Attribute>;
 }
@@ -367,13 +367,13 @@ fn skip_unstructured_argument(input: ParseStream) -> Result<()> {
 
 /// pass all of the attributes into a single structure.
 /// We can then remove them from the struct while passing an any left over must be invalid and an error can be thrown.
-pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
+pub(crate) fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
     parse_attrs_with_filter(attrs, &[])
 }
 
 /// Same as `parse_attrs` but allows skipping attributes by name.
 /// This is useful for skipping attributes that may have non-standard syntax that we can't parse.
-pub fn parse_attrs_with_filter(
+pub(crate) fn parse_attrs_with_filter(
     attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> syn::Result<Vec<Attribute>> {
@@ -452,7 +452,7 @@ pub fn parse_attrs_with_filter(
 /// `Ident` whether it is raw without formatting it first, so the common case
 /// cannot avoid the allocation — but the raw prefix is drained from the same
 /// buffer instead of copying the remaining name into a second one.
-pub fn unraw_raw_ident(ident: &Ident) -> String {
+pub(crate) fn unraw_raw_ident(ident: &Ident) -> String {
     let mut name = ident.to_string();
     if name.starts_with("r#") {
         name.drain(..2);

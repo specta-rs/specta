@@ -23,7 +23,7 @@ use crate::derive::attr::parse::invisible;
 /// parameters, so the caller knows whether the function holding it must be
 /// generic.
 #[allow(clippy::too_many_arguments)]
-pub fn parse_enum(
+pub(crate) fn parse_enum(
     names: &Names,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
@@ -33,8 +33,6 @@ pub fn parse_enum(
     attrs_apply: Option<&TokenStream>,
     build: BuildKind,
 ) -> syn::Result<(TokenStream, bool)> {
-    crate::phase!("enum:build");
-
     if container_attrs.transparent {
         return Err(syn::Error::new(
             data.enum_token.span(),
@@ -46,8 +44,6 @@ pub fn parse_enum(
     let mut variant_steps = Vec::with_capacity(variants.len());
 
     for (variant, info) in data.variants.iter().zip(variants) {
-        crate::phase!("variant:build");
-
         let attrs = &info.attrs;
         let binding = &info.binding;
 

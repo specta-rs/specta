@@ -5,7 +5,7 @@ use crate::derive::attr::parse::{AttrExtract, Attribute};
 use super::RustCAttr;
 
 #[derive(Default)]
-pub struct VariantAttr {
+pub(crate) struct VariantAttr {
     pub r#type: Option<Type>,
     pub skip: bool,
     pub inline: bool,

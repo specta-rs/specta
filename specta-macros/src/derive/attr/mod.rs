@@ -1,8 +1,8 @@
-pub use container::*;
-pub use field::*;
-pub use parse::*;
-pub use rustc::*;
-pub use variant::*;
+pub(crate) use container::*;
+pub(crate) use field::*;
+pub(crate) use parse::*;
+pub(crate) use rustc::*;
+pub(crate) use variant::*;
 
 use crate::derive::attr::parse::{Attribute, AttributeValue};
 
@@ -12,7 +12,7 @@ pub(crate) mod parse;
 mod rustc;
 mod variant;
 
-pub fn reject_unknown_specta_attrs(attrs: &[Attribute], scope: Scope) -> syn::Result<()> {
+pub(crate) fn reject_unknown_specta_attrs(attrs: &[Attribute], scope: Scope) -> syn::Result<()> {
     let Some(attr) = attrs
         .iter()
         .find(|attr| attr.source == crate::derive::attr::parse::AttributeSource::Specta)
@@ -56,7 +56,7 @@ pub fn reject_unknown_specta_attrs(attrs: &[Attribute], scope: Scope) -> syn::Re
 }
 
 #[derive(Clone, Copy)]
-pub enum Scope {
+pub(crate) enum Scope {
     Container,
     Field,
     Variant,
@@ -72,7 +72,7 @@ impl Scope {
     }
 }
 
-pub fn migration_hint(scope: Scope, key: &str) -> Option<String> {
+pub(crate) fn migration_hint(scope: Scope, key: &str) -> Option<String> {
     let replacement = match (scope, key) {
         (Scope::Container, "rename") | (Scope::Field, "rename") | (Scope::Variant, "rename") => {
             Some("#[serde(rename = \"...\")]")

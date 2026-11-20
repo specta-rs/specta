@@ -8,7 +8,7 @@ use crate::derive::attr::parse::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
 #[derive(Clone)]
-pub struct Deprecated {
+pub(crate) struct Deprecated {
     note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
@@ -37,7 +37,7 @@ impl Deprecated {
 }
 
 #[derive(Default)]
-pub struct RustCAttr {
+pub(crate) struct RustCAttr {
     pub doc: String,
     pub deprecated: Option<Deprecated>,
 }

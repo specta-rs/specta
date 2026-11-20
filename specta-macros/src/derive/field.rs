@@ -10,12 +10,10 @@ use crate::derive::attr::parse::invisible;
 
 /// Parses a field's attributes, erroring on any `#[specta(...)]` key the derive
 /// does not consume.
-pub fn decode_field_attrs<'a>(
+pub(crate) fn decode_field_attrs<'a>(
     field: &'a syn::Field,
     skip_attrs: &[String],
 ) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
-    crate::phase!("field:decode");
-
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
     let mut attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
@@ -39,14 +37,14 @@ use super::{
 /// it out of a `let mut` binding also keeps the compiler from having to hold a
 /// `Field` (which owns a map and a `Cow`) alive across statements, with the drop
 /// flag and cleanup path that costs once per field.
-pub struct FieldTokens {
+pub(crate) struct FieldTokens {
     pub value: TokenStream,
     /// Whether the type expression names one of the container's parameters, so
     /// the function holding it must be generic.
     pub uses_params: bool,
 }
 
-pub fn construct_field(
+pub(crate) fn construct_field(
     names: &Names,
     field: &FieldInfo,
     field_ty: &Type,
@@ -66,7 +64,7 @@ pub fn construct_field(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn construct_field_with_variant_skip(
+pub(crate) fn construct_field_with_variant_skip(
     names: &Names,
     field: &FieldInfo,
     field_ty: &Type,
@@ -75,8 +73,6 @@ pub fn construct_field_with_variant_skip(
     variant_skip: bool,
     build: BuildKind,
 ) -> syn::Result<FieldTokens> {
-    crate::phase!("field:construct");
-
     let attrs = &field.attrs;
 
     // Checked on the *declared* Rust type, never the `#[specta(type = ...)]`
