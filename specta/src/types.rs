@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, hash_map},
+    collections::hash_map,
     fmt,
     panic::{self, AssertUnwindSafe},
 };
@@ -7,6 +7,7 @@ use std::{
 use crate::{
     Type,
     datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    hash::FastHashMap,
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -30,7 +31,7 @@ pub struct Types {
     /// A `None` value is a placeholder for a datatype whose definition is
     /// currently being resolved. This lets recursive definitions refer to the
     /// in-progress type without re-entering resolution indefinitely.
-    pub(crate) types: HashMap<NamedId, Option<NamedDataType>>,
+    pub(crate) types: FastHashMap<NamedId, Option<NamedDataType>>,
 
     /// Cached count of completed entries in [`Self::types`].
     ///

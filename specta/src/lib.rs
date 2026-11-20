@@ -13,6 +13,7 @@
 pub mod collect;
 pub mod datatype;
 mod format;
+mod hash;
 mod r#type;
 mod types;
 
