@@ -73,7 +73,7 @@ jobs:
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
       - name: Install OpenCode
         run: |
-          curl --fail --silent --show-error --location https://opencode.ai/install \
+          curl --fail --silent --show-error --location https://opencode.ai/v2/install \
             | bash -s -- --version "$OPENCODE_VERSION" --no-modify-path
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Triage
@@ -124,7 +124,7 @@ jobs:
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
       - name: Install OpenCode
         run: |
-          curl --fail --silent --show-error --location https://opencode.ai/install \
+          curl --fail --silent --show-error --location https://opencode.ai/v2/install \
             | bash -s -- --version "$OPENCODE_VERSION" --no-modify-path
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
       - name: Propose a fix
