@@ -35,7 +35,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             ty,
             types,
             &mut checked_references,
-            ndt.name.to_string(),
+            &mut ValidationPath::new(ndt.name.as_ref()),
             mode,
             true,
             None,
@@ -53,7 +53,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             root,
             types,
             &mut checked_references,
-            "<root>".to_string(),
+            &mut ValidationPath::new("<root>"),
             mode,
             true,
             None,
@@ -74,7 +74,7 @@ pub(crate) fn validate_datatype_for_mode(
         dt,
         types,
         &mut ValidationVisits::default(),
-        "<top-level>".to_string(),
+        &mut ValidationPath::new("<top-level>"),
         mode,
         true,
         None,
@@ -92,7 +92,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
         dt,
         types,
         &mut ValidationVisits::default(),
-        "<top-level>".to_string(),
+        &mut ValidationPath::new("<top-level>"),
         mode,
         false,
         None,
@@ -166,11 +166,100 @@ impl ValidationVisits {
     }
 }
 
+/// The diagnostic path of the node the walk is currently visiting.
+///
+/// A path is only ever read when validation fails, yet every visited node used
+/// to build its own `String` for one (`format!("{path}.{name}")`), which made
+/// path formatting the single largest cost of the walk. One buffer is instead
+/// pushed and truncated as the walk enters and leaves nodes, and the helpers
+/// that only name the node in an error take the current path as a `&str`.
+#[derive(Default)]
+struct ValidationPath {
+    buf: String,
+}
+
+impl ValidationPath {
+    fn new(root: &str) -> Self {
+        let mut buf = String::with_capacity(root.len() + 16);
+        buf.push_str(root);
+        Self { buf }
+    }
+
+    fn as_str(&self) -> &str {
+        &self.buf
+    }
+
+    /// Runs `f` with `segment` appended, removing it again even when `f`
+    /// fails.
+    fn with_segment<R>(
+        &mut self,
+        segment: impl FnOnce(&mut String),
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let mark = self.buf.len();
+        segment(&mut self.buf);
+        let result = f(self);
+        self.buf.truncate(mark);
+        result
+    }
+
+    /// Appends `.name`.
+    fn with_field<R>(&mut self, name: &str, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.with_segment(
+            |buf| {
+                buf.push('.');
+                buf.push_str(name);
+            },
+            f,
+        )
+    }
+
+    /// Appends `::name`.
+    fn with_variant<R>(&mut self, name: &str, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.with_segment(
+            |buf| {
+                buf.push_str("::");
+                buf.push_str(name);
+            },
+            f,
+        )
+    }
+
+    /// Appends `[index]`.
+    fn with_index<R>(&mut self, index: usize, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.with_segment(
+            |buf| {
+                buf.push('[');
+                buf.push_str(&index.to_string());
+                buf.push(']');
+            },
+            f,
+        )
+    }
+
+    /// Appends a literal suffix, e.g. `.<map_key>`.
+    fn with_suffix<R>(&mut self, suffix: &str, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.with_segment(|buf| buf.push_str(suffix), f)
+    }
+
+    /// Replaces the path with a fresh root, returning the replaced path so the
+    /// caller can put it back with [`Self::restore`].
+    fn swap_root(&mut self, root: &str) -> String {
+        let saved = std::mem::replace(&mut self.buf, String::with_capacity(root.len() + 16));
+        self.buf.push_str(root);
+        saved
+    }
+
+    fn restore(&mut self, saved: String) {
+        self.buf = saved;
+    }
+}
+
 fn inner(
     dt: &DataType,
     types: &Types,
     checked_references: &mut ValidationVisits,
-    path: String,
+    path: &mut ValidationPath,
     mode: ApplyMode,
     follow_named_references: bool,
     env: Option<&GenericEnv<'_>>,
@@ -188,38 +277,44 @@ fn inner(
             root_directions,
         )?,
         DataType::Map(map) => {
-            inner(
-                map.key_ty(),
-                types,
-                checked_references,
-                format!("{path}.<map_key>"),
-                mode,
-                follow_named_references,
-                env,
-                root_directions,
-            )?;
-            inner(
-                map.value_ty(),
-                types,
-                checked_references,
-                format!("{path}.<map_value>"),
-                mode,
-                follow_named_references,
-                env,
-                root_directions,
-            )?;
+            path.with_suffix(".<map_key>", |path| {
+                inner(
+                    map.key_ty(),
+                    types,
+                    checked_references,
+                    path,
+                    mode,
+                    follow_named_references,
+                    env,
+                    root_directions,
+                )
+            })?;
+            path.with_suffix(".<map_value>", |path| {
+                inner(
+                    map.value_ty(),
+                    types,
+                    checked_references,
+                    path,
+                    mode,
+                    follow_named_references,
+                    env,
+                    root_directions,
+                )
+            })?;
         }
         DataType::List(list) => {
-            inner(
-                &list.ty,
-                types,
-                checked_references,
-                format!("{path}.<list_item>"),
-                mode,
-                follow_named_references,
-                env,
-                root_directions,
-            )?;
+            path.with_suffix(".<list_item>", |path| {
+                inner(
+                    &list.ty,
+                    types,
+                    checked_references,
+                    path,
+                    mode,
+                    follow_named_references,
+                    env,
+                    root_directions,
+                )
+            })?;
         }
         DataType::Struct(strct) => {
             let container_attrs = SerdeContainerAttrs::from_attributes(&strct.attributes)?;
@@ -231,7 +326,7 @@ fn inner(
                 &strct.attributes,
                 types,
                 checked_references,
-                &path,
+                path,
                 mode,
                 env,
                 root_directions,
@@ -239,28 +334,28 @@ fn inner(
             if let Some(attrs) = &container_attrs {
                 if attrs.variant_identifier || attrs.field_identifier {
                     return Err(Error::invalid_phased_type_usage(
-                        path,
+                        path.as_str(),
                         "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
                     ));
                 }
 
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
-                        path,
+                        path.as_str(),
                         "`#[serde(untagged)]` is only valid on enums",
                     ));
                 }
 
                 if attrs.content.is_some() {
                     return Err(Error::invalid_phased_type_usage(
-                        path,
+                        path.as_str(),
                         "`#[serde(content = ...)]` is only valid on enums",
                     ));
                 }
 
                 if attrs.tag.is_some() && !matches!(&strct.fields, Fields::Named(_)) {
                     return Err(Error::invalid_phased_type_usage(
-                        path,
+                        path.as_str(),
                         "`#[serde(tag = ...)]` on structs requires named fields",
                     ));
                 }
@@ -278,7 +373,7 @@ fn inner(
                     .is_some_and(|attrs| attrs.skip_serializing || attrs.skip_deserializing)
             {
                 return Err(Error::invalid_usage_of_skip(
-                    path,
+                    path.as_str(),
                     "serde ignores `skip` on a newtype struct's only field (the wire format \
                      stays the bare inner value), so the export cannot represent it; remove \
                      the attribute -- it has no effect on the serde wire format",
@@ -293,7 +388,7 @@ fn inner(
                             .as_ref()
                             .is_none_or(|attrs| attrs.resolved_into.is_none())
                     {
-                        validate_unnamed_conditional_omission(unnamed, &path)?;
+                        validate_unnamed_conditional_omission(unnamed, path.as_str())?;
                     }
                     for (idx, (field, _)) in unnamed
                         .fields
@@ -301,7 +396,9 @@ fn inner(
                         .enumerate()
                         .filter_map(|(idx, field)| field.ty.as_ref().map(|ty| (idx, (field, ty))))
                     {
-                        validate_field_attributes(field, format!("{path}[{idx}]"), mode)?;
+                        path.with_index(idx, |path| {
+                            validate_field_attributes(field, path.as_str(), mode)
+                        })?;
                     }
                     for (idx, (field, ty)) in unnamed
                         .fields
@@ -309,23 +406,26 @@ fn inner(
                         .enumerate()
                         .filter_map(|(idx, field)| field.ty.as_ref().map(|ty| (idx, (field, ty))))
                     {
-                        inner(
-                            ty,
-                            types,
-                            checked_references,
-                            format!("{path}[{idx}]"),
-                            mode,
-                            follow_named_references,
-                            env,
-                            root_directions.and(FlattenDirections::for_field(field)?),
-                        )?;
+                        let directions = root_directions.and(FlattenDirections::for_field(field)?);
+                        path.with_index(idx, |path| {
+                            inner(
+                                ty,
+                                types,
+                                checked_references,
+                                path,
+                                mode,
+                                follow_named_references,
+                                env,
+                                directions,
+                            )
+                        })?;
                     }
                 }
                 Fields::Named(named) => {
                     validate_named_field_keys(
                         named,
-                        struct_field_key_rules(&strct.attributes, &path)?,
-                        &path,
+                        struct_field_key_rules(&strct.attributes, path.as_str())?,
+                        path.as_str(),
                         declared_deserialize_live,
                         mode,
                     )?;
@@ -334,32 +434,37 @@ fn inner(
                         .iter()
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
-                        validate_field_attributes(field, format!("{path}.{name}"), mode)?;
-                        validate_flatten_field(
-                            field,
-                            ty,
-                            types,
-                            &format!("{path}.{name}"),
-                            mode,
-                            root_directions,
-                            env,
-                        )?;
+                        path.with_field(name, |path| {
+                            validate_field_attributes(field, path.as_str(), mode)?;
+                            validate_flatten_field(
+                                field,
+                                ty,
+                                types,
+                                path.as_str(),
+                                mode,
+                                root_directions,
+                                env,
+                            )
+                        })?;
                     }
                     for (name, (field, ty)) in named
                         .fields
                         .iter()
                         .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
-                        inner(
-                            ty,
-                            types,
-                            checked_references,
-                            format!("{path}.{name}"),
-                            mode,
-                            follow_named_references,
-                            env,
-                            root_directions.and(FlattenDirections::for_field(field)?),
-                        )?;
+                        let directions = root_directions.and(FlattenDirections::for_field(field)?);
+                        path.with_field(name, |path| {
+                            inner(
+                                ty,
+                                types,
+                                checked_references,
+                                path,
+                                mode,
+                                follow_named_references,
+                                env,
+                                directions,
+                            )
+                        })?;
                     }
                 }
             }
@@ -384,24 +489,24 @@ fn inner(
                 &enm.attributes,
                 types,
                 checked_references,
-                &path,
+                path,
                 mode,
                 env,
                 root_directions,
             )?;
             if container_attrs.as_ref().is_some_and(|attrs| attrs.default) {
                 return Err(Error::invalid_phased_type_usage(
-                    path,
+                    path.as_str(),
                     "`#[serde(default)]` is only valid on structs",
                 ));
             }
-            validate_identifier_enum(enm, &path, mode)?;
-            validate_enum(enm, types, path.clone(), mode, declared_directions, env)?;
+            validate_identifier_enum(enm, path.as_str(), mode)?;
+            validate_enum(enm, types, path.as_str(), mode, declared_directions, env)?;
             if variant_names_emitted {
                 validate_variant_aliases(
                     enm,
                     &container_attrs,
-                    &path,
+                    path.as_str(),
                     declared_directions.deserialize,
                     mode,
                 )?;
@@ -409,130 +514,154 @@ fn inner(
 
             for (variant_name, variant) in &enm.variants {
                 let variant_is_rendered = variant_is_rendered(variant)?;
-                validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
                 let variant_directions =
                     FlattenDirections::for_variant(variant)?.and(root_directions);
-                if variant_names_emitted && variant_is_rendered {
-                    validate_variant_key(variant_name, variant, &container_attrs, &path, mode)?;
-                }
-                match &variant.fields {
-                    Fields::Unit => {}
-                    Fields::Named(named) => {
-                        if variant_is_rendered {
-                            validate_named_field_keys(
-                                named,
-                                variant_field_key_rules(&container_attrs, variant, variant_name)?,
-                                &format!("{path}::{variant_name}"),
-                                declared_directions.deserialize && variant_directions.deserialize,
-                                mode,
-                            )?;
+                path.with_variant(variant_name, |path| {
+                    validate_variant_attributes(variant, path.as_str(), mode)?;
+                    if variant_names_emitted && variant_is_rendered {
+                        validate_variant_key(
+                            variant_name,
+                            variant,
+                            &container_attrs,
+                            path.as_str(),
+                            mode,
+                        )?;
+                    }
+                    match &variant.fields {
+                        Fields::Unit => Ok(()),
+                        Fields::Named(named) => {
+                            if variant_is_rendered {
+                                validate_named_field_keys(
+                                    named,
+                                    variant_field_key_rules(
+                                        &container_attrs,
+                                        variant,
+                                        variant_name,
+                                    )?,
+                                    path.as_str(),
+                                    declared_directions.deserialize
+                                        && variant_directions.deserialize,
+                                    mode,
+                                )?;
+                            }
+                            for (name, (field, ty)) in
+                                named.fields.iter().filter_map(|(name, field)| {
+                                    field.ty.as_ref().map(|ty| (name, (field, ty)))
+                                })
+                            {
+                                path.with_field(name, |path| {
+                                    validate_field_attributes(field, path.as_str(), mode)?;
+                                    validate_flatten_field(
+                                        field,
+                                        ty,
+                                        types,
+                                        path.as_str(),
+                                        mode,
+                                        variant_directions,
+                                        env,
+                                    )
+                                })?;
+                            }
+                            for (name, (field, ty)) in
+                                named.fields.iter().filter_map(|(name, field)| {
+                                    field.ty.as_ref().map(|ty| (name, (field, ty)))
+                                })
+                            {
+                                let directions =
+                                    variant_directions.and(FlattenDirections::for_field(field)?);
+                                path.with_field(name, |path| {
+                                    inner(
+                                        ty,
+                                        types,
+                                        checked_references,
+                                        path,
+                                        mode,
+                                        follow_named_references,
+                                        env,
+                                        directions,
+                                    )
+                                })?;
+                            }
+                            Ok(())
                         }
-                        for (name, (field, ty)) in
-                            named.fields.iter().filter_map(|(name, field)| {
-                                field.ty.as_ref().map(|ty| (name, (field, ty)))
-                            })
-                        {
-                            let path = format!("{path}::{variant_name}.{name}");
-                            validate_field_attributes(field, path.clone(), mode)?;
-                            validate_flatten_field(
-                                field,
-                                ty,
-                                types,
-                                &path,
-                                mode,
-                                variant_directions,
-                                env,
-                            )?;
-                        }
-                        for (name, (field, ty)) in
-                            named.fields.iter().filter_map(|(name, field)| {
-                                field.ty.as_ref().map(|ty| (name, (field, ty)))
-                            })
-                        {
-                            inner(
-                                ty,
-                                types,
-                                checked_references,
-                                format!("{path}::{variant_name}.{name}"),
-                                mode,
-                                follow_named_references,
-                                env,
-                                variant_directions.and(FlattenDirections::for_field(field)?),
-                            )?;
+                        Fields::Unnamed(unnamed) => {
+                            if declared_directions.serialize && variant_is_serialized(variant)? {
+                                validate_unnamed_conditional_omission(unnamed, path.as_str())?;
+                            }
+                            for (idx, (field, _)) in
+                                unnamed
+                                    .fields
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(idx, field)| {
+                                        field.ty.as_ref().map(|ty| (idx, (field, ty)))
+                                    })
+                            {
+                                path.with_index(idx, |path| {
+                                    validate_field_attributes(field, path.as_str(), mode)
+                                })?;
+                            }
+                            for (idx, (field, ty)) in
+                                unnamed
+                                    .fields
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(idx, field)| {
+                                        field.ty.as_ref().map(|ty| (idx, (field, ty)))
+                                    })
+                            {
+                                let directions =
+                                    variant_directions.and(FlattenDirections::for_field(field)?);
+                                path.with_index(idx, |path| {
+                                    inner(
+                                        ty,
+                                        types,
+                                        checked_references,
+                                        path,
+                                        mode,
+                                        follow_named_references,
+                                        env,
+                                        directions,
+                                    )
+                                })?;
+                            }
+                            Ok(())
                         }
                     }
-                    Fields::Unnamed(unnamed) => {
-                        if declared_directions.serialize && variant_is_serialized(variant)? {
-                            validate_unnamed_conditional_omission(
-                                unnamed,
-                                &format!("{path}::{variant_name}"),
-                            )?;
-                        }
-                        for (idx, (field, _)) in
-                            unnamed
-                                .fields
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(idx, field)| {
-                                    field.ty.as_ref().map(|ty| (idx, (field, ty)))
-                                })
-                        {
-                            validate_field_attributes(
-                                field,
-                                format!("{path}::{variant_name}[{idx}]"),
-                                mode,
-                            )?;
-                        }
-                        for (idx, (field, ty)) in
-                            unnamed
-                                .fields
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(idx, field)| {
-                                    field.ty.as_ref().map(|ty| (idx, (field, ty)))
-                                })
-                        {
-                            inner(
-                                ty,
-                                types,
-                                checked_references,
-                                format!("{path}::{variant_name}[{idx}]"),
-                                mode,
-                                follow_named_references,
-                                env,
-                                variant_directions.and(FlattenDirections::for_field(field)?),
-                            )?;
-                        }
-                    }
-                }
+                })?;
             }
         }
         DataType::Tuple(tuple) => {
             for (idx, ty) in tuple.elements.iter().enumerate() {
-                inner(
-                    ty,
-                    types,
-                    checked_references,
-                    format!("{path}[{idx}]"),
-                    mode,
-                    follow_named_references,
-                    env,
-                    root_directions,
-                )?;
+                path.with_index(idx, |path| {
+                    inner(
+                        ty,
+                        types,
+                        checked_references,
+                        path,
+                        mode,
+                        follow_named_references,
+                        env,
+                        root_directions,
+                    )
+                })?;
             }
         }
         DataType::Intersection(types_) => {
             for (idx, ty) in types_.iter().enumerate() {
-                inner(
-                    ty,
-                    types,
-                    checked_references,
-                    format!("{path}.<intersection_{idx}>"),
-                    mode,
-                    follow_named_references,
-                    env,
-                    root_directions,
-                )?;
+                let suffix = format!(".<intersection_{idx}>");
+                path.with_suffix(&suffix, |path| {
+                    inner(
+                        ty,
+                        types,
+                        checked_references,
+                        path,
+                        mode,
+                        follow_named_references,
+                        env,
+                        root_directions,
+                    )
+                })?;
             }
         }
         DataType::Reference(reference) => match reference {
@@ -543,16 +672,18 @@ fn inner(
                 } = &reference.inner
                 {
                     for (_, dt) in reference_generics {
-                        inner(
-                            dt,
-                            types,
-                            checked_references,
-                            format!("{path}.<generic>"),
-                            mode,
-                            follow_named_references,
-                            env,
-                            root_directions,
-                        )?;
+                        path.with_suffix(".<generic>", |path| {
+                            inner(
+                                dt,
+                                types,
+                                checked_references,
+                                path,
+                                mode,
+                                follow_named_references,
+                                env,
+                                root_directions,
+                            )
+                        })?;
                     }
                 }
 
@@ -576,10 +707,13 @@ fn inner(
                     && checked_references.enter(reference, env, root_directions)
                     && let Some(ty) = named_reference_ty(reference, types)
                 {
-                    let name = types
+                    // The traversal resets the path to the declaration's own
+                    // name, so an error surfaced inside the definition names
+                    // that declaration instead of the whole chain of use
+                    // sites.
+                    let saved = types
                         .get(reference)
-                        .map(|ndt| ndt.name.to_string())
-                        .unwrap_or_else(|| path.clone());
+                        .map(|ndt| path.swap_root(ndt.name.as_ref()));
                     // A resolved definition's `Generic` placeholders are
                     // bound by *this* reference's concrete arguments,
                     // which were written in the current scope - hence a
@@ -594,49 +728,57 @@ fn inner(
                             None
                         }
                     };
-                    inner(
+                    let result = inner(
                         ty,
                         types,
                         checked_references,
-                        name,
+                        path,
                         mode,
                         follow_named_references,
                         reference_frame.as_ref().or(env),
                         root_directions,
-                    )?;
+                    );
+                    if let Some(saved) = saved {
+                        path.restore(saved);
+                    }
+                    result?;
                 }
             }
             Reference::Opaque(reference) => {
                 if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
                     if mode == ApplyMode::Unified {
                         return Err(Error::invalid_phased_type_usage(
-                            path,
+                            path.as_str(),
                             "`specta_serde::Phased<Serialize, Deserialize>` requires `PhasesFormat`",
                         ));
                     }
 
                     // Each phased side is only ever rendered for its own
                     // phase, so flatten liveness narrows accordingly.
-                    inner(
-                        &phased.serialize,
-                        types,
-                        checked_references,
-                        format!("{path}.<phased_serialize>"),
-                        mode,
-                        follow_named_references,
-                        env,
-                        root_directions.and(FlattenDirections::SERIALIZE_ONLY),
-                    )?;
-                    inner(
-                        &phased.deserialize,
-                        types,
-                        checked_references,
-                        format!("{path}.<phased_deserialize>"),
-                        mode,
-                        follow_named_references,
-                        env,
-                        root_directions.and(FlattenDirections::DESERIALIZE_ONLY),
-                    )?;
+                    path.with_suffix(".<phased_serialize>", |path| {
+                        inner(
+                            &phased.serialize,
+                            types,
+                            checked_references,
+                            path,
+                            mode,
+                            follow_named_references,
+                            env,
+                            root_directions.and(FlattenDirections::SERIALIZE_ONLY),
+                        )
+                    })?;
+                    path.with_suffix(".<phased_deserialize>", |path| {
+                        inner(
+                            &phased.deserialize,
+                            types,
+                            checked_references,
+                            path,
+                            mode,
+                            follow_named_references,
+                            env,
+                            root_directions.and(FlattenDirections::DESERIALIZE_ONLY),
+                        )
+                    })?;
                 }
             }
         },
@@ -709,7 +851,7 @@ fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
     checked_references: &mut ValidationVisits,
-    path: &str,
+    path: &mut ValidationPath,
     mode: ApplyMode,
     env: Option<&GenericEnv<'_>>,
     root_directions: FlattenDirections,
@@ -720,7 +862,7 @@ fn validate_container_attributes(
 
     if container_attrs.from.is_some() && container_attrs.try_from.is_some() {
         return Err(Error::invalid_conversion_usage(
-            path,
+            path.as_str(),
             "`from` and `try_from` cannot be used together",
         ));
     }
@@ -731,32 +873,34 @@ fn validate_container_attributes(
     // composed with the caller's root liveness.
     for (suffix, target, target_directions) in [
         (
-            "<serde_into>",
+            ".<serde_into>",
             container_attrs.resolved_into.as_ref(),
             FlattenDirections::SERIALIZE_ONLY,
         ),
         (
-            "<serde_from>",
+            ".<serde_from>",
             container_attrs.resolved_from.as_ref(),
             FlattenDirections::DESERIALIZE_ONLY,
         ),
         (
-            "<serde_try_from>",
+            ".<serde_try_from>",
             container_attrs.resolved_try_from.as_ref(),
             FlattenDirections::DESERIALIZE_ONLY,
         ),
     ] {
         if let Some(target) = target {
-            inner(
-                target,
-                types,
-                checked_references,
-                format!("{path}.{suffix}"),
-                mode,
-                true,
-                env,
-                root_directions.and(target_directions),
-            )?;
+            path.with_suffix(suffix, |path| {
+                inner(
+                    target,
+                    types,
+                    checked_references,
+                    path,
+                    mode,
+                    true,
+                    env,
+                    root_directions.and(target_directions),
+                )
+            })?;
         }
     }
 
@@ -767,15 +911,18 @@ fn validate_container_attributes(
         // a no-op. `rename_all` / `rename_all_fields` are validated per field
         // and variant key via `validate_named_field_keys` /
         // `validate_variant_key` instead of comparing the raw rules.
-        let rename_serialize = container_attrs.rename_serialize.as_deref().unwrap_or(path);
+        let rename_serialize = container_attrs
+            .rename_serialize
+            .as_deref()
+            .unwrap_or(path.as_str());
         let rename_deserialize = container_attrs
             .rename_deserialize
             .as_deref()
-            .unwrap_or(path);
+            .unwrap_or(path.as_str());
         if rename_serialize != rename_deserialize {
             return Err(Error::incompatible_rename(
                 "container rename",
-                path.to_string(),
+                path.as_str(),
                 Some(rename_serialize.to_string()),
                 Some(rename_deserialize.to_string()),
             ));
@@ -787,7 +934,7 @@ fn validate_container_attributes(
 
 fn validate_variant_attributes(
     variant: &Variant,
-    path: String,
+    path: &str,
     mode: ApplyMode,
 ) -> Result<(), Error> {
     if variant.attributes.is_empty() {
@@ -799,13 +946,13 @@ fn validate_variant_attributes(
     let (has_serialize_with, has_deserialize_with, has_with) =
         SerdeVariantAttrs::codec_flags(&variant.attributes);
     if has_serialize_with {
-        ensure_codec_override(has_type_override, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, path, "serialize_with")?;
     }
     if has_deserialize_with {
-        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, path, "deserialize_with")?;
     }
     if has_with {
-        ensure_codec_override(has_type_override, &path, "with")?;
+        ensure_codec_override(has_type_override, path, "with")?;
     }
 
     // Variant renames and rename_all rules are validated by comparing the
@@ -1110,7 +1257,7 @@ fn field_has_live_key(field: &Field) -> Result<bool, Error> {
     Ok(!(SerdeFieldAttrs::is_flatten(&field.attributes) || skip_serializing && skip_deserializing))
 }
 
-fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
+fn validate_field_attributes(field: &Field, path: &str, mode: ApplyMode) -> Result<(), Error> {
     // Field renames are validated by comparing the *effective* per-direction
     // keys in `validate_named_field_keys` (unnamed fields have no wire key,
     // so renames are meaningless for them), so only the skip and codec flags
@@ -1146,13 +1293,13 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         SerdeFieldAttrs::codec_flags(&field.attributes);
 
     if has_serialize_with {
-        ensure_codec_override(has_type_override, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, path, "serialize_with")?;
     }
     if has_deserialize_with {
-        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, path, "deserialize_with")?;
     }
     if has_with {
-        ensure_codec_override(has_type_override, &path, "with")?;
+        ensure_codec_override(has_type_override, path, "with")?;
     }
 
     Ok(())
@@ -1849,7 +1996,7 @@ fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
 fn validate_enum(
     enm: &Enum,
     types: &Types,
-    path: String,
+    path: &str,
     mode: ApplyMode,
     declared_directions: FlattenDirections,
     env: Option<&GenericEnv<'_>>,
@@ -1868,9 +2015,9 @@ fn validate_enum(
 
     let repr = EnumRepr::from_attrs(&enm.attributes)?;
 
-    validate_untagged_variants(enm, &path)?;
-    validate_other_variant(enm, &path, &repr, mode, declared_directions.deserialize)?;
-    validate_adjacent_collapsed_newtype_variants(enm, &path, &repr, mode)?;
+    validate_untagged_variants(enm, path)?;
+    validate_other_variant(enm, path, &repr, mode, declared_directions.deserialize)?;
+    validate_adjacent_collapsed_newtype_variants(enm, path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(
@@ -2055,7 +2202,7 @@ fn externally_tagged_unit_enum(enm: &Enum, repr: &EnumRepr) -> Result<bool, Erro
 fn validate_internally_tag_enum(
     enm: &Enum,
     types: &Types,
-    path: String,
+    path: &str,
     seen: &mut HashSet<Reference>,
     env: Option<&GenericEnv<'_>>,
     directions: FlattenDirections,
@@ -2066,7 +2213,7 @@ fn validate_internally_tag_enum(
             variant_name,
             variant,
             types,
-            &path,
+            path,
             seen,
             env,
             directions.and(FlattenDirections::for_variant(variant)?),
@@ -2345,7 +2492,7 @@ fn validate_internally_tag_enum_datatype(
         }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
             EnumRepr::Untagged => {
-                validate_internally_tag_enum(enm, types, path.to_string(), seen, env, directions)
+                validate_internally_tag_enum(enm, types, path, seen, env, directions)
             }
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
