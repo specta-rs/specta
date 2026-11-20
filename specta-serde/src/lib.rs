@@ -3322,7 +3322,7 @@ fn select_phase_string<'a>(
     })
 }
 
-fn select_phase_rule(
+pub(crate) fn select_phase_rule(
     mode: PhaseRewrite,
     serialize: Option<RenameRule>,
     deserialize: Option<RenameRule>,

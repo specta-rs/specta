@@ -12,13 +12,13 @@ use specta::{
 };
 
 use crate::{
-    Error, Phase, PhaseRewrite, container_rename_all_rule, enum_variant_field_rename_rule,
+    Error, Phase, PhaseRewrite, enum_variant_field_rename_rule,
     inflection::RenameRule,
     parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phase_field_key,
     phased::PhasedTy,
     repr::EnumRepr,
-    serialized_variant_name,
+    select_phase_rule, serialized_variant_name,
 };
 
 /// A fast, non-cryptographic hasher for the walk's memo sets.
@@ -373,7 +373,7 @@ fn inner(
                     attrs.resolved_from.is_some() || attrs.resolved_try_from.is_some()
                 });
             validate_container_attributes(
-                &strct.attributes,
+                container_attrs.as_ref(),
                 types,
                 checked_references,
                 path,
@@ -474,7 +474,7 @@ fn inner(
                 Fields::Named(named) => {
                     validate_named_field_keys(
                         named,
-                        struct_field_key_rules(&strct.attributes, path.as_str())?,
+                        struct_field_key_rules(container_attrs.as_ref(), path.as_str())?,
                         path.as_str(),
                         declared_deserialize_live,
                         mode,
@@ -533,10 +533,10 @@ fn inner(
             };
             // Untagged enums never emit variant names, so attrs that only
             // rename variant labels are not part of the wire shape for them.
-            let variant_names_emitted =
-                !matches!(EnumRepr::from_attrs(&enm.attributes)?, EnumRepr::Untagged);
+            let repr = EnumRepr::from_attrs(&enm.attributes)?;
+            let variant_names_emitted = !matches!(repr, EnumRepr::Untagged);
             validate_container_attributes(
-                &enm.attributes,
+                container_attrs.as_ref(),
                 types,
                 checked_references,
                 path,
@@ -551,7 +551,15 @@ fn inner(
                 ));
             }
             validate_identifier_enum(enm, path.as_str(), mode)?;
-            validate_enum(enm, types, path.as_str(), mode, declared_directions, env)?;
+            validate_enum(
+                enm,
+                types,
+                &repr,
+                path.as_str(),
+                mode,
+                declared_directions,
+                env,
+            )?;
             if variant_names_emitted {
                 validate_variant_aliases(
                     enm,
@@ -898,7 +906,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 }
 
 fn validate_container_attributes(
-    attrs: &specta::datatype::Attributes,
+    container_attrs: Option<&SerdeContainerAttrs>,
     types: &Types,
     checked_references: &mut ValidationVisits,
     path: &mut ValidationPath,
@@ -906,7 +914,7 @@ fn validate_container_attributes(
     env: Option<&GenericEnv<'_>>,
     root_directions: FlattenDirections,
 ) -> Result<(), Error> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
+    let Some(container_attrs) = container_attrs else {
         return Ok(());
     };
 
@@ -1032,12 +1040,22 @@ fn validate_variant_attributes(
 /// (`Serialize`, then `Deserialize`), computed by the same helper the rewrite
 /// path uses.
 fn struct_field_key_rules(
-    attrs: &specta::datatype::Attributes,
+    container_attrs: Option<&SerdeContainerAttrs>,
     path: &str,
 ) -> Result<(Option<RenameRule>, Option<RenameRule>), Error> {
+    let rule = |mode| -> Result<Option<RenameRule>, Error> {
+        select_phase_rule(
+            mode,
+            container_attrs.and_then(|attrs| attrs.rename_all_serialize),
+            container_attrs.and_then(|attrs| attrs.rename_all_deserialize),
+            "struct rename_all",
+            path,
+        )
+    };
+
     Ok((
-        container_rename_all_rule(attrs, PhaseRewrite::Serialize, "struct rename_all", path)?,
-        container_rename_all_rule(attrs, PhaseRewrite::Deserialize, "struct rename_all", path)?,
+        rule(PhaseRewrite::Serialize)?,
+        rule(PhaseRewrite::Deserialize)?,
     ))
 }
 
@@ -2046,6 +2064,7 @@ fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
 fn validate_enum(
     enm: &Enum,
     types: &Types,
+    repr: &EnumRepr,
     path: &str,
     mode: ApplyMode,
     declared_directions: FlattenDirections,
@@ -2063,11 +2082,9 @@ fn validate_enum(
         ));
     }
 
-    let repr = EnumRepr::from_attrs(&enm.attributes)?;
-
     validate_untagged_variants(enm, path)?;
-    validate_other_variant(enm, path, &repr, mode, declared_directions.deserialize)?;
-    validate_adjacent_collapsed_newtype_variants(enm, path, &repr, mode)?;
+    validate_other_variant(enm, path, repr, mode, declared_directions.deserialize)?;
+    validate_adjacent_collapsed_newtype_variants(enm, path, repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(
