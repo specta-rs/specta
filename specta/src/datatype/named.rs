@@ -209,8 +209,16 @@ impl NamedDataType {
                 }
             }
 
-            types.types.insert(id.clone(), Some(ndt));
-            types.len += 1;
+            // `build_ndt` may already have completed this entry, for example by
+            // merging a collection that contains it through `Types::extend`.
+            // Only count the entry when the placeholder we installed is still a
+            // placeholder, otherwise `Types::len` would report more entries than
+            // the map holds.
+            let already_complete = types
+                .types
+                .insert(id.clone(), Some(ndt))
+                .is_some_and(|slot| slot.is_some());
+            types.len += usize::from(!already_complete);
 
             // We patch the Tauri `Type` implementation.
             if is_tauri_type {
@@ -429,6 +437,69 @@ mod tests {
             .next()
             .expect("the definition is registered");
         assert_eq!(ndt.name, "Dup");
+    }
+
+    #[test]
+    fn extending_during_resolution_counts_the_entry_once() {
+        use std::cell::RefCell;
+
+        thread_local! {
+            static OTHER: RefCell<Types> = RefCell::new(Types::default());
+        }
+
+        const SENTINEL: &str = "test::ExtendDuringResolution";
+
+        fn metadata(ndt: &mut super::NamedDataType) {
+            ndt.name = std::borrow::Cow::Borrowed("ExtendDuringResolution");
+            ndt.module_path = std::borrow::Cow::Borrowed("test");
+            ndt.ty = Some(crate::datatype::Primitive::str.into());
+        }
+
+        fn build(_: &mut Types, ndt: &mut super::NamedDataType) {
+            metadata(ndt);
+        }
+
+        // A definition that merges another collection into the one being built,
+        // as an exporter that has already collected this type would.
+        fn build_while_extending(types: &mut Types, ndt: &mut super::NamedDataType) {
+            metadata(ndt);
+            OTHER.with(|other| types.extend(&other.borrow()));
+        }
+
+        fn inline(_: &mut Types) -> DataType {
+            unreachable!("the definition is registered up front")
+        }
+
+        OTHER.with(|other| {
+            super::NamedDataType::init_with_sentinel(
+                SENTINEL,
+                &[],
+                &[],
+                false,
+                false,
+                0,
+                &mut other.borrow_mut(),
+                build,
+                inline,
+            );
+        });
+
+        let mut types = Types::default();
+        super::NamedDataType::init_with_sentinel(
+            SENTINEL,
+            &[],
+            &[],
+            false,
+            false,
+            0,
+            &mut types,
+            build_while_extending,
+            inline,
+        );
+
+        // `Types::len` checks its count against the map, so a double count
+        // shows up here rather than as a wrong length in an exporter.
+        assert_eq!(types.len(), 1);
     }
 
     #[test]
