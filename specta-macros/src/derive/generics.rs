@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
 use syn::{
     ConstParam, Data, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause,
     parse_quote,
@@ -216,10 +216,19 @@ pub(crate) fn generics_with_ident_only(generics: &Generics) -> Option<TokenStrea
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub(crate) fn type_with_inferred_lifetimes(ty: &Type) -> Type {
+/// Replaces every lifetime in `ty` with `'_` so the field resolves through the declared
+/// type's inferred-lifetime form.
+///
+/// Only borrows the type when it has no lifetimes to rewrite, which is the
+/// overwhelming majority of fields.
+pub(crate) fn type_with_inferred_lifetimes(ty: &Type) -> Cow<'_, Type> {
+    if !mentions_lifetime(|finder| finder.visit_type(ty)) {
+        return Cow::Borrowed(ty);
+    }
+
     let mut ty = ty.clone();
     InferredLifetimeVisitor.visit_type_mut(&mut ty);
-    ty
+    Cow::Owned(ty)
 }
 
 struct InferredLifetimeVisitor;
@@ -254,14 +263,9 @@ pub(crate) fn used_type_params(
         return Ok(Vec::new());
     }
 
-    let known_generics = all_generic_type_idents
-        .iter()
-        .map(ToString::to_string)
-        .collect::<HashSet<_>>();
-
     let mut visitor = GenericTypeUseVisitor {
-        known_generics: &known_generics,
-        used_generics: HashSet::new(),
+        known_generics: &all_generic_type_idents,
+        used_generics: Vec::new(),
         conservative: false,
         unsupported_associated_item: None,
     };
@@ -310,10 +314,13 @@ pub(crate) fn used_type_params(
         return Ok(all_generic_type_idents);
     }
 
+    let used_generics = std::mem::take(&mut visitor.used_generics);
+
     Ok(all_generic_type_idents
-        .iter()
-        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
-        .cloned()
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| used_generics.contains(index))
+        .map(|(_, ident)| ident)
         .collect())
 }
 
@@ -326,9 +333,13 @@ pub(crate) fn placeholder_ident(ident: &syn::Ident) -> syn::Ident {
 /// Rewrites single-segment paths that name one of `params` to their
 /// placeholder type, so the declaration is built with `Generic` placeholders
 /// instead of the concrete arguments.
-pub(crate) fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> Type {
+///
+/// The flag reports whether anything was rewritten, which spares callers a
+/// token-level comparison of the before and after types.
+pub(crate) fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident]) -> (Type, bool) {
     struct Rewrite<'a> {
         params: &'a [syn::Ident],
+        changed: bool,
     }
 
     impl VisitMut for Rewrite<'_> {
@@ -337,9 +348,10 @@ pub(crate) fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident
                 && node.path.leading_colon.is_none()
                 && node.path.segments.len() == 1
             {
-                let ident = node.path.segments[0].ident.clone();
-                if self.params.contains(&ident) {
-                    node.path.segments[0].ident = placeholder_ident(&ident);
+                let segment = &mut node.path.segments[0];
+                if let Some(param) = self.params.iter().find(|param| **param == segment.ident) {
+                    segment.ident = placeholder_ident(param);
+                    self.changed = true;
                 }
             }
             syn::visit_mut::visit_type_path_mut(self, node);
@@ -347,8 +359,12 @@ pub(crate) fn rewrite_generics_with_placeholders(ty: &Type, params: &[syn::Ident
     }
 
     let mut ty = ty.clone();
-    Rewrite { params }.visit_type_mut(&mut ty);
-    ty
+    let mut rewriter = Rewrite {
+        params,
+        changed: false,
+    };
+    rewriter.visit_type_mut(&mut ty);
+    (ty, rewriter.changed)
 }
 
 /// Builds the expression that resolves `ty` to a [`DataType`].
@@ -371,37 +387,38 @@ pub(crate) fn resolve_ty_expr(
     bounded_params: &HashSet<String>,
     conditional: bool,
 ) -> TokenStream {
+    let mentioned = type_params_used_in(ty, used_generic_types);
+
     // A field that mentions no enclosing parameter is resolved at its own use
     // site. It must not see the enclosing field's substitution scope: its own
     // concrete element type could otherwise match an enclosing slot and bake
     // that parameter into a nested declaration (issue #609).
-    let isolated = quote!(types.with_generic_substitution(
-        &[],
-        |types| <#ty as #crate_ref::Type>::definition(types),
-    ));
-    // The concrete half of a conditional resolution instead inherits whatever
-    // scope is active. That scope belongs to an enclosing *declaration* whose
-    // slots describe this field's own arguments, which is what an inlined
-    // generic type needs to rewrite its expansion back to `Generic` (issue
-    // #613 regressed this: an empty scope baked the first instantiation's
-    // concrete arguments into a generic inline declaration).
-    let concrete = quote!(<#ty as #crate_ref::Type>::definition(types));
+    if mentioned.is_empty() {
+        return quote!(types.with_generic_substitution(
+            &[],
+            |types| <#ty as #crate_ref::Type>::definition(types),
+        ));
+    }
 
-    let mentioned = type_params_used_in(ty, used_generic_types);
-    let unbounded = mentioned
-        .iter()
-        .filter(|ident| !bounded_params.contains(&ident.to_string()))
-        .cloned()
-        .collect::<Vec<_>>();
-    let bounded = mentioned
-        .iter()
-        .filter(|ident| bounded_params.contains(&ident.to_string()))
-        .cloned()
-        .collect::<Vec<_>>();
+    let mut unbounded = Vec::new();
+    let mut bounded = Vec::new();
+    for ident in &mentioned {
+        if bounded_params.contains(&ident.to_string()) {
+            bounded.push(ident.clone());
+        } else {
+            unbounded.push(ident.clone());
+        }
+    }
 
-    let declaration_ty = rewrite_generics_with_placeholders(ty, &unbounded);
-    let rewritten =
-        declaration_ty.to_token_stream().to_string() != ty.to_token_stream().to_string();
+    // Rewriting is only observable when there is a parameter to rewrite; with
+    // none the type is used as written, so it is borrowed instead of cloned.
+    let (declaration_ty, rewritten) = if unbounded.is_empty() {
+        (Cow::Borrowed(ty), false)
+    } else {
+        let (rewritten_ty, changed) = rewrite_generics_with_placeholders(ty, &unbounded);
+        (Cow::Owned(rewritten_ty), changed)
+    };
+    let declaration_ty = declaration_ty.as_ref();
 
     // When the placeholder rewrite could not reach a parameter — an opaque
     // `macro!`-typed field, `Type::Verbatim`, ... — substitute every parameter
@@ -413,12 +430,6 @@ pub(crate) fn resolve_ty_expr(
         mentioned.clone()
     };
 
-    // Nothing to rewrite and no parameter to substitute: resolve concretely,
-    // isolated from the enclosing scope.
-    if !rewritten && mentioned.is_empty() {
-        return isolated;
-    }
-
     let mut declaration = quote!(types.define_root::<#declaration_ty>());
 
     if !substituted.is_empty() {
@@ -426,7 +437,7 @@ pub(crate) fn resolve_ty_expr(
         // `Types::define_param` consumes them positionally as the nested type
         // resolves its own parameters, so two parameters instantiated with the
         // same concrete type still map to distinct `Generic` names. See #609.
-        let slots = generic_substitution_slots(crate_ref, &declaration_ty, &substituted);
+        let slots = generic_substitution_slots(crate_ref, declaration_ty, &substituted);
         declaration = quote!(types.with_generic_substitution(
             &[#(#slots),*],
             |types| #declaration,
@@ -437,7 +448,17 @@ pub(crate) fn resolve_ty_expr(
         return declaration;
     }
 
-    quote!(if declaration { #declaration } else { #concrete })
+    // The concrete half of a conditional resolution instead inherits whatever
+    // scope is active. That scope belongs to an enclosing *declaration* whose
+    // slots describe this field's own arguments, which is what an inlined
+    // generic type needs to rewrite its expansion back to `Generic` (issue
+    // #613 regressed this: an empty scope baked the first instantiation's
+    // concrete arguments into a generic inline declaration).
+    quote!(if declaration {
+        #declaration
+    } else {
+        <#ty as #crate_ref::Type>::definition(types)
+    })
 }
 
 /// Returns the subset of `candidates` that appear in `ty`, conservatively
@@ -450,14 +471,9 @@ pub(crate) fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<s
         return Vec::new();
     }
 
-    let known_generics = candidates
-        .iter()
-        .map(ToString::to_string)
-        .collect::<HashSet<_>>();
-
     let mut visitor = GenericTypeUseVisitor {
-        known_generics: &known_generics,
-        used_generics: HashSet::new(),
+        known_generics: candidates,
+        used_generics: Vec::new(),
         conservative: false,
         unsupported_associated_item: None,
     };
@@ -469,8 +485,9 @@ pub(crate) fn type_params_used_in(ty: &Type, candidates: &[syn::Ident]) -> Vec<s
 
     candidates
         .iter()
-        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
-        .cloned()
+        .enumerate()
+        .filter(|(index, _)| visitor.used_generics.contains(index))
+        .map(|(_, ident)| ident.clone())
         .collect()
 }
 
@@ -690,8 +707,10 @@ fn merge_custom_bounds(
 }
 
 struct GenericTypeUseVisitor<'a> {
-    known_generics: &'a HashSet<String>,
-    used_generics: HashSet<String>,
+    /// The container's type parameters, in declaration order.
+    known_generics: &'a [syn::Ident],
+    /// Indices into the parameter list that the visited nodes mention.
+    used_generics: Vec<usize>,
     conservative: bool,
     unsupported_associated_item: Option<syn::Error>,
 }
@@ -704,11 +723,9 @@ impl Visit<'_> for GenericTypeUseVisitor<'_> {
             && node.path.leading_colon.is_none()
             && node.path.segments.len() == 1
             && let Some(segment) = node.path.segments.first()
+            && let Some(index) = self.param_index(&segment.ident)
         {
-            let segment_name = segment.ident.to_string();
-            if self.known_generics.contains(&segment_name) {
-                self.used_generics.insert(segment_name);
-            }
+            self.mark_used(index);
         }
 
         visit::visit_type_path(self, node);
@@ -731,17 +748,30 @@ impl Visit<'_> for GenericTypeUseVisitor<'_> {
 }
 
 impl GenericTypeUseVisitor<'_> {
+    /// The position of `ident` in the container's type parameter list, if it is
+    /// one of them. Idents are compared directly so matching a parameter never
+    /// allocates.
+    fn param_index(&self, ident: &syn::Ident) -> Option<usize> {
+        self.known_generics.iter().position(|known| known == ident)
+    }
+
+    fn mark_used(&mut self, index: usize) {
+        if !self.used_generics.contains(&index) {
+            self.used_generics.push(index);
+        }
+    }
+
     fn reject_unsupported_associated_path(
         &mut self,
         path: &syn::Path,
         qself: &Option<syn::QSelf>,
         tokens: &impl ToTokens,
     ) {
-        let direct_associated_item = path
-            .segments
-            .first()
-            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()))
-            && path.segments.len() > 1;
+        let direct_associated_item = path.segments.len() > 1
+            && path
+                .segments
+                .first()
+                .is_some_and(|first| self.param_index(&first.ident).is_some());
 
         let qualified_associated_item = qself
             .as_ref()
@@ -749,7 +779,7 @@ impl GenericTypeUseVisitor<'_> {
                 syn::Type::Path(syn::TypePath { qself: None, path }) => path.segments.first(),
                 _ => None,
             })
-            .is_some_and(|first| self.known_generics.contains(&first.ident.to_string()));
+            .is_some_and(|first| self.param_index(&first.ident).is_some());
 
         if direct_associated_item || qualified_associated_item {
             self.unsupported_associated_item.get_or_insert_with(|| {
