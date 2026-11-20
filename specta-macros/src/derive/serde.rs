@@ -124,6 +124,37 @@ pub(super) fn lower_runtime_attributes(
     }
 }
 
+/// Lowers only the container renames onto a declaration.
+///
+/// A container-level type override replaces the struct/enum node, so a rename
+/// stored only on that node would be lost. Conversion, tagging and
+/// field-shaping attributes are deliberately not copied: they describe the
+/// replaced shape, not the declaration.
+pub(super) fn lower_container_rename(raw_attrs: &[Attribute]) -> Result<Option<TokenStream>> {
+    let Some(attrs) = parse_container_attrs(raw_attrs)? else {
+        return Ok(None);
+    };
+
+    let mut inserts = Vec::new();
+    push_opt_string(
+        &mut inserts,
+        "serde:container:rename_serialize",
+        &attrs.rename_serialize,
+    );
+    push_opt_string(
+        &mut inserts,
+        "serde:container:rename_deserialize",
+        &attrs.rename_deserialize,
+    );
+
+    Ok((!inserts.is_empty()).then(|| {
+        quote!({
+            let attrs = &mut ndt.attributes;
+            #(#inserts)*
+        })
+    }))
+}
+
 fn parse_container_attrs(attrs: &[Attribute]) -> Result<Option<ContainerAttrs>> {
     let mut parsed = ContainerAttrs::default();
     let mut found = false;

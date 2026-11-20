@@ -26,6 +26,9 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///
 /// - `#[specta(type = T)]` overrides the generated type definition with `T`.
 ///   `T` may be a path or Rust type, such as `String`, `Vec<T>`, or `(String, i32)`.
+///   The declaration keeps its name, docs, deprecation and container rename, but
+///   attributes that describe the replaced shape (tagging, conversion, field
+///   rules) no longer apply.
 /// - `#[specta(crate = path::to::specta)]` uses a custom path to the `specta` crate.
 ///   The target must re-export the `specta` crate wholesale (for example with
 ///   `pub use specta;`): the generated code resolves `Type`, `Types`, the

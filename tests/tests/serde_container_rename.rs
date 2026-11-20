@@ -617,3 +617,24 @@ fn enum_container_rename_collision_is_rejected() {
 
     assert!(err.to_string().contains("CollidingEnumName"));
 }
+
+/// A container-level type override replaces the shape but not the declaration's
+/// metadata. The serde rename applies to the exported name even though the
+/// resulting datatype is no longer a struct or an enum.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false, type = String)]
+#[serde(rename = "WireName")]
+struct RenamedOverride(u32);
+
+#[test]
+fn a_container_override_keeps_the_container_rename() {
+    let ts = Typescript::default()
+        .export(
+            &Types::default().register::<RenamedOverride>(),
+            specta_serde::Format,
+        )
+        .expect("export should succeed");
+
+    assert!(ts.contains("export type WireName = string;"), "{ts}");
+    assert!(!ts.contains("RenamedOverride"), "{ts}");
+}
