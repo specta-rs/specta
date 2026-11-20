@@ -22,14 +22,14 @@ pub use map::Map;
 pub use named::{Deprecated, NamedDataType, inline};
 pub use primitive::Primitive;
 pub use reference::{
-    NamedReference, NamedReferenceType, OpaqueReference, RecursiveInlineType, Reference,
+    NamedReference, NamedReferenceType, NamedTypeId, OpaqueReference, RecursiveInlineType,
+    Reference,
 };
 
 pub(crate) use reference::RecursiveInlineFrame;
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
-pub(crate) use reference::NamedId;
 
 /// Runtime type-erased representation of a Rust type.
 ///

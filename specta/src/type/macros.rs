@@ -373,6 +373,7 @@ macro_rules! _impl_ndt {
 
             let reference = datatype::NamedDataType::init_with_sentinel(
                 SENTINEL,
+                None,
                 __specta_instantiation_generics,
                 &[$(::std::any::type_name::<$generic>()),*],
                 $has_const_param,

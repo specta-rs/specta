@@ -6,7 +6,9 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
+    datatype::{
+        DataType, Generic, NamedDataType, NamedReference, NamedTypeId, RecursiveInlineFrame,
+    },
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -30,7 +32,7 @@ pub struct Types {
     /// A `None` value is a placeholder for a datatype whose definition is
     /// currently being resolved. This lets recursive definitions refer to the
     /// in-progress type without re-entering resolution indefinitely.
-    pub(crate) types: HashMap<NamedId, Option<NamedDataType>>,
+    pub(crate) types: HashMap<NamedTypeId, Option<NamedDataType>>,
 
     /// Cached count of completed entries in [`Self::types`].
     ///
@@ -208,7 +210,12 @@ impl GenericSubstitutionSlot {
 
 #[derive(Debug, Clone)]
 pub(crate) struct InlineResolutionFrame {
-    pub(crate) hash: u64,
+    /// Identity of the named declaration being inlined.
+    pub(crate) id: NamedTypeId,
+    /// Concrete generic arguments of this inline use site.
+    pub(crate) generics: Vec<(Generic, DataType)>,
+    /// Concrete type identities of the enclosing declaration's parameters.
+    pub(crate) identities: Vec<&'static str>,
     pub(crate) ty: RecursiveInlineFrame,
 }
 
@@ -639,7 +646,7 @@ impl Types {
 }
 
 struct UnsortedIter<'a> {
-    iter: hash_map::Iter<'a, NamedId, Option<NamedDataType>>,
+    iter: hash_map::Iter<'a, NamedTypeId, Option<NamedDataType>>,
     count: usize,
 }
 

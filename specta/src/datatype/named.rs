@@ -1,9 +1,8 @@
 use std::{
     borrow::Cow,
-    hash::{DefaultHasher, Hash, Hasher},
+    hash::Hash,
     mem,
     panic::{self, AssertUnwindSafe, Location},
-    ptr,
     sync::Arc,
 };
 
@@ -11,7 +10,7 @@ use crate::{
     Types,
     datatype::{
         DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
+        RecursiveInlineType, Reference, generic::GenericDefinition, reference::{NamedId, NamedTypeId},
     },
     types::InlineResolutionFrame,
 };
@@ -42,7 +41,7 @@ pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
 #[non_exhaustive]
 pub struct NamedDataType {
     /// Stable identity for resolving references to this datatype.
-    pub(crate) id: NamedId,
+    pub(crate) id: NamedTypeId,
     /// Exported type name.
     pub name: Cow<'static, str>,
     /// Documentation comments attached to the source type.
@@ -63,6 +62,15 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
+    /// Stable identity of this declaration within the type graph.
+    ///
+    /// Two declarations compare equal only when they are the same declaration;
+    /// a copy of the graph keeps the same identities. The value is process-local
+    /// and must not be used as a persistence key or as a stable sort tiebreaker.
+    pub fn id(&self) -> &NamedTypeId {
+        &self.id
+    }
+
     /// Constructs a new named datatype and register it into the [`Types`] collection.
     #[track_caller]
     pub fn new(
@@ -71,7 +79,7 @@ impl NamedDataType {
         build: impl FnOnce(&mut Types, &mut NamedDataType),
     ) -> Self {
         let location = Location::caller();
-        let id = NamedId::Dynamic(Arc::new(()));
+        let id = NamedTypeId(NamedId::Dynamic(Arc::new(())));
         let mut ndt = Self {
             id: id.clone(),
             name: name.into(),
@@ -141,6 +149,7 @@ impl NamedDataType {
     #[track_caller]
     pub fn init_with_sentinel(
         sentinel: &'static str,
+        nominal: Option<std::any::TypeId>,
         instantiation_generics: &[(Generic, DataType)],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -151,7 +160,12 @@ impl NamedDataType {
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
-        let id = NamedId::Static(sentinel);
+        let id = NamedTypeId(nominal.map_or(NamedId::Static(sentinel), |id| {
+            NamedId::Nominal {
+                label: sentinel,
+                id,
+            }
+        }));
         let location = Location::caller().to_owned();
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
@@ -216,18 +230,6 @@ impl NamedDataType {
         }
 
         if inline {
-            let hash = {
-                let mut h = DefaultHasher::new();
-                sentinel.hash(&mut h);
-                ptr::hash(sentinel, &mut h);
-                for (generic_r, generic) in instantiation_generics {
-                    generic_r.hash(&mut h);
-                    generic.hash(&mut h);
-                }
-                instantiation_generic_identities.hash(&mut h);
-                h.finish()
-            };
-
             let current_ty = types
                 .types
                 .get(&id)
@@ -241,7 +243,15 @@ impl NamedDataType {
                     )
                 });
 
-            if let Some(cycle_start) = types.stack.iter().position(|frame| frame.hash == hash) {
+            // Exact identity, not a hash: a hash collision must not be mistaken
+            // for a recursive inline expansion.
+            let cycle_start = types.stack.iter().position(|frame| {
+                frame.id == id
+                    && frame.generics == instantiation_generics
+                    && frame.identities == instantiation_generic_identities
+            });
+
+            if let Some(cycle_start) = cycle_start {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
                 if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
@@ -276,7 +286,9 @@ impl NamedDataType {
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
             types.stack.push(InlineResolutionFrame {
-                hash,
+                id: id.clone(),
+                generics: instantiation_generics.to_vec(),
+                identities: instantiation_generic_identities.to_vec(),
                 ty: current_ty,
             });
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
@@ -403,6 +415,7 @@ mod tests {
         let mut types = Types::default();
         super::NamedDataType::init_with_sentinel(
             "test::Dup",
+            None,
             &[],
             &[],
             false,
@@ -417,6 +430,7 @@ mod tests {
         // with the same name.
         super::NamedDataType::init_with_sentinel(
             "test::Dup",
+            None,
             &[],
             &[],
             false,
