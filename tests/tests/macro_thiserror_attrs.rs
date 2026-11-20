@@ -36,14 +36,14 @@ fn thiserror_method_call_arguments_compile_and_serde_attributes_are_captured() {
     InheritanceError::definition(&mut types);
 
     let data_type = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|data_type| data_type.name == "InheritanceError")
         .and_then(|data_type| data_type.ty.clone())
         .expect("InheritanceError should be registered");
     let untagged = match data_type {
         DataType::Enum(data_type) => data_type
             .attributes
-            .get_named_as::<bool>("serde:container:untagged")
+            .get_as::<bool>("serde:container:untagged")
             .copied(),
         _ => None,
     };

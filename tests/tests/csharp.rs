@@ -1158,7 +1158,7 @@ fn low_level_named_export_respects_layout() {
     let output = specta_csharp::primitives::export(
         &CSharp::new().layout(Layout::Namespaces),
         &types,
-        types.into_unsorted_iter(),
+        types.iter_unsorted(),
     )
     .unwrap();
 
@@ -1168,7 +1168,7 @@ fn low_level_named_export_respects_layout() {
         specta_csharp::primitives::export(
             &CSharp::new().layout(Layout::Files),
             &types,
-            types.into_unsorted_iter(),
+            types.iter_unsorted(),
         ),
         Err(Error::ExportRequiresExportTo(Layout::Files))
     ));

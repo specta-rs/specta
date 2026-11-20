@@ -56,14 +56,14 @@ fn apply_metadata(ndt: &mut NamedDataType) {
 
     if let Some(rename) = strct
         .attributes
-        .get_named_as::<String>("serde:container:rename_serialize")
+        .get_as::<String>("serde:container:rename_serialize")
     {
         ndt.name = Cow::Owned(rename.clone());
     }
 
     let rule = strct
         .attributes
-        .get_named_as::<String>("serde:container:rename_all_serialize")
+        .get_as::<String>("serde:container:rename_all_serialize")
         .map(String::as_str);
     let Fields::Named(named) = &mut strct.fields else {
         return;
@@ -101,7 +101,7 @@ fn main() {
 
     // 1. The metadata must be recorded even though nothing here depends on `specta-serde`.
     let attributes = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find_map(|ndt| match ndt.ty.as_ref() {
             Some(DataType::Struct(strct)) => Some(strct.attributes.clone()),
             _ => None,
@@ -109,14 +109,14 @@ fn main() {
         .expect("Demo should be registered as a named struct");
     assert_eq!(
         attributes
-            .get_named_as::<String>("serde:container:rename_serialize")
+            .get_as::<String>("serde:container:rename_serialize")
             .map(String::as_str),
         Some("RenamedDemo"),
         "container `rename` metadata was dropped; is serde lowering feature-gated again?"
     );
     assert_eq!(
         attributes
-            .get_named_as::<String>("serde:container:rename_all_serialize")
+            .get_as::<String>("serde:container:rename_all_serialize")
             .map(String::as_str),
         Some("camelCase"),
         "`rename_all` metadata was dropped; is serde lowering feature-gated again?"

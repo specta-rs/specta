@@ -648,7 +648,7 @@ struct Module<'a> {
 }
 
 fn build_module_graph(types: &Types) -> Module<'_> {
-    types.into_unsorted_iter().fold(
+    types.iter_unsorted().fold(
         Module {
             types: Default::default(),
             children: Default::default(),
@@ -835,7 +835,7 @@ fn render_types(
             s.push_str(&reexports);
         }
         Layout::FlatFile | Layout::ModulePrefixedName => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, types, types.iter_sorted(), "")?;
         }
         Layout::Files => {
             if !files_user_types.is_empty() {

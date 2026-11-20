@@ -93,7 +93,7 @@ impl Go {
 
         validate_package_name(&self.package_name)?;
         let types = format_types(types, &format)?;
-        let body = primitives::export(self, types.as_ref(), types.as_ref().into_sorted_iter())?;
+        let body = primitives::export(self, types.as_ref(), types.as_ref().iter_sorted())?;
         Ok(self.render_file(&body, true))
     }
 
@@ -116,7 +116,7 @@ impl Go {
             Layout::FlatFile => write_file(
                 path,
                 &self.render_file(
-                    &primitives::export(self, types, types.into_sorted_iter())?,
+                    &primitives::export(self, types, types.iter_sorted())?,
                     true,
                 ),
             ),
@@ -136,10 +136,10 @@ impl Go {
                 })?;
 
                 // Validate package-wide symbol uniqueness before splitting the declarations.
-                let _ = primitives::export(self, types, types.into_sorted_iter())?;
+                let _ = primitives::export(self, types, types.iter_sorted())?;
 
                 let mut files = BTreeMap::new();
-                for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+                for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
                     let file_name = primitives::file_name(ndt)?;
                     let body = primitives::export(self, types, std::iter::once(ndt))?;
                     if files.insert(file_name.clone(), body).is_some() {

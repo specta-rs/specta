@@ -2661,7 +2661,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2675,7 +2675,7 @@ fn struct_collects_all_transparent_field_types() {
     let mut types = Types::default();
     UsesTransparent::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2944,7 +2944,7 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
     register_local_b(&mut types);
 
     let fields = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| ndt.name == "Local")
         .map(|ndt| {
             let Some(DataType::Struct(structure)) = &ndt.ty else {

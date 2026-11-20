@@ -54,8 +54,8 @@ fn shared_tails_and_cycles_preserve_bodies_in_both_modes() {
                     &specta_serde::PhasesFormat,
                 ] {
                     let mapped = format.map_types(&types).expect("the shared graph is valid");
-                    let original = types.into_sorted_iter().collect::<Vec<_>>();
-                    let rewritten = mapped.into_sorted_iter().collect::<Vec<_>>();
+                    let original = types.iter_sorted().collect::<Vec<_>>();
+                    let rewritten = mapped.iter_sorted().collect::<Vec<_>>();
                     assert_eq!(original.len(), rewritten.len());
                     for (original, rewritten) in original.iter().zip(rewritten) {
                         assert_eq!(original.name, rewritten.name);

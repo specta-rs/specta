@@ -26,7 +26,7 @@ pub(crate) fn export(
     validate_names(exporter, &types)?;
     validate_non_object_roots(&types)?;
     let ndts = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| is_emitted_named(ndt))
         .collect::<Vec<_>>();
 
@@ -62,7 +62,7 @@ pub(crate) fn export_to(
 
     let mut files = Vec::new();
     let mut case_folded_paths = HashMap::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| is_emitted_named(ndt)) {
+    for ndt in types.iter_sorted().filter(|ndt| is_emitted_named(ndt)) {
         let module = module_segments(ndt);
         let mut file_path = module
             .iter()
@@ -1932,7 +1932,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
 fn validate_names(exporter: &CSharp, types: &Types) -> Result<(), Error> {
     validate_namespace(exporter.namespace.as_ref())?;
     let ndts = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| is_emitted_named(ndt))
         .collect::<Vec<_>>();
     if matches!(
@@ -2158,7 +2158,7 @@ fn unique_type_identifier(
 
 fn reserved_type_names(exporter: &CSharp, types: &Types) -> HashSet<String> {
     types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .filter(|ndt| match exporter.layout {
             Layout::FlatFile | Layout::ModulePrefixedName => true,
             Layout::Namespaces | Layout::Files => {

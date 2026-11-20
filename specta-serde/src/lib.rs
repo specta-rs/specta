@@ -242,7 +242,7 @@ impl specta::Format for PhasesFormat {
     fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
         validate::validate_for_mode(types, validate::ApplyMode::Phases)?;
 
-        let originals = types.into_unsorted_iter().collect::<Vec<_>>();
+        let originals = types.iter_unsorted().collect::<Vec<_>>();
         let mut dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
         let mut reverse_dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
 
@@ -558,7 +558,7 @@ impl specta::Format for PhasesFormat {
 
 fn datatype_is_registered_definition(types: &Types, dt: &DataType) -> bool {
     types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .any(|ndt| ndt.ty.as_ref() == Some(dt))
 }
 
@@ -5050,7 +5050,7 @@ fn substitute_container_attribute_generics(
         "serde:container:from_resolved",
         "serde:container:try_from_resolved",
     ] {
-        let Some(mut ty) = attributes.get_named_as::<DataType>(key).cloned() else {
+        let Some(mut ty) = attributes.get_as::<DataType>(key).cloned() else {
             continue;
         };
         substitute_generics(&mut ty, generics);

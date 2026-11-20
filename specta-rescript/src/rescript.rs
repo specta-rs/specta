@@ -138,7 +138,7 @@ impl ReScript {
 
 fn validate_serde_enum_representations(types: &Types) -> Result<()> {
     types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .filter(|ty| !(ty.name == "Result" && ty.module_path == "std::result"))
         .filter_map(|ty| ty.ty.as_ref())
         .try_for_each(validate_serde_datatype)
@@ -157,7 +157,7 @@ fn validate_serde_datatype(dt: &DataType) -> Result<()> {
         DataType::Enum(enumeration) => {
             let untagged = enumeration
                 .attributes
-                .get_named_as::<bool>("serde:container:untagged")
+                .get_as::<bool>("serde:container:untagged")
                 == Some(&true);
             if untagged {
                 return Err(Error::UnsupportedType(
@@ -217,7 +217,7 @@ fn validate_serde_fields(fields: &Fields) -> Result<()> {
 
 fn preserve_standard_result<'a>(original: &Types, processed: Cow<'a, Types>) -> Cow<'a, Types> {
     let Some(result) = original
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ty| ty.name == "Result" && ty.module_path == "std::result")
         .cloned()
     else {
@@ -235,7 +235,7 @@ fn preserve_standard_result<'a>(original: &Types, processed: Cow<'a, Types>) -> 
 
 fn preserve_serde_unit_enums<'a>(original: &Types, processed: Cow<'a, Types>) -> Cow<'a, Types> {
     let locations = original
-        .into_unsorted_iter()
+        .iter_unsorted()
         .filter(|ty| {
             matches!(
                 &ty.ty,
@@ -269,7 +269,7 @@ fn preserve_serde_unit_enums<'a>(original: &Types, processed: Cow<'a, Types>) ->
 
 fn validate_type_names(types: &Types) -> Result<()> {
     let mut names = HashMap::<String, String>::new();
-    for ty in types.into_sorted_iter().filter(|ty| ty.ty.is_some()) {
+    for ty in types.iter_sorted().filter(|ty| ty.ty.is_some()) {
         validate_generic_names(ty)?;
 
         let name = type_name(&ty.name);

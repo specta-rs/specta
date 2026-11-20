@@ -44,13 +44,13 @@ fn named_type_ids_survive_graph_copies() {
     let clone = types.clone();
 
     let id = types
-        .into_sorted_iter()
+        .iter_sorted()
         .next()
         .expect("IdentityItem is registered")
         .id()
         .clone();
     let clone_id = clone
-        .into_sorted_iter()
+        .iter_sorted()
         .next()
         .expect("IdentityItem is registered")
         .id()

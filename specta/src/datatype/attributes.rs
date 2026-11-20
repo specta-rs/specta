@@ -118,7 +118,7 @@ impl Attributes {
     /// This is useful when the expected type is not known until runtime.
     /// Prefer [`Attributes::get_named_as`] when you know the concrete type.
     ///
-    pub fn get_named(&self, key: &str) -> Option<&dyn Any> {
+    pub fn get(&self, key: &str) -> Option<&dyn Any> {
         self.0.get(key).map(|value| value.value_any())
     }
 
@@ -127,7 +127,7 @@ impl Attributes {
     /// Returns `None` when the key is missing or when the stored value has a
     /// different type than `T`.
     ///
-    pub fn get_named_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
+    pub fn get_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
         self.0
             .get(key)
             .and_then(|value| value.value_any().downcast_ref::<T>())

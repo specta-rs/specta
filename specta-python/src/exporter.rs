@@ -103,7 +103,7 @@ impl Python {
                 let body = primitives::export(
                     self,
                     types.as_ref(),
-                    types.as_ref().into_sorted_iter(),
+                    types.as_ref().iter_sorted(),
                     "",
                 )?;
                 append_section(&mut out, &body);
@@ -183,7 +183,7 @@ fn append_raw(out: &mut String, snippets: &[Cow<'static, str>]) {
 fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
     let mut seen = HashMap::<String, String>::new();
     if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
-        for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+        for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
             let segments = ndt
                 .module_path
                 .split("::")
@@ -210,7 +210,7 @@ fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
             }
         }
     }
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let exported = primitives::exported_type_name(exporter, ndt);
         let rust_path = rust_type_path(ndt);
         primitives::validate_identifier(&exported, &rust_path)
@@ -272,7 +272,7 @@ struct Namespace<'a> {
 
 fn render_namespaces(out: &mut String, exporter: &Python, types: &Types) -> Result<(), Error> {
     let mut root = Namespace::default();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let mut namespace = &mut root;
         for segment in ndt
             .module_path
@@ -339,7 +339,7 @@ fn render_namespace_node(
 
 fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Error> {
     let mut modules = BTreeMap::<String, Vec<&NamedDataType>>::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         modules
             .entry(ndt.module_path.to_string())
             .or_default()

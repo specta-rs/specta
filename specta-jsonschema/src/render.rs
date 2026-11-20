@@ -56,7 +56,7 @@ impl<'a> Renderer<'a> {
         string_formats: bool,
     ) -> Self {
         let mut name_counts = BTreeMap::new();
-        for ndt in types.into_sorted_iter() {
+        for ndt in types.iter_sorted() {
             *name_counts.entry(ndt.name.clone()).or_default() += 1;
         }
 
@@ -88,7 +88,7 @@ impl<'a> Renderer<'a> {
             )?);
         }
 
-        for ndt in self.types.into_sorted_iter() {
+        for ndt in self.types.iter_sorted() {
             if ndt.ty.is_none() {
                 continue;
             }

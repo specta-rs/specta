@@ -259,7 +259,7 @@ impl Swift {
         }
 
         // Export types
-        for ndt in raw_types.into_sorted_iter() {
+        for ndt in raw_types.iter_sorted() {
             let exported = export_type(&exporter, Some(&format), raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
@@ -291,7 +291,7 @@ impl Swift {
 fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
     let mut names = HashMap::<String, String>::new();
 
-    for ndt in types.into_sorted_iter() {
+    for ndt in types.iter_sorted() {
         if !matches!(
             ndt.ty,
             Some(DataType::Struct(_) | DataType::Enum(_) | DataType::Tuple(_))
@@ -520,7 +520,7 @@ fn escape_swift_keyword(name: &str) -> String {
 
 /// Check if the type collection contains any Duration types that need the helper
 fn needs_duration_helper(types: &Types) -> bool {
-    for ndt in types.into_sorted_iter() {
+    for ndt in types.iter_sorted() {
         if ndt.name == "Duration" {
             return true;
         }
