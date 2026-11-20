@@ -24,7 +24,7 @@ use crate::{
 /// # Invariants
 ///
 /// Internally, entries may temporarily be placeholders while recursive types are
-/// resolving. Public iterators and [`Types::len`] expose only completed
+/// resolving. Public iterators and [`Types::named_len`] expose only completed
 /// [`NamedDataType`] values.
 #[derive(Default, Clone)]
 pub struct Types {
@@ -1194,7 +1194,12 @@ impl Types {
     }
 
     /// Returns the number of completed named datatypes in the collection.
-    pub fn len(&self) -> usize {
+    ///
+    /// Roots registered with [`Types::register`] are not named datatypes and
+    /// are not counted; iterate [`Types::roots`] for those. This is why the
+    /// count is named explicitly rather than `len`: a collection holding only a
+    /// root has no entries here but is not [`Types::is_empty`].
+    pub fn named_len(&self) -> usize {
         debug_assert_eq!(
             self.len,
             self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
@@ -1204,14 +1209,14 @@ impl Types {
         self.len
     }
 
-    /// Returns `true` when the collection holds no named datatypes and no
-    /// registered roots.
+    /// Returns `true` when there is nothing to export: no named datatypes and
+    /// no registered roots.
     ///
-    /// This is deliberately not `len() == 0`: registering an anonymous root
-    /// such as a primitive adds no named datatype, but the collection still has
-    /// something to export.
+    /// Registering an anonymous root such as a primitive adds no named
+    /// datatype, so [`Types::named_len`] stays zero, but the collection still
+    /// has something to export. This is not `named_len() == 0` for that reason.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0 && self.roots.is_empty()
+        self.named_len() == 0 && self.roots.is_empty()
     }
 
     /// Merges types from another collection into this one.

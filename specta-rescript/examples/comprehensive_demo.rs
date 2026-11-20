@@ -335,7 +335,7 @@ fn main() {
 
     let output = ReScript::default().export(&types).unwrap();
     let lines = output.lines().count();
-    let types_count = types.len();
+    let types_count = types.named_len();
 
     println!("Generated {lines} lines of ReScript across {types_count} types.\n");
     println!("First 40 lines:\n");
