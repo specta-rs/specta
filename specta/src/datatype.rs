@@ -25,7 +25,7 @@ pub use reference::{
     NamedReference, NamedReferenceType, OpaqueReference, RecursiveInlineType, Reference,
 };
 
-pub(crate) use reference::{RecursiveInlineFrame, RecursiveInlineIdentity};
+pub(crate) use reference::RecursiveInlineFrame;
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 

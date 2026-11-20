@@ -9,8 +9,7 @@ use crate::{
     Types,
     datatype::{
         DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineIdentity, RecursiveInlineType, Reference, generic::GenericDefinition,
-        reference::NamedId,
+        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
     },
     types::InlineResolutionFrame,
 };
@@ -155,8 +154,20 @@ impl NamedDataType {
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
 
-        // If we have never encountered this type, register it to type map
-        if !types.types.contains_key(&id) {
+        // If we have never encountered this type, register it to type map.
+        //
+        // A single `entry` probe both answers "is this type known?" and installs
+        // the in-progress placeholder, which keeps the common repeat use site to
+        // one hash lookup instead of a `contains_key` followed by an `insert`.
+        let vacant = match types.types.entry(id.clone()) {
+            std::collections::hash_map::Entry::Occupied(_) => false,
+            std::collections::hash_map::Entry::Vacant(slot) => {
+                slot.insert(None);
+                true
+            }
+        };
+
+        if vacant {
             let mut ndt = NamedDataType {
                 id: id.clone(),
                 location,
@@ -168,8 +179,6 @@ impl NamedDataType {
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
             };
-
-            types.types.insert(id.clone(), None);
 
             let prev_inline = mem::replace(&mut types.should_inline, false);
             let prev_has_const_params = mem::replace(&mut types.has_const_params, has_const_param);
@@ -215,16 +224,9 @@ impl NamedDataType {
         }
 
         if inline {
-            let identity = match types.types.get(&id) {
-                Some(Some(_)) => RecursiveInlineIdentity::Named(id.clone()),
-                // The type has no (completed) entry, so the sentinel path is all
-                // the diagnostics can show.
-                _ => RecursiveInlineIdentity::Path(sentinel.into()),
-            };
-
             if let Some(cycle_start) = types.stack.iter().position(|frame| {
                 frame.is_use_site(
-                    &identity,
+                    &id,
                     instantiation_generic_identities,
                     instantiation_generics,
                 )
@@ -248,7 +250,7 @@ impl NamedDataType {
                     .collect::<Vec<_>>();
                 cycle.push(RecursiveInlineFrame::describe(
                     types,
-                    &identity,
+                    &id,
                     instantiation_generics,
                 ));
 
@@ -269,7 +271,7 @@ impl NamedDataType {
             let prev_inline = (types.should_inline != child_inline)
                 .then(|| mem::replace(&mut types.should_inline, child_inline));
             types.stack.push(InlineResolutionFrame::new(
-                identity,
+                id.clone(),
                 instantiation_generic_identities,
                 instantiation_generics,
             ));

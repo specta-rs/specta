@@ -6,10 +6,7 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{
-        DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame,
-        RecursiveInlineIdentity,
-    },
+    datatype::{DataType, Generic, NamedDataType, NamedId, NamedReference, RecursiveInlineFrame},
 };
 
 /// Collection of named datatypes that can be exported together.
@@ -217,7 +214,7 @@ impl GenericSubstitutionSlot {
 /// passthrough use site while cycles are rare.
 #[derive(Debug, Clone)]
 pub(crate) struct InlineResolutionFrame {
-    pub(crate) identity: RecursiveInlineIdentity,
+    pub(crate) id: NamedId,
     /// Concrete type names of the generic arguments.
     ///
     /// Needed because an inlined generic type records its arguments as
@@ -228,20 +225,20 @@ pub(crate) struct InlineResolutionFrame {
 }
 
 impl InlineResolutionFrame {
-    /// Records a use site of `identity` with its concrete generic arguments.
+    /// Records a use site of `id` with its concrete generic arguments.
     pub(crate) fn new(
-        identity: RecursiveInlineIdentity,
+        id: NamedId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) -> Self {
         Self {
-            identity,
+            id,
             generic_identities: generic_identities.to_vec(),
             generics: generics.to_vec(),
         }
     }
 
-    /// Whether this frame is the same use site as `identity` with `generics`.
+    /// Whether this frame is the same use site as `id` with `generics`.
     ///
     /// This replaces the previous hashed comparison: comparing the identity and
     /// arguments directly is both cheaper (no hashing of whole `DataType`
@@ -249,19 +246,17 @@ impl InlineResolutionFrame {
     /// cycle that did not exist.
     pub(crate) fn is_use_site(
         &self,
-        identity: &RecursiveInlineIdentity,
+        id: &NamedId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) -> bool {
         // Cheapest comparisons first; the datatypes are the expensive part.
-        self.identity == *identity
-            && self.generic_identities == generic_identities
-            && self.generics == generics
+        self.id == *id && self.generic_identities == generic_identities && self.generics == generics
     }
 
     /// Renders this frame's description for a reported cycle.
     pub(crate) fn describe(&self, types: &Types) -> RecursiveInlineFrame {
-        RecursiveInlineFrame::describe(types, &self.identity, &self.generics)
+        RecursiveInlineFrame::describe(types, &self.id, &self.generics)
     }
 }
 

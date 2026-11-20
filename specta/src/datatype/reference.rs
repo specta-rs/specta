@@ -75,21 +75,6 @@ pub(crate) struct RecursiveInlineFrame {
     generics: Vec<Cow<'static, str>>,
 }
 
-/// Cheap identity of an entry on the inline resolution stack.
-///
-/// Frames are pushed for every inline or passthrough use site, so their identity
-/// is kept cheap to build: a registered named type is identified by its
-/// [`NamedId`] and its path is only looked up (and rendered) if a cycle is
-/// actually reported. The fallback variant carries the sentinel path used when
-/// the type was never registered.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) enum RecursiveInlineIdentity {
-    /// The named type is registered in [`Types`].
-    Named(NamedId),
-    /// The named type has no entry in [`Types`]; only the sentinel path is known.
-    Path(Cow<'static, str>),
-}
-
 impl RecursiveInlineType {
     pub(crate) fn from_cycle(
         cycle: Vec<RecursiveInlineFrame>,
@@ -143,27 +128,16 @@ impl RecursiveInlineFrame {
         Self::new_inner(types, type_name, generics)
     }
 
-    /// Describes the frame for `identity` at a use site with `generics`.
+    /// Describes the `id` use site with `generics`.
     ///
     /// This is only called when a cycle is actually reported, so the (allocating)
     /// path rendering and generic formatting stay off the common resolution path.
-    pub(crate) fn describe(
-        types: &Types,
-        identity: &RecursiveInlineIdentity,
-        generics: &[(Generic, DataType)],
-    ) -> Self {
-        match identity {
-            RecursiveInlineIdentity::Path(path) => {
-                Self::from_type_path(types, path.clone(), generics)
-            }
-            RecursiveInlineIdentity::Named(id) => {
-                match types.types.get(id).and_then(|ndt| ndt.as_ref()) {
-                    Some(ndt) => Self::new(types, ndt, generics),
-                    // The entry can only disappear if the definition is being
-                    // rebuilt after a panic; fall back to the identity itself.
-                    None => Self::from_type_path(types, id.static_path(), generics),
-                }
-            }
+    pub(crate) fn describe(types: &Types, id: &NamedId, generics: &[(Generic, DataType)]) -> Self {
+        match types.types.get(id).and_then(|ndt| ndt.as_ref()) {
+            Some(ndt) => Self::new(types, ndt, generics),
+            // The entry can only disappear if the definition is being rebuilt
+            // after a panic; fall back to the identity itself.
+            None => Self::from_type_path(types, id.static_path(), generics),
         }
     }
 
