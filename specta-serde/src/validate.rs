@@ -1088,27 +1088,43 @@ fn field_has_live_key(field: &Field) -> Result<bool, Error> {
         return Ok(false);
     }
 
-    let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
+    // Only the flatten/skip flags matter, so read them in place rather than
+    // materialising the whole parsed field metadata (which clones every
+    // rename and alias string it finds).
+    if field.attributes.is_empty() {
         return Ok(true);
-    };
+    }
 
-    Ok(!(attrs.flatten || attrs.skip_serializing && attrs.skip_deserializing))
+    Ok(!(field.attributes.contains_key("serde:field:flatten")
+        || field
+            .attributes
+            .contains_key("serde:field:skip_serializing")
+            && field
+                .attributes
+                .contains_key("serde:field:skip_deserializing")))
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
-    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
-        return Ok(());
-    };
-
     // Field renames are validated by comparing the *effective* per-direction
     // keys in `validate_named_field_keys` (unnamed fields have no wire key,
-    // so renames are meaningless for them).
+    // so renames are meaningless for them), so only the skip and codec flags
+    // are read here, in place.
+    if field.attributes.is_empty() {
+        return Ok(());
+    }
+
+    let skip_serializing = field
+        .attributes
+        .contains_key("serde:field:skip_serializing");
+    let skip_deserializing = field
+        .attributes
+        .contains_key("serde:field:skip_deserializing");
 
     if mode == ApplyMode::Unified
         && !field
             .attributes
             .contains_key("specta:serde_newtype_skip_ignored")
-        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+        && skip_serializing != skip_deserializing
     {
         // Plain `#[serde(skip)]` sets both flags and never reaches here.
         // A one-sided skip means serde requires/emits the field on one side
@@ -1118,20 +1134,26 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         return Err(Error::incompatible_skip(
             "field skip",
             path,
-            serde_attrs.skip_serializing,
-            serde_attrs.skip_deserializing,
+            skip_serializing,
+            skip_deserializing,
         ));
     }
 
     let has_type_override = has_type_override(&field.attributes);
 
-    if serde_attrs.has_serialize_with {
+    if field
+        .attributes
+        .contains_key("serde:field:has_serialize_with")
+    {
         ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
-    if serde_attrs.has_deserialize_with {
+    if field
+        .attributes
+        .contains_key("serde:field:has_deserialize_with")
+    {
         ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
-    if serde_attrs.has_with {
+    if field.attributes.contains_key("serde:field:has_with") {
         ensure_codec_override(has_type_override, &path, "with")?;
     }
 
@@ -1155,8 +1177,9 @@ fn validate_unnamed_conditional_omission(
             ));
         }
 
-        let has_skip_serializing_if = SerdeFieldAttrs::from_attributes(&field.attributes)?
-            .is_some_and(|attrs| attrs.skip_serializing_if.is_some());
+        let has_skip_serializing_if = field
+            .attributes
+            .contains_key("serde:field:skip_serializing_if");
         if has_skip_serializing_if {
             conditional_omission = Some(idx);
         }
@@ -1170,8 +1193,9 @@ fn unnamed_field_is_absent_from_serialization(field: &Field) -> Result<bool, Err
         return Ok(true);
     }
 
-    Ok(SerdeFieldAttrs::from_attributes(&field.attributes)?
-        .is_some_and(|attrs| attrs.skip_serializing))
+    Ok(field
+        .attributes
+        .contains_key("serde:field:skip_serializing"))
 }
 
 /// Validates a `#[serde(flatten)]`-ed field's own type, independent of the
@@ -1188,11 +1212,7 @@ fn validate_flatten_field(
     container: FlattenDirections,
     env: Option<&GenericEnv<'_>>,
 ) -> Result<(), Error> {
-    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
-        return Ok(());
-    };
-
-    if !serde_attrs.flatten {
+    if !field.attributes.contains_key("serde:field:flatten") {
         return Ok(());
     }
 
@@ -1208,8 +1228,14 @@ fn validate_flatten_field(
     // `filter_enum_variants_for_phase`) ANDs in: a phase the variant doesn't
     // exist in can't flatten any of its fields.
     let directions = FlattenDirections {
-        serialize: container.serialize && !serde_attrs.skip_serializing,
-        deserialize: container.deserialize && !serde_attrs.skip_deserializing,
+        serialize: container.serialize
+            && !field
+                .attributes
+                .contains_key("serde:field:skip_serializing"),
+        deserialize: container.deserialize
+            && !field
+                .attributes
+                .contains_key("serde:field:skip_deserializing"),
     };
 
     let live = match mode {
@@ -1285,10 +1311,13 @@ impl FlattenDirections {
         {
             return Ok(Self::LIVE);
         }
-        let attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
         Ok(Self {
-            serialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_serializing),
-            deserialize: !attrs.as_ref().is_some_and(|attrs| attrs.skip_deserializing),
+            serialize: !field
+                .attributes
+                .contains_key("serde:field:skip_serializing"),
+            deserialize: !field
+                .attributes
+                .contains_key("serde:field:skip_deserializing"),
         })
     }
 
