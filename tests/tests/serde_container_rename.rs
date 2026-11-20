@@ -523,7 +523,8 @@ fn references_use_renamed_enum_name() {
         .expect("export should succeed");
 
     assert!(
-        ts.contains("field: ReferencedEnumNew,") && ts.contains("opt: ReferencedEnumNew | null,"),
+        ts.contains("field: ReferencedEnumNew,")
+            && ts.contains("opt?: ReferencedEnumNew | null,"),
         "expected references to use the renamed enum name, got:\n{ts}"
     );
 }

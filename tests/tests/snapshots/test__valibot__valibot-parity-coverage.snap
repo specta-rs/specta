@@ -129,7 +129,7 @@ export type ValibotCoverage<T = string> = {
 	 */
 	"quote\"slash\\line\nseparator": string,
 	generic: T,
-	optional: boolean | null,
+	optional?: boolean | null,
 	tuple: [number, string],
 	list: (number | null)[],
 	map: { [key in string]: number },
@@ -140,7 +140,7 @@ export function ValibotCoverageSchema(T: v.GenericSchema = v.pipe(v.string(), v.
 	return $spectaObject({
 	"quote\"slash\\line\nseparator": v.pipe(v.string(), v.check((value) => !/[\uD800-\uDFFF]/u.test(value))),
 	generic: T,
-	optional: v.nullable(v.boolean()),
+	optional: v.optional(v.nullable(v.boolean())),
 	tuple: v.strictTuple([v.pipe(v.number(), v.integer(), v.minValue(-2147483648), v.maxValue(2147483647)), v.pipe(v.string(), v.check((value) => !/[\uD800-\uDFFF]/u.test(value)))]),
 	list: v.array(v.nullable(v.pipe(v.number(), v.finite()))),
 	map: $spectaRecord(v.pipe(v.string(), v.check((value) => !/[\uD800-\uDFFF]/u.test(value))), v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65535))),

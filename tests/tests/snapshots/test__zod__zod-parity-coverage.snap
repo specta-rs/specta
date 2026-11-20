@@ -29,7 +29,7 @@ export type ZodCoverage<T = string> = {
 	 */
 	"quote\"slash\\line\nseparator": string,
 	generic: T,
-	optional: boolean | null,
+	optional?: boolean | null,
 	tuple: [number, string],
 	list: (number | null)[],
 	map: { [key in string]: number },
@@ -40,7 +40,7 @@ export function ZodCoverageSchema(T: z.ZodType = z.string()): z.ZodType<any> {
 	return z.object({
 	"quote\"slash\\line\nseparator": z.string(),
 	generic: T,
-	optional: z.boolean().nullable(),
+	optional: z.boolean().nullable().optional(),
 	tuple: z.tuple([z.int().min(-2147483648).max(2147483647), z.string()]),
 	list: z.array(z.number().nullable()),
 	map: z.record(z.string(), z.int().min(0).max(65535)),

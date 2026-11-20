@@ -2517,7 +2517,11 @@ fn rewrite_fields_for_phase(
                 apply_field_attrs(field, mode, container_default)?;
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
-                if mode == PhaseRewrite::Deserialize
+                // Serde omits a None on serialize but accepts a missing key on
+                // deserialize, so neither direction requires the key. A unified
+                // shape must accept both: the field is optional. Only the
+                // serialize half alone may leave it required.
+                if mode != PhaseRewrite::Serialize
                     && field.attributes.contains_key("specta:nullable")
                     && !serde_attrs
                         .as_ref()

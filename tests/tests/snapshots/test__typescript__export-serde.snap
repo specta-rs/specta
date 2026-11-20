@@ -49,7 +49,7 @@ SimpleStruct: export type SimpleStruct = {
 	b: string,
 	c: [number, string, number],
 	d: string[],
-	e: string | null,
+	e?: string | null,
 };
 
 TupleStruct1: export type TupleStruct1 = number;
@@ -98,7 +98,7 @@ InlineEnumField: export type InlineEnumField = { A: {
 } };
 
 InlineOptionalType: export type InlineOptionalType = {
-	optional_field: {
+	optional_field?: {
 	a: string,
 } | null,
 };
@@ -202,7 +202,7 @@ ContainerTypeOverrideTuple: export type ContainerTypeOverrideTuple = [string, nu
 ContainerTypeOverrideTupleGeneric<i32>: export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
 InvalidToValidType: export type InvalidToValidType = {
-	cause: null,
+	cause?: null,
 };
 
 TupleStruct: export type TupleStruct = string;
@@ -260,7 +260,7 @@ OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 };
 
 OptionalInEnum: export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	a: string | null,
+	a?: string | null,
 } }) & { A?: never; C?: never } | ({ C: {
 	a?: string | null,
 } }) & { A?: never; B?: never };

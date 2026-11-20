@@ -135,7 +135,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "required": [
           "id",
           "value",
-          "optionalValue",
           "fixed",
           "tuple",
           "labels"
@@ -211,7 +210,6 @@ expression: "serde_json::to_string_pretty(&value).expect(\"snapshot value should
         "required": [
           "id",
           "value",
-          "optionalValue",
           "fixed",
           "tuple",
           "labels"
