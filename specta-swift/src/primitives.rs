@@ -694,8 +694,8 @@ pub fn export_type(
             .map(ToString::to_string)
             .unwrap_or_else(|| "This type is deprecated".to_string());
         result.push_str(&format!(
-            "@available(*, deprecated, message: \"{}\")\n",
-            message
+            "@available(*, deprecated, message: {})\n",
+            swift_string_literal(&message)
         ));
     }
 

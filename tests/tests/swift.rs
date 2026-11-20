@@ -2612,3 +2612,32 @@ fn duplicate_swift_type_names_are_rejected() {
     assert!(message.contains("same_name_a::Item"));
     assert!(message.contains("same_name_b::Item"));
 }
+
+/// A deprecation note is placed inside a Swift string literal, so quotes and
+/// backslashes in it must be escaped rather than ending the attribute early.
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[deprecated(note = "use \"New\" instead, not C:\\old")]
+struct DeprecatedQuote {
+    value: String,
+}
+
+#[test]
+#[allow(deprecated)]
+fn swift_deprecation_message_is_escaped() {
+    let note = "use \"New\" instead, not C:\\old";
+    let rendered = Swift::default()
+        .export(
+            &Types::default().register::<DeprecatedQuote>(),
+            specta_serde::Format,
+        )
+        .unwrap();
+
+    let expected = format!(
+        "@available(*, deprecated, message: {})",
+        swift_literal(note)
+    );
+    assert!(rendered.contains(&expected), "{rendered}");
+
+    run_swift(&rendered, "print(\"SWIFT-OK\")");
+}
