@@ -9,7 +9,7 @@ use std::{
 use crate::{
     Types,
     datatype::{
-        DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
+        Attributes, DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
         RecursiveInlineType, Reference, generic::GenericDefinition, reference::{NamedId, NamedTypeId},
     },
     types::InlineResolutionFrame,
@@ -54,6 +54,12 @@ pub struct NamedDataType {
     pub location: Location<'static>,
     /// Generic parameters declared by this named datatype.
     pub generics: Cow<'static, [GenericDefinition]>,
+    /// Metadata attached to the declaration itself rather than to its shape.
+    ///
+    /// The derive records container-level attributes here as well, so they
+    /// survive when the shape is replaced by an override such as
+    /// `#[specta(type = ...)]` and is therefore no longer a struct or an enum.
+    pub attributes: Attributes,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
     ///
@@ -90,6 +96,7 @@ impl NamedDataType {
                 .unwrap_or(Cow::Borrowed("virtual")),
             location: location.to_owned(),
             generics: Cow::Borrowed(&[]),
+            attributes: Attributes::default(),
             ty: None,
         };
         build(types, &mut ndt);
@@ -177,6 +184,7 @@ impl NamedDataType {
                 location,
                 // `build_ndt` will just override all of this.
                 generics: Cow::Borrowed(&[]),
+                attributes: Default::default(),
                 ty: None,
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),

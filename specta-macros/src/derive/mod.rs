@@ -129,6 +129,10 @@ pub(crate) fn expand(input: proc_macro::TokenStream) -> syn::Result<proc_macro::
         &container_attrs.skip_attrs,
         generic_context,
     )?;
+    // A shape override replaces the struct/enum node, so the container rename
+    // would be lost with it. Keep the declaration's name on the declaration.
+    let declaration_rename_attrs = serde::lower_container_rename(raw_attrs)?;
+
     let container_runtime_attrs =
         if container_runtime_attrs.is_some() || enum_runtime_attrs.is_some() {
             quote! {
@@ -413,6 +417,7 @@ pub(crate) fn expand(input: proc_macro::TokenStream) -> syn::Result<proc_macro::
                     #generics
                     #docs
                     #deprecated;
+                    #declaration_rename_attrs
 
                     #ndt_ty
                 },
