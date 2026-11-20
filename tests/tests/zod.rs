@@ -1532,3 +1532,18 @@ fn zod_nested_errors_include_the_field_path() {
         "unexpected error: {err}"
     );
 }
+
+#[test]
+fn files_layout_refuses_to_delete_an_existing_regular_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("bindings");
+    std::fs::write(&path, "hand-written file").unwrap();
+
+    let error = Zod::default()
+        .layout(Layout::Files)
+        .export_to(&path, &Types::default(), specta_serde::Format)
+        .expect_err("a files layout must not replace a regular file");
+
+    assert!(error.to_string().contains("Refusing to delete it"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "hand-written file");
+}

@@ -1,6 +1,6 @@
 //! [Elm](https://elm-lang.org) language exporter.
 //!
-//! `specta-elm` was originally written by [vivi (`itsnanpc`)](https://github.com/itsnanpc)
+//! `specta-elm` was originally written by [vivi](https://codeberg.org/itsvivi)
 //! and published as a standalone crate. It now lives in the Specta workspace and
 //! is maintained alongside the other exporters.
 //!

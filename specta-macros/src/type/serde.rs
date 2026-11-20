@@ -112,10 +112,11 @@ pub(super) fn lower_runtime_attributes(
     crate_ref: &TokenStream,
     scope: AttributeScope,
     raw_attrs: &[Attribute],
+    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
 ) -> Result<Option<TokenStream>> {
     match scope {
         AttributeScope::Container => parse_container_attrs(raw_attrs)
-            .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs))),
+            .map(|attrs| attrs.map(|attrs| lower_container_attrs(crate_ref, attrs, generics))),
         AttributeScope::Variant => {
             parse_variant_attrs(raw_attrs).map(|attrs| attrs.map(lower_variant_attrs))
         }
@@ -392,7 +393,11 @@ fn parse_lit_str(meta: &ParseNestedMeta<'_>) -> Result<LitStr> {
     meta.value()?.parse()
 }
 
-fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> TokenStream {
+fn lower_container_attrs(
+    crate_ref: &TokenStream,
+    attrs: ContainerAttrs,
+    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
+) -> TokenStream {
     let mut inserts = Vec::new();
     push_opt_string(
         &mut inserts,
@@ -444,6 +449,7 @@ fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> Toke
         "serde:container:from_type_src",
         "serde:container:from_resolved",
         &attrs.from,
+        generics,
     );
     push_opt_conversion(
         &mut inserts,
@@ -451,6 +457,7 @@ fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> Toke
         "serde:container:try_from_type_src",
         "serde:container:try_from_resolved",
         &attrs.try_from,
+        generics,
     );
     push_opt_conversion(
         &mut inserts,
@@ -458,6 +465,7 @@ fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> Toke
         "serde:container:into_type_src",
         "serde:container:into_resolved",
         &attrs.into,
+        generics,
     );
     push_bool(
         &mut inserts,
@@ -604,13 +612,21 @@ fn push_opt_conversion(
     src_key: &str,
     resolved_key: &str,
     value: &Option<ConversionType>,
+    generics: Option<(&[syn::Ident], &std::collections::HashSet<String>)>,
 ) {
-    if let Some(value) = value {
-        let type_src = &value.type_src;
-        let ty = &value.ty;
-        inserts.push(quote!(attrs.insert(#src_key, ::std::string::String::from(#type_src));));
-        inserts.push(
-            quote!(attrs.insert(#resolved_key, <#ty as #crate_ref::Type>::definition(types));),
-        );
-    }
+    let Some(value) = value else {
+        return;
+    };
+
+    let type_src = &value.type_src;
+    let ty = &value.ty;
+    let resolve = match generics {
+        Some((used, bounded)) => {
+            super::generics::resolve_ty_expr(crate_ref, ty, used, bounded, true)
+        }
+        None => quote!(<#ty as #crate_ref::Type>::definition(types)),
+    };
+
+    inserts.push(quote!(attrs.insert(#src_key, ::std::string::String::from(#type_src));));
+    inserts.push(quote!(attrs.insert(#resolved_key, #resolve);));
 }

@@ -573,13 +573,9 @@ impl Valibot {
         }
 
         match path.metadata() {
-            Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
-                if source.kind() == std::io::ErrorKind::NotFound {
-                    Ok(())
-                } else {
-                    Err(Error::remove_file(path.to_path_buf(), source))
-                }
-            })?,
+            Ok(meta) if !meta.is_dir() => {
+                return Err(Error::expected_directory(path.to_path_buf()));
+            }
             Ok(_) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(source) => {
@@ -599,15 +595,45 @@ impl Valibot {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    Ok(
-        match format
-            .map_types(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))?
-        {
-            Cow::Borrowed(_) => Cow::Borrowed(types),
-            Cow::Owned(types) => Cow::Owned(types),
-        },
-    )
+    let mapped = match format
+        .map_types(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))?
+    {
+        Cow::Borrowed(_) => types.clone(),
+        Cow::Owned(types) => types,
+    };
+    let source = mapped.clone();
+    let mut output = mapped;
+    let mut error = None;
+
+    output.iter_mut(|ndt| {
+        if error.is_some() {
+            return;
+        }
+
+        for generic in ndt.generics.to_mut() {
+            let Some(default) = generic.default.clone() else {
+                continue;
+            };
+            match map_datatype_format(Some(format), &source, &default) {
+                Ok(default) => generic.default = Some(default),
+                Err(source) => {
+                    error = Some(source);
+                    return;
+                }
+            }
+        }
+
+        let Some(datatype) = ndt.ty.clone() else {
+            return;
+        };
+        match map_datatype_format(Some(format), &source, &datatype) {
+            Ok(datatype) => ndt.ty = Some(datatype),
+            Err(source) => error = Some(source),
+        }
+    });
+
+    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
 }
 
 fn map_datatype_format(
@@ -778,20 +804,6 @@ fn map_datatype_fields(
     Ok(())
 }
 
-fn map_named_datatype_format(
-    format: Option<&dyn Format>,
-    types: &Types,
-    ndt: &NamedDataType,
-) -> Result<NamedDataType, Error> {
-    let mut mapped = ndt.clone();
-    mapped.ty = ndt
-        .ty
-        .clone()
-        .map(|ty| map_datatype_format_children(format, types, ty))
-        .transpose()?;
-    Ok(mapped)
-}
-
 impl AsRef<Valibot> for Valibot {
     fn as_ref(&self) -> &Valibot {
         self
@@ -886,10 +898,7 @@ impl FrameworkExporter<'_> {
             ndts.retain(|ndt| ndt.ty.is_none() || seen.insert(manual_export_identity(ndt)));
         }
 
-        let mapped = ndts
-            .iter()
-            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mapped = ndts.iter().map(|ndt| (*ndt).clone()).collect::<Vec<_>>();
         let rendered = if self.layout == Layout::Namespaces {
             render_manual_namespace_types(self, self.types, &mapped, indent, &already_exported)?
         } else {

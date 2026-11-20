@@ -50,14 +50,19 @@ artifact() {
     local path="$lib/kotlinx-serialization-$name-jvm-$KOTLINX_SERIALIZATION_VERSION.jar"
     if [ ! -f "$path" ]; then
         echo "downloading $name $KOTLINX_SERIALIZATION_VERSION" >&2
+        local artifact_path="org/jetbrains/kotlinx/kotlinx-serialization-$name-jvm/$KOTLINX_SERIALIZATION_VERSION/kotlinx-serialization-$name-jvm-$KOTLINX_SERIALIZATION_VERSION.jar"
         curl --fail --silent --show-error --location --retry 3 \
-            --output "$path.tmp" \
-            "https://repo1.maven.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-$name-jvm/$KOTLINX_SERIALIZATION_VERSION/kotlinx-serialization-$name-jvm-$KOTLINX_SERIALIZATION_VERSION.jar"
-        mv "$path.tmp" "$path"
+            --output "$path.tmp" "https://repo.maven.apache.org/maven2/$artifact_path" ||
+            curl --fail --silent --show-error --location --retry 3 \
+                --output "$path.tmp" "https://repo1.maven.org/maven2/$artifact_path" || return
+        mv "$path.tmp" "$path" || return
     fi
     printf '%s\n' "$path"
 }
-classpath="$(artifact core):$(artifact json)"
+# Separate assignments preserve download failures instead of masking the first substitution's status.
+core="$(artifact core)"
+json="$(artifact json)"
+classpath="$core:$json"
 
 echo "generating Kotlin declarations"
 cargo run --quiet --manifest-path "$manifest" -p specta-tests --example kotlin_typecheck

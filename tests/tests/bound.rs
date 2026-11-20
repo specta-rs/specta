@@ -116,3 +116,24 @@ fn requires_clone_bound() {
         value: CloneAndType,
     };
 }
+
+struct UnboundedWire<T>(std::marker::PhantomData<T>);
+
+impl<T> Type for UnboundedWire<T> {
+    fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
+        <String as Type>::definition(types)
+    }
+}
+
+#[derive(Type)]
+#[specta(bound = "", collect = false)]
+struct NoInferredBound<T> {
+    value: UnboundedWire<T>,
+}
+
+#[test]
+fn empty_bound_disables_inferred_type_bounds() {
+    struct NotType;
+
+    let _ = specta::Types::default().register::<NoInferredBound<NotType>>();
+}

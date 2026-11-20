@@ -11,7 +11,7 @@ Export your Rust types to [Elm](https://elm-lang.org), built on top of
 > repository, but has had far less real-world use than the TypeScript exporter.
 > Bug reports and test cases from Elm users are very welcome.
 
-`specta-elm` was created by [vivi (`itsnanpc`)](https://github.com/itsnanpc),
+`specta-elm` was created by [vivi](https://codeberg.org/itsvivi),
 who designed and published it as a standalone crate before it moved into the
 Specta repository.
 

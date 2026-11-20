@@ -1762,3 +1762,40 @@ fn selection_supports_arbitrary_values_and_nested_fields() {
         "{\n\t__typename: string,\n\tname: string,\n\tpets: {\n\t\tname: string,\n\t}[],\n}"
     );
 }
+
+specta_typescript::branded!(pub struct QualifiedBrand(String) as "qualifiedBrand");
+
+#[derive(Type)]
+struct UsesQualifiedBrand {
+    value: QualifiedBrand,
+}
+
+#[test]
+fn branded_macro_supports_qualified_invocation() {
+    let output = Typescript::default()
+        .export(
+            &Types::default().register::<UsesQualifiedBrand>(),
+            specta_serde::Format,
+        )
+        .expect("qualified branded! invocation should work");
+
+    assert!(
+        output.contains("value: string & {"),
+        "the qualified branded! expansion should render its brand:\n{output}"
+    );
+}
+
+#[test]
+fn files_layout_refuses_to_delete_an_existing_regular_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("bindings");
+    std::fs::write(&path, "hand-written file").unwrap();
+
+    let error = Typescript::default()
+        .layout(Layout::Files)
+        .export_to(&path, &Types::default(), specta_serde::Format)
+        .expect_err("a files layout must not replace a regular file");
+
+    assert!(error.to_string().contains("Refusing to delete it"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "hand-written file");
+}

@@ -9,9 +9,9 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_no_lifetimes,
-    generics_with_ident_and_bounds_only, generics_with_ident_only, placeholder_ident,
-    resolve_ty_expr, type_with_inferred_lifetimes, used_type_params,
+    add_type_to_where_clause, build_where_clause, generics_with_ident_and_bounds_only,
+    generics_with_ident_only, generics_with_ident_only_no_lifetimes, placeholder_ident,
+    resolve_ty_expr, type_params_used_in, type_with_inferred_lifetimes, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -43,6 +43,7 @@ pub(super) fn build_runtime_attributes(
     attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
+    generics: Option<(&[syn::Ident], &HashSet<String>)>,
 ) -> syn::Result<Option<TokenStream>> {
     let serde_insert = serde::lower_runtime_attributes(
         crate_ref,
@@ -58,6 +59,7 @@ pub(super) fn build_runtime_attributes(
             })
             .cloned()
             .collect::<Vec<_>>(),
+        generics,
     )?;
 
     if serde_insert.is_none() {
@@ -89,7 +91,28 @@ fn generic_type_and_const_args(
         })
 }
 
+/// Builds an identifier suffix unique to this declaration's source position.
+///
+/// `module_path!()` does not distinguish declarations in separate function or
+/// block scopes, so its result is not a unique type identity on its own.
+fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    let span = input
+        .clone()
+        .into_iter()
+        .next()
+        .map_or_else(proc_macro::Span::call_site, |token| token.span());
+    let mut hasher = DefaultHasher::new();
+    span.file().hash(&mut hasher);
+    span.line().hash(&mut hasher);
+    span.column().hash(&mut hasher);
+
+    format!("{:x}", hasher.finish())
+}
+
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
+    let source_suffix = source_position_suffix(&input);
     let DeriveInput {
         ident: raw_ident,
         generics,
@@ -122,12 +145,27 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     reject_unknown_specta_attrs(&attrs, Scope::Container)?;
 
+    let used_generic_types = used_type_params(
+        generics,
+        data,
+        container_attrs.r#type.as_ref(),
+        &container_attrs.skip_attrs,
+    )?;
+
+    let bounded = bounded_params(
+        generics,
+        container_attrs.bound.as_deref(),
+        &used_generic_types,
+    );
+
+    let generic_context = Some((used_generic_types.as_slice(), &bounded));
     let container_runtime_attrs = build_runtime_attributes(
         &crate_ref,
         AttributeScope::Container,
         quote!(s.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
+        generic_context,
     )?;
     let enum_runtime_attrs = build_runtime_attributes(
         &crate_ref,
@@ -135,6 +173,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote!(en.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
+        generic_context,
     )?;
     let container_runtime_attrs =
         if container_runtime_attrs.is_some() || enum_runtime_attrs.is_some() {
@@ -148,19 +187,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         } else {
             quote!()
         };
-
-    let used_generic_types = used_type_params(
-        generics,
-        data,
-        container_attrs.r#type.as_ref(),
-        &container_attrs.skip_attrs,
-    )?;
-
-    let bounded = bounded_params(
-        generics,
-        container_attrs.bound.as_deref(),
-        &used_generic_types,
-    );
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         let container_ty = type_with_inferred_lifetimes(container_ty);
@@ -216,16 +242,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // `build` resolves field types with the *concrete* generic arguments (so any
     // bounds a field's own type declaration requires are satisfied) and the
     // declaration then rewrites those arguments back to `Generic` placeholders.
-    // It therefore needs the declared inline bounds on the parameter list plus
-    // the container's `where` clause, the `#[specta(bound = "...")]` override
-    // and the automatic `Type` predicates.
+    // It therefore needs the declared bounds, the container's `where` clause,
+    // the `#[specta(bound = "...")]` override and the automatic `Type`
+    // predicates. All of them live in this clause; the parameter list stays
+    // bare so no bound is declared in two places.
     let build_ty_where_bound = build_where_clause(
         &crate_ref,
         generics,
         container_attrs.bound.as_deref(),
         &used_generic_types,
     );
-    let build_ty_bounds = generics_with_ident_and_bounds_no_lifetimes(&crate_ref, generics);
+    let build_ty_bounds = generics_with_ident_only_no_lifetimes(generics);
     let placeholder_params = used_generic_types
         .iter()
         .filter(|ident| !bounded.contains(&ident.to_string()))
@@ -242,11 +269,30 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // aligned (issue #609).
     let mut generics_for_ndt: Vec<TokenStream> = Vec::new();
     let mut instantiation_steps: Vec<TokenStream> = Vec::new();
+    // `#[specta(bound = "")]` explicitly disables every inferred bound, which
+    // includes the `Type` bound needed to resolve a parameter's concrete
+    // argument. Such parameters cannot participate in the exported generic
+    // declaration; field types can still ignore them through a wrapper whose
+    // own `Type` implementation is unconditional.
+    let erase_generics = container_attrs.bound.as_ref().is_some_and(Vec::is_empty);
+
+    let all_type_params = generics
+        .params
+        .iter()
+        .filter_map(|param| match param {
+            GenericParam::Type(param) => Some(param.ident.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
 
     for param in &generics.params {
         let GenericParam::Type(t) = param else {
             continue;
         };
+
+        if erase_generics {
+            continue;
+        }
 
         let i = &t.ident;
         let i_str = i.to_string();
@@ -273,11 +319,23 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         let default = match (&t.default, skip_default) {
             (_, true) | (None, false) => quote!(None),
             (Some(default), false) => {
-                // A default may reference another parameter (`U = T`), so
-                // resolve it with the same placeholder rewriting.
-                let resolve =
-                    resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
-                quote!(Some(#resolve))
+                let mentioned = type_params_used_in(default, &all_type_params);
+                if mentioned
+                    .iter()
+                    .any(|param| !used_generic_types.contains(param))
+                {
+                    // The declaration omits unused parameters, so a default
+                    // that references one cannot be represented. Dropping the
+                    // default is preferable to emitting a dangling name or
+                    // requiring a bound for a parameter that is not exported.
+                    quote!(None)
+                } else {
+                    // A default may reference another parameter (`U = T`), so
+                    // resolve it with the same placeholder rewriting.
+                    let resolve =
+                        resolve_ty_expr(&crate_ref, default, &used_generic_types, &bounded, false);
+                    quote!(Some(#resolve))
+                }
             }
         };
 
@@ -293,18 +351,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         ));
     }
 
-    if cfg!(feature = "DO_NOT_USE_collect")
-        && has_const_param
-        && !container_attrs.inline
-        && container_attrs.collect.unwrap_or(true)
-    {
-        return Err(syn::Error::new(
-            raw_ident.span(),
-            "specta: automatic collection does not support const generics; use `#[specta(collect = false)]`",
-        ));
-    }
+    // Automatic collection has no concrete arguments to register a generic
+    // declaration with. The previous `()` placeholders broke any parameter
+    // with a real bound, so generic declarations are left for the application
+    // to register at the instantiations it actually exports.
+    let has_generic_params = generics
+        .params
+        .iter()
+        .any(|param| !matches!(param, GenericParam::Lifetime(_)));
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect")
+        && !has_generic_params
         && !container_attrs.inline
         && container_attrs.collect.unwrap_or(true))
     .then(|| {
@@ -348,9 +405,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             ndt.docs = Cow::Borrowed(#docs);
         }
     });
-    let instantiation_generic_identities = used_generic_types
-        .iter()
-        .map(|generic| quote!(std::any::type_name::<#generic>()));
+    let instantiation_generic_identities = if erase_generics {
+        Vec::new()
+    } else {
+        used_generic_types
+            .iter()
+            .map(|generic| quote!(std::any::type_name::<#generic>()))
+            .collect::<Vec<_>>()
+    };
     let deprecated = container_attrs.common.deprecated.map(|deprecated| {
         let tokens = deprecated_as_tokens(deprecated);
         quote!(ndt.deprecated = #tokens;)
@@ -410,7 +472,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 use std::borrow::Cow;
                 use #crate_ref::datatype;
 
-                static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
+                static SENTINEL: &str = concat!(
+                    module_path!(),
+                    "::",
+                    stringify!(#raw_ident),
+                    "#",
+                    #source_suffix
+                );
 
                 #build_placeholders
 

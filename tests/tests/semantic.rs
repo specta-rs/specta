@@ -1161,16 +1161,16 @@ fn semantic_absent_proto_key_does_not_inject_a_bogus_property_on_serialize() {
         .try_apply_serialize(&types, &dt, "value")
         .expect("skipped prototype-named field serialization should be supported")
         .expect("skipped prototype-named field serialization should require a transform");
-    assert_eq!(
-        serialize,
-        "({...value,[\"__proto__\"]:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value==null?Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value:Object.getOwnPropertyDescriptor(value,\"__proto__\")?.value.toString(),site:value.site.toString()})"
+    assert!(
+        serialize.contains("hasOwnProperty.call(value,\"__proto__\")"),
+        "an optional field must be guarded by own-property presence: {serialize}"
     );
 
     // Key absent: no throw, and nothing bogus reaches the wire.
     assert_runtime_js(
         &serialize,
         "{ site: new URL(\"https://example.com/s\") }",
-        "out[\"__proto__\"] === undefined && JSON.stringify(out) === JSON.stringify({site:\"https://example.com/s\"}) && Object.getPrototypeOf(out) === Object.prototype",
+        "!Object.prototype.hasOwnProperty.call(out,\"__proto__\") && JSON.stringify(out) === JSON.stringify({site:\"https://example.com/s\"}) && Object.getPrototypeOf(out) === Object.prototype",
     );
     // Key present: still rewritten to the wire string.
     assert_runtime_js(
@@ -1317,5 +1317,94 @@ fn semantic_map_keys_are_not_remapped_or_transformed() {
     assert_eq!(
         deserialize,
         "({...payload,wide:Object.fromEntries(Object.entries(payload.wide).map(([k,v])=>[k,BigInt(v)]))})"
+    );
+}
+
+#[derive(Type)]
+struct SemanticWire(String);
+
+#[derive(Type)]
+struct SemanticGeneric<T> {
+    value: T,
+}
+
+#[derive(Type)]
+struct SemanticGenericUser {
+    generic: SemanticGeneric<SemanticWire>,
+}
+
+#[test]
+fn runtime_transforms_instantiate_generic_named_types() {
+    use specta_typescript::semantic::{Configuration, Transform};
+
+    let mut types = Types::default();
+    let dt = SemanticGenericUser::definition(&mut types);
+    let configuration = Configuration::empty().define::<SemanticWire>(
+        |_| specta_typescript::define("Date").into(),
+        None,
+        Some(Transform::new(|value| format!("new Date({value})"))),
+    );
+
+    let transformed = configuration
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("a concrete generic argument must be transformable")
+        .expect("the nested wire value needs a runtime transform");
+
+    assert!(
+        transformed.1.contains("new Date("),
+        "the runtime expression should reach the generic argument: {transformed:?}"
+    );
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct RecursiveStruct {
+    site: Website,
+    next: Option<Box<RecursiveStruct>>,
+}
+
+#[test]
+fn recursive_structs_with_runtime_transforms_are_reported_unsupported() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<RecursiveStruct>();
+
+    let result = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect_err("a partial recursive transform must fail closed");
+    assert!(
+        result.to_string().contains("the type is recursive"),
+        "{result}"
+    );
+
+    // The infallible API keeps its documented best-effort behavior; callers
+    // that need a sound contract use the try_* variant above.
+    assert!(semantic.apply_deserialize(&types, &dt, "value").is_some());
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct OptionalSemanticField {
+    #[specta(optional)]
+    site: Website,
+}
+
+#[test]
+fn optional_transformed_fields_stay_absent_when_omitted() {
+    let semantic = semantic_config();
+    let (types, dt) = mapped_types::<OptionalSemanticField>();
+    let (_, deserialize) = semantic
+        .try_apply_deserialize(&types, &dt, "value")
+        .expect("the optional field should transform")
+        .expect("the optional field needs a runtime transform");
+
+    assert!(
+        deserialize.contains("hasOwnProperty"),
+        "presence must be checked before transforming: {deserialize}"
+    );
+    assert_runtime_js(&deserialize, "{}", "JSON.stringify(out) === \"{}\"");
+    assert_runtime_js(
+        &deserialize,
+        "{ site: \"https://example.com/\" }",
+        "out.site instanceof URL",
     );
 }
