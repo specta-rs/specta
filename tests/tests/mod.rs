@@ -35,6 +35,7 @@ mod macro_thiserror_attrs;
 mod maybe_undefined;
 mod openapi;
 mod python;
+mod repr_transparent;
 mod references;
 mod rust;
 mod semantic;
