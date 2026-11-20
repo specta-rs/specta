@@ -85,8 +85,10 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 /// - `#[deprecated(since = "...", note = "...")]` marks the item as deprecated with a version
 ///   and note.
 ///
-/// `#[repr(transparent)]` is also accepted on containers as an alias for
-/// `#[specta(transparent)]`.
+/// `#[repr(transparent)]` is a memory-layout attribute and does not change the
+/// serialized shape, so it is ignored. Use `#[serde(transparent)]` when Serde
+/// serializes the type as its only field, or `#[specta(transparent)]` to say
+/// the same thing only to Specta.
 ///
 /// ## Serde attributes
 ///

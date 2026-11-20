@@ -951,9 +951,11 @@ struct InvalidToValidType {
 #[specta(collect = false, transparent)]
 struct TupleStruct(String);
 
+// repr(transparent) is a layout attribute; the wire shape comes from the
+// explicit specta(transparent).
 #[repr(transparent)]
 #[derive(Type)]
-#[specta(collect = false)]
+#[specta(collect = false, transparent)]
 struct TupleStructWithRep(String);
 
 #[derive(Type)]

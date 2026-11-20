@@ -80,7 +80,7 @@ pub(crate) fn expand(input: proc_macro::TokenStream) -> syn::Result<proc_macro::
     let raw_attrs = attrs; // Preserve raw attrs before parse_attrs shadows the variable
     let mut attrs = parse_attrs(attrs)?;
 
-    let container_attrs = ContainerAttr::from_attrs(&mut attrs, matches!(data, Data::Struct(_)))?;
+    let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
     if container_attrs.r#type.is_some() && container_attrs.transparent {
