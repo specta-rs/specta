@@ -311,7 +311,7 @@ impl NamedDataType {
             // `build_ndt` may already have completed this entry, for example by
             // merging a collection that contains it through `Types::extend`.
             // Only count the entry when the placeholder we installed is still a
-            // placeholder, otherwise `Types::len` would report more entries than
+            // placeholder, otherwise `Types::named_len` would report more entries than
             // the map holds.
             let already_complete = types
                 .types
@@ -537,7 +537,7 @@ mod tests {
             inline,
         );
 
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
         let ndt = types
             .iter_sorted()
             .next()
@@ -603,9 +603,9 @@ mod tests {
             inline,
         );
 
-        // `Types::len` checks its count against the map, so a double count
+        // `Types::named_len` checks its count against the map, so a double count
         // shows up here rather than as a wrong length in an exporter.
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
     }
 
     #[test]

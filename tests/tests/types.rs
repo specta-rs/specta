@@ -2827,7 +2827,7 @@ fn named_type_mutation_preserves_graph_identity() {
         ndt.ty = Some(Primitive::str.into());
     });
     NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    assert_eq!(types.named_len(), 2);
 
     let a_reference = a.reference(Vec::new());
     let mut types = types.map(|_| a.clone());
@@ -2842,7 +2842,7 @@ fn named_type_mutation_preserves_graph_identity() {
     );
 
     types.for_each_named_mut(|ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    assert_eq!(types.named_len(), 2);
 }
 
 #[derive(Type)]
@@ -2957,4 +2957,41 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
         })
         .collect::<Vec<_>>();
     assert_eq!(fields, ["a", "b"]);
+}
+
+/// named_len counts declarations only; is_empty follows the usual collection
+/// meaning and has_roots answers whether anything was registered for export.
+#[test]
+fn named_len_and_has_roots_describe_different_things() {
+    let types = Types::default();
+    assert_eq!(types.named_len(), 0);
+    assert!(types.is_empty());
+    assert!(!types.has_roots());
+
+    let types = Types::default().register::<bool>();
+    assert_eq!(
+        types.named_len(),
+        0,
+        "an anonymous root adds no named datatype"
+    );
+    assert_eq!(types.roots().len(), 1);
+    assert!(types.is_empty(), "is_empty counts named datatypes only");
+    assert!(types.has_roots());
+
+    // A named declaration without a root is not empty either.
+    let mut types = Types::default();
+    let _ = <SimpleStruct as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
+    assert!(!types.has_roots());
+
+    // A container-inline declaration (Vec resolves to an entry with no body)
+    // counts as an entry and keeps the graph non-empty, even though it has no
+    // standalone declaration.
+    let mut types = Types::default();
+    let _ = <Vec<u8> as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
 }

@@ -26,7 +26,7 @@ fn macro_expanded_declarations_have_distinct_identity() {
     let u32_ty = scoped!(u32)(&mut types);
 
     assert_eq!(
-        types.len(),
+        types.named_len(),
         2,
         "distinct declarations must not share a graph node"
     );
