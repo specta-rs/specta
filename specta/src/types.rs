@@ -284,31 +284,49 @@ impl Types {
     /// Resolves `T` like [`Type::definition`], honouring any active generic
     /// substitution.
     ///
-    /// This exists so the `#[derive(Type)]` generated code can resolve a field
-    /// type through the concrete generic arguments (satisfying any bounds the
-    /// field's own type declaration requires) while still emitting `Generic`
-    /// placeholders into the canonical declaration. See
-    /// [`Types::with_generic_substitution`].
+    /// Call this from a hand-written generic [`Type`](crate::Type) implementation
+    /// instead of `<T as Type>::definition(types)`. When the caller is building a
+    /// type's canonical *declaration*, an active scope maps the argument to a
+    /// [`Generic`] node rather than one concrete definition; otherwise this
+    /// simply calls `T`'s definition. A compound argument that mentions
+    /// enclosing parameters resolves through the nested scope the caller paired
+    /// with its slot, so a field type keeps its generic parameters instead of
+    /// baking in the first instantiation.
+    ///
+    /// Generated implementations resolve *positionally* with
+    /// [`Types::define_param`] instead, because their parameters are known at
+    /// expansion time and two of them may share a concrete type. This method
+    /// looks `T` up by [`std::any::type_name`] in the **innermost** scope only —
+    /// it must not fall through to an enclosing one, or the argument would leak
+    /// into a nested declaration.
     ///
     /// # Contract
     ///
-    /// Every generic `Type` implementation — the derive, the built-in impls in
-    /// this crate, `specta_util`, exporters, and hand-written impls — **must**
-    /// resolve its generic arguments through this method (or
-    /// [`Types::define_param`]) rather than `<T as Type>::definition(types)`.
-    /// Otherwise a canonical declaration can bake in the first instantiation's
-    /// concrete argument.
+    /// Resolve each argument **once**, in declaration order: the scope hands out
+    /// its slots positionally, so a skipped or reordered argument misaligns
+    /// every later one. That produces a silently wrong export rather than a
+    /// compile error.
     ///
-    /// Generated implementations resolve *positionally* with
-    /// [`Types::define_param`]. Hand-written ones call this method, which looks
-    /// the argument up by [`std::any::type_name`] in the **innermost** scope
-    /// only. It must not fall through to an enclosing scope: the argument may
-    /// happen to match an enclosing parameter's concrete type and would leak
-    /// into this declaration.
+    /// # Example
     ///
-    /// A compound argument that mentions enclosing parameters is resolved with
-    /// the nested scope the derive paired with its slot.
-    #[doc(hidden)]
+    /// ```
+    /// use specta::{datatype::DataType, Type, Types};
+    ///
+    /// # #[allow(dead_code)]
+    /// struct Wrapper<T>(T);
+    ///
+    /// impl<T: Type> Type for Wrapper<T> {
+    ///     fn definition(types: &mut Types) -> DataType {
+    ///         // Not `<T as Type>::definition(types)`: resolving through
+    ///         // `define` records `T` as a generic parameter of the
+    ///         // declaration instead of one concrete argument.
+    ///         types.define::<T>()
+    ///     }
+    /// }
+    ///
+    /// let mut types = Types::default();
+    /// let _: DataType = <Wrapper<u8> as Type>::definition(&mut types);
+    /// ```
     pub fn define<T: Type + ?Sized>(&mut self) -> DataType {
         self.define_with(std::any::type_name::<T>(), T::definition)
     }
@@ -351,6 +369,28 @@ impl Types {
         }
     }
 
+    /// Rejects two different types claiming the same registration sentinel.
+    ///
+    /// The sentinel is a type's identity in [`Types`]. Two types sharing one
+    /// would silently export as a single named type — the second registration
+    /// sees the first and returns a reference to it — so this turns a
+    /// near-undebuggable export bug into a failing assertion. Only debug builds
+    /// pay for the lookup; a generated or hand-written implementation that
+    /// re-registers the same type (every generic instantiation does) passes,
+    /// because its name is unchanged.
+    #[cfg(debug_assertions)]
+    fn assert_sentinel_owner(&self, sentinel: &'static str, name: &str) {
+        let Some(Some(existing)) = self.types.get(&NamedId::Static(sentinel)) else {
+            return;
+        };
+        assert!(
+            existing.name.as_ref() == name,
+            "specta: two types are registered under the same sentinel `{sentinel}` \
+             (`{}` and `{name}`); a sentinel must identify exactly one type",
+            existing.name,
+        );
+    }
+
     /// Registers a named datatype that declares no generic parameters.
     ///
     /// This is [`NamedDataType::init_with_sentinel`] with every argument that
@@ -380,6 +420,9 @@ impl Types {
         deprecated: Option<Deprecated>,
         build_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
+        #[cfg(debug_assertions)]
+        self.assert_sentinel_owner(sentinel, name);
+
         let generic_substitution_base = self.generic_substitution_cursor();
         let location = Location::caller().to_owned();
 
@@ -535,6 +578,9 @@ impl Types {
         build_ty: fn(&mut Types) -> DataType,
         build_reference_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
+        #[cfg(debug_assertions)]
+        self.assert_sentinel_owner(sentinel, name);
+
         let generic_substitution_base = self.generic_substitution_cursor();
         let mut instantiation_generics = Vec::with_capacity(params.len());
 
@@ -944,3 +990,33 @@ impl<'a> Iterator for UnsortedIter<'a> {
 }
 
 impl ExactSizeIterator for UnsortedIter<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::datatype::Primitive;
+
+    fn primitive(_: &mut Types) -> DataType {
+        DataType::Primitive(Primitive::i32)
+    }
+
+    /// A sentinel identifies exactly one type; two types sharing one would
+    /// silently collapse into a single export.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "same sentinel")]
+    fn two_types_cannot_share_a_sentinel() {
+        let mut types = Types::default();
+        types.define_named("crate::A", "A", "crate", "", None, primitive);
+        types.define_named("crate::A", "B", "crate", "", None, primitive);
+    }
+
+    /// Every instantiation of a generic type re-registers under the same
+    /// sentinel and name, so that must stay accepted.
+    #[test]
+    fn re_registering_the_same_type_is_allowed() {
+        let mut types = Types::default();
+        types.define_named("crate::A", "A", "crate", "", None, primitive);
+        types.define_named("crate::A", "A", "crate", "", None, primitive);
+    }
+}

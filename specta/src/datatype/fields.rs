@@ -63,35 +63,36 @@ impl Field {
         }
     }
 
-    /// Sets [`Field::optional`].
+    /// Marks the field as optional.
     ///
-    /// This is the consuming form of the assignment the `#[derive(Type)]` output
-    /// used to emit. A field with metadata is otherwise a `let mut` binding that
-    /// is mutated twice and then read; as a chain it is one expression, and the
-    /// compiler does not have to keep a `Field` (which owns a map and a `Cow`)
-    /// alive across statements, with the drop flag and cleanup path that costs.
-    #[doc(hidden)]
+    /// This is the consuming form of setting `Field::optional`, so a field can be
+    /// built as one expression. Exporters render an optional field as a property
+    /// that may be absent; `#[specta(optional)]` and `#[serde(default)]` record it
+    /// for you on a derived type.
     pub fn optional(mut self) -> Self {
         self.optional = true;
         self
     }
 
-    /// Sets [`Field::deprecated`].
-    #[doc(hidden)]
+    /// Sets `Field::deprecated`, the consuming form of the assignment.
     pub fn deprecated(mut self, deprecated: Option<Deprecated>) -> Self {
         self.deprecated = deprecated;
         self
     }
 
-    /// Sets [`Field::docs`].
-    #[doc(hidden)]
+    /// Sets `Field::docs` from a `'static` string, which is what a
+    /// `///` doc comment produces.
     pub fn docs(mut self, docs: &'static str) -> Self {
         self.docs = Cow::Borrowed(docs);
         self
     }
 
-    /// Inserts one runtime attribute, like [`Attributes::insert`].
-    #[doc(hidden)]
+    /// Inserts one runtime attribute, like [`Attributes::insert`], and returns
+    /// the field.
+    ///
+    /// Keys beginning with `specta:` or `serde:` are reserved for the derive
+    /// and the exporters that read them; give application metadata its own
+    /// prefix.
     pub fn attribute<T>(mut self, key: &'static str, value: T) -> Self
     where
         T: Any + Clone + Eq + Hash + Debug + Send + Sync + 'static,
@@ -104,12 +105,12 @@ impl Field {
     ///
     /// This is the `specta:nullable` runtime attribute, which consumers such as
     /// `specta-serde` and `specta-swift` read to tell a missing value apart from
-    /// an absent field. It has its own setter because a derive sets it on every
-    /// field declared as an `Option`, and it keeps that key out of every one of
-    /// those call sites. The flag is syntactic: it is recorded on the declared
-    /// Rust type even when the exported datatype is overridden or the field is
-    /// skipped, so it cannot be derived from the datatype afterwards.
-    #[doc(hidden)]
+    /// an absent field. The derive sets it on every field declared as an `Option`;
+    /// a hand-written implementation can set it when the exported datatype alone
+    /// doesn't say it (an overridden type, or a `#[specta(skip)]` field).
+    ///
+    /// The flag is advisory and syntactic: it describes what the source declared,
+    /// not what the datatype contains.
     pub fn nullable(mut self) -> Self {
         self.attributes.insert("specta:nullable", true);
         self
