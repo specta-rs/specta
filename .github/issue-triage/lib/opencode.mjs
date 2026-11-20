@@ -9,8 +9,9 @@
 // Nothing here passes `--auto`, which would auto-approve any permission that is
 // not explicitly denied.
 
-import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { parseJsonLoose, validate } from "./schema.mjs";
@@ -21,11 +22,17 @@ const RUN_TIMEOUT_MS = 15 * 60 * 1000;
 // The model process gets an allowlist, not the workflow's environment. That
 // keeps `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN` and any ambient OpenCode session
 // out of the process that is being steered by a hostile issue.
+//
+// The real model key is deliberately absent: `startModelProxy` holds it and
+// injects it in flight, so the agent sees a placeholder. Neither credential is
+// present in the environment the agent runs under.
 const PASS_THROUGH = [
   "PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SHELL", "USER",
   "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy",
-  "OPENCODE_API_KEY",
 ];
+
+// Non-empty so the provider counts as connected; replaced by the proxy.
+const PLACEHOLDER_KEY = "injected-by-local-proxy";
 
 function childEnvironment(root) {
   const env = {};
@@ -42,20 +49,40 @@ function childEnvironment(root) {
   // resolves the project from `PWD`. Without this it reads the caller's
   // directory, finds no agent, and fails with "Agent not found".
   env.PWD = path.resolve(root);
+  // Both are placeholders. The proxy replaces the auth header in flight.
+  env.OPENCODE_API_KEY = PLACEHOLDER_KEY;
+  env.TRIAGE_PROXY_KEY = PLACEHOLDER_KEY;
   return env;
 }
 
+// One throwaway state root per process. A stable path would let a previous run's
+// project registry point the CLI at a directory that no longer exists.
+let scratchRoot = null;
+
 function scratch(name) {
-  const base = process.env.RUNNER_TEMP || path.join(process.env.TMPDIR || "/tmp");
-  const directory = path.join(base, "specta-triage-opencode", name);
+  if (!scratchRoot) {
+    const base = process.env.RUNNER_TEMP || process.env.TMPDIR || os.tmpdir();
+    scratchRoot = mkdtempSync(path.join(base, "specta-triage-"));
+  }
+  const directory = path.join(scratchRoot, name);
   mkdirSync(directory, { recursive: true });
   return directory;
 }
 
+// Where the proxy forwards to: the catalog provider's endpoint unless the
+// repository points `OPENCODE_BASE_URL` at another OpenAI-compatible gateway.
+export function upstreamBaseUrl() {
+  return (process.env.OPENCODE_BASE_URL || "https://opencode.ai/inference/openai/v1").replace(/\/+$/, "");
+}
+
+// The bare Console model id, accepting the `opencode/<id>` form used in OpenCode
+// configs as well.
+export function modelId() {
+  return (process.env.OPENCODE_MODEL || "kimi-k3").replace(/^(opencode|triage)\//, "");
+}
+
 export function modelRef() {
-  // Accept both the bare catalog id and the `opencode/<id>` form.
-  const id = (process.env.OPENCODE_MODEL || "kimi-k3").replace(/^opencode\//, "");
-  return `opencode/${id}`;
+  return `triage/${modelId()}`;
 }
 
 // Installs the only configuration the agent will run under.
@@ -64,7 +91,7 @@ export function modelRef() {
 // outranks a root `opencode.json`, and either outranks the global config. Both
 // forms are removed first, so the rules in `.github/issue-triage/opencode.json`
 // cannot be loosened by anything checked into the repository.
-export function prepare(root, harnessDirectory) {
+export function prepare(root, harnessDirectory, { baseUrl } = {}) {
   for (const relative of [
     "opencode.json",
     "opencode.jsonc",
@@ -79,10 +106,19 @@ export function prepare(root, harnessDirectory) {
 
   const config = JSON.parse(readFileSync(path.join(harnessDirectory, "opencode.json"), "utf8"));
 
-  const baseUrl = process.env.OPENCODE_BASE_URL;
+  // A dedicated provider rather than an override of the catalog one: the catalog
+  // entry refuses to route a model until it is "connected" with a real key, which
+  // is exactly the key we are keeping out of this process.
   if (baseUrl) {
-    if (!/^https:\/\//.test(baseUrl)) throw new Error("OPENCODE_BASE_URL must be an https URL");
-    config.providers = { opencode: { settings: { baseURL: baseUrl } } };
+    config.providers = {
+      triage: {
+        name: "Issue triage proxy",
+        env: ["TRIAGE_PROXY_KEY"],
+        package: "@opencode/ai/providers/openai-compatible",
+        settings: { baseURL: baseUrl },
+        models: { [modelId()]: { name: modelId() } },
+      },
+    };
   }
 
   writeFileSync(path.join(root, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`, {
@@ -126,20 +162,43 @@ function extractFinalText(stdout) {
   return parts.filter((part) => part.message === last).map((part) => part.text).join("");
 }
 
+// Asynchronous on purpose: the model proxy runs in this process, so blocking the
+// event loop would deadlock the CLI against a server that can never reply.
 function run(root, agent, prompt, session) {
   const args = ["run", "--standalone", "--archived", "--format", "json", "--agent", agent, "--model", modelRef()];
   if (session) args.push("--session", session);
   args.push(prompt);
 
-  const result = spawnSync("opencode", args, {
-    cwd: root,
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    timeout: RUN_TIMEOUT_MS,
-    env: childEnvironment(root),
-  });
+  return new Promise((resolve, reject) => {
+    const child = spawn("opencode", args, {
+      cwd: root,
+      env: childEnvironment(root),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-  if (result.error) throw result.error;
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), RUN_TIMEOUT_MS);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (status, signal) => {
+      clearTimeout(timer);
+      resolve({ status, signal, stdout, stderr });
+    });
+  });
+}
+
+async function runOnce(root, agent, prompt, session) {
+  const result = await run(root, agent, prompt, session);
 
   const stdout = result.stdout ?? "";
   const stderr = result.stderr ?? "";
@@ -159,12 +218,12 @@ function run(root, agent, prompt, session) {
 // Returns a JSON object that satisfies `schema` and `extraChecks`. The session is
 // continued for the repair attempt so the model sees its own rejected answer;
 // after that the caller fails closed.
-export function askJson({ root, agent, prompt, session, schema, extraChecks = () => [] }) {
+export async function askJson({ root, agent, prompt, session, schema, extraChecks = () => [] }) {
   let next = prompt;
   let errors = [];
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const reply = run(root, agent, next, session);
+    const reply = await runOnce(root, agent, next, session);
 
     let parsed;
     try {

@@ -10,7 +10,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { prepare } from "./lib/opencode.mjs";
+import { createServer } from "node:http";
+
+import { askJson, prepare } from "./lib/opencode.mjs";
+import { startModelProxy } from "./lib/proxy.mjs";
 
 import { cannotReproduceComment } from "./lib/comment.mjs";
 import { inspectPatch } from "./lib/patch.mjs";
@@ -29,6 +32,15 @@ const failures = [];
 function check(name, fn) {
   try {
     fn();
+    passed += 1;
+  } catch (error) {
+    failures.push(`${name}: ${error.message}`);
+  }
+}
+
+async function checkAsync(name, fn) {
+  try {
+    await fn();
     passed += 1;
   } catch (error) {
     failures.push(`${name}: ${error.message}`);
@@ -228,17 +240,43 @@ check("the only secret is the model key", () => {
   assert(secrets.every((name) => name === "OPENCODE_API_KEY"), `unexpected secret: ${secrets.join(", ")}`);
 });
 
-check("jobs that run untrusted code have no secret and no permission", () => {
+// Splits the jobs so each one can be inspected on its own.
+function jobBlocks(source) {
   const blocks = new Map();
-  const parts = workflow.split(/\n {2}([a-z][a-z0-9-]*):\n/);
+  const parts = source.split(/\n {2}([a-z][a-z0-9-]*):\n/);
   for (let index = 1; index < parts.length; index += 2) blocks.set(parts[index], parts[index + 1] ?? "");
+  return blocks;
+}
 
+const jobs = jobBlocks(workflow);
+
+check("jobs that run untrusted code have no secret and no permission", () => {
   for (const job of ["reproduce", "verify"]) {
-    const block = blocks.get(job);
+    const block = jobs.get(job);
     assert(block, `job ${job} is missing from the workflow`);
     assert(/permissions: \{\}/.test(block), `${job} must declare permissions: {}`);
     assert(!/secrets\./.test(block), `${job} must not receive a secret`);
     assert(!/GITHUB_TOKEN:/.test(block), `${job} must not receive a token`);
+  }
+});
+
+check("the model jobs get no GitHub token and no repository permission", () => {
+  for (const job of ["triage", "fix"]) {
+    const block = jobs.get(job);
+    assert(block, `job ${job} is missing from the workflow`);
+    assert(/permissions: \{\}/.test(block), `${job} must declare permissions: {}`);
+    assert(!/GITHUB_TOKEN/.test(block), `${job} must not be given a GitHub token`);
+    assert(!/issues:|contents:|pull-requests:/.test(block), `${job} must not ask for a permission`);
+  }
+});
+
+check("the jobs that hold the GitHub token cannot reach the model", () => {
+  for (const job of ["collect", "comment", "publish"]) {
+    const block = jobs.get(job);
+    assert(block, `job ${job} is missing from the workflow`);
+    assert(!/OPENCODE_API_KEY/.test(block), `${job} must not receive the model key`);
+    assert(!/Install OpenCode/.test(block), `${job} must not install the agent runtime`);
+    assert(!/issue-triage\/(triage|fix|comment\.mjs.*agent)/.test(block), `${job} must not run an agent`);
   }
 });
 
@@ -287,11 +325,22 @@ check("the runner deletes repository-supplied configuration", () => {
   assert(runner.includes("opencode.jsonc"), "the jsonc variant must be removed too");
 });
 
-check("the model process does not inherit the workflow's credentials", () => {
+check("the model process holds no real credential", () => {
   const allowlist = runner.slice(runner.indexOf("const PASS_THROUGH"), runner.indexOf("function childEnvironment"));
   assert(!allowlist.includes("GITHUB_TOKEN"), "GITHUB_TOKEN must not reach the model process");
   assert(!allowlist.includes("ACTIONS_"), "runner tokens must not reach the model process");
-  assert(allowlist.includes("OPENCODE_API_KEY"), "the model key is the one credential it needs");
+  assert(!allowlist.includes("OPENCODE_API_KEY"), "the model key must stay in the proxy");
+  assert(/env\.OPENCODE_API_KEY = PLACEHOLDER_KEY/.test(runner), "the CLI needs a placeholder to consider the provider connected");
+});
+
+check("the proxy only forwards the endpoints the CLI uses", () => {
+  const source = readFileSync(new URL("./lib/proxy.mjs", import.meta.url), "utf8");
+  assert(source.includes("startModelProxy"), "the proxy must be the only credential holder");
+  assert(/const ALLOWED = \[/.test(source), "the proxy needs an endpoint allowlist");
+  for (const forbidden of ["CONNECT", "server.on(\"connect\"", "upgrade"]) {
+    assert(!source.includes(forbidden), `the proxy must not act as a tunnel (${forbidden})`);
+  }
+  assert(source.includes("127.0.0.1"), "the proxy must bind to loopback");
 });
 
 check("the model process is pinned to the clone's directory", () => {
@@ -347,6 +396,94 @@ check("OpenCode resolves read-only permissions for both agents", () => {
   }
 
   rmSync(scratch, { recursive: true, force: true });
+});
+
+await checkAsync("the proxy injects the key and refuses other paths", async () => {
+  const { createServer } = await import("node:http");
+
+  let seen = null;
+  const upstream = createServer((request, response) => {
+    seen = { authorization: request.headers.authorization, url: request.url };
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+  const upstreamUrl = `http://127.0.0.1:${upstream.address().port}`;
+
+  const proxy = await startModelProxy({ upstream: upstreamUrl, apiKey: "real-key", maxRequests: 1 });
+  try {
+    const ok = await fetch(`${proxy.url}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: "Bearer dummy", "content-type": "application/json" },
+      body: "{}",
+    });
+    assert(ok.status === 200, `proxy returned ${ok.status}`);
+    assert(seen.authorization === "Bearer real-key", `upstream saw ${seen.authorization}`);
+    assert(seen.url === "/chat/completions", `upstream saw ${seen.url}`);
+
+    const denied = await fetch(`${proxy.url}/../../etc/passwd`);
+    assert(denied.status === 404, `unexpected path returned ${denied.status}`);
+
+    const exhausted = await fetch(`${proxy.url}/chat/completions`, { method: "POST", body: "{}" });
+    assert(exhausted.status === 429, `budget was not enforced (${exhausted.status})`);
+  } finally {
+    await proxy.close();
+    await new Promise((resolve) => upstream.close(resolve));
+  }
+});
+
+// The whole path, offline: markdown agent -> CLI -> loopback proxy -> upstream.
+// This is the part that cannot be proved by reading files.
+await checkAsync("an agent runs end to end and never sees the key", async () => {
+  if (spawnSync("which", ["opencode"], { encoding: "utf8" }).status !== 0) {
+    console.log("  (skipped: opencode is not installed)");
+    return;
+  }
+
+  let upstreamAuthorization = null;
+  const upstream = createServer(async (request, response) => {
+    for await (const _ of request) void _;
+    upstreamAuthorization = request.headers.authorization;
+    const answer = JSON.stringify({ ok: true });
+    response.writeHead(200, { "content-type": "text/event-stream" });
+    const chunk = { id: "1", object: "chat.completion.chunk", created: 0, model: "m", choices: [{ index: 0, delta: { role: "assistant", content: answer }, finish_reason: null }] };
+    const stop = { id: "1", object: "chat.completion.chunk", created: 0, model: "m", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] };
+    response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    response.write(`data: ${JSON.stringify(stop)}\n\n`);
+    response.write("data: [DONE]\n\n");
+    response.end();
+  });
+  await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+
+  const proxy = await startModelProxy({
+    upstream: `http://127.0.0.1:${upstream.address().port}`,
+    apiKey: "the-real-key",
+  });
+  const scratch = mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "specta-agent-"));
+
+  try {
+    prepare(scratch, fileURLToPath(new URL(".", import.meta.url)), { baseUrl: proxy.url });
+
+    const result = await askJson({
+      root: scratch,
+      agent: "triage",
+      prompt: "reply with the schema",
+      session: "ses_selftest",
+      schema: { type: "object", fields: { ok: { type: "boolean" } } },
+    });
+
+    assert(result.ok === true, `agent returned ${JSON.stringify(result)}`);
+    assert(upstreamAuthorization === "Bearer the-real-key", `upstream saw ${upstreamAuthorization}`);
+    assert(proxy.count() > 0, "the agent bypassed the proxy");
+
+    // The agent's own environment must not contain the real credentials.
+    const childEnv = readFileSync(new URL("./lib/opencode.mjs", import.meta.url), "utf8");
+    assert(!/env\.OPENCODE_API_KEY = "the-real-key"/.test(childEnv), "the key must not be hard-coded");
+  } finally {
+    await proxy.close();
+    await new Promise((resolve) => upstream.close(resolve));
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 // --- report ----------------------------------------------------------------

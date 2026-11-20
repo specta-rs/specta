@@ -3,13 +3,17 @@ name: Issue triage
 # Duplicate detection, a sandboxed reproduction attempt, and — when the defect
 # really does reproduce — a draft pull request with a candidate fix.
 #
-# Threat model, setup and the list of permissions per job live in
+# Threat model, setup and the permissions per job live in
 # .github/issue-triage/README.md. Read that before changing anything here.
 #
-# Three rules keep this workflow safe to run on hostile input:
-#   1. no job both holds a credential and executes code from the report;
-#   2. every job declares its own permissions, and the default is none;
-#   3. nothing is cached or uploaded, so no data survives the run.
+# The trust boundary is drawn job by job. A job gets at most one of:
+#   * a GitHub token          (collect, comment, publish)
+#   * access to the model     (triage, fix)
+#   * the ability to execute code from the report (reproduce, verify)
+# The last two never overlap, and the model jobs hold no GitHub token at all.
+# The model key itself is not in the agent's environment either: a loopback
+# proxy injects it, so a compromised agent finds a metered endpoint rather than
+# a credential.
 
 on:
   issues:
@@ -38,9 +42,8 @@ env:
   # OPENCODE_MODEL (and optionally OPENCODE_BASE_URL) under Settings → Variables
   # to change models without editing this file.
   OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL || 'kimi-k3' }}
-  # Optional. Unset means the catalog `opencode` provider, which already points
-  # at Console. Set it to the full OpenAI-compatible base (ending in /v1) only to
-  # route through another gateway, for example the Go plan.
+  # Optional. The full OpenAI-compatible base URL the proxy forwards to, for a
+  # gateway other than the catalog. Unset means Console.
   OPENCODE_BASE_URL: ${{ vars.OPENCODE_BASE_URL }}
   OPENCODE_VERSION: ${{ vars.OPENCODE_VERSION || '2.2.7' }}
   TRIAGE_FULL_SUITE: ${{ vars.TRIAGE_FULL_SUITE || 'true' }}
@@ -52,23 +55,44 @@ env:
   RUST_BACKTRACE: '0'
 
 jobs:
-  # Reads the report, decides duplicate / needs-information / actionable, and
-  # writes a reproduction crate. Reads repository source only: no shell, no
-  # writes, no code execution.
+  # The only job that reads the issue. It holds a read-only token and runs
+  # nothing: what it reads is handed to the model job through step outputs.
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: read
+    outputs:
+      decision: ${{ steps.collect.outputs.decision }}
+      reason: ${{ steps.collect.outputs.reason }}
+      issue: ${{ steps.collect.outputs.issue }}
+      candidates: ${{ steps.collect.outputs.candidates }}
+      candidate_numbers: ${{ steps.collect.outputs.candidate_numbers }}
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Read the issue
+        id: collect
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node repo/.github/issue-triage/collect.mjs
+
+  # The model phase. No GitHub token, no shell, no repository write: the only
+  # thing reachable is a loopback proxy that can spend a bounded number of
+  # model requests.
   triage:
+    needs: collect
+    if: needs.collect.outputs.decision == 'triage'
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    permissions:
-      issues: write # read the issue, list related issues, post one comment
+    permissions: {}
     outputs:
       decision: ${{ steps.triage.outputs.decision }}
+      result: ${{ steps.triage.outputs.result }}
       kind: ${{ steps.triage.outputs.kind }}
       spec: ${{ steps.triage.outputs.spec }}
-      body: ${{ steps.triage.outputs.body }}
       diagnosis: ${{ steps.triage.outputs.diagnosis }}
     steps:
-      # Anonymous clone of the public repository. The job's token can comment on
-      # issues but cannot read the repository or push to it.
       - name: Clone
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
       - name: Install OpenCode
@@ -79,12 +103,14 @@ jobs:
       - name: Triage
         id: triage
         env:
-          GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ISSUE_B64: ${{ needs.collect.outputs.issue }}
+          CANDIDATES_B64: ${{ needs.collect.outputs.candidates }}
+          CANDIDATE_NUMBERS_B64: ${{ needs.collect.outputs.candidate_numbers }}
         run: node repo/.github/issue-triage/triage.mjs repo
 
-  # Builds and runs the reproduction. This is the job that executes the
-  # untrusted code, and it holds no token and no secret whatsoever.
+  # Builds and runs the reproduction. This is the job that executes untrusted
+  # code, and it holds no token and no secret whatsoever.
   reproduce:
     needs: triage
     if: needs.triage.outputs.decision == 'reproduce'
@@ -106,10 +132,9 @@ jobs:
           REPRO_SPEC_B64: ${{ needs.triage.outputs.spec }}
         run: node repo/.github/issue-triage/repro.mjs reproduce repo
 
-  # Proposes a patch. Holds the model key but never runs cargo or the patch, so
-  # nothing from the report is executed next to the credential.
+  # Proposes a patch. Same boundary as triage: the proxy is its only credential.
   fix:
-    needs: [triage, reproduce]
+    needs: [collect, triage, reproduce]
     if: needs.reproduce.outputs.reproduced == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -131,9 +156,9 @@ jobs:
         id: fix
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ISSUE_B64: ${{ needs.collect.outputs.issue }}
           REPRO_SPEC_B64: ${{ needs.triage.outputs.spec }}
           REPRO_LOG_B64: ${{ needs.reproduce.outputs.log }}
-          ISSUE_BODY_B64: ${{ needs.triage.outputs.body }}
         run: node repo/.github/issue-triage/fix.mjs repo
 
   # Applies the patch and runs the reproduction plus the workspace suite. Again
@@ -168,17 +193,11 @@ jobs:
           PATCH_B64: ${{ needs.fix.outputs.patch }}
         run: node repo/.github/issue-triage/repro.mjs verify repo
 
-  # The "we could not do this on our own" path. Comment only, no secret.
-  ask-for-help:
-    needs: [triage, reproduce, fix, verify]
-    if: |
-      always() &&
-      needs.triage.outputs.decision == 'reproduce' &&
-      (
-        needs.reproduce.outputs.reproduced != 'true' ||
-        needs.fix.outputs.ok != 'true' ||
-        needs.verify.outputs.verified != 'true'
-      )
+  # Every outcome that is not a pull request. Comment only: no secret, no model,
+  # and nothing from the report is executed.
+  comment:
+    needs: [collect, triage, reproduce, fix, verify]
+    if: always() && needs.collect.result == 'success' && needs.collect.outputs.decision != 'skip'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -186,31 +205,24 @@ jobs:
     steps:
       - name: Clone
         run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
-      - name: Pick the message
-        id: pick
-        env:
-          REPRODUCED: ${{ needs.reproduce.outputs.reproduced }}
-          FIXED: ${{ needs.fix.outputs.ok }}
-        run: |
-          if [ "$REPRODUCED" != "true" ]; then
-            echo "scenario=cannot-reproduce" >> "$GITHUB_OUTPUT"
-          elif [ "$FIXED" != "true" ]; then
-            echo "scenario=fix-failed" >> "$GITHUB_OUTPUT"
-          else
-            echo "scenario=verify-failed" >> "$GITHUB_OUTPUT"
-          fi
       - name: Comment
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          REPRO_LOG_B64: ${{ needs.reproduce.outputs.log }}
+          COLLECT_DECISION: ${{ needs.collect.outputs.decision }}
+          TRIAGE_DECISION: ${{ needs.triage.outputs.decision }}
+          RESULT_B64: ${{ needs.triage.outputs.result }}
+          REPRODUCED: ${{ needs.reproduce.outputs.reproduced }}
           REPRO_KIND: ${{ needs.reproduce.outputs.kind }}
+          REPRO_LOG_B64: ${{ needs.reproduce.outputs.log }}
+          FIX_OK: ${{ needs.fix.outputs.ok }}
+          VERIFIED: ${{ needs.verify.outputs.verified }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node repo/.github/issue-triage/reply.mjs "${{ steps.pick.outputs.scenario }}"
+        run: node repo/.github/issue-triage/comment.mjs
 
   # The only job that can write to the repository. It runs no code from the
   # report: git apply writes files, nothing here is interpreted.
   publish:
-    needs: [triage, reproduce, fix, verify]
+    needs: [collect, triage, reproduce, fix, verify]
     if: needs.verify.outputs.verified == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
