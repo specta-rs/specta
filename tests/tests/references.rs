@@ -99,6 +99,7 @@ fn tauri_channel_reference(types: &mut Types, opaque: bool) -> Reference {
         } else {
             "legacy_channel"
         },
+        None,
         &[],
         &[],
         false,

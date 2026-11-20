@@ -20,6 +20,7 @@ mod csharp;
 mod errors;
 mod format_consistency;
 mod go;
+mod identity;
 mod java;
 mod jsdoc;
 mod jsonschema;
