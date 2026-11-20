@@ -1,0 +1,217 @@
+name: Issue triage
+
+# Duplicate detection, a sandboxed reproduction attempt, and — when the defect
+# really does reproduce — a draft pull request with a candidate fix.
+#
+# Threat model, setup and the list of permissions per job live in
+# .github/issue-triage/README.md. Read that before changing anything here.
+#
+# Three rules keep this workflow safe to run on hostile input:
+#   1. no job both holds a credential and executes code from the report;
+#   2. every job declares its own permissions, and the default is none;
+#   3. nothing is cached or uploaded, so no data survives the run.
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to triage
+        required: true
+        type: string
+      force:
+        description: Ignore the existing triage comment and run again
+        required: false
+        type: boolean
+        default: false
+
+# Nothing is granted unless a job below opts in.
+permissions: {}
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+env:
+  # Model configuration is repository configuration, not code. Set
+  # OPENCODE_MODEL (and optionally OPENCODE_BASE_URL) under Settings → Variables
+  # to change models without editing this file.
+  OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL || 'kimi-k3' }}
+  OPENCODE_BASE_URL: ${{ vars.OPENCODE_BASE_URL || 'https://opencode.ai/inference' }}
+  TRIAGE_FULL_SUITE: ${{ vars.TRIAGE_FULL_SUITE || 'true' }}
+  ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+  REPO: ${{ github.repository }}
+  TRIAGE_FORCE: ${{ inputs.force || 'false' }}
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: '0'
+  RUST_BACKTRACE: '0'
+
+jobs:
+  # Reads the report, decides duplicate / needs-information / actionable, and
+  # writes a reproduction crate. Reads repository source only: no shell, no
+  # writes, no code execution.
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      issues: write # read the issue, list related issues, post one comment
+    outputs:
+      decision: ${{ steps.triage.outputs.decision }}
+      kind: ${{ steps.triage.outputs.kind }}
+      spec: ${{ steps.triage.outputs.spec }}
+      body: ${{ steps.triage.outputs.body }}
+      diagnosis: ${{ steps.triage.outputs.diagnosis }}
+    steps:
+      # Anonymous clone of the public repository. The job's token can comment on
+      # issues but cannot read the repository or push to it.
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Triage
+        id: triage
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: node repo/.github/issue-triage/triage.mjs repo
+
+  # Builds and runs the reproduction. This is the job that executes the
+  # untrusted code, and it holds no token and no secret whatsoever.
+  reproduce:
+    needs: triage
+    if: needs.triage.outputs.decision == 'reproduce'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions: {}
+    outputs:
+      reproduced: ${{ steps.run.outputs.reproduced }}
+      kind: ${{ steps.run.outputs.kind }}
+      log: ${{ steps.run.outputs.log }}
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Attempt reproduction
+        id: run
+        env:
+          REPRO_SPEC_B64: ${{ needs.triage.outputs.spec }}
+        run: node repo/.github/issue-triage/repro.mjs reproduce repo
+
+  # Proposes a patch. Holds the model key but never runs cargo or the patch, so
+  # nothing from the report is executed next to the credential.
+  fix:
+    needs: [triage, reproduce]
+    if: needs.reproduce.outputs.reproduced == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions: {}
+    outputs:
+      ok: ${{ steps.fix.outputs.ok }}
+      patch: ${{ steps.fix.outputs.patch }}
+      diagnosis: ${{ steps.fix.outputs.diagnosis }}
+      notes: ${{ steps.fix.outputs.notes }}
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Propose a fix
+        id: fix
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          REPRO_SPEC_B64: ${{ needs.triage.outputs.spec }}
+          REPRO_LOG_B64: ${{ needs.reproduce.outputs.log }}
+          ISSUE_BODY_B64: ${{ needs.triage.outputs.body }}
+        run: node repo/.github/issue-triage/fix.mjs repo
+
+  # Applies the patch and runs the reproduction plus the workspace suite. Again
+  # no token and no secret, because this executes code.
+  verify:
+    needs: [triage, reproduce, fix]
+    if: needs.fix.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions: {}
+    outputs:
+      verified: ${{ steps.run.outputs.verified }}
+      log: ${{ steps.run.outputs.log }}
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Setup
+        run: sudo apt-get update && sudo apt-get install libgtk-3-dev webkit2gtk-4.1 libayatana-appindicator3-dev
+      # `tests/tests/java.rs` shells out to `javac` and fails when it is absent,
+      # exactly like the `build` job in ci.yml.
+      - name: Install Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Verify the fix
+        id: run
+        env:
+          REPRO_SPEC_B64: ${{ needs.triage.outputs.spec }}
+          PATCH_B64: ${{ needs.fix.outputs.patch }}
+        run: node repo/.github/issue-triage/repro.mjs verify repo
+
+  # The "we could not do this on our own" path. Comment only, no secret.
+  ask-for-help:
+    needs: [triage, reproduce, fix, verify]
+    if: |
+      always() &&
+      needs.triage.outputs.decision == 'reproduce' &&
+      (
+        needs.reproduce.outputs.reproduced != 'true' ||
+        needs.fix.outputs.ok != 'true' ||
+        needs.verify.outputs.verified != 'true'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Pick the message
+        id: pick
+        env:
+          REPRODUCED: ${{ needs.reproduce.outputs.reproduced }}
+          FIXED: ${{ needs.fix.outputs.ok }}
+        run: |
+          if [ "$REPRODUCED" != "true" ]; then
+            echo "scenario=cannot-reproduce" >> "$GITHUB_OUTPUT"
+          elif [ "$FIXED" != "true" ]; then
+            echo "scenario=fix-failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "scenario=verify-failed" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Comment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPRO_LOG_B64: ${{ needs.reproduce.outputs.log }}
+          REPRO_KIND: ${{ needs.reproduce.outputs.kind }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node repo/.github/issue-triage/reply.mjs "${{ steps.pick.outputs.scenario }}"
+
+  # The only job that can write to the repository. It runs no code from the
+  # report: git apply writes files, nothing here is interpreted.
+  publish:
+    needs: [triage, reproduce, fix, verify]
+    if: needs.verify.outputs.verified == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Clone
+        run: git clone --quiet --depth 1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" repo
+      - name: Open a draft pull request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PATCH_B64: ${{ needs.fix.outputs.patch }}
+          DIAGNOSIS_B64: ${{ needs.fix.outputs.diagnosis }}
+          NOTES_B64: ${{ needs.fix.outputs.notes }}
+          REPRO_KIND: ${{ needs.reproduce.outputs.kind }}
+        run: node repo/.github/issue-triage/publish.mjs

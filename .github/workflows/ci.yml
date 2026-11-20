@@ -86,6 +86,23 @@ jobs:
           node .github/features.js
           git diff --exit-code specta/src/docs.md
 
+  # The issue triage workflow runs on hostile input. Its guards (untrusted text
+  # wrapping, schema validation, the patch allowlist, and the fact that the jobs
+  # which execute untrusted code hold no secret) are tested here so they cannot
+  # be weakened silently. See `.github/issue-triage/README.md`.
+  issue-triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the triage scripts
+        run: |
+          for file in .github/issue-triage/*.mjs .github/issue-triage/lib/*.mjs; do
+            node --check "$file"
+          done
+          node .github/issue-triage/self-test.mjs
+
   native-links:
     runs-on: ubuntu-latest
     steps:
