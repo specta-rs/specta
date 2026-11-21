@@ -305,11 +305,11 @@ fn swift_adjacent_empty_struct_variant() {
         .unwrap();
 
     assert!(
-        rendered.contains("case emptyStruct(AdjacentEmptyEmptystructData)"),
+        rendered.contains("case emptyStruct(AdjacentEmptyEmptyStructData)"),
         "{rendered}"
     );
     assert!(
-        rendered.contains("public struct AdjacentEmptyEmptystructData: Codable, Sendable {"),
+        rendered.contains("public struct AdjacentEmptyEmptyStructData: Codable, Sendable {"),
         "{rendered}"
     );
 }

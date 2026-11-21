@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, dead_code, missing_docs)]
 
+use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -81,4 +82,53 @@ fn test_struct_variants_generation() {
     assert!(result.contains("let message: String"));
     assert!(result.contains("let code: UInt32"));
     assert!(result.contains("let details: String?"));
+}
+
+// A `rename_all = "camelCase"` rule hands the exporter the wire name
+// `notFound`. A wrapper struct is still a type name, so it has to keep the
+// inner capital instead of lowercasing it into `NotfoundData`.
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ErrorResponse {
+    NotFound { message: String },
+    BadRequest { code: u32 },
+}
+
+// The wrapper struct is also named from the wire name when the enum is
+// externally tagged, whose case is decoded by the custom `Codable`.
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExternalError {
+    NotFound { message: String },
+}
+
+// An all-caps word from a SCREAMING rule is not an acronym, so it is cased
+// like any other word rather than shouting in the type name.
+#[derive(Type, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ScreamingError {
+    NotFound { message: String },
+}
+
+#[test]
+fn test_renamed_struct_variant_names() {
+    let types = Types::default()
+        .register::<ErrorResponse>()
+        .register::<ExternalError>()
+        .register::<ScreamingError>();
+    let result = Swift::default()
+        .export(&types, specta_serde::Format)
+        .unwrap();
+
+    println!("Generated Swift for renamed struct variants:");
+    println!("{}", result);
+
+    assert!(result.contains("case notFound(ErrorResponseNotFoundData)"));
+    assert!(result.contains("struct ErrorResponseNotFoundData: Codable"));
+    assert!(result.contains("case badRequest(ErrorResponseBadRequestData)"));
+    assert!(result.contains("struct ErrorResponseBadRequestData: Codable"));
+    assert!(result.contains("case notFound(ExternalErrorNotFoundData)"));
+    assert!(result.contains("struct ExternalErrorNotFoundData: Codable"));
+    assert!(result.contains("case notFound(ScreamingErrorNotFoundData)"));
+    assert!(result.contains("struct ScreamingErrorNotFoundData: Codable"));
 }
