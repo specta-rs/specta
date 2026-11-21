@@ -2180,29 +2180,40 @@ fn generate_enum_structs(
     Ok(result)
 }
 
-/// Convert a string to PascalCase
+/// Convert a serde wire name to PascalCase for a generated Swift declaration.
+///
+/// Variants reach the exporter under their serde name, which `rename_all` may
+/// have turned into snake_case, kebab-case or camelCase. Splitting on the
+/// separators and capitalising each word keeps camelCase's inner capitals
+/// (`notFound` becomes `NotFound`, not `Notfound`).
 fn to_pascal_case(s: &str) -> String {
-    // If it's already PascalCase (starts with uppercase), return as-is
-    if s.chars().next().is_some_and(|c| c.is_uppercase()) {
-        return s.to_string();
-    }
+    let words = s
+        .split(['_', '-'])
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>();
 
-    // Otherwise, convert snake_case to PascalCase
-    let mut result = String::new();
-    let mut capitalize_next = true;
+    // An all-caps word in a multi-word name was produced by a SCREAMING rule,
+    // so its capitals carry no meaning and only the first letter should stay
+    // uppercase. A lone all-caps word is more likely an acronym (`HTTP`) and is
+    // preserved as-is.
+    let shouting = words.len() > 1;
 
-    for c in s.chars() {
-        if c == '_' || c == '-' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(c.to_uppercase().next().unwrap_or(c));
-            capitalize_next = false;
-        } else {
-            result.push(c.to_lowercase().next().unwrap_or(c));
-        }
-    }
-
-    result
+    words
+        .into_iter()
+        .map(|word| {
+            let mut chars = word.chars();
+            let Some(first) = chars.next() else {
+                return String::new();
+            };
+            let rest = chars.as_str();
+            let rest = if shouting && word.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
+                rest.to_lowercase()
+            } else {
+                rest.to_string()
+            };
+            first.to_uppercase().chain(rest.chars()).collect()
+        })
+        .collect()
 }
 
 /// Convert tuple types to Swift.
@@ -2807,8 +2818,7 @@ fn generate_external_enum_codable(
             }
             specta::datatype::Fields::Named(_) => {
                 if should_emit_variant_wrapper(original_variant_name, variant) {
-                    let pascal_variant_name = to_pascal_case(original_variant_name.as_ref());
-                    let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
+                    let struct_name = variant_wrapper_name(enum_name, original_variant_name);
 
                     result.push_str(&format!("        case .{}:\n", swift_case_name));
                     result.push_str(&format!(

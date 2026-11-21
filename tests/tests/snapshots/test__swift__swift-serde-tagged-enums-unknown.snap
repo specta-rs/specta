@@ -231,10 +231,10 @@ extension ExternalError: Codable {
 
 public enum ExternalReason: Sendable {
     case credentialsInvalid
-    case quotaExhausted(ExternalReasonQuotaexhaustedData)
+    case quotaExhausted(ExternalReasonQuotaExhaustedData)
     case unknown(tag: String, content: JSONValue?)
 }
-public struct ExternalReasonQuotaexhaustedData: Codable, Sendable {
+public struct ExternalReasonQuotaExhaustedData: Codable, Sendable {
     public let retryAfter: UInt32
 
     private enum CodingKeys: String, CodingKey {
@@ -288,7 +288,7 @@ extension ExternalReason: Codable {
         case .credentialsInvalid:
             self = .credentialsInvalid
         case .quotaExhausted:
-            let data = try container.decode(ExternalReasonQuotaexhaustedData.self, forKey: .quotaExhausted)
+            let data = try container.decode(ExternalReasonQuotaExhaustedData.self, forKey: .quotaExhausted)
             self = .quotaExhausted(data)
         }
     }
@@ -316,10 +316,10 @@ extension ExternalReason: Codable {
 
 public enum InternalReason: Sendable {
     case credentialsInvalid
-    case quotaExhausted(InternalReasonQuotaexhaustedData)
+    case quotaExhausted(InternalReasonQuotaExhaustedData)
     case unknown(tag: String, content: JSONValue?)
 }
-public struct InternalReasonQuotaexhaustedData: Codable, Sendable {
+public struct InternalReasonQuotaExhaustedData: Codable, Sendable {
     public let retryAfter: UInt32
 
     private enum CodingKeys: String, CodingKey {
@@ -345,7 +345,7 @@ extension InternalReason: Codable {
             self = .credentialsInvalid
         case "quotaExhausted":
             let retryAfterValue = try container.decode(UInt32.self, forKey: CodingKeys("retry_after"))
-            self = .quotaExhausted(InternalReasonQuotaexhaustedData(retryAfter: retryAfterValue))
+            self = .quotaExhausted(InternalReasonQuotaExhaustedData(retryAfter: retryAfterValue))
         default:
             var content: [String: JSONValue] = [:]
             for key in container.allKeys where key.stringValue != "reason" {
