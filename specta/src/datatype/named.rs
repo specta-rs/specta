@@ -1,4 +1,5 @@
 use std::{
+    any::TypeId,
     borrow::Cow,
     mem,
     panic::{self, AssertUnwindSafe, Location},
@@ -8,8 +9,9 @@ use std::{
 use crate::{
     Types,
     datatype::{
-        DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
+        Attributes, DataType, Generic, NamedReference, NamedReferenceType, NamedTypeId,
+        RecursiveInlineFrame, RecursiveInlineType, Reference, generic::GenericDefinition,
+        reference::NamedId,
     },
 };
 
@@ -39,7 +41,7 @@ pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
 #[non_exhaustive]
 pub struct NamedDataType {
     /// Stable identity for resolving references to this datatype.
-    pub(crate) id: NamedId,
+    pub(crate) id: NamedTypeId,
     /// Exported type name.
     pub name: Cow<'static, str>,
     /// Documentation comments attached to the source type.
@@ -52,11 +54,63 @@ pub struct NamedDataType {
     pub location: Location<'static>,
     /// Generic parameters declared by this named datatype.
     pub generics: Cow<'static, [GenericDefinition]>,
+    /// Metadata attached to the declaration itself rather than to its shape.
+    ///
+    /// The derive records container-level attributes here as well, so they
+    /// survive when the shape is replaced by an override such as
+    /// `#[specta(type = ...)]` and is therefore no longer a struct or an enum.
+    pub attributes: Attributes,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
     ///
     /// This will be `None` for types which are container inlined as they aren't exported.
     pub ty: Option<DataType>,
+}
+
+/// Identity a named declaration is registered under.
+///
+/// Generated code passes a nominal key built from the marker type it emits next
+/// to the impl, so two declarations that share a module path, name and source
+/// span (for example two expansions of one `macro_rules!` macro) stay distinct.
+/// Built-in implementations pass their stable Rust path.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct NamedKey {
+    label: &'static str,
+    nominal: Option<TypeId>,
+}
+
+impl NamedKey {
+    /// A key identified by its stable `module_path::TypeName`.
+    pub const fn label(label: &'static str) -> Self {
+        Self {
+            label,
+            nominal: None,
+        }
+    }
+
+    /// A key identified by the `TypeId` of the declaration's marker type.
+    pub const fn nominal(label: &'static str, id: TypeId) -> Self {
+        Self {
+            label,
+            nominal: Some(id),
+        }
+    }
+
+    /// Human-readable identity used in diagnostics.
+    pub(crate) const fn label_str(&self) -> &'static str {
+        self.label
+    }
+
+    pub(crate) fn id(&self) -> NamedTypeId {
+        NamedTypeId(match self.nominal {
+            Some(id) => NamedId::Nominal {
+                label: self.label,
+                id,
+            },
+            None => NamedId::Static(self.label),
+        })
+    }
 }
 
 impl NamedDataType {
@@ -68,7 +122,7 @@ impl NamedDataType {
         build: impl FnOnce(&mut Types, &mut NamedDataType),
     ) -> Self {
         let location = Location::caller();
-        let id = NamedId::Dynamic(Arc::new(()));
+        let id = NamedTypeId(NamedId::Dynamic(Arc::new(())));
         let mut ndt = Self {
             id: id.clone(),
             name: name.into(),
@@ -79,6 +133,7 @@ impl NamedDataType {
                 .unwrap_or(Cow::Borrowed("virtual")),
             location: location.to_owned(),
             generics: Cow::Borrowed(&[]),
+            attributes: Attributes::default(),
             ty: None,
         };
         build(types, &mut ndt);
@@ -91,7 +146,16 @@ impl NamedDataType {
         ndt
     }
 
-    /// Initializes a named type using a static sentinel as its identity.
+    /// Stable identity of this declaration within the type graph.
+    ///
+    /// Two declarations compare equal only when they are the same declaration;
+    /// a copy of the graph keeps the same identities. The value is process-local
+    /// and must not be used as a persistence key or as a stable sort tiebreaker.
+    pub fn id(&self) -> &NamedTypeId {
+        &self.id
+    }
+
+    /// Initializes a named type using a stable key as its identity.
     ///
     /// This is used by `#[derive(Type)]` and the built-in `Type` implementation macros and must be used carefully.
     ///
@@ -137,7 +201,7 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        sentinel: &'static str,
+        key: NamedKey,
         instantiation_generics: &[(Generic, DataType)],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -148,7 +212,7 @@ impl NamedDataType {
         build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         Self::init(
-            sentinel,
+            key,
             instantiation_generics.to_vec(),
             instantiation_generic_identities,
             has_const_param,
@@ -174,7 +238,7 @@ impl NamedDataType {
     /// which `#[track_caller]` cannot see through.
     #[track_caller]
     pub(crate) fn init(
-        sentinel: &'static str,
+        key: NamedKey,
         instantiation_generics: Vec<(Generic, DataType)>,
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -186,7 +250,7 @@ impl NamedDataType {
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
-        let id = NamedId::Static(sentinel);
+        let id = key.id();
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
 
@@ -209,6 +273,7 @@ impl NamedDataType {
                 location,
                 // `build_ndt` will just override all of this.
                 generics: Cow::Borrowed(&[]),
+                attributes: Default::default(),
                 ty: None,
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
@@ -248,7 +313,7 @@ impl NamedDataType {
             // `build_ndt` may already have completed this entry, for example by
             // merging a collection that contains it through `Types::extend`.
             // Only count the entry when the placeholder we installed is still a
-            // placeholder, otherwise `Types::len` would report more entries than
+            // placeholder, otherwise `Types::named_len` would report more entries than
             // the map holds.
             let already_complete = types
                 .types
@@ -449,7 +514,7 @@ mod tests {
 
         let mut types = Types::default();
         super::NamedDataType::init_with_sentinel(
-            "test::Dup",
+            super::NamedKey::label("test::Dup"),
             &[],
             &[],
             false,
@@ -463,7 +528,7 @@ mod tests {
         // It must reuse the first definition instead of exporting another type
         // with the same name.
         super::NamedDataType::init_with_sentinel(
-            "test::Dup",
+            super::NamedKey::label("test::Dup"),
             &[],
             &[],
             false,
@@ -474,9 +539,9 @@ mod tests {
             inline,
         );
 
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
         let ndt = types
-            .into_sorted_iter()
+            .iter_sorted()
             .next()
             .expect("the definition is registered");
         assert_eq!(ndt.name, "Dup");
@@ -515,7 +580,7 @@ mod tests {
 
         OTHER.with(|other| {
             super::NamedDataType::init_with_sentinel(
-                SENTINEL,
+                super::NamedKey::label(SENTINEL),
                 &[],
                 &[],
                 false,
@@ -529,7 +594,7 @@ mod tests {
 
         let mut types = Types::default();
         super::NamedDataType::init_with_sentinel(
-            SENTINEL,
+            super::NamedKey::label(SENTINEL),
             &[],
             &[],
             false,
@@ -540,9 +605,9 @@ mod tests {
             inline,
         );
 
-        // `Types::len` checks its count against the map, so a double count
+        // `Types::named_len` checks its count against the map, so a double count
         // shows up here rather than as a wrong length in an exporter.
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
     }
 
     #[test]

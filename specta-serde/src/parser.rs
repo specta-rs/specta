@@ -302,12 +302,12 @@ impl SerdeFieldAttrs {
 }
 
 fn get_string(attributes: &Attributes, key: &str) -> Option<String> {
-    attributes.get_named_as::<String>(key).cloned()
+    attributes.get_as::<String>(key).cloned()
 }
 
 fn get_strings(attributes: &Attributes, key: &str) -> Vec<String> {
     attributes
-        .get_named_as::<Vec<String>>(key)
+        .get_as::<Vec<String>>(key)
         .cloned()
         .unwrap_or_default()
 }
@@ -317,7 +317,7 @@ fn has_attr(attributes: &Attributes, key: &str) -> bool {
 }
 
 fn get_datatype(attributes: &Attributes, key: &str) -> Option<DataType> {
-    attributes.get_named_as::<DataType>(key).cloned()
+    attributes.get_as::<DataType>(key).cloned()
 }
 
 fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRule>, Error> {

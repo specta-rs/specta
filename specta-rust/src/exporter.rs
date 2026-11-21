@@ -187,11 +187,10 @@ impl Rust {
         ty: &DataType,
         format: impl Format,
     ) -> Result<String, Error> {
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "<inline>", source))?;
-        let types = formatted.as_ref();
-        let ty = map_datatype(Some(&format), types, ty, "<inline>")?;
+        let types = &formatted;
+        let ty = map_datatype(Some(&specta::Identity), types, ty, "<inline>")?;
         render_datatype(self, None, types, &ty, "<inline>")
     }
 
@@ -213,16 +212,16 @@ impl Rust {
             return Err(Error::ExportRequiresExportTo(self.layout));
         }
 
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "", source))?;
-        let types = formatted.as_ref();
+        let types = &formatted;
+        let format = specta::Identity;
         validate_names(self, types)?;
 
         let mut out = render_header(self);
         match self.layout {
             Layout::FlatFile | Layout::ModulePrefixedName => {
-                for ndt in types.into_sorted_iter() {
+                for ndt in types.iter_sorted() {
                     render_named(&mut out, self, Some(&format), types, ndt, 0)?;
                 }
             }
@@ -250,10 +249,10 @@ impl Rust {
                 .map_err(|source| Error::io("write generated file", path, source));
         }
 
-        let formatted = format
-            .map_types(types)
+        let formatted = specta::format_types(types, &format)
             .map_err(|source| Error::format("type graph formatter failed", "", source))?;
-        let types = formatted.as_ref();
+        let types = &formatted;
+        let format = specta::Identity;
         validate_names(self, types)?;
         export_files(self, path, Some(&format), types)
     }
@@ -518,7 +517,7 @@ fn render_field_type(
 }
 
 fn is_direct_recursive_field(types: &Types, ty: &DataType, path: &str) -> bool {
-    let Some(owner) = types.into_sorted_iter().find(|ndt| {
+    let Some(owner) = types.iter_sorted().find(|ndt| {
         path.strip_prefix(&rust_path(ndt))
             .is_some_and(|rest| rest.starts_with('.'))
     }) else {
@@ -999,16 +998,16 @@ fn render_serde_container(
         "serde:container:rename_all_deserialize",
     );
     if attributes
-        .get_named_as::<bool>("serde:container:untagged")
+        .get_as::<bool>("serde:container:untagged")
         .copied()
         .unwrap_or(false)
     {
         args.push("untagged".to_string());
     }
-    if let Some(tag) = attributes.get_named_as::<String>("serde:container:tag") {
+    if let Some(tag) = attributes.get_as::<String>("serde:container:tag") {
         args.push(format!("tag = {}", string_literal(tag)));
     }
-    if let Some(content) = attributes.get_named_as::<String>("serde:container:content") {
+    if let Some(content) = attributes.get_as::<String>("serde:container:content") {
         args.push(format!("content = {}", string_literal(content)));
     }
 
@@ -1027,8 +1026,8 @@ fn push_serde_rename(
     serialize_key: &str,
     deserialize_key: &str,
 ) {
-    let serialize = attributes.get_named_as::<String>(serialize_key);
-    let deserialize = attributes.get_named_as::<String>(deserialize_key);
+    let serialize = attributes.get_as::<String>(serialize_key);
+    let deserialize = attributes.get_as::<String>(deserialize_key);
     match (serialize, deserialize) {
         (Some(serialize), Some(deserialize)) if serialize == deserialize => {
             args.push(format!("{name} = {}", string_literal(serialize)));
@@ -1288,7 +1287,7 @@ fn reference_name(
 
 fn owner_module_depth(types: &Types, path: &str) -> Option<usize> {
     types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| {
             let candidate = rust_path(ndt);
             path == candidate || path.starts_with(&format!("{candidate}."))
@@ -1299,7 +1298,7 @@ fn owner_module_depth(types: &Types, path: &str) -> Option<usize> {
 
 fn validate_names(exporter: &Rust, types: &Types) -> Result<(), Error> {
     let mut names = HashMap::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let name = exported_name(exporter, ndt)?;
         let scope = match exporter.layout {
             Layout::FlatFile | Layout::ModulePrefixedName => String::new(),
@@ -1352,7 +1351,7 @@ fn validate_module_collisions(
 
 fn module_tree(types: &Types) -> Module<'_> {
     let mut root = Module::default();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let mut module = &mut root;
         for segment in module_segments(ndt) {
             module = module.children.entry(segment).or_default();

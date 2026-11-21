@@ -951,9 +951,11 @@ struct InvalidToValidType {
 #[specta(collect = false, transparent)]
 struct TupleStruct(String);
 
+// repr(transparent) is a layout attribute; the wire shape comes from the
+// explicit specta(transparent).
 #[repr(transparent)]
 #[derive(Type)]
-#[specta(collect = false)]
+#[specta(collect = false, transparent)]
 struct TupleStructWithRep(String);
 
 #[derive(Type)]
@@ -2659,7 +2661,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2673,7 +2675,7 @@ fn struct_collects_all_transparent_field_types() {
     let mut types = Types::default();
     UsesTransparent::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2825,7 +2827,7 @@ fn named_type_mutation_preserves_graph_identity() {
         ndt.ty = Some(Primitive::str.into());
     });
     NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    assert_eq!(types.named_len(), 2);
 
     let a_reference = a.reference(Vec::new());
     let mut types = types.map(|_| a.clone());
@@ -2839,8 +2841,8 @@ fn named_type_mutation_preserves_graph_identity() {
         Some("A")
     );
 
-    types.iter_mut(|ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    types.for_each_named_mut(|ndt| *ndt = a.clone());
+    assert_eq!(types.named_len(), 2);
 }
 
 #[derive(Type)]
@@ -2942,7 +2944,7 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
     register_local_b(&mut types);
 
     let fields = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| ndt.name == "Local")
         .map(|ndt| {
             let Some(DataType::Struct(structure)) = &ndt.ty else {
@@ -2955,4 +2957,38 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
         })
         .collect::<Vec<_>>();
     assert_eq!(fields, ["a", "b"]);
+}
+
+/// named_len counts declarations only; is_empty answers whether the graph has
+/// no declarations and no roots.
+#[test]
+fn emptiness_accounts_for_roots_but_named_len_does_not() {
+    let types = Types::default();
+    assert_eq!(types.named_len(), 0);
+    assert!(types.is_empty());
+
+    let types = Types::default().register::<bool>();
+    assert_eq!(
+        types.named_len(),
+        0,
+        "an anonymous root adds no named datatype"
+    );
+    assert_eq!(types.roots().len(), 1);
+    assert!(!types.is_empty(), "a registered root is not empty");
+
+    // A named declaration without a root is not empty either.
+    let mut types = Types::default();
+    let _ = <SimpleStruct as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
+
+    // A container-inline declaration (Vec resolves to an entry with no body)
+    // counts as an entry and keeps the graph non-empty, even though it has no
+    // standalone declaration.
+    let mut types = Types::default();
+    let _ = <Vec<u8> as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
 }

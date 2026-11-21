@@ -28,7 +28,7 @@ pub enum Reference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct NamedReference {
-    pub(crate) id: NamedId,
+    pub(crate) id: NamedTypeId,
     /// How this named type should be referenced at the use site.
     pub inner: NamedReferenceType,
 }
@@ -132,12 +132,16 @@ impl RecursiveInlineFrame {
     ///
     /// This is only called when a cycle is actually reported, so the (allocating)
     /// path rendering and generic formatting stay off the common resolution path.
-    pub(crate) fn describe(types: &Types, id: &NamedId, generics: &[(Generic, DataType)]) -> Self {
+    pub(crate) fn describe(
+        types: &Types,
+        id: &NamedTypeId,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
         match types.types.get(id).and_then(|ndt| ndt.as_ref()) {
             Some(ndt) => Self::new(types, ndt, generics),
             // The entry can only disappear if the definition is being rebuilt
             // after a panic; fall back to the identity itself.
-            None => Self::from_type_path(types, id.static_path(), generics),
+            None => Self::from_type_path(types, id.0.static_path(), generics),
         }
     }
 
@@ -390,14 +394,39 @@ impl From<Reference> for DataType {
     }
 }
 
-/// Unique identifier for a [NamedDataType].
+/// Stable identity of a [`NamedDataType`].
 ///
-/// For static types (from derive macros), we use a unique string based on the
-/// type's module path and name. For dynamic types, we use an Arc pointer.
+/// Equality, hashing and cloning are available to exporters that need to key
+/// collections by declaration. Two declarations are equal only when they are
+/// the same declaration in the same graph; a copy of the graph keeps the same
+/// identities.
+///
+/// The identity is process-local and must not be used as a persistence key or
+/// as a stable sort tiebreaker.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct NamedTypeId(pub(crate) NamedId);
+
+/// How a [`NamedTypeId`] is determined.
+///
+/// A derived declaration is identified by the [`TypeId`] of a marker type
+/// generated next to its `Type` implementation. Two Rust declarations can share
+/// a module path, name and source span (for example when a `macro_rules!` macro
+/// expands the same `#[derive(Type)]` twice), so the human-readable identity is
+/// not unique and must not be used for equality.
+///
+/// Built-in implementations, whose identity is their stable Rust path, and
+/// dynamic types, identified by an `Arc` pointer, keep their own variants.
 #[derive(Clone)]
 pub(crate) enum NamedId {
-    // A unique string identifying the type (module_path::TypeName).
+    /// A built-in implementation, identified by its stable `module_path::TypeName`.
     Static(&'static str),
+    /// A derived declaration, identified by the marker type generated with it.
+    Nominal {
+        /// Human-readable identity used in diagnostics.
+        label: &'static str,
+        /// Nominal identity of the declaration.
+        id: TypeId,
+    },
     Dynamic(Arc<()>),
 }
 
@@ -405,6 +434,7 @@ impl PartialEq for NamedId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (NamedId::Static(a), NamedId::Static(b)) => a == b,
+            (NamedId::Nominal { id: a, .. }, NamedId::Nominal { id: b, .. }) => a == b,
             (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -416,7 +446,7 @@ impl NamedId {
     /// Best-effort path for diagnostics when the name itself is unavailable.
     pub(crate) fn static_path(&self) -> Cow<'static, str> {
         match self {
-            NamedId::Static(s) => Cow::Borrowed(s),
+            NamedId::Static(label) | NamedId::Nominal { label, .. } => Cow::Borrowed(label),
             NamedId::Dynamic(p) => Cow::Owned(format!("d{:p}", Arc::as_ptr(p))),
         }
     }
@@ -425,8 +455,18 @@ impl NamedId {
 impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            NamedId::Static(s) => s.hash(state),
-            NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
+            NamedId::Static(s) => {
+                0u8.hash(state);
+                s.hash(state);
+            }
+            NamedId::Nominal { id, .. } => {
+                1u8.hash(state);
+                id.hash(state);
+            }
+            NamedId::Dynamic(p) => {
+                2u8.hash(state);
+                std::ptr::hash(Arc::as_ptr(p), state);
+            }
         }
     }
 }
@@ -440,10 +480,12 @@ fn display_type_identity(identity: &str) -> &str {
     identity.split_once('#').map_or(identity, |(path, _)| path)
 }
 
-impl fmt::Debug for NamedId {
+impl fmt::Debug for NamedTypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NamedId::Static(s) => write!(f, "s:{}", display_type_identity(s)),
+        match &self.0 {
+            NamedId::Nominal { label, .. } | NamedId::Static(label) => {
+                write!(f, "s:{}", display_type_identity(label))
+            }
             NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }

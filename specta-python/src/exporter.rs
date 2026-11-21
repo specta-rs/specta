@@ -100,12 +100,8 @@ impl Python {
         match self.layout {
             Layout::Namespaces => render_namespaces(&mut out, self, types.as_ref())?,
             Layout::FlatFile | Layout::ModulePrefixedName => {
-                let body = primitives::export(
-                    self,
-                    types.as_ref(),
-                    types.as_ref().into_sorted_iter(),
-                    "",
-                )?;
+                let body =
+                    primitives::export(self, types.as_ref(), types.as_ref().iter_sorted(), "")?;
                 append_section(&mut out, &body);
             }
             Layout::Files => unreachable!("files layout was rejected above"),
@@ -183,7 +179,7 @@ fn append_raw(out: &mut String, snippets: &[Cow<'static, str>]) {
 fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
     let mut seen = HashMap::<String, String>::new();
     if matches!(exporter.layout, Layout::Namespaces | Layout::Files) {
-        for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+        for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
             let segments = ndt
                 .module_path
                 .split("::")
@@ -210,7 +206,7 @@ fn validate_names(exporter: &Python, types: &Types) -> Result<(), Error> {
             }
         }
     }
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let exported = primitives::exported_type_name(exporter, ndt);
         let rust_path = rust_type_path(ndt);
         primitives::validate_identifier(&exported, &rust_path)
@@ -272,7 +268,7 @@ struct Namespace<'a> {
 
 fn render_namespaces(out: &mut String, exporter: &Python, types: &Types) -> Result<(), Error> {
     let mut root = Namespace::default();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         let mut namespace = &mut root;
         for segment in ndt
             .module_path
@@ -339,7 +335,7 @@ fn render_namespace_node(
 
 fn export_files(exporter: &Python, root: &Path, types: &Types) -> Result<(), Error> {
     let mut modules = BTreeMap::<String, Vec<&NamedDataType>>::new();
-    for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+    for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
         modules
             .entry(ndt.module_path.to_string())
             .or_default()
@@ -663,172 +659,8 @@ fn remove_empty_ancestors(mut path: PathBuf, root: &Path) -> Result<(), Error> {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
-        .map_types(types)
-        .map_err(|source| Error::format("type graph formatter failed", source))?
-    {
-        Cow::Borrowed(_) => types.clone(),
-        Cow::Owned(types) => types,
-    };
-    let source_types = mapped.clone();
-    let mut output = mapped;
-    let mut error = None;
-    output.iter_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-        let path = vec![Cow::Owned(rust_type_path(ndt))];
-        for generic in ndt.generics.to_mut() {
-            let Some(default) = generic.default.clone() else {
-                continue;
-            };
-            let mut generic_path = path.clone();
-            generic_path.push(Cow::Owned(format!("<generic_default:{}>", generic.name)));
-            match map_datatype(format, &source_types, &default, &generic_path) {
-                Ok(default) => generic.default = Some(default),
-                Err(source) => {
-                    error = Some(source.with_named_datatype(ndt));
-                    return;
-                }
-            }
-        }
-        let Some(datatype) = ndt.ty.clone() else {
-            return;
-        };
-        match map_datatype(format, &source_types, &datatype, &path) {
-            Ok(datatype) => ndt.ty = Some(datatype),
-            Err(source) => error = Some(source.with_named_datatype(ndt)),
-        }
-    });
-    if let Some(error) = error {
-        Err(error)
-    } else {
-        Ok(Cow::Owned(output))
-    }
-}
-
-fn map_datatype(
-    format: &dyn Format,
-    types: &Types,
-    datatype: &DataType,
-    path: &[Cow<'static, str>],
-) -> Result<DataType, Error> {
-    if matches!(datatype, DataType::Generic(_)) {
-        return Ok(datatype.clone());
-    }
-    let mapped = match format.map_type(types, datatype) {
-        Ok(mapped) => mapped.into_owned(),
-        Err(source) if source.to_string().contains("Unresolved generic reference") => {
-            datatype.clone()
-        }
-        Err(source) => {
-            return Err(Error::format_at(
-                "datatype formatter failed",
-                path.iter().map(Cow::as_ref).collect::<Vec<_>>().join("."),
-                source,
-            ));
-        }
-    };
-    map_datatype_children(format, types, mapped, path)
-}
-
-fn map_datatype_children(
-    format: &dyn Format,
-    types: &Types,
-    mut datatype: DataType,
-    path: &[Cow<'static, str>],
-) -> Result<DataType, Error> {
-    let child_path = |segment: Cow<'static, str>| {
-        let mut path = path.to_vec();
-        path.push(segment);
-        path
-    };
-    match &mut datatype {
-        DataType::Primitive(_)
-        | DataType::Generic(_)
-        | DataType::Reference(Reference::Opaque(_)) => {}
-        DataType::List(list) => {
-            *list.ty = map_datatype(format, types, &list.ty, &child_path("<list_item>".into()))?;
-        }
-        DataType::Map(map) => {
-            let key = map_datatype(format, types, map.key_ty(), &child_path("<map_key>".into()))?;
-            let value = map_datatype(
-                format,
-                types,
-                map.value_ty(),
-                &child_path("<map_value>".into()),
-            )?;
-            map.set_key_ty(key);
-            map.set_value_ty(value);
-        }
-        DataType::Struct(strct) => map_fields(format, types, &mut strct.fields, path)?,
-        DataType::Enum(enm) => {
-            for (name, variant) in &mut enm.variants {
-                map_fields(
-                    format,
-                    types,
-                    &mut variant.fields,
-                    &child_path(name.clone()),
-                )?;
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for (index, element) in tuple.elements.iter_mut().enumerate() {
-                *element = map_datatype(
-                    format,
-                    types,
-                    element,
-                    &child_path(index.to_string().into()),
-                )?;
-            }
-        }
-        DataType::Nullable(inner) => **inner = map_datatype(format, types, inner, path)?,
-        DataType::Intersection(parts) => {
-            for part in parts {
-                *part = map_datatype(format, types, part, path)?;
-            }
-        }
-        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-            NamedReferenceType::Reference { generics, .. } => {
-                for (_, generic) in generics {
-                    *generic = map_datatype(format, types, generic, path)?;
-                }
-            }
-            NamedReferenceType::Inline { dt, .. } => {
-                **dt = map_datatype(format, types, dt, path)?;
-            }
-            NamedReferenceType::Recursive(_) => {}
-        },
-    }
-    Ok(datatype)
-}
-
-fn map_fields(
-    format: &dyn Format,
-    types: &Types,
-    fields: &mut Fields,
-    path: &[Cow<'static, str>],
-) -> Result<(), Error> {
-    match fields {
-        Fields::Unit => {}
-        Fields::Unnamed(fields) => {
-            for (index, field) in fields.fields.iter_mut().enumerate() {
-                if let Some(datatype) = &mut field.ty {
-                    let mut field_path = path.to_vec();
-                    field_path.push(index.to_string().into());
-                    *datatype = map_datatype(format, types, datatype, &field_path)?;
-                }
-            }
-        }
-        Fields::Named(fields) => {
-            for (name, field) in &mut fields.fields {
-                if let Some(datatype) = &mut field.ty {
-                    let mut field_path = path.to_vec();
-                    field_path.push(name.clone());
-                    *datatype = map_datatype(format, types, datatype, &field_path)?;
-                }
-            }
-        }
-    }
-    Ok(())
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }

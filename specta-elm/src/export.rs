@@ -113,7 +113,7 @@ impl Exporter for SingleFileExporter {
         let mut declarations = String::new();
         let mut imports = ModuleImports::default();
 
-        for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+        for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
             render_declaration(&mut declarations, &mut imports, self, types, &ndt.into())?;
         }
 

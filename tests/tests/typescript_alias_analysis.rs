@@ -29,7 +29,7 @@ fn graph(count: usize, edges: impl Fn(usize, &[NamedDataType]) -> Vec<DataType>)
             })
         })
         .collect::<Vec<_>>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         let index = ndt.name.trim_start_matches("Node").parse().unwrap();
         ndt.ty = Some(union(edges(index, &nodes)));
     });
@@ -61,7 +61,7 @@ fn long_acyclic_alias_chain_preserves_every_reference_in_both_export_orders() {
             format!("export type Node{i:04} = {next} | boolean;\n")
         })
         .collect::<Vec<_>>();
-    let nodes = types.into_sorted_iter().collect::<Vec<_>>();
+    let nodes = types.iter_sorted().collect::<Vec<_>>();
     assert_eq!(
         primitives::export(&Typescript::default(), &types, nodes.iter().copied(), "").unwrap(),
         expected.join("\n")
@@ -88,7 +88,7 @@ fn shared_acyclic_tail_and_duplicate_edges_remain_uncollapsed() {
         _ => vec![Primitive::str.into()],
     });
     insta::assert_snapshot!(
-        primitives::export(&Typescript::default(), &types, types.into_sorted_iter(), "").unwrap(),
+        primitives::export(&Typescript::default(), &types, types.iter_sorted(), "").unwrap(),
         @r"
     export type Node0000 = Node0001 | Node0002;
 
@@ -117,7 +117,7 @@ fn cycle_next_to_cached_acyclic_tail_still_collapses_with_null_and_external_refe
     });
     // Export the acyclic tail first to populate the proof cache before the
     // predecessor and cyclic component are encountered.
-    let nodes = types.into_sorted_iter().collect::<Vec<_>>();
+    let nodes = types.iter_sorted().collect::<Vec<_>>();
     let order = [nodes[3], nodes[4], nodes[0], nodes[1], nodes[2]];
     insta::assert_snapshot!(
         primitives::export(&Typescript::default(), &types, order.into_iter(), "").unwrap(),
@@ -153,7 +153,7 @@ fn alias_proofs_do_not_survive_between_exports_or_conflate_cloned_declarations()
             vec![Primitive::str.into()]
         }
     });
-    let nodes = types.into_sorted_iter().collect::<Vec<_>>();
+    let nodes = types.iter_sorted().collect::<Vec<_>>();
     let mut altered = nodes[0].clone();
     altered.ty = Some(union([reference(nodes[0]), Primitive::bool.into()]));
     let output = primitives::export(
@@ -186,13 +186,7 @@ fn alias_proofs_do_not_survive_between_exports_or_conflate_cloned_declarations()
         vec![reference(&nodes[0]), Primitive::bool.into()]
     });
     assert_eq!(
-        primitives::export(
-            &Typescript::default(),
-            &changed,
-            changed.into_sorted_iter(),
-            ""
-        )
-        .unwrap(),
+        primitives::export(&Typescript::default(), &changed, changed.iter_sorted(), "").unwrap(),
         "export type Node0000 = boolean;\n"
     );
 }

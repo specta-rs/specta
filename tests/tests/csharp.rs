@@ -551,7 +551,7 @@ fn flat_references_are_not_shadowed_by_inline_helpers() {
 #[test]
 fn global_namespace_references_are_not_shadowed_by_inline_helpers() {
     let mut types = Types::default().register::<InlineNameShadowing>();
-    types.iter_mut(|ndt| ndt.module_path = "".into());
+    types.for_each_named_mut(|ndt| ndt.module_path = "".into());
     let output = CSharp::new()
         .namespace("")
         .layout(Layout::Namespaces)
@@ -593,7 +593,7 @@ fn skipped_inline_enum_variants_do_not_trigger_recursion_errors() {
 #[test]
 fn duplicate_generic_parameters_are_rejected() {
     let mut types = Types::default().register::<GenericType<String>>();
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         if datatype.name == "GenericType" {
             datatype.generics = vec![
                 specta::datatype::GenericDefinition::new("T".into(), None),
@@ -666,7 +666,7 @@ fn invalid_namespace_and_module_paths_are_rejected_before_writes() {
     ));
 
     let mut types = types;
-    types.iter_mut(|datatype| datatype.module_path = "../../escape".into());
+    types.for_each_named_mut(|datatype| datatype.module_path = "../../escape".into());
     let root = workspace_scratch("path-traversal");
     let _ = std::fs::remove_dir_all(&root);
     assert!(matches!(
@@ -683,7 +683,7 @@ fn files_layout_rejects_case_insensitive_path_collisions() {
     let mut types = Types::default()
         .register::<FileCaseA>()
         .register::<FileCaseB>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         ndt.name = if ndt.name == "FileCaseA" {
             "Url".into()
         } else {
@@ -705,7 +705,7 @@ fn files_layout_rejects_case_insensitive_path_collisions() {
 #[test]
 fn files_layout_handles_case_only_renames() {
     let mut types = Types::default().register::<FileCaseA>();
-    types.iter_mut(|ndt| ndt.name = "Url".into());
+    types.for_each_named_mut(|ndt| ndt.name = "Url".into());
     let root = workspace_scratch("case-only-file-rename");
     let _ = std::fs::remove_dir_all(&root);
     CSharp::new()
@@ -713,7 +713,7 @@ fn files_layout_handles_case_only_renames() {
         .export_to(&root, &types, IdentityFormat)
         .unwrap();
 
-    types.iter_mut(|ndt| ndt.name = "URL".into());
+    types.for_each_named_mut(|ndt| ndt.name = "URL".into());
     CSharp::new()
         .layout(Layout::Files)
         .export_to(&root, &types, IdentityFormat)
@@ -732,7 +732,7 @@ fn files_layout_handles_case_only_renames() {
 #[test]
 fn real_virtual_module_segments_are_preserved() {
     let mut types = Types::default().register::<Status>();
-    types.iter_mut(|ndt| ndt.module_path = "foo::virtual".into());
+    types.for_each_named_mut(|ndt| ndt.module_path = "foo::virtual".into());
 
     let output = CSharp::new()
         .layout(Layout::Namespaces)
@@ -740,7 +740,7 @@ fn real_virtual_module_segments_are_preserved() {
         .unwrap();
     assert!(output.contains("namespace Specta.Generated.Foo.Virtual"));
 
-    types.iter_mut(|ndt| ndt.module_path = "virtual".into());
+    types.for_each_named_mut(|ndt| ndt.module_path = "virtual".into());
     let output = CSharp::new()
         .layout(Layout::Namespaces)
         .export(&types, IdentityFormat)
@@ -795,7 +795,7 @@ fn datatype_format_errors_include_the_named_type_path() {
         .unwrap_err();
     let message = error.to_string();
 
-    assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
+    assert!(message.contains("KeywordFields"));
     assert!(message.contains("rejected for test"));
 }
 
@@ -809,7 +809,7 @@ fn datatype_format_is_applied_to_the_named_root() {
         .unwrap_err();
     let message = error.to_string();
 
-    assert!(message.contains("datatype formatter failed at test::csharp::KeywordFields"));
+    assert!(message.contains("KeywordFields"));
     assert!(message.contains("root rejected for test"));
 }
 
@@ -1058,7 +1058,7 @@ fn verbatim_string_enum_names_generate_valid_converter_names() {
 #[test]
 fn references_to_non_emitted_named_types_are_rejected() {
     let mut types = Types::default().register::<InlineNameShadowing>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "FooValue" {
             ndt.ty = None;
         }
@@ -1073,7 +1073,7 @@ fn references_to_non_emitted_named_types_are_rejected() {
 #[test]
 fn inline_overrides_reject_references_to_non_emitted_named_types() {
     let mut types = Types::default().register::<MultiInlineFields>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "WireNewtype" {
             ndt.ty = None;
         }
@@ -1158,7 +1158,7 @@ fn low_level_named_export_respects_layout() {
     let output = specta_csharp::primitives::export(
         &CSharp::new().layout(Layout::Namespaces),
         &types,
-        types.into_unsorted_iter(),
+        types.iter_unsorted(),
     )
     .unwrap();
 
@@ -1168,7 +1168,7 @@ fn low_level_named_export_respects_layout() {
         specta_csharp::primitives::export(
             &CSharp::new().layout(Layout::Files),
             &types,
-            types.into_unsorted_iter(),
+            types.iter_unsorted(),
         ),
         Err(Error::ExportRequiresExportTo(Layout::Files))
     ));

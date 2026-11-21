@@ -7,10 +7,10 @@ use std::{
 };
 
 use crate::{
-    Type,
+    Format, FormatError, Type,
     datatype::{
-        self, DataType, Deprecated, Generic, GenericDefinition, NamedDataType, NamedId,
-        NamedReference, RecursiveInlineFrame,
+        self, DataType, Deprecated, Fields, Generic, GenericDefinition, NamedDataType, NamedKey,
+        NamedReference, NamedReferenceType, NamedTypeId, RecursiveInlineFrame, Reference,
     },
     hash::FastHashMap,
 };
@@ -24,7 +24,7 @@ use crate::{
 /// # Invariants
 ///
 /// Internally, entries may temporarily be placeholders while recursive types are
-/// resolving. Public iterators and [`Types::len`] expose only completed
+/// resolving. Public iterators and [`Types::named_len`] expose only completed
 /// [`NamedDataType`] values.
 #[derive(Default, Clone)]
 pub struct Types {
@@ -36,7 +36,7 @@ pub struct Types {
     /// A `None` value is a placeholder for a datatype whose definition is
     /// currently being resolved. This lets recursive definitions refer to the
     /// in-progress type without re-entering resolution indefinitely.
-    pub(crate) types: FastHashMap<NamedId, Option<NamedDataType>>,
+    pub(crate) types: FastHashMap<NamedTypeId, Option<NamedDataType>>,
 
     /// Cached count of completed entries in [`Self::types`].
     ///
@@ -233,7 +233,7 @@ impl GenericSubstitutionSlot {
 /// passthrough use site while cycles are rare.
 #[derive(Debug, Clone)]
 pub(crate) struct InlineResolutionFrame {
-    pub(crate) id: NamedId,
+    pub(crate) id: NamedTypeId,
     /// Range of this frame's generic-argument identities in
     /// [`Types::stack_identities`].
     ///
@@ -259,7 +259,7 @@ impl InlineResolutionFrame {
     pub(crate) fn is_use_site(
         &self,
         types: &Types,
-        id: &NamedId,
+        id: &NamedTypeId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) -> bool {
@@ -320,7 +320,7 @@ pub enum InstantiationParam {
 /// Everything one instantiation of a named datatype fixes, gathered so
 /// [`Types::instantiate`] can build it without being generic.
 struct Instantiation<'a> {
-    sentinel: &'static str,
+    key: NamedKey,
     name: &'static str,
     module_path: &'static str,
     generics: Cow<'static, [GenericDefinition]>,
@@ -330,6 +330,8 @@ struct Instantiation<'a> {
     /// monomorphised `definition` would need a drop flag, drop glue and a
     /// cleanup path for.
     deprecated: Option<&'a Deprecated>,
+    /// Declaration-level metadata recorded from the container's attributes.
+    attributes: &'static [(&'static str, &'static str)],
     instantiation_generics: Vec<(Generic, DataType)>,
     instantiation_generic_identities: &'a [&'static str],
     has_const_param: bool,
@@ -356,13 +358,13 @@ impl Types {
     ///
     /// This consumes and returns `self`, making it convenient to chain multiple
     /// registrations.
-    pub fn register<T: Type>(mut self) -> Self {
+    pub fn register<T: Type + ?Sized>(mut self) -> Self {
         self.register_mut::<T>();
         self
     }
 
     /// Registers `T` and its named dependencies with the collection in-place.
-    pub fn register_mut<T: Type>(&mut self) -> &mut Self {
+    pub fn register_mut<T: Type + ?Sized>(&mut self) -> &mut Self {
         let root = T::definition(self);
         self.roots.push(root);
         self
@@ -466,8 +468,9 @@ impl Types {
     /// re-registers the same type (every generic instantiation does) passes,
     /// because its name is unchanged.
     #[cfg(debug_assertions)]
-    fn assert_sentinel_owner(&self, sentinel: &'static str, name: &str) {
-        let Some(Some(existing)) = self.types.get(&NamedId::Static(sentinel)) else {
+    fn assert_sentinel_owner(&self, key: &NamedKey, name: &str) {
+        let sentinel = key.label_str();
+        let Some(Some(existing)) = self.types.get(&key.id()) else {
             return;
         };
         assert!(
@@ -500,7 +503,7 @@ impl Types {
     #[track_caller]
     pub fn define_named(
         &mut self,
-        sentinel: &'static str,
+        key: NamedKey,
         name: &'static str,
         module_path: &'static str,
         docs: &'static str,
@@ -508,14 +511,14 @@ impl Types {
         build_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
         #[cfg(debug_assertions)]
-        self.assert_sentinel_owner(sentinel, name);
+        self.assert_sentinel_owner(&key, name);
 
         let generic_substitution_base = self.generic_substitution_cursor();
         let location = Location::caller().to_owned();
 
         self.with_generic_substitution(&[], |types| {
             NamedDataType::init(
-                sentinel,
+                key,
                 Vec::new(),
                 &[],
                 false,
@@ -569,12 +572,13 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     pub fn define_instantiation_params(
         &mut self,
-        sentinel: &'static str,
+        key: NamedKey,
         name: &'static str,
         module_path: &'static str,
         generics: &'static [GenericDefinition],
         docs: &'static str,
         deprecated: Option<&'static Deprecated>,
+        attributes: &'static [(&'static str, &'static str)],
         params: &[InstantiationParam],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -585,12 +589,13 @@ impl Types {
     ) -> DataType {
         let location = Location::caller().to_owned();
         self.instantiate_params(
-            sentinel,
+            key,
             name,
             module_path,
             Cow::Borrowed(generics),
             docs,
             deprecated,
+            attributes,
             params,
             instantiation_generic_identities,
             has_const_param,
@@ -613,12 +618,13 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     pub fn define_instantiation_params_owned(
         &mut self,
-        sentinel: &'static str,
+        key: NamedKey,
         name: &'static str,
         module_path: &'static str,
         generics: Cow<'static, [GenericDefinition]>,
         docs: &'static str,
         deprecated: Option<Deprecated>,
+        attributes: &'static [(&'static str, &'static str)],
         params: &[InstantiationParam],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -629,12 +635,13 @@ impl Types {
     ) -> DataType {
         let location = Location::caller().to_owned();
         self.instantiate_params(
-            sentinel,
+            key,
             name,
             module_path,
             generics,
             docs,
             deprecated.as_ref(),
+            attributes,
             params,
             instantiation_generic_identities,
             has_const_param,
@@ -650,12 +657,13 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     fn instantiate_params(
         &mut self,
-        sentinel: &'static str,
+        key: NamedKey,
         name: &'static str,
         module_path: &'static str,
         generics: Cow<'static, [GenericDefinition]>,
         docs: &'static str,
         deprecated: Option<&Deprecated>,
+        attributes: &'static [(&'static str, &'static str)],
         params: &[InstantiationParam],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -666,7 +674,7 @@ impl Types {
         build_reference_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
         #[cfg(debug_assertions)]
-        self.assert_sentinel_owner(sentinel, name);
+        self.assert_sentinel_owner(&key, name);
 
         let generic_substitution_base = self.generic_substitution_cursor();
         let mut instantiation_generics = Vec::with_capacity(params.len());
@@ -692,12 +700,13 @@ impl Types {
         }
 
         let instantiation = Instantiation {
-            sentinel,
+            key,
             name,
             module_path,
             generics,
             docs,
             deprecated,
+            attributes,
             has_const_param,
             inline,
             passthrough,
@@ -728,12 +737,13 @@ impl Types {
     /// [`Types::instantiate`] with the inline context already entered.
     fn init_instantiation(&mut self, instantiation: Instantiation<'_>) -> DataType {
         let Instantiation {
-            sentinel,
+            key,
             name,
             module_path,
             generics,
             docs,
             deprecated,
+            attributes,
             has_const_param,
             inline,
             passthrough,
@@ -752,13 +762,16 @@ impl Types {
             ndt.generics = generics.clone();
             ndt.docs = Cow::Borrowed(docs);
             ndt.deprecated = deprecated.cloned();
+            for (key, value) in attributes {
+                ndt.attributes.insert(*key, *value);
+            }
             if !inline && !passthrough {
                 ndt.ty = Some(build_reference_ty(types));
             }
         };
 
         let reference = NamedDataType::init(
-            sentinel,
+            key,
             instantiation_generics,
             instantiation_generic_identities,
             has_const_param,
@@ -983,7 +996,7 @@ impl Types {
     /// currently being expanded.
     pub(crate) fn push_inline_frame(
         &mut self,
-        id: NamedId,
+        id: NamedTypeId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) {
@@ -1014,7 +1027,7 @@ impl Types {
     /// recursively reaching itself.
     pub(crate) fn inline_cycle_start(
         &self,
-        id: &NamedId,
+        id: &NamedTypeId,
         generic_identities: &[&'static str],
         generics: &[(Generic, DataType)],
     ) -> Option<usize> {
@@ -1061,6 +1074,99 @@ impl Types {
         self.roots.iter()
     }
 
+    /// Applies `format` to this collection and returns the graph to render.
+    ///
+    /// This is the single formatting traversal shared by every exporter:
+    ///
+    /// - [`Format::map_types`] runs exactly once, and its result is the graph
+    ///   used for the rest of the walk, including the [`Types`] passed to
+    ///   [`Format::map_type`].
+    /// - [`Format::map_type`] runs once on each root and each named
+    ///   declaration body, then once on each structural child that the formatter
+    ///   left [`Cow::Borrowed`](std::borrow::Cow::Borrowed): list elements,
+    ///   map keys and values, tuple elements, intersections, struct and enum
+    ///   fields, inline payloads, and the generic arguments of a named
+    ///   reference.
+    /// - A [`Cow::Owned`](std::borrow::Cow::Owned) result that differs from the
+    ///   node it replaced is used as-is and its subtree is not visited again. A
+    ///   formatter that rewrites a whole subtree therefore owns it, and its
+    ///   result is not formatted a second time.
+    /// - A [`Cow::Borrowed`](std::borrow::Cow::Borrowed) result, or an owned
+    ///   result equal to the input (the common `Cow::Owned(dt.clone())` for a
+    ///   node the formatter does not touch), is treated as unchanged and its
+    ///   children are visited. A formatter can therefore rewrite only leaves
+    ///   without having to return `Borrowed` for everything else.
+    /// - [`DataType::Generic`] placeholders are never passed to the formatter;
+    ///   they are substituted by the declaration that owns them.
+    /// - A named reference is not followed; the referenced declaration's body is
+    ///   mapped once by the declaration walk instead of once per use.
+    ///
+    /// Exporters that need to render fragments outside a whole graph should
+    /// format the graph first and pass the result to their fragment renderer.
+    pub fn format(&self, format: &dyn Format) -> Result<Self, FormatError> {
+        let mapped = format.map_types(self)?;
+        let source = mapped.as_ref();
+        let mut output = source.clone();
+
+        let roots = std::mem::take(&mut output.roots);
+        let mut formatted_roots = Vec::with_capacity(roots.len());
+        for (index, root) in roots.iter().enumerate() {
+            formatted_roots.push(format_datatype(root, source, format).map_err(|err| {
+                // A root is often the reference produced by register, so name
+                // the declaration it targets instead of only its position.
+                let named = match root {
+                    DataType::Reference(Reference::Named(reference)) => source.get(reference),
+                    _ => None,
+                };
+                let context = named.map_or_else(
+                    || format!("root type #{index}"),
+                    |ndt| format!("root type {}", ndt.name),
+                );
+                crate::format::with_context(context, named.cloned(), err)
+            })?);
+        }
+        output.roots = formatted_roots;
+
+        let mut error = None;
+        output.for_each_named_mut(|ndt| {
+            if error.is_some() {
+                return;
+            }
+
+            for generic in ndt.generics.to_mut() {
+                if let Some(default) = &generic.default {
+                    match format_datatype(default, source, format) {
+                        Ok(formatted) => generic.default = Some(formatted),
+                        Err(err) => {
+                            error = Some(err);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            let Some(ty) = &ndt.ty else {
+                return;
+            };
+
+            match format_datatype(ty, source, format) {
+                Ok(formatted) => ndt.ty = Some(formatted),
+                Err(err) => {
+                    error = Some(crate::format::with_context(
+                        format!("named type `{}`", ndt.name),
+                        Some(ndt.clone()),
+                        err,
+                    ));
+                }
+            }
+        });
+
+        match error {
+            Some(err) => Err(err),
+            None => Ok(output),
+        }
+    }
+
     /// Gets the named datatype targeted by a [`NamedReference`].
     ///
     /// Returns `None` if the reference is unknown or currently only has an
@@ -1069,16 +1175,31 @@ impl Types {
         self.types.get(&r.id)?.as_ref()
     }
 
-    /// Gets the named datatype targeted by a [`NamedReference`] mutably.
+    /// Edits the named datatype targeted by a [`NamedReference`].
     ///
-    /// The entry's identity cannot change; mutating the returned value updates
-    /// the same graph node that the reference resolves to.
-    pub fn get_mut(&mut self, r: &NamedReference) -> Option<&mut NamedDataType> {
-        self.types.get_mut(&r.id)?.as_mut()
+    /// The entry's identity is restored after `f` returns, including when it
+    /// unwinds, so replacing the whole value cannot make references to this
+    /// entry resolve to a different declaration. This is why the collection does
+    /// not hand out a mutable reference to a whole [`NamedDataType`].
+    ///
+    /// Returns `false` when the reference is unknown or currently only has an
+    /// internal placeholder entry.
+    pub fn edit(&mut self, r: &NamedReference, f: impl FnOnce(&mut NamedDataType)) -> bool {
+        let Some(ndt) = self.types.get_mut(&r.id).and_then(Option::as_mut) else {
+            return false;
+        };
+
+        with_identity(ndt, f);
+        true
     }
 
     /// Returns the number of completed named datatypes in the collection.
-    pub fn len(&self) -> usize {
+    ///
+    /// Roots registered with [`Types::register`] are not named datatypes and
+    /// are not counted; iterate [`Types::roots`] for those. This is why the
+    /// count is named explicitly rather than `len`: a collection holding only a
+    /// root has no entries here but is not [`Types::is_empty`].
+    pub fn named_len(&self) -> usize {
         debug_assert_eq!(
             self.len,
             self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
@@ -1088,15 +1209,18 @@ impl Types {
         self.len
     }
 
-    /// Returns `true` when the typemap has no entries at all.
+    /// Returns `true` when the collection holds no named datatypes and no
+    /// registered roots.
+    ///
+    /// This is not `named_len() == 0`: registering an anonymous root such as a
+    /// primitive adds no named datatype, but the root is still part of the graph
+    /// an exporter may render.
+    ///
+    /// Every named entry counts, including a container-inline declaration such
+    /// as `Vec`'s, whose body is `None` and which therefore has no standalone
+    /// declaration to render.
     pub fn is_empty(&self) -> bool {
-        debug_assert_eq!(
-            self.len,
-            self.types.values().filter_map(|ndt| ndt.as_ref()).count(),
-            "Types count logic mismatch"
-        );
-
-        self.len == 0
+        self.named_len() == 0 && self.roots.is_empty()
     }
 
     /// Merges types from another collection into this one.
@@ -1133,8 +1257,8 @@ impl Types {
     /// so that between multiple runs of the exporter you get the same type in the same order in the file.
     ///
     /// This method allocates a temporary vector to sort the collection. Prefer
-    /// [`Types::into_unsorted_iter`] if the order does not matter.
-    pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
+    /// [`Types::iter_unsorted`] if the order does not matter.
+    pub fn iter_sorted(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
             .types
             .values()
@@ -1151,7 +1275,7 @@ impl Types {
     }
 
     /// Returns an unsorted iterator over completed named datatypes.
-    pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
+    pub fn iter_unsorted(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
         UnsortedIter {
             iter: self.types.iter(),
             count: self.len,
@@ -1159,31 +1283,218 @@ impl Types {
     }
 
     /// Mutably modifies each [`NamedDataType`] in the collection.
-    pub fn iter_mut<F>(&mut self, mut f: F)
+    ///
+    /// The named type's identity is preserved across the callback, including
+    /// when the callback replaces the whole value or unwinds. References to the
+    /// type therefore keep resolving to this entry.
+    pub fn for_each_named_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
     {
-        for ndt in self.types.values_mut().flatten() {
-            f(ndt);
+        for (id, slot) in &mut self.types {
+            if let Some(ndt) = slot {
+                with_identity(ndt, &mut f);
+                debug_assert_eq!(&ndt.id, id, "named type identity changed");
+            }
         }
     }
 
     /// Transforms each [`NamedDataType`] in the collection.
+    ///
+    /// The named type's identity is preserved across the callback, including
+    /// when the callback returns a clone of a different named type.
     pub fn map<F>(mut self, mut f: F) -> Self
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for slot in self.types.values_mut() {
+        for (id, slot) in &mut self.types {
             if let Some(ndt) = slot.take() {
-                *slot = Some(f(ndt));
+                let mut mapped = f(ndt);
+                mapped.id = id.clone();
+                *slot = Some(mapped);
             }
         }
         self
     }
 }
 
+/// Applies `format` to `dt`, then to each structural child of the result.
+///
+/// See [`Types::format`] for the contract. Named references are not followed:
+/// their declaration body is mapped by the declaration walk.
+fn format_datatype(
+    dt: &DataType,
+    types: &Types,
+    format: &dyn Format,
+) -> Result<DataType, FormatError> {
+    if matches!(dt, DataType::Generic(_)) {
+        return Ok(dt.clone());
+    }
+
+    let mut node = match format.map_type(types, dt) {
+        // A changed owned node is the formatter's result; it owns the subtree
+        // inside it, so the result is not formatted a second time.
+        Ok(std::borrow::Cow::Owned(node)) if node != *dt => return Ok(node),
+        // The formatter left the node unchanged (borrowed it, or returned an
+        // equal clone), so descend into its children and rebuild only the parts
+        // that a child formatter rewrites.
+        Ok(std::borrow::Cow::Owned(node)) => node,
+        Ok(std::borrow::Cow::Borrowed(node)) => node.clone(),
+        Err(err) if contains_generic(dt) && crate::format::is_unresolved_generic(err.as_ref()) => {
+            dt.clone()
+        }
+        Err(err) => return Err(err),
+    };
+
+    match &mut node {
+        DataType::Primitive(_) | DataType::Generic(_) => {}
+        DataType::List(list) => {
+            *list.ty = format_datatype(&list.ty, types, format)?;
+        }
+        DataType::Map(map) => {
+            let key = format_datatype(map.key_ty(), types, format)?;
+            let value = format_datatype(map.value_ty(), types, format)?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = format_datatype(inner, types, format)?;
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                *element = format_datatype(element, types, format)?;
+            }
+        }
+        DataType::Intersection(parts) => {
+            for part in parts {
+                *part = format_datatype(part, types, format)?;
+            }
+        }
+        DataType::Struct(data) => format_fields(&mut data.fields, types, format)?,
+        DataType::Enum(data) => {
+            for (_, variant) in &mut data.variants {
+                format_fields(&mut variant.fields, types, format)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            NamedReferenceType::Inline { dt } => {
+                **dt = format_datatype(dt, types, format)?;
+            }
+            NamedReferenceType::Reference { generics } => {
+                for (_, ty) in generics {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+            NamedReferenceType::Recursive(_) => {}
+        },
+        DataType::Reference(Reference::Opaque(_)) => {}
+    }
+
+    Ok(node)
+}
+
+fn format_fields(
+    fields: &mut Fields,
+    types: &Types,
+    format: &dyn Format,
+) -> Result<(), FormatError> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = &mut field.ty {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = &mut field.ty {
+                    *ty = format_datatype(ty, types, format)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether `dt` contains a [`DataType::Generic`] placeholder.
+fn contains_generic(dt: &DataType) -> bool {
+    match dt {
+        DataType::Generic(_) => true,
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::List(list) => contains_generic(&list.ty),
+        DataType::Map(map) => contains_generic(map.key_ty()) || contains_generic(map.value_ty()),
+        DataType::Nullable(inner) => contains_generic(inner),
+        DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic),
+        DataType::Intersection(parts) => parts.iter().any(contains_generic),
+        DataType::Struct(data) => fields_contain_generic(&data.fields),
+        DataType::Enum(data) => data
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain_generic(&variant.fields)),
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Inline { dt } => contains_generic(dt),
+            NamedReferenceType::Reference { generics } => {
+                generics.iter().any(|(_, ty)| contains_generic(ty))
+            }
+            NamedReferenceType::Recursive(_) => false,
+        },
+    }
+}
+
+fn fields_contain_generic(fields: &Fields) -> bool {
+    match fields {
+        Fields::Unit => false,
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .iter()
+            .filter_map(|field| field.ty.as_ref())
+            .any(contains_generic),
+        Fields::Named(named) => named
+            .fields
+            .iter()
+            .filter_map(|(_, field)| field.ty.as_ref())
+            .any(contains_generic),
+    }
+}
+
+/// Runs `f` over `ndt` and restores its identity afterwards, including on unwind.
+fn with_identity<R>(ndt: &mut NamedDataType, f: impl FnOnce(&mut NamedDataType) -> R) -> R {
+    struct IdentityGuard<'a> {
+        ndt: &'a mut NamedDataType,
+        id: NamedTypeId,
+    }
+
+    impl std::ops::Deref for IdentityGuard<'_> {
+        type Target = NamedDataType;
+
+        fn deref(&self) -> &Self::Target {
+            self.ndt
+        }
+    }
+
+    impl std::ops::DerefMut for IdentityGuard<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.ndt
+        }
+    }
+
+    impl Drop for IdentityGuard<'_> {
+        fn drop(&mut self) {
+            self.ndt.id = self.id.clone();
+        }
+    }
+
+    let mut guard = IdentityGuard {
+        id: ndt.id.clone(),
+        ndt,
+    };
+    f(&mut guard)
+}
+
 struct UnsortedIter<'a> {
-    iter: hash_map::Iter<'a, NamedId, Option<NamedDataType>>,
+    iter: hash_map::Iter<'a, NamedTypeId, Option<NamedDataType>>,
     count: usize,
 }
 
@@ -1243,8 +1554,8 @@ mod tests {
     #[test]
     fn inline_frames_share_storage_and_release_lifo() {
         let mut types = Types::default();
-        let outer = NamedId::Static("test::Outer");
-        let inner = NamedId::Static("test::Inner");
+        let outer = NamedKey::label("test::Outer").id();
+        let inner = NamedKey::label("test::Inner").id();
         let arguments = [(
             Generic::new("T".into()),
             DataType::Primitive(Primitive::u32),
@@ -1290,8 +1601,22 @@ mod tests {
     #[should_panic(expected = "same sentinel")]
     fn two_types_cannot_share_a_sentinel() {
         let mut types = Types::default();
-        types.define_named("crate::A", "A", "crate", "", None, primitive);
-        types.define_named("crate::A", "B", "crate", "", None, primitive);
+        types.define_named(
+            NamedKey::label("crate::A"),
+            "A",
+            "crate",
+            "",
+            None,
+            primitive,
+        );
+        types.define_named(
+            NamedKey::label("crate::A"),
+            "B",
+            "crate",
+            "",
+            None,
+            primitive,
+        );
     }
 
     /// Every instantiation of a generic type re-registers under the same
@@ -1299,7 +1624,21 @@ mod tests {
     #[test]
     fn re_registering_the_same_type_is_allowed() {
         let mut types = Types::default();
-        types.define_named("crate::A", "A", "crate", "", None, primitive);
-        types.define_named("crate::A", "A", "crate", "", None, primitive);
+        types.define_named(
+            NamedKey::label("crate::A"),
+            "A",
+            "crate",
+            "",
+            None,
+            primitive,
+        );
+        types.define_named(
+            NamedKey::label("crate::A"),
+            "A",
+            "crate",
+            "",
+            None,
+            primitive,
+        );
     }
 }

@@ -44,13 +44,13 @@ expression: output
 	*		b: string,
 	*		c: [number, string, number],
 	*		d: string[],
-	*		e: string | null,
+	*		e?: string | null,
 	*	}} SimpleStruct
 	* @property {number} a
 	* @property {string} b
 	* @property {[number, string, number]} c
 	* @property {string[]} d
-	* @property {string | null} e
+	* @property {string | null} [e]
 	*
 	* @typedef {number} TupleStruct1
 	* @property {number} "0"
@@ -129,13 +129,13 @@ expression: output
 	* } }} A
 	*
 	* @typedef {{
-	*		optional_field: {
+	*		optional_field?: {
 	* 	a: string,
 	* } | null,
 	*	}} InlineOptionalType
 	* @property {{
 	* 	a: string,
-	* } | null} optional_field
+	* } | null} [optional_field]
 	*
 	* @typedef {"OneWord" | "Two words"} Rename
 	* @property {"OneWord"} OneWord
@@ -264,9 +264,9 @@ expression: output
 	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
 	*
 	* @typedef {{
-	*		cause: null,
+	*		cause?: null,
 	*	}} InvalidToValidType
-	* @property {null} cause
+	* @property {null} [cause]
 	*
 	* @typedef {string} TupleStruct
 	* @property {string} "0"
@@ -349,13 +349,13 @@ expression: output
 	* @property {string | null} b
 	*
 	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	* 	a: string | null,
+	* 	a?: string | null,
 	* } }) & { A?: never; C?: never } | ({ C: {
 	* 	a?: string | null,
 	* } }) & { A?: never; B?: never }} OptionalInEnum
 	* @property {{ A?: string | null }} A
 	* @property {{ B: {
-	* 	a: string | null,
+	* 	a?: string | null,
 	* } }} B
 	* @property {{ C: {
 	* 	a?: string | null,

@@ -1859,9 +1859,11 @@ fn map_type_is_not_reapplied_inside_its_own_result() {
         !output.contains("value: boolean"),
         "the already-mapped subtree was formatted a second time:\n{output}"
     );
+    // The root reference and the named definition body. Roots are formatted
+    // too, so an anonymous root is never rendered unformatted.
     assert_eq!(
         calls.load(Ordering::Relaxed),
-        1,
-        "each named definition should be formatted exactly once:\n{output}"
+        2,
+        "the root and each named definition should be formatted exactly once:\n{output}"
     );
 }

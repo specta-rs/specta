@@ -387,7 +387,7 @@ fn main() {
         .register::<SystemMetrics>();
 
     // Export with default settings
-    let total_types = types.len();
+    let total_types = types.named_len();
     let swift = Swift::default();
     let output = swift.export(&types, specta_serde::Format).unwrap();
 

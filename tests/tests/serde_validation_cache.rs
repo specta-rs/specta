@@ -13,7 +13,7 @@ fn graph(count: usize, cyclic: bool) -> Types {
             })
         })
         .collect::<Vec<_>>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         let i = ndt
             .name
             .trim_start_matches("Node")
@@ -54,8 +54,8 @@ fn shared_tails_and_cycles_preserve_bodies_in_both_modes() {
                     &specta_serde::PhasesFormat,
                 ] {
                     let mapped = format.map_types(&types).expect("the shared graph is valid");
-                    let original = types.into_sorted_iter().collect::<Vec<_>>();
-                    let rewritten = mapped.into_sorted_iter().collect::<Vec<_>>();
+                    let original = types.iter_sorted().collect::<Vec<_>>();
+                    let rewritten = mapped.iter_sorted().collect::<Vec<_>>();
                     assert_eq!(original.len(), rewritten.len());
                     for (original, rewritten) in original.iter().zip(rewritten) {
                         assert_eq!(original.name, rewritten.name);
@@ -70,7 +70,7 @@ fn shared_tails_and_cycles_preserve_bodies_in_both_modes() {
 }
 
 fn add_invalid_codec(types: &mut Types) {
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         let reference = ndt.reference(vec![]);
         if ndt.name == "Node0000"
             && let Some(DataType::Struct(strct)) = &mut ndt.ty
@@ -193,7 +193,7 @@ fn phase_dead_generic_visit_does_not_hide_a_later_live_root() {
 fn field_key_fast_path_does_not_skip_metadata_or_container_rules() {
     for container_rule in [false, true] {
         let mut types = graph(4, false);
-        types.iter_mut(|ndt| {
+        types.for_each_named_mut(|ndt| {
             if ndt.name == "Node0000"
                 && let Some(DataType::Struct(strct)) = &mut ndt.ty
             {

@@ -385,10 +385,11 @@ type InlineFlattenGenerics = _specta_typed_dict_test__types__InlineFlattenGeneri
 class InlineFlattenGenericsG[T](_specta_typing.TypedDict):
     t: T
 
+_specta_typed_dict_test__types__InlineOptionalType = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineOptionalType", {"optional_field": _specta_typing.NotRequired["None | _specta_typed_dict_test__types__InlineOptionalTypeoptional_field"]})
+
 _specta_typed_dict_test__types__InlineOptionalTypeoptional_field = _specta_typing.TypedDict("_specta_typed_dict_test__types__InlineOptionalTypeoptional_field", {"a": "_specta_builtins.str"})
 
-class InlineOptionalType(_specta_typing.TypedDict):
-    optional_field: None | _specta_typed_dict_test__types__InlineOptionalTypeoptional_field
+type InlineOptionalType = _specta_typed_dict_test__types__InlineOptionalType
 
 class InlineRecursiveConstGeneric(_specta_typing.TypedDict):
     data: _specta_builtins.list[_specta_builtins.int]
@@ -461,8 +462,9 @@ type InternallyTaggedM = _specta_typed_dict_test__types__InternallyTaggedMA
 
 type InternallyTaggedMInner = None
 
-class InvalidToValidType(_specta_typing.TypedDict):
-    cause: None
+_specta_typed_dict_test__types__InvalidToValidType = _specta_typing.TypedDict("_specta_typed_dict_test__types__InvalidToValidType", {"cause": _specta_typing.NotRequired["None"]})
+
+type InvalidToValidType = _specta_typed_dict_test__types__InvalidToValidType
 
 _specta_typed_dict_test__types__Issue221ExternalA = _specta_typing.TypedDict("_specta_typed_dict_test__types__Issue221ExternalA", {"A": "_specta_typed_dict_test__types__Issue221ExternalAA"})
 
@@ -591,7 +593,7 @@ _specta_typed_dict_test__types__OptionalInEnumA = _specta_typing.TypedDict("_spe
 
 _specta_typed_dict_test__types__OptionalInEnumB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumB", {"B": "_specta_typed_dict_test__types__OptionalInEnumBB"})
 
-_specta_typed_dict_test__types__OptionalInEnumBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumBB", {"a": "None | _specta_builtins.str"})
+_specta_typed_dict_test__types__OptionalInEnumBB = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumBB", {"a": _specta_typing.NotRequired["None | _specta_builtins.str"]})
 
 _specta_typed_dict_test__types__OptionalInEnumC = _specta_typing.TypedDict("_specta_typed_dict_test__types__OptionalInEnumC", {"C": "_specta_typed_dict_test__types__OptionalInEnumCC"})
 
@@ -685,12 +687,9 @@ class Seventh(_specta_typing.TypedDict):
     a: First
     b: Second
 
-class SimpleStruct(_specta_typing.TypedDict):
-    a: _specta_builtins.int
-    b: _specta_builtins.str
-    c: _specta_builtins.tuple[_specta_builtins.int, _specta_builtins.str, _specta_builtins.int]
-    d: _specta_builtins.list[_specta_builtins.str]
-    e: None | _specta_builtins.str
+_specta_typed_dict_test__types__SimpleStruct = _specta_typing.TypedDict("_specta_typed_dict_test__types__SimpleStruct", {"a": "_specta_builtins.int", "b": "_specta_builtins.str", "c": "_specta_builtins.tuple[_specta_builtins.int, _specta_builtins.str, _specta_builtins.int]", "d": "_specta_builtins.list[_specta_builtins.str]", "e": _specta_typing.NotRequired["None | _specta_builtins.str"]})
+
+type SimpleStruct = _specta_typed_dict_test__types__SimpleStruct
 
 _specta_typed_dict_test__types__SingleLineCommentA = _specta_typing.TypedDict("_specta_typed_dict_test__types__SingleLineCommentA", {"A": "_specta_builtins.int"})
 

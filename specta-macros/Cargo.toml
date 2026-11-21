@@ -1,5 +1,6 @@
 [package]
 name = "specta-macros"
+rust-version = "1.95"
 description = "Macros for specta. Don't use directly!"
 version = "2.0.0-rc.28"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]

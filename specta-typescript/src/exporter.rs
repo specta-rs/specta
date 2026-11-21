@@ -16,14 +16,6 @@ use specta::{
 
 use crate::{Branded, Error, primitives, references};
 
-fn rust_type_path(ndt: &NamedDataType) -> Cow<'static, str> {
-    if ndt.module_path.is_empty() {
-        ndt.name.clone()
-    } else {
-        Cow::Owned(format!("{}::{}", ndt.module_path, ndt.name))
-    }
-}
-
 /// Allows configuring the format of the final types file
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Layout {
@@ -515,101 +507,11 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = format
-        .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?;
-
-    // Bodies are formatted against the pre-format graph, so the results can be
-    // computed from a shared borrow of it and applied afterwards. Mapping in a
-    // single `iter_mut` pass instead needs the graph to also be readable while
-    // it is written, which would force a deep clone of every named datatype.
-    let mut bodies = Vec::with_capacity(mapped.len());
-    let mut changed = matches!(mapped, Cow::Owned(_));
-    let mut error = None;
-
-    for ndt in mapped.into_unsorted_iter() {
-        if error.is_some() {
-            break;
-        }
-
-        let mut path = FormatPath::new(rust_type_path(ndt));
-        let mut defaults = Vec::new();
-        for (idx, generic) in ndt.generics.iter().enumerate() {
-            let Some(default) = generic.default.as_ref() else {
-                continue;
-            };
-            let segment =
-                PathSegment::Name(Cow::Owned(format!("<generic_default:{}>", generic.name)));
-            match path.with(segment, |path| {
-                map_datatype_format(Some(format), &mapped, default, path)
-            }) {
-                Ok(default) => {
-                    if let Cow::Owned(default) = default {
-                        changed = true;
-                        defaults.push((idx, default));
-                    }
-                }
-                Err(source) => {
-                    error = Some(source.with_named_datatype(ndt));
-                    break;
-                }
-            }
-        }
-        if error.is_some() {
-            break;
-        }
-
-        let datatype = ndt
-            .ty
-            .as_ref()
-            .map(|datatype| map_datatype_format(Some(format), &mapped, datatype, &mut path))
-            .transpose();
-        match datatype {
-            Ok(datatype) => {
-                let datatype = match datatype {
-                    Some(Cow::Owned(datatype)) => {
-                        changed = true;
-                        Some(datatype)
-                    }
-                    _ => None,
-                };
-                bodies.push((defaults, datatype));
-            }
-            Err(source) => error = Some(source.with_named_datatype(ndt)),
-        }
-    }
-
-    if let Some(error) = error {
-        return Err(error);
-    }
-
-    // A format that left every body untouched (the identity case, or one that
-    // only annotates) needs no owned graph at all: the input is already the
-    // finished graph.
-    if !changed {
-        return Ok(mapped);
-    }
-
-    let mut output = mapped.into_owned();
-    let mut bodies = bodies.into_iter();
-    output.iter_mut(|ndt| {
-        let Some((defaults, datatype)) = bodies.next() else {
-            return;
-        };
-
-        // `to_mut` is only paid for when the format actually rewrote a default.
-        for (idx, default) in defaults {
-            if let Some(generic) = ndt.generics.to_mut().get_mut(idx) {
-                generic.default = Some(default);
-            }
-        }
-        if let Some(datatype) = datatype {
-            ndt.ty = Some(datatype);
-        }
-    });
-
-    Ok(Cow::Owned(output))
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 fn render_runtime(exporter: &Exporter, framework_runtime: Cow<'static, str>) -> String {
@@ -950,10 +852,6 @@ enum PathSegment {
 }
 
 impl FormatPath {
-    fn new(root: Cow<'static, str>) -> Self {
-        Self(vec![PathSegment::Name(root)])
-    }
-
     fn with<T>(&mut self, segment: PathSegment, f: impl FnOnce(&mut Self) -> T) -> T {
         self.0.push(segment);
         let out = f(self);
@@ -1188,7 +1086,7 @@ struct Module<'a> {
 }
 
 fn build_module_graph(types: &Types) -> Module<'_> {
-    types.into_unsorted_iter().fold(
+    types.iter_unsorted().fold(
         Module {
             types: Default::default(),
             children: Default::default(),
@@ -1345,7 +1243,7 @@ fn render_types(
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            render_flat_types(s, exporter, format, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, format, types, types.iter_sorted(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.

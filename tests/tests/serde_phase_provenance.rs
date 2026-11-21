@@ -94,7 +94,7 @@ fn generated_phase_bodies_are_updated_by_identity() {
         .into_owned();
 
     let fields = resolved
-        .into_unsorted_iter()
+        .iter_unsorted()
         .filter(|ndt| ndt.name == "Item_Serialize")
         .map(|ndt| {
             let Some(DataType::Struct(structure)) = &ndt.ty else {

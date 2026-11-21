@@ -163,7 +163,7 @@ impl specta::Format for Format {
         let split_types = HashSet::<TypeIdentity>::new();
         let mut rewrite_err = None;
 
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }
@@ -252,7 +252,7 @@ impl specta::Format for PhasesFormat {
     fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
         validate::validate_for_mode(types, validate::ApplyMode::Phases)?;
 
-        let originals = types.into_unsorted_iter().collect::<Vec<_>>();
+        let originals = types.iter_unsorted().collect::<Vec<_>>();
         let mut dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
         let mut reverse_dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
 
@@ -413,14 +413,14 @@ impl specta::Format for PhasesFormat {
                 let Reference::Named(reference) = generated.reference(Vec::new()) else {
                     unreachable!("named types always produce named references")
                 };
-                if let Some(registered) = out.get_mut(&reference) {
+                out.edit(&reference, |registered| {
                     registered.ty = generated.ty.clone();
-                }
+                });
             }
         }
 
         let mut rewrite_err = None;
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }
@@ -459,7 +459,7 @@ impl specta::Format for PhasesFormat {
         }
 
         let mut rewrite_err = None;
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }
@@ -567,9 +567,7 @@ impl specta::Format for PhasesFormat {
 }
 
 fn datatype_is_registered_definition(types: &Types, dt: &DataType) -> bool {
-    types
-        .into_unsorted_iter()
-        .any(|ndt| ndt.ty.as_ref() == Some(dt))
+    types.iter_unsorted().any(|ndt| ndt.ty.as_ref() == Some(dt))
 }
 
 /// Rewrites a [`DataType`] to the requested directional shape for [`PhasesFormat`].
@@ -2527,7 +2525,11 @@ fn rewrite_fields_for_phase(
                 apply_field_attrs(field, mode, container_default)?;
 
                 let serde_attrs = SerdeFieldAttrs::from_attributes(&field.attributes)?;
-                if mode == PhaseRewrite::Deserialize
+                // Serde omits a None on serialize but accepts a missing key on
+                // deserialize, so neither direction requires the key. A unified
+                // shape must accept both: the field is optional. Only the
+                // serialize half alone may leave it required.
+                if mode != PhaseRewrite::Serialize
                     && field.attributes.contains_key("specta:nullable")
                     && !serde_attrs
                         .as_ref()
@@ -5056,7 +5058,7 @@ fn substitute_container_attribute_generics(
         "serde:container:from_resolved",
         "serde:container:try_from_resolved",
     ] {
-        let Some(mut ty) = attributes.get_named_as::<DataType>(key).cloned() else {
+        let Some(mut ty) = attributes.get_as::<DataType>(key).cloned() else {
             continue;
         };
         substitute_generics(&mut ty, generics);
@@ -5616,9 +5618,7 @@ fn register_generated_type(types: &mut Types, generated: NamedDataType) -> Named
 }
 
 fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> Result<(), Error> {
-    if let Some(ty) = &ndt.ty
-        && let Some(rename) = renamed_type_name_for_phase(ty, mode, ndt.name.as_ref())?
-    {
+    if let Some(rename) = renamed_type_name_for_phase(ndt, mode)? {
         ndt.name = Cow::Owned(rename);
     }
 
@@ -5629,14 +5629,9 @@ fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> 
 /// deserialize renames agree (defaulting a missing side to the type's own
 /// name), or `None` when the phases have distinct names or no rename at all.
 fn symmetric_container_rename(ndt: &NamedDataType) -> Result<Option<String>, Error> {
-    let Some(ty) = &ndt.ty else {
-        return Ok(None);
-    };
-
     let original_name = ndt.name.as_ref();
-    let serialize_rename = renamed_type_name_for_phase(ty, PhaseRewrite::Serialize, original_name)?;
-    let deserialize_rename =
-        renamed_type_name_for_phase(ty, PhaseRewrite::Deserialize, original_name)?;
+    let serialize_rename = renamed_type_name_for_phase(ndt, PhaseRewrite::Serialize)?;
+    let deserialize_rename = renamed_type_name_for_phase(ndt, PhaseRewrite::Deserialize)?;
 
     let effective_serialize = serialize_rename.as_deref().unwrap_or(original_name);
     let effective_deserialize = deserialize_rename.as_deref().unwrap_or(original_name);
@@ -5654,14 +5649,7 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
         PhaseRewrite::Unified => return Ok(original.name.to_string()),
     };
 
-    let rename_for = |phase: PhaseRewrite| {
-        original
-            .ty
-            .as_ref()
-            .map(|ty| renamed_type_name_for_phase(ty, phase, original.name.as_ref()))
-            .transpose()
-            .map(Option::flatten)
-    };
+    let rename_for = |phase: PhaseRewrite| renamed_type_name_for_phase(original, phase);
     let serialize_rename = rename_for(PhaseRewrite::Serialize)?;
     let deserialize_rename = rename_for(PhaseRewrite::Deserialize)?;
 
@@ -5711,14 +5699,16 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
 }
 
 fn renamed_type_name_for_phase(
-    ty: &DataType,
+    ndt: &NamedDataType,
     mode: PhaseRewrite,
-    current_name: &str,
 ) -> Result<Option<String>, Error> {
-    let attributes = match ty {
-        DataType::Struct(strct) => &strct.attributes,
-        DataType::Enum(e) => &e.attributes,
-        _ => return Ok(None),
+    // A container keeps its attributes on the struct/enum node. When the shape
+    // was replaced by a type override the node is not a container, so read the
+    // declaration-level copy the derive also records.
+    let attributes = match &ndt.ty {
+        Some(DataType::Struct(strct)) => &strct.attributes,
+        Some(DataType::Enum(e)) => &e.attributes,
+        _ => &ndt.attributes,
     };
     let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes)? else {
         return Ok(None);
@@ -5729,7 +5719,7 @@ fn renamed_type_name_for_phase(
         attrs.rename_serialize.as_deref(),
         attrs.rename_deserialize.as_deref(),
         "container rename",
-        current_name,
+        ndt.name.as_ref(),
     )?
     .map(str::to_string))
 }

@@ -181,12 +181,31 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
     let raw_attrs = attrs; // Preserve raw attrs before parse_attrs shadows the variable
+
     let (attrs, container_attrs) = {
         let mut attrs = parse_attrs(attrs)?;
-        let container_attrs =
-            ContainerAttr::from_attrs(&mut attrs, matches!(data, Data::Struct(_)))?;
+        let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
         (attrs, container_attrs)
     };
+
+    // A container-level type override replaces the struct/enum node, so the
+    // container rename would be lost with it. Keep the declaration's name on the
+    // declaration; shape-specific attributes describe the replaced shape.
+    let declaration_renames = serde::container_rename_pairs(raw_attrs)?;
+    let declaration_attr_pairs = {
+        let keys = declaration_renames.iter().map(|(key, _)| *key);
+        let values = declaration_renames.iter().map(|(_, value)| value.as_str());
+        quote!(&[#((#keys, #values)),*])
+    };
+    let declaration_rename_attrs = (!declaration_renames.is_empty()).then(|| {
+        let keys = declaration_renames.iter().map(|(key, _)| *key);
+        let values = declaration_renames.iter().map(|(_, value)| value.as_str());
+        quote!({
+            let attrs = &mut ndt.attributes;
+            #(attrs.insert(#keys, ::std::string::String::from(#values));)*
+        })
+    });
+
     let (crate_ref, names, ident, name) = {
         let crate_ref = container_attrs
             .crate_name
@@ -269,62 +288,65 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
             ));
 
             let mut enum_attrs_apply = None;
-            let container_attrs_apply =
-                if container_attrs.r#type.is_some() || matches!(data, Data::Union(_)) {
-                    // `#[specta(type = ...)]` can replace the datatype with any shape, so
-                    // keep matching both container shapes.
-                    let struct_attrs = build_runtime_attributes(
-                        &names,
-                        Scope::Container,
-                        AttributeTarget::Statements(quote!(s.attributes)),
-                        raw_attrs,
-                        &container_attrs.skip_attrs,
-                        generics_ctx,
-                    )?;
-                    let enum_attrs = build_runtime_attributes(
-                        &names,
-                        Scope::Container,
-                        AttributeTarget::Statements(quote!(en.attributes)),
-                        raw_attrs,
-                        &container_attrs.skip_attrs,
-                        generics_ctx,
-                    )?;
-                    (struct_attrs.is_some() || enum_attrs.is_some()).then(|| {
-                        quote! {
-                            match &mut e {
-                                #dt::DataType::Struct(s) => { #struct_attrs }
-                                #dt::DataType::Enum(en) => { #enum_attrs }
-                                _ => unreachable!("specta derive generated non-container datatype"),
-                            }
+            let container_attrs_apply = if container_attrs.r#type.is_some() {
+                // `#[specta(type = ...)]` replaces the container shape, so the
+                // shape-level attributes have nothing to attach to. The
+                // declaration keeps its name and rename; tagging, conversion and
+                // field rules described the replaced shape.
+                None
+            } else if matches!(data, Data::Union(_)) {
+                let struct_attrs = build_runtime_attributes(
+                    &names,
+                    Scope::Container,
+                    AttributeTarget::Statements(quote!(s.attributes)),
+                    raw_attrs,
+                    &container_attrs.skip_attrs,
+                    generics_ctx,
+                )?;
+                let enum_attrs = build_runtime_attributes(
+                    &names,
+                    Scope::Container,
+                    AttributeTarget::Statements(quote!(en.attributes)),
+                    raw_attrs,
+                    &container_attrs.skip_attrs,
+                    generics_ctx,
+                )?;
+                (struct_attrs.is_some() || enum_attrs.is_some()).then(|| {
+                    quote! {
+                        match &mut e {
+                            #dt::DataType::Struct(s) => { #struct_attrs }
+                            #dt::DataType::Enum(en) => { #enum_attrs }
+                            _ => {}
                         }
-                    })
-                } else if matches!(data, Data::Struct(_)) {
-                    build_runtime_attributes(
-                        &names,
-                        Scope::Container,
-                        AttributeTarget::Statements(quote!(s.attributes)),
-                        raw_attrs,
-                        &container_attrs.skip_attrs,
-                        generics_ctx,
-                    )?
-                    .map(|attrs| {
-                        quote! {
-                            if let #dt::DataType::Struct(s) = &mut e {
-                                #attrs
-                            }
+                    }
+                })
+            } else if matches!(data, Data::Struct(_)) {
+                build_runtime_attributes(
+                    &names,
+                    Scope::Container,
+                    AttributeTarget::Statements(quote!(s.attributes)),
+                    raw_attrs,
+                    &container_attrs.skip_attrs,
+                    generics_ctx,
+                )?
+                .map(|attrs| {
+                    quote! {
+                        if let #dt::DataType::Struct(s) = &mut e {
+                            #attrs
                         }
-                    })
-                } else {
-                    enum_attrs_apply = build_runtime_attributes(
-                        &names,
-                        Scope::Container,
-                        AttributeTarget::Statements(quote!(e.attributes)),
-                        raw_attrs,
-                        &container_attrs.skip_attrs,
-                        generics_ctx,
-                    )?;
-                    None
-                };
+                    }
+                })
+            } else {
+                enum_attrs_apply = build_runtime_attributes(
+                    &names,
+                    Scope::Container,
+                    AttributeTarget::Statements(quote!(e.attributes)),
+                    raw_attrs,
+                    &container_attrs.skip_attrs,
+                    generics_ctx,
+                )?;
+                None
+            };
 
             Ok((container_attrs_apply, enum_attrs_apply))
         };
@@ -354,7 +376,10 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
         .any(|param| matches!(param, GenericParam::Type(_)))
         || erase_generics)
         && !has_const_param
-        && !container_attrs.inline;
+        && !container_attrs.inline
+        // An override keeps its container rename on the declaration, which
+        // `define_named` does not accept; the full path records it.
+        && container_attrs.r#type.is_none();
 
     // A container with used type parameters builds its datatype twice: the
     // canonical declaration (parameters replaced by placeholders) and a concrete
@@ -833,6 +858,15 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
             #source_suffix
         ));
 
+        // The key is nominal: the marker type below is emitted once per derive
+        // expansion, so two declarations that share a module path, name and
+        // source span (two expansions of one `macro_rules!` macro) stay
+        // distinct. The label stays human-readable for diagnostics.
+        let nominal_key = quote!(#dt::NamedKey::nominal(
+            #sentinel,
+            ::std::any::TypeId::of::<__SpectaNominalType>(),
+        ));
+
         // A container that resolved no generic parameter leaves the substitution
         // bookkeeping in `definition` dead: nothing is resolved into the enclosing
         // scope and the cursor cannot move. Without a const parameter and without
@@ -845,7 +879,7 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
                 let deprecated_arg = deprecated_arg();
                 quote! {
                     types.define_named(
-                        #sentinel,
+                        #nominal_key,
                         #name,
                         module_path!(),
                         #docs,
@@ -881,7 +915,7 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
 
                 quote! {
                     #dt::NamedDataType::init_with_sentinel(
-                        #sentinel,
+                        #nominal_key,
                         &[],
                         &[],
                         #has_const_param,
@@ -894,6 +928,7 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
                             #generics
                             #docs
                             #deprecated_stmt
+                            #declaration_rename_attrs
 
                             #ndt_ty
                         },
@@ -920,12 +955,13 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
                             let __declaration_generics = #generics_value;
 
                             types.define_instantiation_params_owned(
-                                #sentinel,
+                                #nominal_key,
                                 #name,
                                 module_path!(),
                                 __declaration_generics,
                                 #docs_arg,
                                 #deprecated_arg,
+                                #declaration_attr_pairs,
                                 #params,
                                 #identities,
                                 #has_const_param,
@@ -976,12 +1012,13 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
                             #deprecated_static
 
                             types.define_instantiation_params(
-                                #sentinel,
+                                #nominal_key,
                                 #name,
                                 module_path!(),
                                 #generics,
                                 #docs_arg,
                                 #deprecated_borrowed_arg,
+                                #declaration_attr_pairs,
                                 #params,
                                 #identities,
                                 #has_const_param,
@@ -1015,21 +1052,30 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
 
     let emitted = {
         quote! {
-            #[automatically_derived]
-            impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
-                // The aliases are imported into the body, so this signature — which
-                // is checked against the trait's — keeps the real paths.
-                fn definition(types: &mut #crate_ref::Types) -> #crate_ref::datatype::DataType {
-                    #cow_import
-                    #imports
+            // The const block gives this declaration an unnameable scope, so the
+            // marker below is unique per derive expansion. Identity must be
+            // nominal: a `macro_rules!` macro can expand two declarations with
+            // the same name, module path and source span.
+            const _: () = {
+                #[allow(non_camel_case_types)]
+                struct __SpectaNominalType;
 
-                    #build_placeholders
+                #[automatically_derived]
+                impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
+                    // The aliases are imported into the body, so this signature — which
+                    // is checked against the trait's — keeps the real paths.
+                    fn definition(types: &mut #crate_ref::Types) -> #crate_ref::datatype::DataType {
+                        #cow_import
+                        #imports
 
-                    #build_fns
+                        #build_placeholders
 
-                    #definition
+                        #build_fns
+
+                        #definition
+                    }
                 }
-            }
+            };
 
             #collect
         }

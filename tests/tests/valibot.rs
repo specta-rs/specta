@@ -808,7 +808,7 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
         .framework_runtime(|exporter| {
             let target = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "target");
             Ok(Cow::Owned(exporter.export(target, "")?))
         })
@@ -891,7 +891,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
         .framework_runtime(|exporter| {
             let foo = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "Foo");
             Ok(Cow::Owned(exporter.export(foo, "")?))
         })
@@ -919,7 +919,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
         .framework_runtime(|exporter| {
             let nested_foo = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "Foo" && !ndt.module_path.is_empty());
             Ok(Cow::Owned(exporter.export(nested_foo, "")?))
         })
@@ -945,7 +945,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
         .framework_runtime(|exporter| {
             let foo = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .find(|ndt| ndt.name == "Foo")
                 .unwrap();
             let first = exporter.export(std::iter::once(foo), "")?;
@@ -975,7 +975,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
             let rendered = exporter.render_types()?;
             let foo = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "Foo");
             let repeated = exporter.export(foo, "")?;
             Ok(Cow::Owned(format!("{rendered}{repeated}")))
@@ -1003,7 +1003,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
         .layout(Layout::Files)
         .framework_runtime(|exporter| {
             Ok(Cow::Owned(
-                exporter.export(exporter.types.into_unsorted_iter(), "")?,
+                exporter.export(exporter.types.iter_unsorted(), "")?,
             ))
         })
         .export_to(
@@ -1327,7 +1327,7 @@ fn valibot_inline_recursive_generics_keep_schema_arguments() {
     let mut types = Types::default();
     let holder = ConcreteHolder::definition(&mut types);
     let ty = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "GenericNode")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("generic node definition should be registered");
@@ -1776,7 +1776,7 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
         .framework_runtime(|exporter| {
             let generic_defaults = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ValibotGenericDefaults");
             Ok(Cow::Owned(exporter.export(generic_defaults, "")?))
         })
@@ -1838,7 +1838,7 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
         .framework_runtime(|mut exporter| {
             let root = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "foo_Bar");
             Ok(Cow::Owned(exporter.export(root, "")?))
         })
@@ -1860,7 +1860,7 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
         .framework_runtime(|exporter| {
             let manual = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "Manual");
             Ok(Cow::Owned(exporter.export(manual, "")?))
         })
@@ -1898,7 +1898,7 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
         .layout(Layout::Namespaces)
         .framework_runtime(|exporter| {
             Ok(Cow::Owned(
-                exporter.export(exporter.types.into_unsorted_iter(), "")?,
+                exporter.export(exporter.types.iter_unsorted(), "")?,
             ))
         })
         .export(&non_exportable, specta_serde::Format)
@@ -1923,7 +1923,7 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
             .framework_runtime(move |mut exporter| {
                 let manual_type = exporter
                     .types
-                    .into_unsorted_iter()
+                    .iter_unsorted()
                     .find(|ndt| ndt.name == "ValibotGenericDefaults")
                     .unwrap();
                 let manual = exporter.export(std::iter::once(manual_type), "")?;
@@ -1967,7 +1967,7 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
     let mut types = Types::default()
         .register::<FilesManualRoot>()
         .register::<FilesRemainingRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if matches!(ndt.name.as_ref(), "FilesManualRoot" | "FilesRemainingRoot") {
             ndt.module_path = "".into();
         }
@@ -1981,7 +1981,7 @@ fn valibot_render_types_omits_types_exported_earlier_in_the_callback() {
         .framework_runtime(|mut exporter| {
             let manual_type = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .find(|ndt| ndt.name == "FilesManualRoot")
                 .unwrap();
             let manual = exporter.export(std::iter::once(manual_type), "")?;
@@ -2105,7 +2105,7 @@ fn valibot_files_framework_runtime_deduplicates_body_imports() {
     }
 
     let mut types = Types::default().register::<FrameworkRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "FrameworkRoot" {
             ndt.module_path = Cow::Borrowed("");
         }

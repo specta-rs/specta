@@ -199,7 +199,13 @@ impl Kotlin {
             return Err(Error::ExportRequiresExportTo(self.layout));
         }
         let types = format_types(types, &format)?;
-        render::render_file(self, types.as_ref(), Some(&format), render::Selection::All)
+
+        render::render_file(
+            self,
+            types.as_ref(),
+            Some(&specta::Identity),
+            render::Selection::All,
+        )
     }
 
     /// Exports types to a file, or to a directory for [`Layout::Files`].
@@ -211,6 +217,7 @@ impl Kotlin {
     ) -> Result<(), Error> {
         let path = path.as_ref();
         let types = format_types(types, &format)?;
+
         let types = types.as_ref();
 
         if self.layout != Layout::Files {
@@ -237,7 +244,7 @@ impl Kotlin {
         let mut filenames = BTreeSet::new();
         let mut casefolded_filenames = BTreeSet::new();
         let mut files = Vec::new();
-        for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+        for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
             let filename = format!("{}.kt", render::filename(self, &ndt.name)?);
             if !filenames.insert(filename.clone())
                 || !casefolded_filenames.insert(filename.to_lowercase())
@@ -320,9 +327,10 @@ impl Kotlin {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
-    format
-        .map_types(types)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    types
+        .format(format)
+        .map(Cow::Owned)
         .map_err(|source| Error::format("type graph formatter failed", source))
 }
 

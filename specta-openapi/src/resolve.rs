@@ -17,7 +17,6 @@
 //! under [`specta_serde::PhasesFormat`] a type whose phases diverge resolves to its
 //! `_Serialize`/`_Deserialize` projection per use — the format is the switch, not a knob here.
 
-use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 
 use serde_json::Value;
@@ -52,25 +51,6 @@ impl Resolved {
     }
 }
 
-/// A format whose collection mapping has already been applied. Mapping runs exactly once however
-/// many exports resolution performs; per-datatype mapping still delegates to the real format.
-struct Premapped<F>(F);
-
-impl<F: Format> Format for Premapped<F> {
-    fn map_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
-        // Mapping has already run, so the prepared collection can be borrowed.
-        Ok(Cow::Borrowed(types))
-    }
-
-    fn map_type<'a>(
-        &'a self,
-        types: &'a Types,
-        dt: &'a DataType,
-    ) -> Result<Cow<'a, DataType>, specta::FormatError> {
-        self.0.map_type(types, dt)
-    }
-}
-
 /// Exports `types`, and resolves every type referenced by `operations` per side.
 ///
 /// Returns the components with the probe removed, so the caller exports exactly what it would have
@@ -82,7 +62,7 @@ pub(crate) fn resolve(
     mode: SchemaMode,
     version: OasVersion,
 ) -> Result<(BTreeMap<String, Value>, Resolved), Error> {
-    let mapped = format.map_types(types)?.into_owned();
+    let mapped = types.format(&format)?;
 
     // (original declaration, phase projection, Rust name) per side, deduplicated by projection.
     let mut request: Vec<(DataType, DataType)> = Vec::new();
@@ -123,7 +103,7 @@ pub(crate) fn resolve(
         }
     }
 
-    let existing_components = components(&mapped, Premapped(&format), mode, version)?;
+    let existing_components = components(&mapped, specta::Identity, mode, version)?;
 
     if probe_fields.is_empty() {
         return Ok((
@@ -152,7 +132,7 @@ pub(crate) fn resolve(
         ndt.ty = Some(body.clone());
     });
 
-    let mut components = components(&probe_types, Premapped(&format), mode, version)?;
+    let mut components = components(&probe_types, specta::Identity, mode, version)?;
     let Some(probe) = components.remove(&probe_name) else {
         return Err(Error::UnresolvedOperationTypes);
     };

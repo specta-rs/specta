@@ -663,7 +663,7 @@ fn unknown_case_name(swift: &Swift, e: &Enum) -> String {
 /// `JSONValue` helper injected alongside it.
 pub fn needs_json_value(swift: &Swift, format: Option<&dyn Format>, types: &Types) -> bool {
     swift.unknown_variants
-        && types.into_sorted_iter().any(|ndt| {
+        && types.iter_sorted().any(|ndt| {
             matches!(&ndt.ty, Some(DataType::Enum(e)) if enum_needs_custom_codable(format, e))
         })
 }
@@ -2291,7 +2291,7 @@ fn reference_to_swift(
 
 /// Convert generic types to Swift.
 fn generic_to_swift(
-    g: &specta::datatype::GenericReference,
+    g: &specta::datatype::Generic,
     generic_scope: &[Generic],
 ) -> Result<String, Error> {
     generic_scope

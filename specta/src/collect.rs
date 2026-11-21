@@ -59,13 +59,18 @@ static TYPES: OnceLock<Mutex<Vec<fn(&mut Types)>>> = OnceLock::new();
 /// }
 /// ```
 pub fn collect() -> Types {
-    let types = TYPES
+    // Snapshot the registrations and release the lock before running any
+    // `Type::definition`. A definition may legitimately register another type,
+    // and holding the lock across arbitrary user code would deadlock if it
+    // called back into `collect`.
+    let exports = TYPES
         .get_or_init(Default::default)
         .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
 
     let mut map = Types::default();
-    for export in types.iter() {
+    for export in exports {
         export(&mut map);
     }
     map

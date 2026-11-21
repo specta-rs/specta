@@ -361,12 +361,13 @@ macro_rules! _impl_ndt {
         // instead of a `(Generic, DataType)` array, a `Cow` and an
         // `Option<Deprecated>` and the drop glue of all three.
         $types.define_instantiation_params(
-            $sentinel,
+            $crate::datatype::NamedKey::label($sentinel),
             impl_ndt!(@type_name $($type_name)*),
             $module_path,
             __SPECTA_GENERICS,
             "",
             ::core::option::Option::None,
+            &[],
             impl_ndt!(@params $typed_generics, $inline [$($generic),*]),
             &[$(::std::any::type_name::<$generic>()),*],
             $has_const_param,

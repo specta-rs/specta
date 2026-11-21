@@ -832,7 +832,7 @@ fn generic_conversion_wire_substitutes_concrete_arguments() {
         .expect("a concrete generic conversion wire is a valid map payload")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "GenericConvertedPayloadWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -881,7 +881,7 @@ fn format_inlines_external_enum_tagged_serializer_shape() {
         .expect("external enum payload is supported by TaggedSerializer")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "ExternalPayloadWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -917,7 +917,7 @@ fn contextual_external_enum_shape_substitutes_concrete_generics() {
             .expect("concrete generic external payload should remain concrete")
             .into_owned();
         let wrapper = mapped
-            .into_unsorted_iter()
+            .iter_unsorted()
             .find(|ndt| ndt.name == name)
             .and_then(|ndt| ndt.ty.as_ref())
             .expect("mapped wrapper definition should exist");
@@ -935,7 +935,7 @@ fn contextual_external_enum_shape_substitutes_concrete_generics() {
         .expect("contextual generic substitution should be applied exactly once")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "GenericOptionExternalPayloadWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped generic option wrapper definition should exist");
@@ -965,7 +965,7 @@ fn generic_newtype_wrapper_does_not_hide_external_enum_shape() {
             .expect("generic newtype wrappers delegate into TaggedSerializer")
             .into_owned();
         let wrapper = mapped
-            .into_unsorted_iter()
+            .iter_unsorted()
             .find(|ndt| ndt.name == name)
             .and_then(|ndt| ndt.ty.as_ref())
             .expect("mapped wrapper definition should exist");
@@ -1017,7 +1017,7 @@ fn contextual_external_enum_applies_serde_field_and_variant_semantics() {
         .expect("contextual lowering should apply serde field and variant attributes")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "ExternalWithSerdeAttrsWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -1047,7 +1047,7 @@ fn skipped_variant_does_not_trigger_contextual_flatten_error() {
         .map_types(&types)
         .expect("attributes on skipped variants are not part of the wire shape")
         .into_owned();
-    let mapped = mapped.into_unsorted_iter().collect::<Vec<_>>();
+    let mapped = mapped.iter_unsorted().collect::<Vec<_>>();
     let payload = mapped
         .iter()
         .find(|ndt| ndt.name == "ExternalWithSkippedFlatten")
@@ -1102,7 +1102,7 @@ fn contextual_external_enum_lowers_flattened_and_aliased_fields() {
         .expect("a flattened map variant remains valid beside a contextual unit variant")
         .into_owned();
     let flattened = flattened
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "ExternalWithContextualFlattenWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped flattened wrapper definition should exist");
@@ -1113,7 +1113,7 @@ fn contextual_external_enum_lowers_flattened_and_aliased_fields() {
         .expect("an aliased map variant remains valid beside a contextual unit variant")
         .into_owned();
     let aliased = aliased
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "ExternalWithContextualAliasWrapper_Deserialize")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped aliased deserialize wrapper definition should exist");
@@ -1166,7 +1166,7 @@ fn inline_external_enum_keeps_tagged_serializer_shape() {
         .expect("inline external enums use the same contextual representation")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "InlineExternalPayloadWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -1192,7 +1192,7 @@ fn inline_external_untagged_unit_contributes_an_empty_object() {
         .expect("an untagged unit contributes no fields under TaggedSerializer")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "InlineExternalWithUntaggedUnitWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -1207,7 +1207,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         .expect("nested untagged payloads propagate contextual replacements")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "UntaggedExternalPayloadWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped wrapper definition should exist");
@@ -1222,7 +1222,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         .expect("skipped untagged variants must not participate in contextual replacement")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "UntaggedExternalPayloadWithSkippedScalarWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped skipped-variant wrapper definition should exist");
@@ -1236,7 +1236,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         .expect("filtering a skipped branch must itself produce a contextual replacement")
         .into_owned();
     let wrapper = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "UntaggedMapPayloadWithSkippedScalarWrapper")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped map-only wrapper definition should exist");
@@ -1263,7 +1263,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         .map_types(&Types::default().register::<UntaggedAttributedMapPayloadWrapper>())
         .expect("untagged contextual replacements must lower their surviving map fields")
         .into_owned();
-    let mapped = mapped.into_unsorted_iter().collect::<Vec<_>>();
+    let mapped = mapped.iter_unsorted().collect::<Vec<_>>();
     for (name, alias_expected) in [
         ("UntaggedAttributedMapPayloadWrapper_Serialize", false),
         ("UntaggedAttributedMapPayloadWrapper_Deserialize", true),
@@ -1297,7 +1297,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         .expect("a phase with no live inner variants should map to an impossible payload")
         .into_owned();
     let serialize = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "UntaggedSerializeImpossibleWrapper_Serialize")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped impossible serialize wrapper should exist");
@@ -1306,7 +1306,7 @@ fn nested_untagged_enum_propagates_contextual_external_shape() {
         "the outer serialize variant must be impossible: {serialize:#?}"
     );
     let deserialize = mapped
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "UntaggedSerializeImpossibleWrapper_Deserialize")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("mapped live deserialize wrapper should exist");
