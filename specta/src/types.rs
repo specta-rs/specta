@@ -614,7 +614,7 @@ impl Types {
     /// The named type's identity is preserved across the callback, including
     /// when the callback replaces the whole value. References to the type
     /// therefore keep resolving to this entry.
-    pub fn iter_mut<F>(&mut self, mut f: F)
+    pub fn for_each_named_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
     {

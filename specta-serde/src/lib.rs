@@ -163,7 +163,7 @@ impl specta::Format for Format {
         let split_types = HashSet::<TypeIdentity>::new();
         let mut rewrite_err = None;
 
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }
@@ -410,7 +410,7 @@ impl specta::Format for PhasesFormat {
         }
 
         let mut rewrite_err = None;
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }
@@ -449,7 +449,7 @@ impl specta::Format for PhasesFormat {
         }
 
         let mut rewrite_err = None;
-        out.iter_mut(|ndt| {
+        out.for_each_named_mut(|ndt| {
             if rewrite_err.is_some() {
                 return;
             }

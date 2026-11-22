@@ -738,7 +738,7 @@ fn python_reports_name_collisions() {
     let mut types = Types::default()
         .register::<namespace_binding_collision::a::B>()
         .register::<namespace_binding_collision::a::b::Child>();
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         if datatype.name == "B" {
             datatype.name = "b".into();
         }
@@ -764,7 +764,7 @@ fn python_rejects_normalized_namespace_module_collisions() {
     let mut types = Types::default()
         .register::<duplicate_a::Duplicate>()
         .register::<duplicate_b::Duplicate>();
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         if datatype.module_path.ends_with("duplicate_a") {
             datatype.name = "First".into();
             datatype.module_path = "root::K".into();
@@ -786,7 +786,7 @@ fn python_rejects_normalized_namespace_module_collisions() {
 #[test]
 fn python_rejects_names_mangled_by_namespace_classes() {
     let mut types = Types::default().register::<namespace_dunder::Secret>();
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         datatype.name = "__Secret".into();
         datatype.module_path = "".into();
     });
@@ -799,7 +799,7 @@ fn python_rejects_names_mangled_by_namespace_classes() {
 
     Python::default().export(&types, IdentityFormat).unwrap();
 
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         datatype.name = "Secret".into();
         datatype.module_path = "__private".into();
     });
@@ -864,7 +864,7 @@ fn python_rejects_generic_parameters_shadowing_concrete_references() {
 #[test]
 fn python_rejects_identifiers_with_invalid_original_characters() {
     let mut types = Types::default().register::<namespace_dunder::Secret>();
-    types.iter_mut(|datatype| datatype.name = "℡".into());
+    types.for_each_named_mut(|datatype| datatype.name = "℡".into());
 
     let error = Python::default()
         .export(&types, IdentityFormat)

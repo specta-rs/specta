@@ -673,7 +673,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
     let source_types = mapped.clone();
     let mut output = mapped;
     let mut error = None;
-    output.iter_mut(|ndt| {
+    output.for_each_named_mut(|ndt| {
         if error.is_some() {
             return;
         }

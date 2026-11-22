@@ -29,7 +29,7 @@ fn graph(count: usize, edges: impl Fn(usize, &[NamedDataType]) -> Vec<DataType>)
             })
         })
         .collect::<Vec<_>>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         let index = ndt.name.trim_start_matches("Node").parse().unwrap();
         ndt.ty = Some(union(edges(index, &nodes)));
     });

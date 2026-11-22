@@ -2839,7 +2839,7 @@ fn named_type_mutation_preserves_graph_identity() {
         Some("A")
     );
 
-    types.iter_mut(|ndt| *ndt = a.clone());
+    types.for_each_named_mut(|ndt| *ndt = a.clone());
     assert_eq!(types.len(), 2);
 }
 

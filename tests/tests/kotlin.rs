@@ -393,7 +393,7 @@ fn kotlin_rejects_recursive_aliases_and_preserves_literal_payloads() {
     let alias_b = specta::datatype::NamedDataType::new("AliasB", &mut indirect, |_, datatype| {
         datatype.ty = Some(DataType::Reference(alias_a.reference(vec![])));
     });
-    indirect.iter_mut(|datatype| {
+    indirect.for_each_named_mut(|datatype| {
         if datatype.name == "AliasA" {
             datatype.ty = Some(DataType::Reference(alias_b.reference(vec![])));
         }
@@ -1064,7 +1064,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
     assert!(supported.contains("@kotlin.jvm.JvmInline"));
 
     let mut deprecated_types = Types::default().register::<OptIn>();
-    deprecated_types.iter_mut(|datatype| {
+    deprecated_types.for_each_named_mut(|datatype| {
         datatype.deprecated = Some(specta::datatype::Deprecated::new());
     });
     let supported = Kotlin::default()
@@ -1304,7 +1304,7 @@ fn kotlin_exports_shared_type_corpus() {
     // `crate::types()` adds a synthetic `Primitives` record whose stringify-based field names
     // intentionally contain duplicates. It is useful to TypeScript's structural snapshots but
     // cannot be a Kotlin constructor, so exercise the actual collected named corpus here.
-    types.iter_mut(|datatype| {
+    types.for_each_named_mut(|datatype| {
         if datatype.name == "Primitives" {
             datatype.ty = None;
         }

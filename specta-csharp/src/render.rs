@@ -1929,7 +1929,7 @@ fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Typ
     let source = mapped.as_ref();
     let mut mapped_types = source.clone();
     let mut failure = None;
-    mapped_types.iter_mut(|ndt| {
+    mapped_types.for_each_named_mut(|ndt| {
         if failure.is_some() {
             return;
         }
