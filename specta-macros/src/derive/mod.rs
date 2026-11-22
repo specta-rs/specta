@@ -189,22 +189,28 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
     };
 
     // A container-level type override replaces the struct/enum node, so the
-    // container rename would be lost with it. Keep the declaration's name on the
-    // declaration; shape-specific attributes describe the replaced shape.
+    // container rename would be lost with it. Keep the declaration's rename on
+    // the declaration; shape-specific attributes describe the replaced shape.
     let declaration_renames = serde::container_rename_pairs(raw_attrs)?;
-    let declaration_attr_pairs = {
+    // The declaration-level copy exists only when an override replaced the
+    // shape, so the two copies never coexist.
+    let shape_was_replaced = container_attrs.r#type.is_some();
+    let declaration_attr_pairs = if shape_was_replaced {
         let keys = declaration_renames.iter().map(|(key, _)| *key);
         let values = declaration_renames.iter().map(|(_, value)| value.as_str());
         quote!(&[#((#keys, #values)),*])
+    } else {
+        quote!(&[])
     };
-    let declaration_rename_attrs = (!declaration_renames.is_empty()).then(|| {
-        let keys = declaration_renames.iter().map(|(key, _)| *key);
-        let values = declaration_renames.iter().map(|(_, value)| value.as_str());
-        quote!({
-            let attrs = &mut ndt.attributes;
-            #(attrs.insert(#keys, ::std::string::String::from(#values));)*
-        })
-    });
+    let declaration_rename_attrs =
+        (shape_was_replaced && !declaration_renames.is_empty()).then(|| {
+            let keys = declaration_renames.iter().map(|(key, _)| *key);
+            let values = declaration_renames.iter().map(|(_, value)| value.as_str());
+            quote!({
+                let attrs = &mut ndt.attributes;
+                #(attrs.insert(#keys, ::std::string::String::from(#values));)*
+            })
+        });
 
     let (crate_ref, names, ident, name) = {
         let crate_ref = container_attrs

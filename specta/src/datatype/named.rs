@@ -56,9 +56,9 @@ pub struct NamedDataType {
     pub generics: Cow<'static, [GenericDefinition]>,
     /// Metadata attached to the declaration itself rather than to its shape.
     ///
-    /// The derive records container-level attributes here as well, so they
-    /// survive when the shape is replaced by an override such as
-    /// `#[specta(type = ...)]` and is therefore no longer a struct or an enum.
+    /// Container attributes normally live on the [`Struct`] or [`Enum`] node.
+    /// They are recorded here only when an override such as `#[specta(type =
+    /// ...)]` replaced that node and this is the only place they survive.
     pub attributes: Attributes,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
