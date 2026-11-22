@@ -531,10 +531,10 @@ fn test_named_variant_with_only_skipped_fields_is_unit() {
 #[test]
 fn test_duplicate_rescript_type_names_are_rejected() {
     let mut types = Types::default();
-    NamedDataType::new("Duplicate", &mut types, |_, ty| {
+    NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
         ty.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Duplicate", &mut types, |_, ty| {
+    NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
         ty.ty = Some(Primitive::i32.into());
     });
 
@@ -547,8 +547,8 @@ fn test_duplicate_rescript_type_names_are_rejected() {
 #[test]
 fn test_hidden_named_references_are_rejected() {
     let mut types = Types::default();
-    let hidden = NamedDataType::new("Hidden", &mut types, |_, _| {});
-    NamedDataType::new("UsesHidden", &mut types, |_, datatype| {
+    let hidden = NamedDataType::new("Hidden", &mut types, |_, _, _| {});
+    NamedDataType::new("UsesHidden", &mut types, |_, _, datatype| {
         datatype.ty = Some(
             Struct::named()
                 .field(

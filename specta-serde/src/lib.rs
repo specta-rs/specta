@@ -159,7 +159,7 @@ impl specta::Format for Format {
         validate::validate_for_mode(types, validate::ApplyMode::Unified)?;
 
         let mut out = types.clone();
-        let generated = HashMap::<TypeIdentity, SplitGeneratedTypes>::new();
+        let registered = HashMap::<TypeIdentity, SplitHandles>::new();
         let split_types = HashSet::<TypeIdentity>::new();
         let mut rewrite_err = None;
 
@@ -182,7 +182,7 @@ impl specta::Format for Format {
                     ty,
                     PhaseRewrite::Unified,
                     types,
-                    &generated,
+                    &registered,
                     &split_types,
                     Some(ndt_name.as_str()),
                 )
@@ -295,6 +295,7 @@ impl specta::Format for PhasesFormat {
 
         let mut out = types.clone();
         let mut generated = HashMap::<TypeIdentity, SplitGeneratedTypes>::new();
+        let mut registered = HashMap::<TypeIdentity, SplitHandles>::new();
         let mut generated_types = HashSet::<TypeIdentity>::new();
 
         for original in &originals {
@@ -332,7 +333,7 @@ impl specta::Format for PhasesFormat {
                     ty,
                     PhaseRewrite::Serialize,
                     types,
-                    &generated,
+                    &registered,
                     &split_types,
                     Some(original.name.as_ref()),
                 )
@@ -348,7 +349,7 @@ impl specta::Format for PhasesFormat {
                     ty,
                     PhaseRewrite::Deserialize,
                     types,
-                    &generated,
+                    &registered,
                     &split_types,
                     Some(original.name.as_ref()),
                 )
@@ -362,29 +363,33 @@ impl specta::Format for PhasesFormat {
             generated.insert(key, generated_types_for_phase);
         }
 
-        for generated_types_for_phase in generated.values_mut() {
+        for (key, generated_types_for_phase) in &mut generated {
             let serialize =
                 register_generated_type(&mut out, generated_types_for_phase.serialize.clone());
-            let deserialize = Box::new(register_generated_type(
-                &mut out,
-                (*generated_types_for_phase.deserialize).clone(),
+            let deserialize =
+                register_generated_type(&mut out, (*generated_types_for_phase.deserialize).clone());
+
+            generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.serialize));
+            generated_types.insert(TypeIdentity::from_ndt(
+                &generated_types_for_phase.deserialize,
             ));
 
-            generated_types.insert(TypeIdentity::from_ndt(&serialize));
-            generated_types.insert(TypeIdentity::from_ndt(&deserialize));
-
-            generated_types_for_phase.serialize = serialize;
-            generated_types_for_phase.deserialize = deserialize;
+            registered.insert(
+                key.clone(),
+                SplitHandles {
+                    serialize,
+                    deserialize,
+                },
+            );
         }
 
-        let registered_generated = generated.clone();
         for generated_types_for_phase in generated.values_mut() {
             if let Some(ty) = generated_types_for_phase.serialize.ty.as_mut() {
                 rewrite_datatype_for_phase(
                     ty,
                     PhaseRewrite::Serialize,
                     types,
-                    &registered_generated,
+                    &registered,
                     &split_types,
                     Some(generated_types_for_phase.serialize.name.as_ref()),
                 )?;
@@ -395,7 +400,7 @@ impl specta::Format for PhasesFormat {
                     ty,
                     PhaseRewrite::Deserialize,
                     types,
-                    &registered_generated,
+                    &registered,
                     &split_types,
                     Some(generated_types_for_phase.deserialize.name.as_ref()),
                 )?;
@@ -405,15 +410,20 @@ impl specta::Format for PhasesFormat {
         // Update the registered generated entries by identity. Matching their
         // display names previously copied one module's body into every type
         // that happened to share the generated phase name.
-        for generated_types_for_phase in generated.values() {
-            for generated in [
-                &generated_types_for_phase.serialize,
-                &generated_types_for_phase.deserialize,
+        for (key, generated_types_for_phase) in &generated {
+            let Some(SplitHandles {
+                serialize,
+                deserialize,
+            }) = registered.get(key)
+            else {
+                continue;
+            };
+
+            for (reference, generated) in [
+                (serialize, &generated_types_for_phase.serialize),
+                (deserialize, generated_types_for_phase.deserialize.as_ref()),
             ] {
-                let Reference::Named(reference) = generated.reference(Vec::new()) else {
-                    unreachable!("named types always produce named references")
-                };
-                if let Some(registered) = out.get_mut(&reference) {
+                if let Some(registered) = out.get_mut(reference) {
                     registered.ty = generated.ty.clone();
                 }
             }
@@ -445,7 +455,7 @@ impl specta::Format for PhasesFormat {
                     ty,
                     PhaseRewrite::Unified,
                     types,
-                    &generated,
+                    &registered,
                     &split_types,
                     Some(ndt_name.as_str()),
                 )
@@ -469,10 +479,10 @@ impl specta::Format for PhasesFormat {
                 return;
             }
 
-            let Some(SplitGeneratedTypes {
+            let Some(SplitHandles {
                 serialize,
                 deserialize,
-            }) = generated.get(&key)
+            }) = registered.get(&key)
             else {
                 return;
             };
@@ -697,14 +707,12 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 return;
             }
 
-            let target_ndt =
-                select_split_type_variant(referenced_ndt, types, phase).unwrap_or(referenced_ndt);
-            let Reference::Named(new_reference) =
-                target_ndt.reference(named_reference_generics(reference).to_vec())
-            else {
-                unreachable!("named types always produce named references")
+            let generics = named_reference_generics(reference).to_vec();
+            let selected = select_split_type_variant(referenced_ndt, phase);
+            *reference = match selected {
+                Some(split) => split.with_generics(generics),
+                None => reference.with_generics(generics),
             };
-            *reference = new_reference;
         }
         DataType::Reference(Reference::Opaque(_))
         | DataType::Generic(_)
@@ -777,11 +785,7 @@ fn select_split_wrapper_variant(ty: &DataType, phase: Phase) -> Option<DataType>
     field.ty.clone()
 }
 
-fn select_split_type_variant<'a>(
-    ndt: &'a NamedDataType,
-    types: &'a Types,
-    phase: Phase,
-) -> Option<&'a NamedDataType> {
+fn select_split_type_variant(ndt: &NamedDataType, phase: Phase) -> Option<NamedReference> {
     let Some(DataType::Enum(wrapper)) = &ndt.ty else {
         return None;
     };
@@ -809,7 +813,7 @@ fn select_split_type_variant<'a>(
         return None;
     };
 
-    types.get(reference)
+    Some(reference.clone())
 }
 
 /// Applies a use-site generic environment to a selected phase projection.
@@ -862,6 +866,14 @@ struct SplitGeneratedTypes {
     deserialize: Box<NamedDataType>,
 }
 
+/// Identity of each generated declaration registered into the output
+/// collection, keyed like [SplitGeneratedTypes].
+#[derive(Debug, Clone)]
+struct SplitHandles {
+    serialize: NamedReference,
+    deserialize: NamedReference,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct TypeIdentity {
     name: String,
@@ -900,7 +912,7 @@ fn rewrite_datatype_for_phase(
     ty: &mut DataType,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     container_name: Option<&str>,
 ) -> Result<(), Error> {
@@ -908,7 +920,7 @@ fn rewrite_datatype_for_phase(
         ty,
         mode,
         original_types,
-        generated,
+        registered,
         split_types,
         container_name,
         &mut HashSet::new(),
@@ -921,7 +933,7 @@ fn rewrite_datatype_for_phase_inner(
     ty: &mut DataType,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     container_name: Option<&str>,
     expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
@@ -938,7 +950,7 @@ fn rewrite_datatype_for_phase_inner(
             ty,
             mode,
             original_types,
-            generated,
+            registered,
             split_types,
             container_name,
             expanding_flattened,
@@ -975,7 +987,7 @@ fn rewrite_datatype_for_phase_inner(
                 &mut s.fields,
                 mode,
                 original_types,
-                generated,
+                registered,
                 split_types,
                 container_rename_all,
                 container_default,
@@ -1022,7 +1034,7 @@ fn rewrite_datatype_for_phase_inner(
                 s,
                 mode,
                 original_types,
-                generated,
+                registered,
                 split_types,
                 expanding_flattened,
             )? {
@@ -1059,7 +1071,7 @@ fn rewrite_datatype_for_phase_inner(
                     &mut variant.fields,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     rename_rule,
                     false,
@@ -1093,7 +1105,7 @@ fn rewrite_datatype_for_phase_inner(
                         &mut strct,
                         mode,
                         original_types,
-                        generated,
+                        registered,
                         split_types,
                         expanding_flattened,
                     )?
@@ -1111,7 +1123,8 @@ fn rewrite_datatype_for_phase_inner(
                 }
             }
 
-            if rewrite_identifier_enum_for_phase(e, mode, original_types, generated, split_types)? {
+            if rewrite_identifier_enum_for_phase(e, mode, original_types, registered, split_types)?
+            {
                 return Ok(());
             }
 
@@ -1124,7 +1137,7 @@ fn rewrite_datatype_for_phase_inner(
                     ty,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     None,
                     expanding_flattened,
@@ -1135,7 +1148,7 @@ fn rewrite_datatype_for_phase_inner(
             &mut list.ty,
             mode,
             original_types,
-            generated,
+            registered,
             split_types,
             None,
             expanding_flattened,
@@ -1145,7 +1158,7 @@ fn rewrite_datatype_for_phase_inner(
                 map.key_ty_mut(),
                 mode,
                 original_types,
-                generated,
+                registered,
                 split_types,
                 None,
                 expanding_flattened,
@@ -1154,7 +1167,7 @@ fn rewrite_datatype_for_phase_inner(
                 map.value_ty_mut(),
                 mode,
                 original_types,
-                generated,
+                registered,
                 split_types,
                 None,
                 expanding_flattened,
@@ -1166,7 +1179,7 @@ fn rewrite_datatype_for_phase_inner(
                     ty,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     None,
                     expanding_flattened,
@@ -1177,7 +1190,7 @@ fn rewrite_datatype_for_phase_inner(
             inner,
             mode,
             original_types,
-            generated,
+            registered,
             split_types,
             None,
             expanding_flattened,
@@ -1188,7 +1201,7 @@ fn rewrite_datatype_for_phase_inner(
                     dt,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     None,
                     expanding_flattened,
@@ -1204,7 +1217,7 @@ fn rewrite_datatype_for_phase_inner(
                     dt,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     None,
                     expanding_flattened,
@@ -1215,24 +1228,25 @@ fn rewrite_datatype_for_phase_inner(
                 return Ok(());
             }
 
-            let Some(target) = generated.get(&key) else {
+            let generics = named_reference_generics(reference).to_vec();
+            let Some(SplitHandles {
+                serialize,
+                deserialize,
+            }) = registered.get(&key)
+            else {
+                // Registration has not run yet, so no generated twin
+                // exists: keep resolving to the referenced declaration.
+                *reference = reference.with_generics(generics);
                 return Ok(());
             };
 
-            let Reference::Named(reference_from_target) = (match mode {
+            *reference = match mode {
                 PhaseRewrite::Unified => {
                     unreachable!("unified mode should not reference split types")
                 }
-                PhaseRewrite::Serialize => target
-                    .serialize
-                    .reference(named_reference_generics(reference).to_vec()),
-                PhaseRewrite::Deserialize => target
-                    .deserialize
-                    .reference(named_reference_generics(reference).to_vec()),
-            }) else {
-                unreachable!("named types always produce named references")
+                PhaseRewrite::Serialize => serialize.with_generics(generics),
+                PhaseRewrite::Deserialize => deserialize.with_generics(generics),
             };
-            *reference = reference_from_target;
         }
         DataType::Reference(Reference::Opaque(_))
         | DataType::Generic(_)
@@ -1246,14 +1260,14 @@ fn lower_flattened_struct(
     strct: &mut Struct,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<Option<DataType>, Error> {
     lower_flattened_struct_inner(
         strct,
         mode,
         original_types,
-        generated,
+        registered,
         split_types,
         &mut HashSet::new(),
     )
@@ -1263,7 +1277,7 @@ fn lower_flattened_struct_inner(
     strct: &mut Struct,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
 ) -> Result<Option<DataType>, Error> {
@@ -1327,7 +1341,7 @@ fn lower_flattened_struct_inner(
                     ty,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     expanding_flattened,
                 )?;
@@ -1384,14 +1398,14 @@ fn flattened_payload_datatype(
     ty: DataType,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<DataType, Error> {
     flattened_payload_datatype_inner(
         ty,
         mode,
         original_types,
-        generated,
+        registered,
         split_types,
         &mut HashSet::new(),
     )
@@ -1401,7 +1415,7 @@ fn flattened_payload_datatype_inner(
     ty: DataType,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     expanding_flattened: &mut HashSet<(TypeIdentity, String)>,
 ) -> Result<DataType, Error> {
@@ -1455,7 +1469,7 @@ fn flattened_payload_datatype_inner(
         &mut payload,
         mode,
         original_types,
-        generated,
+        registered,
         split_types,
         Some(referenced.name.as_ref()),
         expanding_flattened,
@@ -2458,7 +2472,7 @@ fn rewrite_fields_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     rename_all_rule: Option<RenameRule>,
     container_default: bool,
@@ -2493,7 +2507,7 @@ fn rewrite_fields_for_phase(
                     field,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     conditional_omission_applies,
                 )?;
@@ -2547,7 +2561,7 @@ fn rewrite_fields_for_phase(
                     field,
                     mode,
                     original_types,
-                    generated,
+                    registered,
                     split_types,
                     conditional_omission_applies,
                 )?;
@@ -2592,7 +2606,7 @@ fn rewrite_field_for_phase(
     field: &mut Field,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
     conditional_omission_applies: bool,
 ) -> Result<(), Error> {
@@ -2657,7 +2671,7 @@ fn rewrite_field_for_phase(
     }
 
     if let Some(ty) = field.ty.as_mut() {
-        rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
+        rewrite_datatype_for_phase(ty, mode, original_types, registered, split_types, None)?;
     }
 
     Ok(())
@@ -3050,7 +3064,7 @@ fn rewrite_identifier_enum_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    registered: &HashMap<TypeIdentity, SplitHandles>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<bool, Error> {
     let Some(attrs) = SerdeContainerAttrs::from_attributes(&e.attributes)? else {
@@ -3112,7 +3126,7 @@ fn rewrite_identifier_enum_for_phase(
             &mut fallback_ty,
             mode,
             original_types,
-            generated,
+            registered,
             split_types,
             None,
         )?;
@@ -5606,8 +5620,8 @@ fn build_from_original(
     Ok(ndt)
 }
 
-fn register_generated_type(types: &mut Types, generated: NamedDataType) -> NamedDataType {
-    NamedDataType::new(generated.name.clone(), types, move |_, ndt| {
+fn register_generated_type(types: &mut Types, generated: NamedDataType) -> NamedReference {
+    NamedDataType::new(generated.name.clone(), types, move |_, _, ndt| {
         ndt.docs = generated.docs;
         ndt.deprecated = generated.deprecated;
         ndt.module_path = generated.module_path;
@@ -5702,9 +5716,9 @@ fn renamed_type_name_for_phase(
     ndt: &NamedDataType,
     mode: PhaseRewrite,
 ) -> Result<Option<String>, Error> {
-    // A container keeps its attributes on the struct/enum node. When the shape
-    // was replaced by a type override the node is not a container, so read the
-    // declaration-level copy the derive also records.
+    // A container keeps its attributes on the struct/enum node. When a type
+    // override replaced the shape the node is not a container, so read the
+    // declaration-level copy the derive records for exactly that case.
     let attributes = match &ndt.ty {
         Some(DataType::Struct(strct)) => &strct.attributes,
         Some(DataType::Enum(e)) => &e.attributes,

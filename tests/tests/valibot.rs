@@ -598,7 +598,7 @@ fn valibot_layout_duplicate_typenames() {
 #[test]
 fn valibot_module_prefixed_duplicate_checks_use_rendered_names() {
     fn add_type(types: &mut Types, name: &'static str, module_path: &'static str) {
-        NamedDataType::new(name, types, |_, ndt| {
+        NamedDataType::new(name, types, |_, _, ndt| {
             ndt.module_path = module_path.into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -615,11 +615,11 @@ fn valibot_module_prefixed_duplicate_checks_use_rendered_names() {
     assert!(out.contains("export type foo_Bar = string"));
 
     let mut references = Types::default();
-    let root = NamedDataType::new("RootReference", &mut references, |_, ndt| {
+    let root = NamedDataType::new("RootReference", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut references, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Reference(root.reference(vec![])));
     });
@@ -675,7 +675,7 @@ fn valibot_layout_namespaces() {
 #[test]
 fn valibot_layout_namespaces_reexports_root_schema() {
     let mut types = Types::default();
-    NamedDataType::new("Root", &mut types, |_, ndt| {
+    NamedDataType::new("Root", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -719,11 +719,11 @@ fn valibot_layout_files_sanitises_the_valibot_prelude_binding() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-prelude-binding");
     let mut types = Types::default();
-    let v_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+    let v_type = NamedDataType::new("PreludeCollision", &mut types, |_, _, ndt| {
         ndt.module_path = "v".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesV", &mut types, |_, ndt| {
+    NamedDataType::new("UsesV", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(v_type.reference(vec![])));
     });
@@ -744,11 +744,11 @@ fn valibot_layout_files_qualifies_root_types_from_modules() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-root-reference");
     let mut types = Types::default();
-    let root = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+    let root = NamedDataType::new("RootReference", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(root.reference(vec![])));
     });
@@ -770,11 +770,11 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-import-alias-collision");
     let mut types = Types::default();
-    let other = NamedDataType::new("Other", &mut types, |_, ndt| {
+    let other = NamedDataType::new("Other", &mut types, |_, _, ndt| {
         ndt.module_path = "target".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("target", &mut types, |_, ndt| {
+    NamedDataType::new("target", &mut types, |_, _, ndt| {
         ndt.module_path = "source".into();
         ndt.ty = Some(DataType::Reference(other.reference(vec![])));
     });
@@ -790,15 +790,15 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
     );
 
     let mut types = Types::default();
-    let other = NamedDataType::new("Other", &mut types, |_, ndt| {
+    let other = NamedDataType::new("Other", &mut types, |_, _, ndt| {
         ndt.module_path = "target".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Root", &mut types, |_, ndt| {
+    NamedDataType::new("Root", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Reference(other.reference(vec![])));
     });
-    NamedDataType::new("target", &mut types, |_, ndt| {
+    NamedDataType::new("target", &mut types, |_, _, ndt| {
         ndt.module_path = "source".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -835,11 +835,11 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
         .unwrap();
 
     let mut helper_collision = Types::default();
-    let helper = NamedDataType::new("Helper", &mut helper_collision, |_, ndt| {
+    let helper = NamedDataType::new("Helper", &mut helper_collision, |_, _, ndt| {
         ndt.module_path = "$spectaObject".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesHelper", &mut helper_collision, |_, ndt| {
+    NamedDataType::new("UsesHelper", &mut helper_collision, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Reference(helper.reference(vec![])));
     });
@@ -859,7 +859,7 @@ fn valibot_layout_files_rejects_import_alias_binding_collisions() {
 
     let mut separate_declaration_spaces = Types::default();
     for name in ["Foo", "FooSchema"] {
-        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, _, ndt| {
             ndt.module_path = "source".into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -881,7 +881,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
 
     let mut manual_collision = Types::default();
     for module_path in ["first", "second"] {
-        NamedDataType::new("Foo", &mut manual_collision, |_, ndt| {
+        NamedDataType::new("Foo", &mut manual_collision, |_, _, ndt| {
             ndt.module_path = module_path.into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -909,7 +909,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
 
     let mut root_collision = Types::default();
     for module_path in ["", "nested"] {
-        NamedDataType::new("Foo", &mut root_collision, |_, ndt| {
+        NamedDataType::new("Foo", &mut root_collision, |_, _, ndt| {
             ndt.module_path = module_path.into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -936,7 +936,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
     );
 
     let mut repeated_export = Types::default();
-    NamedDataType::new("Foo", &mut repeated_export, |_, ndt| {
+    NamedDataType::new("Foo", &mut repeated_export, |_, _, ndt| {
         ndt.module_path = "nested".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -965,7 +965,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
     );
 
     let mut repeated_render = Types::default();
-    NamedDataType::new("Foo", &mut repeated_render, |_, ndt| {
+    NamedDataType::new("Foo", &mut repeated_render, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -994,7 +994,7 @@ fn valibot_layout_files_rejects_manual_type_name_collisions() {
 
     let mut separate_declaration_spaces = Types::default();
     for (name, module_path) in [("Foo", "first"), ("FooSchema", "second")] {
-        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, _, ndt| {
             ndt.module_path = module_path.into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -1020,15 +1020,15 @@ fn valibot_layout_files_preserves_a_top_level_index_module() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-index-module");
     let mut types = Types::default();
-    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, _, ndt| {
         ndt.module_path = "index".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("UsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
     });
-    NamedDataType::new("ChildUsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("ChildUsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "index::child".into();
         ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
     });
@@ -1054,11 +1054,11 @@ fn valibot_layout_files_imports_parent_module_files() {
     let temp = temp_dir();
     let path = temp.path().join("valibot-parent-reference");
     let mut types = Types::default();
-    let parent = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+    let parent = NamedDataType::new("ParentReference", &mut types, |_, _, ndt| {
         ndt.module_path = "parent".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+    NamedDataType::new("UsesParent", &mut types, |_, _, ndt| {
         ndt.module_path = "parent::child".into();
         ndt.ty = Some(DataType::Reference(parent.reference(vec![])));
     });
@@ -1091,7 +1091,7 @@ fn valibot_layout_files_empty_export_allows_a_missing_directory() {
 #[test]
 fn valibot_layout_namespaces_rejects_module_type_collisions() {
     let mut types = Types::default().register::<Testing>();
-    NamedDataType::new("test", &mut types, |_, ndt| {
+    NamedDataType::new("test", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -1106,11 +1106,11 @@ fn valibot_layout_namespaces_rejects_module_type_collisions() {
 #[test]
 fn valibot_layout_namespaces_rejects_nested_schema_module_collisions() {
     let mut types = Types::default();
-    NamedDataType::new("Foo", &mut types, |_, ndt| {
+    NamedDataType::new("Foo", &mut types, |_, _, ndt| {
         ndt.module_path = "outer".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Nested", &mut types, |_, ndt| {
+    NamedDataType::new("Nested", &mut types, |_, _, ndt| {
         ndt.module_path = "outer::FooSchema".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -1388,7 +1388,7 @@ fn valibot_reserved_type_name_errors() {
         "undefined",
     ] {
         let mut types = Types::default();
-        NamedDataType::new(name, &mut types, |_, ndt| {
+        NamedDataType::new(name, &mut types, |_, _, ndt| {
             ndt.ty = Some(DataType::Primitive(Primitive::i8));
         });
         let err = Valibot::default()
@@ -1401,7 +1401,7 @@ fn valibot_reserved_type_name_errors() {
     }
 
     let mut types = Types::default();
-    NamedDataType::new("GenericV", &mut types, |_, ndt| {
+    NamedDataType::new("GenericV", &mut types, |_, _, ndt| {
         let generic = specta::datatype::GenericDefinition::new("v".into(), None);
         ndt.generics = Cow::Owned(vec![generic.clone()]);
         ndt.ty = Some(DataType::Generic(generic.reference()));
@@ -1447,10 +1447,10 @@ fn valibot_integers_use_integer_pipeline() {
 #[test]
 fn valibot_narrow_floats_use_representable_ranges() {
     let mut types = Types::default();
-    NamedDataType::new("Half", &mut types, |_, ndt| {
+    NamedDataType::new("Half", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::f16));
     });
-    NamedDataType::new("Single", &mut types, |_, ndt| {
+    NamedDataType::new("Single", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::f32));
     });
 
@@ -1825,11 +1825,11 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
     );
 
     let mut colliding = Types::default();
-    NamedDataType::new("foo_Bar", &mut colliding, |_, ndt| {
+    NamedDataType::new("foo_Bar", &mut colliding, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Bar", &mut colliding, |_, ndt| {
+    NamedDataType::new("Bar", &mut colliding, |_, _, ndt| {
         ndt.module_path = "foo".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -1847,11 +1847,11 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
     assert!(err.to_string().contains("Detected multiple types"));
 
     let mut references = Types::default();
-    let manual = NamedDataType::new("Manual", &mut references, |_, ndt| {
+    let manual = NamedDataType::new("Manual", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Automatic", &mut references, |_, ndt| {
+    NamedDataType::new("Automatic", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Reference(manual.reference(vec![])));
     });
@@ -1891,7 +1891,7 @@ fn valibot_framework_export_formats_generic_named_datatypes() {
     );
 
     let mut non_exportable = Types::default();
-    NamedDataType::new("NonExportable", &mut non_exportable, |_, ndt| {
+    NamedDataType::new("NonExportable", &mut non_exportable, |_, _, ndt| {
         ndt.module_path = "".into();
     });
     let rendered = Valibot::default()

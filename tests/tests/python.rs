@@ -813,7 +813,7 @@ fn python_rejects_names_mangled_by_namespace_classes() {
 #[test]
 fn python_rejects_normalized_generic_parameter_collisions() {
     let mut types = Types::default();
-    specta::datatype::NamedDataType::new("Pair", &mut types, |_, datatype| {
+    specta::datatype::NamedDataType::new("Pair", &mut types, |_, _, datatype| {
         datatype.generics = vec![
             specta::datatype::GenericDefinition::new("T".into(), None),
             specta::datatype::GenericDefinition::new("Ｔ".into(), None),
@@ -835,10 +835,10 @@ fn python_rejects_generic_parameters_shadowing_concrete_references() {
     use specta::datatype::{Field, GenericDefinition, NamedDataType, Struct};
 
     let mut types = Types::default();
-    let concrete = NamedDataType::new("T", &mut types, |_, datatype| {
+    let concrete = NamedDataType::new("T", &mut types, |_, _, datatype| {
         datatype.ty = Some(Struct::unit().into());
     });
-    NamedDataType::new("Wrapper", &mut types, |_, datatype| {
+    NamedDataType::new("Wrapper", &mut types, |_, _, datatype| {
         datatype.generics = vec![GenericDefinition::new("T".into(), None)].into();
         datatype.ty = Some(
             Struct::named()

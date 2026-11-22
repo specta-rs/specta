@@ -128,7 +128,7 @@ pub(crate) fn resolve(
         probe = probe.field(field_name(index), Field::new(dt.clone()));
     }
     let body = probe.build();
-    NamedDataType::new(probe_name.clone(), &mut probe_types, |_, ndt| {
+    NamedDataType::new(probe_name.clone(), &mut probe_types, |_, _, ndt| {
         ndt.ty = Some(body.clone());
     });
 

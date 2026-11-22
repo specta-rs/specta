@@ -1,14 +1,14 @@
 // Regression coverage for https://github.com/specta-rs/specta/pull/640.
 use specta::{
     Format, Type, Types,
-    datatype::{DataType, Field, NamedDataType, Primitive, Struct},
+    datatype::{DataType, Field, NamedDataType, NamedReference, Primitive, Struct},
 };
 
-fn graph(count: usize, cyclic: bool) -> Types {
+fn graph(count: usize, cyclic: bool) -> (Types, Vec<NamedReference>) {
     let mut types = Types::default();
     let nodes = (0..count)
         .map(|i| {
-            NamedDataType::new(format!("Node{i:04}"), &mut types, |_, ndt| {
+            NamedDataType::new(format!("Node{i:04}"), &mut types, |_, _, ndt| {
                 ndt.ty = Some(Primitive::str.into());
             })
         })
@@ -37,7 +37,7 @@ fn graph(count: usize, cyclic: bool) -> Types {
                 .build(),
         );
     });
-    types
+    (types, nodes)
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn shared_tails_and_cycles_preserve_bodies_in_both_modes() {
         .stack_size(8 * 1024 * 1024)
         .spawn(|| {
             for cyclic in [false, true] {
-                let types = graph(128, cyclic);
+                let (types, _) = graph(128, cyclic);
                 for format in [
                     &specta_serde::Format as &dyn Format,
                     &specta_serde::PhasesFormat,
@@ -69,36 +69,33 @@ fn shared_tails_and_cycles_preserve_bodies_in_both_modes() {
         .expect("the graph validation succeeds");
 }
 
-fn add_invalid_codec(types: &mut Types) {
-    types.for_each_named_mut(|ndt| {
-        let reference = ndt.reference(vec![]);
-        if ndt.name == "Node0000"
-            && let Some(DataType::Struct(strct)) = &mut ndt.ty
-        {
-            let mut field = Field::new(Primitive::str.into());
-            field
-                .attributes
-                .insert("serde:field:has_serialize_with", true);
-            let late = Struct::named().field("codec", field).build();
-            let DataType::Struct(replacement) = Struct::named()
-                .field("cycle", Field::new(reference.into()))
-                .field("late", Field::new(late))
-                .build()
-            else {
-                unreachable!()
-            };
-            strct.fields = replacement.fields;
-        }
-    });
+fn add_invalid_codec(types: &mut Types, node: &NamedReference) {
+    let Some(DataType::Struct(strct)) = types.get_mut(node).and_then(|ndt| ndt.ty.as_mut()) else {
+        unreachable!("the graph is made of structs")
+    };
+
+    let mut field = Field::new(Primitive::str.into());
+    field
+        .attributes
+        .insert("serde:field:has_serialize_with", true);
+    let late = Struct::named().field("codec", field).build();
+    let DataType::Struct(replacement) = Struct::named()
+        .field("cycle", Field::new(node.reference(vec![]).into()))
+        .field("late", Field::new(late))
+        .build()
+    else {
+        unreachable!()
+    };
+    strct.fields = replacement.fields;
 }
 
 #[test]
 fn successful_batches_do_not_hide_later_errors_or_cycle_ancestor_errors() {
-    let mut types = graph(16, true);
+    let (mut types, nodes) = graph(16, true);
     specta_serde::Format
         .map_types(&types)
         .expect("the initial graph is valid");
-    add_invalid_codec(&mut types);
+    add_invalid_codec(&mut types, &nodes[0]);
     for format in [
         &specta_serde::Format as &dyn Format,
         &specta_serde::PhasesFormat,
@@ -192,7 +189,7 @@ fn phase_dead_generic_visit_does_not_hide_a_later_live_root() {
 #[test]
 fn field_key_fast_path_does_not_skip_metadata_or_container_rules() {
     for container_rule in [false, true] {
-        let mut types = graph(4, false);
+        let (mut types, _) = graph(4, false);
         types.for_each_named_mut(|ndt| {
             if ndt.name == "Node0000"
                 && let Some(DataType::Struct(strct)) = &mut ndt.ty

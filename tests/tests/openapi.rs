@@ -581,10 +581,10 @@ fn openapi_carries_wide_integer_bounds_in_extensions() {
 #[test]
 fn openapi_rejects_component_name_collisions() {
     let mut types = Types::default();
-    NamedDataType::new("A-B", &mut types, |_, ndt| {
+    NamedDataType::new("A-B", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::str));
     });
-    NamedDataType::new("A_B", &mut types, |_, ndt| {
+    NamedDataType::new("A_B", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::bool));
     });
 
@@ -597,10 +597,10 @@ fn openapi_rejects_component_name_collisions() {
 #[test]
 fn openapi_sanitizes_escaped_definition_names_and_rewrites_refs() {
     let mut types = Types::default();
-    let escaped = NamedDataType::new("A/B~%#é", &mut types, |_, ndt| {
+    let escaped = NamedDataType::new("A/B~%#é", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::str));
     });
-    NamedDataType::new("EscapedHolder", &mut types, |_, ndt| {
+    NamedDataType::new("EscapedHolder", &mut types, |_, _, ndt| {
         ndt.ty = Some(
             Struct::named()
                 .field("value", Field::new(escaped.reference(vec![]).into()))

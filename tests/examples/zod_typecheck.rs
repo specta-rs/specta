@@ -460,41 +460,41 @@ fn main() {
                 .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),
         );
-    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, _, ndt| {
         ndt.module_path = "z".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesZ", &mut types, |_, ndt| {
+    NamedDataType::new("UsesZ", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             z_type.reference(vec![]),
         ));
     });
-    let root_type = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+    let root_type = NamedDataType::new("RootReference", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             root_type.reference(vec![]),
         ));
     });
-    let parent_type = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+    let parent_type = NamedDataType::new("ParentReference", &mut types, |_, _, ndt| {
         ndt.module_path = "parent".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+    NamedDataType::new("UsesParent", &mut types, |_, _, ndt| {
         ndt.module_path = "parent::child".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             parent_type.reference(vec![]),
         ));
     });
-    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, _, ndt| {
         ndt.module_path = "index".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("UsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             index_type.reference(vec![]),
@@ -512,11 +512,11 @@ fn main() {
         .unwrap();
     let mut module_prefixed_types = Types::default();
     let module_prefixed_root =
-        NamedDataType::new("RootType", &mut module_prefixed_types, |_, ndt| {
+        NamedDataType::new("RootType", &mut module_prefixed_types, |_, _, ndt| {
             ndt.module_path = "".into();
             ndt.ty = Some(Primitive::str.into());
         });
-    NamedDataType::new("UsesRootType", &mut module_prefixed_types, |_, ndt| {
+    NamedDataType::new("UsesRootType", &mut module_prefixed_types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             module_prefixed_root.reference(vec![]),

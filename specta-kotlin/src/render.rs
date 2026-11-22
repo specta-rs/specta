@@ -267,7 +267,7 @@ fn contains_named_reference_inner(
             let Some(ndt) = types.get(reference) else {
                 return Ok(false);
             };
-            if ndt == target {
+            if std::ptr::eq(ndt, target) {
                 return Ok(true);
             }
             let pointer = ndt as *const NamedDataType;

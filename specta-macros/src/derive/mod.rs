@@ -136,39 +136,16 @@ fn generic_type_and_const_args(
 /// `proc_macro`-typed because the declaration's source position, which gives a
 /// type its identity suffix, is only readable through [`proc_macro::Span`].
 pub(crate) fn expand(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let source_suffix = source_position_suffix(&input);
-    expand_tokens(input.into(), &source_suffix)
+    expand_tokens(input.into())
         .unwrap_or_else(|err| err.into_compile_error())
         .into()
-}
-
-/// Builds an identifier suffix unique to this declaration's source position.
-///
-/// `module_path!()` does not distinguish declarations in separate function or
-/// block scopes, so its result is not a unique type identity on its own. This
-/// hashes the declaration's file, line and column instead; the derive appends it
-/// to the sentinel and diagnostics strip it back off.
-fn source_position_suffix(input: &proc_macro::TokenStream) -> String {
-    use std::hash::{DefaultHasher, Hash, Hasher};
-
-    let span = input
-        .clone()
-        .into_iter()
-        .next()
-        .map_or_else(proc_macro::Span::call_site, |token| token.span());
-    let mut hasher = DefaultHasher::new();
-    span.file().hash(&mut hasher);
-    span.line().hash(&mut hasher);
-    span.column().hash(&mut hasher);
-
-    format!("{:x}", hasher.finish())
 }
 
 /// Lowers one `#[derive(Type)]` input to the tokens it expands to.
 ///
 /// Split from [`expand`] so the expansion works on `proc_macro2` tokens, which
 /// the `proc_macro` entry point only converts at its boundary.
-fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenStream> {
+fn expand_tokens(input: TokenStream) -> syn::Result<TokenStream> {
     let parsed = parse2::<DeriveInput>(input)?;
     let DeriveInput {
         ident: raw_ident,
@@ -846,35 +823,22 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
             (build_fn.clone(), build_fn.clone())
         };
 
-        // The sentinel is only ever read as an argument, and `init_with_sentinel`
-        // takes a `&'static str`, so the `concat!` is passed straight through
-        // instead of being materialised into a `static` item and then read back.
-        //
-        // `module_path!()` does not distinguish declarations in separate function
-        // or block scopes, so it is not a unique identity on its own: two local
-        // structs named `Local` in one module would share one sentinel and the
-        // second registration would quietly reuse the first definition. The
-        // suffix hashes the declaration's file, line and column, which Rust
-        // itself treats as distinct. It is stripped from diagnostics.
-        let sentinel = quote!(concat!(
-            module_path!(),
-            "::",
-            stringify!(#raw_ident),
-            "#",
-            #source_suffix
-        ));
+        // The path is only a label: `module_path!()` does not distinguish
+        // declarations in separate function or block scopes, so it cannot
+        // identify one. The marker below `definition` does, and is passed
+        // straight through as an argument rather than materialised into a
+        // `static`.
+        let label = quote!(concat!(module_path!(), "::", stringify!(#raw_ident),));
 
-        // The label stays human-readable for diagnostics; the marker at the top
-        // of `definition` supplies the identity.
-        let nominal_key = quote!(#dt::NamedKey::nominal(
-            #sentinel,
+        let nominal_key = quote!(#dt::NamedTypeId::nominal(
+            #label,
             ::std::any::TypeId::of::<__SpectaNominalType>(),
         ));
 
         // A container that resolved no generic parameter leaves the substitution
         // bookkeeping in `definition` dead: nothing is resolved into the enclosing
         // scope and the cursor cannot move. Without a const parameter and without
-        // inlining, that case also fixes every `init_with_sentinel` argument, so it
+        // inlining, that case also fixes every `init_with_id` argument, so it
         // collapses to one `define_named` call; the branches below cover the two
         // remaining shapes.
         let definition = {
@@ -918,7 +882,7 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
                     (!container_attrs.inline).then(|| quote!(ndt.ty = Some(#build_fn(types));));
 
                 quote! {
-                    #dt::NamedDataType::init_with_sentinel(
+                    #dt::NamedDataType::init_with_id(
                         #nominal_key,
                         &[],
                         &[],

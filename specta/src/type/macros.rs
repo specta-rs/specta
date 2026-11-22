@@ -328,15 +328,15 @@ macro_rules! _impl_ndt {
         }
     };
 
-    (@definition_body $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
-        impl_ndt!(@definition_body_inner false, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
+    (@definition_body $typed_generics:tt $label:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
+        impl_ndt!(@definition_body_inner false, $typed_generics $label, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
     }};
-    (@definition_body_const $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
-        impl_ndt!(@definition_body_inner true, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
+    (@definition_body_const $typed_generics:tt $label:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
+        impl_ndt!(@definition_body_inner true, $typed_generics $label, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
     }};
 
     // Helpers for determining NDT name
-    (@definition_body_inner $has_const_param:literal, $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
+    (@definition_body_inner $has_const_param:literal, $typed_generics:tt $label:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:tt, $container:tt, $as_ty:ty, $types:ident) => {{
         // Shared by every monomorphisation of this `definition`: a static inside
         // a generic function is one item, so a `&'static [GenericDefinition]`
         // costs the instantiation two loads instead of an array, a `Cow` and
@@ -361,7 +361,7 @@ macro_rules! _impl_ndt {
         // instead of a `(Generic, DataType)` array, a `Cow` and an
         // `Option<Deprecated>` and the drop glue of all three.
         $types.define_instantiation_params(
-            $crate::datatype::NamedKey::label($sentinel),
+            $crate::datatype::NamedTypeId::label($label),
             impl_ndt!(@type_name $($type_name)*),
             $module_path,
             __SPECTA_GENERICS,

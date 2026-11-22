@@ -1018,7 +1018,7 @@ struct HandBuiltSkippedNewtype;
 
 impl Type for HandBuiltSkippedNewtype {
     fn definition(types: &mut Types) -> DataType {
-        let ndt = NamedDataType::new("HandBuiltSkippedNewtype", types, |_, ndt| {
+        let ndt = NamedDataType::new("HandBuiltSkippedNewtype", types, |_, _, ndt| {
             ndt.ty = Some(Struct::unnamed().field(Field::default()).build());
         });
         DataType::Reference(ndt.reference(vec![]))

@@ -369,7 +369,7 @@ fn files_layout_requires_export_to() {
 #[test]
 fn reports_contextual_errors() {
     let mut invalid = Types::default();
-    NamedDataType::new("not-valid", &mut invalid, |_, ndt| {
+    NamedDataType::new("not-valid", &mut invalid, |_, _, ndt| {
         ndt.module_path = "api".into();
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::bool));
     });
@@ -379,7 +379,7 @@ fn reports_contextual_errors() {
     ));
 
     let mut underscore = Types::default();
-    NamedDataType::new("_", &mut underscore, |_, ndt| {
+    NamedDataType::new("_", &mut underscore, |_, _, ndt| {
         ndt.ty = Some(Struct::unit().into());
     });
     assert!(matches!(
@@ -388,7 +388,7 @@ fn reports_contextual_errors() {
     ));
 
     let mut opaque = Types::default();
-    NamedDataType::new("Opaque", &mut opaque, |_, ndt| {
+    NamedDataType::new("Opaque", &mut opaque, |_, _, ndt| {
         ndt.ty = Some(
             Struct::named()
                 .field("value", Field::new(Reference::opaque("custom").into()))
@@ -401,11 +401,11 @@ fn reports_contextual_errors() {
     ));
 
     let mut dependency_types = Types::default();
-    let dependency = NamedDataType::new("Dependency", &mut dependency_types, |_, ndt| {
+    let dependency = NamedDataType::new("Dependency", &mut dependency_types, |_, _, ndt| {
         ndt.ty = Some(Struct::unit().into());
     });
     let mut dangling = Types::default();
-    NamedDataType::new("Container", &mut dangling, |_, ndt| {
+    NamedDataType::new("Container", &mut dangling, |_, _, ndt| {
         ndt.ty = Some(
             Struct::named()
                 .field("value", Field::new(dependency.reference(Vec::new()).into()))
@@ -418,11 +418,11 @@ fn reports_contextual_errors() {
     ));
 
     let mut duplicate = Types::default();
-    NamedDataType::new("Same", &mut duplicate, |_, ndt| {
+    NamedDataType::new("Same", &mut duplicate, |_, _, ndt| {
         ndt.module_path = "one".into();
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::u8));
     });
-    NamedDataType::new("Same", &mut duplicate, |_, ndt| {
+    NamedDataType::new("Same", &mut duplicate, |_, _, ndt| {
         ndt.module_path = "two".into();
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::u16));
     });
@@ -436,11 +436,11 @@ fn reports_contextual_errors() {
         .unwrap();
 
     let mut collision = Types::default();
-    NamedDataType::new("api", &mut collision, |_, ndt| {
+    NamedDataType::new("api", &mut collision, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Struct::unit().into());
     });
-    NamedDataType::new("Thing", &mut collision, |_, ndt| {
+    NamedDataType::new("Thing", &mut collision, |_, _, ndt| {
         ndt.module_path = "api".into();
         ndt.ty = Some(Struct::unit().into());
     });
@@ -450,7 +450,7 @@ fn reports_contextual_errors() {
     ));
 
     let mut unstable = Types::default();
-    NamedDataType::new("Half", &mut unstable, |_, ndt| {
+    NamedDataType::new("Half", &mut unstable, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::f16));
     });
     assert!(matches!(
@@ -462,7 +462,7 @@ fn reports_contextual_errors() {
     ));
 
     let mut unused = Types::default();
-    NamedDataType::new("Unused", &mut unused, |_, ndt| {
+    NamedDataType::new("Unused", &mut unused, |_, _, ndt| {
         ndt.generics = vec![GenericDefinition::new("T".into(), None)].into();
         ndt.ty = Some(Struct::unit().into());
     });
@@ -472,7 +472,7 @@ fn reports_contextual_errors() {
     ));
 
     let mut skipped_generic = Types::default();
-    NamedDataType::new("Skipped", &mut skipped_generic, |_, ndt| {
+    NamedDataType::new("Skipped", &mut skipped_generic, |_, _, ndt| {
         ndt.generics = vec![GenericDefinition::new("T".into(), None)].into();
         let mut enm = Enum::default();
         enm.variants = vec![
@@ -564,7 +564,7 @@ fn formats_the_top_level_named_datatype() {
     }
 
     let mut types = Types::default();
-    NamedDataType::new("Alias", &mut types, |_, ndt| {
+    NamedDataType::new("Alias", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::i8));
     });
@@ -598,7 +598,7 @@ fn formats_generic_defaults_and_helper_type_graphs() {
     }
 
     let mut types = Types::default();
-    let alias = NamedDataType::new("Alias", &mut types, |_, ndt| {
+    let alias = NamedDataType::new("Alias", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.generics = vec![GenericDefinition::new(
             "T".into(),
@@ -621,7 +621,7 @@ fn formats_generic_defaults_and_helper_type_graphs() {
 fn opaque_renderer_and_inline_helpers() {
     let mut types = Types::default();
     let opaque = Reference::opaque("custom");
-    NamedDataType::new("Opaque", &mut types, |_, ndt| {
+    NamedDataType::new("Opaque", &mut types, |_, _, ndt| {
         ndt.ty = Some(
             Struct::named()
                 .field("value", Field::new(opaque.clone().into()))
@@ -703,7 +703,7 @@ fn custom_header_keeps_generated_marker() {
 #[test]
 fn exports_named_alias_with_generic_default() {
     let mut types = Types::default();
-    NamedDataType::new("Items", &mut types, |_, ndt| {
+    NamedDataType::new("Items", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.generics = vec![GenericDefinition::new(
             "T".into(),
@@ -723,7 +723,7 @@ fn exports_named_alias_with_generic_default() {
 #[test]
 fn generated_nonstandard_names_compile_with_denied_warnings() {
     let mut types = Types::default();
-    NamedDataType::new("TypeName", &mut types, |_, ndt| {
+    NamedDataType::new("TypeName", &mut types, |_, _, ndt| {
         ndt.module_path = "API".into();
         ndt.ty = Some(
             Struct::named()

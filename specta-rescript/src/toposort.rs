@@ -204,10 +204,10 @@ mod tests {
     #[test]
     fn duplicate_display_names_keep_distinct_identities() {
         let mut types = Types::default();
-        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
             ty.ty = Some(Primitive::str.into());
         });
-        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
             ty.ty = Some(Primitive::i32.into());
         });
 

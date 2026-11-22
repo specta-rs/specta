@@ -463,7 +463,7 @@ fn field_suffixes_skip_existing_normalized_names() {
 #[test]
 fn empty_generic_enums_return_an_export_error() {
     let mut types = Types::default();
-    specta::datatype::NamedDataType::new("EmptyGeneric", &mut types, |_, datatype| {
+    specta::datatype::NamedDataType::new("EmptyGeneric", &mut types, |_, _, datatype| {
         datatype.generics = vec![specta::datatype::GenericDefinition::new("T".into(), None)].into();
         datatype.ty = Some(specta::datatype::Enum::default().into());
     });
@@ -498,11 +498,11 @@ fn string_enum_backing_fields_do_not_collide_with_constants() {
 #[test]
 fn files_layout_rejects_default_package_references_from_named_packages() {
     let mut types = Types::default();
-    let root = specta::datatype::NamedDataType::new("Root", &mut types, |_, datatype| {
+    let root = specta::datatype::NamedDataType::new("Root", &mut types, |_, _, datatype| {
         datatype.module_path = "".into();
         datatype.ty = Some(specta::datatype::Struct::unit().into());
     });
-    specta::datatype::NamedDataType::new("Nested", &mut types, |_, datatype| {
+    specta::datatype::NamedDataType::new("Nested", &mut types, |_, _, datatype| {
         datatype.module_path = "nested".into();
         datatype.ty = Some(
             specta::datatype::Struct::named()
@@ -524,8 +524,8 @@ fn files_layout_rejects_default_package_references_from_named_packages() {
 #[test]
 fn definition_less_named_references_return_an_export_error() {
     let mut types = Types::default();
-    let missing = specta::datatype::NamedDataType::new("Missing", &mut types, |_, _datatype| {});
-    specta::datatype::NamedDataType::new("Container", &mut types, |_, datatype| {
+    let missing = specta::datatype::NamedDataType::new("Missing", &mut types, |_, _, _datatype| {});
+    specta::datatype::NamedDataType::new("Container", &mut types, |_, _, datatype| {
         datatype.ty = Some(
             specta::datatype::Struct::named()
                 .field(
@@ -911,7 +911,7 @@ fn java_11_flat_file_compiles_without_records_or_sealed_types() {
         .register::<ExplicitOptionalField>()
         .register::<ExplicitOptionalTupleVariant>()
         .register::<UnderscoreGeneric<String>>();
-    specta::datatype::NamedDataType::new("Labels", &mut types, |_, datatype| {
+    specta::datatype::NamedDataType::new("Labels", &mut types, |_, _, datatype| {
         datatype.ty =
             Some(specta::datatype::List::new(specta::datatype::Primitive::str.into()).into());
     });

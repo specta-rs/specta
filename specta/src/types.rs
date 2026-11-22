@@ -9,7 +9,7 @@ use std::{
 use crate::{
     Format, FormatError, Type,
     datatype::{
-        self, DataType, Deprecated, Fields, Generic, GenericDefinition, NamedDataType, NamedKey,
+        self, DataType, Deprecated, Fields, Generic, GenericDefinition, NamedDataType,
         NamedReference, NamedReferenceType, NamedTypeId, RecursiveInlineFrame, Reference,
     },
     hash::FastHashMap,
@@ -46,7 +46,7 @@ pub struct Types {
 
     /// Stack of inline named-type expansions currently being resolved.
     ///
-    /// Each entry is a hash of the named type sentinel and concrete generic
+    /// Each entry is a hash of the named type identity and concrete generic
     /// arguments for that inline use site. Seeing the same entry twice means an
     /// inline definition has recursively reached itself, so resolution can emit
     /// a recursive reference instead of expanding forever.
@@ -320,7 +320,7 @@ pub enum InstantiationParam {
 /// Everything one instantiation of a named datatype fixes, gathered so
 /// [`Types::instantiate`] can build it without being generic.
 struct Instantiation<'a> {
-    key: NamedKey,
+    id: NamedTypeId,
     name: &'static str,
     module_path: &'static str,
     generics: Cow<'static, [GenericDefinition]>,
@@ -458,32 +458,31 @@ impl Types {
         }
     }
 
-    /// Rejects two different types claiming the same registration sentinel.
+    /// Rejects two different types claiming the same identity.
     ///
-    /// The sentinel is a type's identity in [`Types`]. Two types sharing one
-    /// would silently export as a single named type — the second registration
-    /// sees the first and returns a reference to it — so this turns a
-    /// near-undebuggable export bug into a failing assertion. Only debug builds
-    /// pay for the lookup; a generated or hand-written implementation that
-    /// re-registers the same type (every generic instantiation does) passes,
-    /// because its name is unchanged.
+    /// Two types sharing one identity would silently export as a single named
+    /// type — the second registration sees the first and returns a reference to
+    /// it — so this turns a near-undebuggable export bug into a failing
+    /// assertion. Only debug builds pay for the lookup; a generated or
+    /// hand-written implementation that re-registers the same type (every
+    /// generic instantiation does) passes, because its name is unchanged.
     #[cfg(debug_assertions)]
-    fn assert_sentinel_owner(&self, key: &NamedKey, name: &str) {
-        let sentinel = key.label_str();
-        let Some(Some(existing)) = self.types.get(&key.id()) else {
+    fn assert_identity_owner(&self, id: &NamedTypeId, name: &str) {
+        let label = id.label_str();
+        let Some(Some(existing)) = self.types.get(id) else {
             return;
         };
         assert!(
             existing.name.as_ref() == name,
-            "specta: two types are registered under the same sentinel `{sentinel}` \
-             (`{}` and `{name}`); a sentinel must identify exactly one type",
+            "specta: two types are registered under the same identity `{label}` \
+             (`{}` and `{name}`); an identity must resolve to exactly one type",
             existing.name,
         );
     }
 
     /// Registers a named datatype that declares no generic parameters.
     ///
-    /// This is [`NamedDataType::init_with_sentinel`] with every argument that
+    /// This is [`NamedDataType::init_with_id`] with every argument that
     /// the `#[derive(Type)]` output would fix up front: no instantiation
     /// generics or identities, no const parameters and no passthrough, with the
     /// caller's cursor as the substitution base. The build function both fills
@@ -503,7 +502,7 @@ impl Types {
     #[track_caller]
     pub fn define_named(
         &mut self,
-        key: NamedKey,
+        id: NamedTypeId,
         name: &'static str,
         module_path: &'static str,
         docs: &'static str,
@@ -511,14 +510,14 @@ impl Types {
         build_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
         #[cfg(debug_assertions)]
-        self.assert_sentinel_owner(&key, name);
+        self.assert_identity_owner(&id, name);
 
         let generic_substitution_base = self.generic_substitution_cursor();
         let location = Location::caller().to_owned();
 
         self.with_generic_substitution(&[], |types| {
             NamedDataType::init(
-                key,
+                id,
                 Vec::new(),
                 &[],
                 false,
@@ -542,7 +541,7 @@ impl Types {
     /// Registers a named datatype with the arguments a generic `Type`
     /// implementation fixes per instantiation.
     ///
-    /// This is the non-generic half of [`NamedDataType::init_with_sentinel`]:
+    /// This is the non-generic half of [`NamedDataType::init_with_id`]:
     /// the derived code and the built-in container implementations in this
     /// crate pass everything that only depends on the concrete instantiation —
     /// the name, module path, generic declarations and the two datatype builders
@@ -572,7 +571,7 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     pub fn define_instantiation_params(
         &mut self,
-        key: NamedKey,
+        id: NamedTypeId,
         name: &'static str,
         module_path: &'static str,
         generics: &'static [GenericDefinition],
@@ -589,7 +588,7 @@ impl Types {
     ) -> DataType {
         let location = Location::caller().to_owned();
         self.instantiate_params(
-            key,
+            id,
             name,
             module_path,
             Cow::Borrowed(generics),
@@ -618,7 +617,7 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     pub fn define_instantiation_params_owned(
         &mut self,
-        key: NamedKey,
+        id: NamedTypeId,
         name: &'static str,
         module_path: &'static str,
         generics: Cow<'static, [GenericDefinition]>,
@@ -635,7 +634,7 @@ impl Types {
     ) -> DataType {
         let location = Location::caller().to_owned();
         self.instantiate_params(
-            key,
+            id,
             name,
             module_path,
             generics,
@@ -657,7 +656,7 @@ impl Types {
     #[allow(clippy::too_many_arguments)]
     fn instantiate_params(
         &mut self,
-        key: NamedKey,
+        id: NamedTypeId,
         name: &'static str,
         module_path: &'static str,
         generics: Cow<'static, [GenericDefinition]>,
@@ -674,7 +673,7 @@ impl Types {
         build_reference_ty: fn(&mut Types) -> DataType,
     ) -> DataType {
         #[cfg(debug_assertions)]
-        self.assert_sentinel_owner(&key, name);
+        self.assert_identity_owner(&id, name);
 
         let generic_substitution_base = self.generic_substitution_cursor();
         let mut instantiation_generics = Vec::with_capacity(params.len());
@@ -700,7 +699,7 @@ impl Types {
         }
 
         let instantiation = Instantiation {
-            key,
+            id,
             name,
             module_path,
             generics,
@@ -737,7 +736,7 @@ impl Types {
     /// [`Types::instantiate`] with the inline context already entered.
     fn init_instantiation(&mut self, instantiation: Instantiation<'_>) -> DataType {
         let Instantiation {
-            key,
+            id,
             name,
             module_path,
             generics,
@@ -771,7 +770,7 @@ impl Types {
         };
 
         let reference = NamedDataType::init(
-            key,
+            id,
             instantiation_generics,
             instantiation_generic_identities,
             has_const_param,
@@ -1177,8 +1176,9 @@ impl Types {
 
     /// Gets the named datatype targeted by a [`NamedReference`] mutably.
     ///
-    /// The entry's identity cannot change; mutating the returned value updates
-    /// the same graph node that the reference resolves to.
+    /// A declaration's identity is its key in the collection, not part of the
+    /// value, so any edit — including replacing the whole value — keeps
+    /// references to this declaration resolving here.
     ///
     /// Returns `None` when the reference is unknown or currently only has an
     /// internal placeholder entry.
@@ -1287,34 +1287,28 @@ impl Types {
 
     /// Mutably modifies each [`NamedDataType`] in the collection.
     ///
-    /// The named type's identity is preserved across the callback, including
-    /// when the callback replaces the whole value. References to the type
-    /// therefore keep resolving to this entry.
+    /// Identity is the entry's key, so replacing a whole value does not redirect
+    /// references to it.
     pub fn for_each_named_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
     {
-        for (id, slot) in &mut self.types {
-            if let Some(ndt) = slot {
-                f(ndt);
-                ndt.id = id.clone();
-            }
+        for ndt in self.types.values_mut().flatten() {
+            f(ndt);
         }
     }
 
     /// Transforms each [`NamedDataType`] in the collection.
     ///
-    /// The named type's identity is preserved across the callback, including
-    /// when the callback returns a clone of a different named type.
+    /// The entry's identity is its key in the collection and is therefore
+    /// unaffected by what the callback returns.
     pub fn map<F>(mut self, mut f: F) -> Self
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for (id, slot) in &mut self.types {
+        for slot in self.types.values_mut() {
             if let Some(ndt) = slot.take() {
-                let mut mapped = f(ndt);
-                mapped.id = id.clone();
-                *slot = Some(mapped);
+                *slot = Some(f(ndt));
             }
         }
         self
@@ -1462,7 +1456,6 @@ fn fields_contain_generic(fields: &Fields) -> bool {
     }
 }
 
-
 struct UnsortedIter<'a> {
     iter: hash_map::Iter<'a, NamedTypeId, Option<NamedDataType>>,
     count: usize,
@@ -1524,8 +1517,8 @@ mod tests {
     #[test]
     fn inline_frames_share_storage_and_release_lifo() {
         let mut types = Types::default();
-        let outer = NamedKey::label("test::Outer").id();
-        let inner = NamedKey::label("test::Inner").id();
+        let outer = NamedTypeId::label("test::Outer");
+        let inner = NamedTypeId::label("test::Inner");
         let arguments = [(
             Generic::new("T".into()),
             DataType::Primitive(Primitive::u32),
@@ -1564,15 +1557,15 @@ mod tests {
         DataType::Primitive(Primitive::i32)
     }
 
-    /// A sentinel identifies exactly one type; two types sharing one would
+    /// An identity resolves to exactly one type; two types sharing one would
     /// silently collapse into a single export.
     #[test]
     #[cfg(debug_assertions)]
-    #[should_panic(expected = "same sentinel")]
-    fn two_types_cannot_share_a_sentinel() {
+    #[should_panic(expected = "same identity")]
+    fn two_types_cannot_share_an_identity() {
         let mut types = Types::default();
         types.define_named(
-            NamedKey::label("crate::A"),
+            NamedTypeId::label("crate::A"),
             "A",
             "crate",
             "",
@@ -1580,7 +1573,7 @@ mod tests {
             primitive,
         );
         types.define_named(
-            NamedKey::label("crate::A"),
+            NamedTypeId::label("crate::A"),
             "B",
             "crate",
             "",
@@ -1590,12 +1583,12 @@ mod tests {
     }
 
     /// Every instantiation of a generic type re-registers under the same
-    /// sentinel and name, so that must stay accepted.
+    /// identity and name, so that must stay accepted.
     #[test]
     fn re_registering_the_same_type_is_allowed() {
         let mut types = Types::default();
         types.define_named(
-            NamedKey::label("crate::A"),
+            NamedTypeId::label("crate::A"),
             "A",
             "crate",
             "",
@@ -1603,7 +1596,7 @@ mod tests {
             primitive,
         );
         types.define_named(
-            NamedKey::label("crate::A"),
+            NamedTypeId::label("crate::A"),
             "A",
             "crate",
             "",

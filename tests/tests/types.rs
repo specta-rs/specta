@@ -40,7 +40,7 @@ macro_rules! types {
 
         // This allows us to end-to-end test primitives.
         // Many types won't be directly added to the `Types`, as they are not named.
-        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, ndt| {
+        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, _, ndt| {
             ndt.ty = Some(s.build());
         });
 
@@ -2823,26 +2823,34 @@ fn named_type_mutation_preserves_graph_identity() {
     use specta::datatype::{NamedDataType, Primitive};
 
     let mut types = Types::default();
-    let a = NamedDataType::new("A", &mut types, |_, ndt| {
+    let a = NamedDataType::new("A", &mut types, |_, _, ndt| {
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
+    let b = NamedDataType::new("B", &mut types, |_, _, ndt| {
+        ndt.ty = Some(Primitive::u32.into());
+    });
     assert_eq!(types.named_len(), 2);
 
-    let a_reference = a.reference(Vec::new());
-    let mut types = types.map(|_| a.clone());
+    let mut types = types.map(|mut ndt| {
+        ndt.docs = "mapped".into();
+        ndt
+    });
+    assert_eq!(types.get(&a).map(|ndt| ndt.docs.as_ref()), Some("mapped"));
+
+    // The callback may replace each value wholesale. Identity is the key,
+    // not part of the value, so each entry keeps its own and every
+    // reference still resolves.
+    let a_contents = types.get(&a).expect("A is registered").clone();
+    types.for_each_named_mut(|ndt| *ndt = a_contents.clone());
+    assert_eq!(types.named_len(), 2);
+
+    assert_eq!(types.get(&a).expect("A is registered").name, "A");
     assert_eq!(
-        types
-            .get(match &a_reference {
-                specta::datatype::Reference::Named(reference) => reference,
-                _ => unreachable!(),
-            })
-            .map(|ndt| ndt.name.as_ref()),
-        Some("A")
+        types.get(&b).expect("B is registered").name,
+        "A",
+        "the callback replaced the contents"
     );
-
-    types.for_each_named_mut(|ndt| *ndt = a.clone());
-    assert_eq!(types.named_len(), 2);
+    assert_ne!(a, b, "the entries did not merge");
 }
 
 #[derive(Type)]

@@ -354,8 +354,8 @@ fn kotlin_raw_enum_keeps_self_named_field() {
 #[test]
 fn kotlin_rejects_non_exportable_named_references() {
     let mut types = Types::default();
-    let hidden = specta::datatype::NamedDataType::new("Hidden", &mut types, |_, _| {});
-    specta::datatype::NamedDataType::new("UsesHidden", &mut types, |_, datatype| {
+    let hidden = specta::datatype::NamedDataType::new("Hidden", &mut types, |_, _, _| {});
+    specta::datatype::NamedDataType::new("UsesHidden", &mut types, |_, _, datatype| {
         datatype.ty = Some(
             specta::datatype::Struct::named()
                 .field(
@@ -379,20 +379,24 @@ fn kotlin_rejects_non_exportable_named_references() {
 #[test]
 fn kotlin_rejects_recursive_aliases_and_preserves_literal_payloads() {
     let mut recursive = Types::default();
-    specta::datatype::NamedDataType::new("RecursiveAlias", &mut recursive, |_, datatype| {
-        let reference = datatype.reference(vec![]);
-        datatype.ty = Some(DataType::Reference(reference));
-    });
+    specta::datatype::NamedDataType::new(
+        "RecursiveAlias",
+        &mut recursive,
+        |_, self_ref, datatype| {
+            datatype.ty = Some(DataType::Reference(self_ref.reference(vec![])));
+        },
+    );
     let error = Kotlin::default()
         .export(&recursive, IdentityFormat)
         .expect_err("recursive Kotlin aliases must be rejected");
     assert!(error.to_string().contains("recursive Kotlin typealiases"));
 
     let mut indirect = Types::default();
-    let alias_a = specta::datatype::NamedDataType::new("AliasA", &mut indirect, |_, _| {});
-    let alias_b = specta::datatype::NamedDataType::new("AliasB", &mut indirect, |_, datatype| {
-        datatype.ty = Some(DataType::Reference(alias_a.reference(vec![])));
-    });
+    let alias_a = specta::datatype::NamedDataType::new("AliasA", &mut indirect, |_, _, _| {});
+    let alias_b =
+        specta::datatype::NamedDataType::new("AliasB", &mut indirect, |_, _, datatype| {
+            datatype.ty = Some(DataType::Reference(alias_a.reference(vec![])));
+        });
     indirect.for_each_named_mut(|datatype| {
         if datatype.name == "AliasA" {
             datatype.ty = Some(DataType::Reference(alias_b.reference(vec![])));
@@ -450,7 +454,7 @@ fn kotlin_rejects_generics_that_shadow_their_declaration() {
     use specta::datatype::{GenericDefinition, NamedDataType, Struct};
 
     let mut types = Types::default();
-    NamedDataType::new("Node", &mut types, |_, datatype| {
+    NamedDataType::new("Node", &mut types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("Node"), None)]);
         datatype.ty = Some(DataType::Struct(Struct::unit()));
     });
@@ -466,7 +470,7 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
     use specta::datatype::{Enum, GenericDefinition, NamedDataType, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("Collision", &mut types, |_, datatype| {
+    NamedDataType::new("Collision", &mut types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
         let mut enm = Enum::default();
         for variant in ["Collision", "T", "TVariant"] {
@@ -484,7 +488,7 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
     assert!(output.contains("class TVariantVariant<T>"));
 
     let mut root_types = Types::default();
-    NamedDataType::new("RootVariants", &mut root_types, |_, datatype| {
+    NamedDataType::new("RootVariants", &mut root_types, |_, _, datatype| {
         let mut enm = Enum::default();
         enm.variants.push((
             Cow::Borrowed("Kotlin"),
@@ -503,7 +507,7 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
     assert!(output.contains("class kotlinVariant"));
 
     let mut keyword_types = Types::default();
-    NamedDataType::new("KeywordVariants", &mut keyword_types, |_, datatype| {
+    NamedDataType::new("KeywordVariants", &mut keyword_types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("when"), None)]);
         let mut enm = Enum::default();
         enm.variants.push((Cow::Borrowed("When"), Variant::unit()));
@@ -516,7 +520,7 @@ fn kotlin_renames_enum_variants_that_shadow_parent_scope() {
     assert!(output.contains("class whenVariant<`when`>"));
 
     let mut modifier_types = Types::default();
-    NamedDataType::new("ModifierVariants", &mut modifier_types, |_, datatype| {
+    NamedDataType::new("ModifierVariants", &mut modifier_types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("out"), None)]);
         let mut enm = Enum::default();
         enm.variants.push((Cow::Borrowed("Out"), Variant::unit()));
@@ -536,7 +540,7 @@ fn kotlin_rejects_declarations_that_shadow_generic_modifiers() {
     for modifier in ["out", "reified"] {
         let mut types = Types::default();
         let declaration = if modifier == "out" { "Out" } else { modifier };
-        NamedDataType::new(declaration, &mut types, |_, datatype| {
+        NamedDataType::new(declaration, &mut types, |_, _, datatype| {
             datatype.generics = Cow::Owned(vec![GenericDefinition::new(
                 Cow::Owned(modifier.to_owned()),
                 None,
@@ -562,7 +566,7 @@ fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
 
     let mut types = Types::default();
     let generic = Generic::new(Cow::Borrowed("T"));
-    let identity = NamedDataType::new("Identity", &mut types, |_, datatype| {
+    let identity = NamedDataType::new("Identity", &mut types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
         datatype.ty = Some(DataType::Generic(generic.clone()));
     });
@@ -585,7 +589,7 @@ fn kotlin_wraps_bare_generic_aliases_in_value_classes() {
         .expect_err("mutable generic wrappers cannot preserve scalar Kotlinx encoding");
     assert!(error.to_string().contains("generic wrappers"));
 
-    NamedDataType::new("UsesIdentity", &mut types, |_, datatype| {
+    NamedDataType::new("UsesIdentity", &mut types, |_, _, datatype| {
         datatype.ty = Some(
             Struct::named()
                 .field(
@@ -614,7 +618,7 @@ fn optional_nullable_fallbacks_do_not_get_duplicate_markers() {
     struct UnsupportedOpaque;
 
     let mut types = Types::default();
-    NamedDataType::new("OpaqueContainer", &mut types, |_, datatype| {
+    NamedDataType::new("OpaqueContainer", &mut types, |_, _, datatype| {
         let mut field = Field::new(Reference::opaque(UnsupportedOpaque).into());
         field.optional = true;
         datatype.ty = Some(Struct::named().field("value", field).build());
@@ -633,7 +637,7 @@ fn kotlin_rejects_generics_that_shadow_root_namespaces() {
     use specta::datatype::{GenericDefinition, NamedDataType, Struct};
 
     let mut types = Types::default();
-    NamedDataType::new("GenericRoot", &mut types, |_, datatype| {
+    NamedDataType::new("GenericRoot", &mut types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("kotlin"), None)]);
         datatype.ty = Some(DataType::Struct(Struct::unit()));
     });
@@ -668,7 +672,7 @@ fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
 
     for (arguments, expected) in cases {
         let mut types = Types::default();
-        let target = NamedDataType::new("GenericTarget", &mut types, |_, datatype| {
+        let target = NamedDataType::new("GenericTarget", &mut types, |_, _, datatype| {
             datatype.generics = Cow::Owned(vec![GenericDefinition::new(Cow::Borrowed("T"), None)]);
             datatype.ty = Some(
                 Struct::named()
@@ -676,7 +680,7 @@ fn kotlin_rejects_unknown_and_duplicate_generic_arguments() {
                     .build(),
             );
         });
-        NamedDataType::new("GenericUser", &mut types, |_, datatype| {
+        NamedDataType::new("GenericUser", &mut types, |_, _, datatype| {
             datatype.ty = Some(
                 Struct::named()
                     .field(
@@ -701,7 +705,7 @@ fn kotlin_escapes_generic_modifier_keywords() {
     let out = Generic::new(Cow::Borrowed("out"));
     let reified = Generic::new(Cow::Borrowed("reified"));
     let mut types = Types::default();
-    NamedDataType::new("ContextualGenerics", &mut types, |_, datatype| {
+    NamedDataType::new("ContextualGenerics", &mut types, |_, _, datatype| {
         datatype.generics = Cow::Owned(vec![
             GenericDefinition::new(Cow::Borrowed("out"), None),
             GenericDefinition::new(Cow::Borrowed("reified"), None),
@@ -1145,7 +1149,7 @@ fn kotlinx_is_opt_in_and_rejects_incompatible_wire_shapes() {
 #[test]
 fn kotlin_qualifies_builtins_that_generated_types_can_shadow() {
     let mut types = Types::default();
-    specta::datatype::NamedDataType::new("String", &mut types, |_, datatype| {
+    specta::datatype::NamedDataType::new("String", &mut types, |_, _, datatype| {
         datatype.ty = Some(
             specta::datatype::Struct::named()
                 .field(
@@ -1169,7 +1173,7 @@ fn kotlin_qualifies_builtins_that_generated_types_can_shadow() {
 fn kotlin_rejects_names_that_shadow_root_namespaces() {
     for name in ["kotlin", "kotlinx", "java"] {
         let mut types = Types::default();
-        specta::datatype::NamedDataType::new(name, &mut types, |_, datatype| {
+        specta::datatype::NamedDataType::new(name, &mut types, |_, _, datatype| {
             datatype.ty = Some(DataType::Struct(specta::datatype::Struct::unit()));
         });
         assert!(matches!(
@@ -1256,7 +1260,7 @@ fn kotlin_export_to_creates_parent_directories() {
 #[test]
 fn kotlin_rejects_unsafe_filenames_and_member_collisions() {
     let mut unsafe_types = Types::default();
-    specta::datatype::NamedDataType::new("../../escape", &mut unsafe_types, |_, datatype| {
+    specta::datatype::NamedDataType::new("../../escape", &mut unsafe_types, |_, _, datatype| {
         datatype.ty = Some(DataType::Struct(specta::datatype::Struct::unit()));
     });
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
@@ -1272,7 +1276,7 @@ fn kotlin_rejects_unsafe_filenames_and_member_collisions() {
     ));
 
     let mut collision_types = Types::default();
-    specta::datatype::NamedDataType::new("Collision", &mut collision_types, |_, datatype| {
+    specta::datatype::NamedDataType::new("Collision", &mut collision_types, |_, _, datatype| {
         datatype.ty = Some(
             specta::datatype::Struct::named()
                 .field(

@@ -1061,7 +1061,7 @@ fn non_trailing_hand_built_tuple_default_does_not_split() {
     use specta::datatype::{Field, NamedDataType, Primitive, Struct};
 
     let mut types = Types::default();
-    NamedDataType::new("HandBuilt", &mut types, |_, ndt| {
+    NamedDataType::new("HandBuilt", &mut types, |_, _, ndt| {
         let mut s = Struct::unnamed();
         let mut first = Field::new(DataType::Primitive(Primitive::u8));
         first.attributes.insert("serde:field:default", true);
@@ -1186,7 +1186,7 @@ fn hand_built_skip_variant_with_default_payload_does_not_split() {
     use specta::datatype::{Enum, Field, NamedDataType, Primitive, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("HandBuiltEnum", &mut types, |_, ndt| {
+    NamedDataType::new("HandBuiltEnum", &mut types, |_, _, ndt| {
         let mut hidden_payload = Field::new(DataType::Primitive(Primitive::u8));
         hidden_payload
             .attributes

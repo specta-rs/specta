@@ -36,37 +36,70 @@ fn macro_expanded_declarations_have_distinct_identity() {
     );
 }
 
-/// A declaration's identity is stable across copies of the graph and usable as
-/// a map key.
+/// A declaration's identity is stable across copies of the graph: the same
+/// reference still names the same declaration in a clone.
 #[test]
-fn named_type_ids_survive_graph_copies() {
-    let types = Types::default().register::<IdentityItem>();
-    let clone = types.clone();
+fn named_type_identity_survives_graph_copies() {
+    use specta::datatype::{DataType, Reference};
 
-    let id = types
-        .iter_sorted()
-        .next()
-        .expect("IdentityItem is registered")
-        .id()
-        .clone();
-    let clone_id = clone
-        .iter_sorted()
-        .next()
-        .expect("IdentityItem is registered")
-        .id()
-        .clone();
+    let mut types = Types::default();
+    let DataType::Reference(Reference::Named(original)) =
+        <IdentityItem as Type>::definition(&mut types)
+    else {
+        unreachable!("IdentityItem is a named type");
+    };
+    let DataType::Reference(Reference::Named(copied)) =
+        <IdentityItem as Type>::definition(&mut types.clone())
+    else {
+        unreachable!("IdentityItem is a named type");
+    };
 
-    assert_eq!(id, clone_id);
-    assert_ne!(
-        id,
-        specta::datatype::NamedDataType::new("Other", &mut types.clone(), |_, ndt| {
-            ndt.ty = Some(bool::definition(&mut Types::default()));
-        })
-        .id()
-        .clone()
-    );
+    assert_eq!(original, copied);
+
+    // A different declaration is a different identity.
+    let other = specta::datatype::NamedDataType::new("Other", &mut types.clone(), |_, _, ndt| {
+        ndt.ty = Some(bool::definition(&mut Types::default()));
+    });
+    assert_ne!(original, other);
 }
 
+/// Editing a node only changes the value stored under its key. The identity
+/// is the key and is not part of the value, so even replacing the whole
+/// value cannot redirect a reference to another declaration.
+#[test]
+fn editing_a_named_type_keeps_its_identity() {
+    use specta::datatype::{NamedDataType, Primitive};
+
+    let mut types = Types::default();
+    let a = NamedDataType::new("A", &mut types, |_, _, ndt| {
+        ndt.ty = Some(Primitive::bool.into());
+    });
+    let b = NamedDataType::new("B", &mut types, |_, _, ndt| {
+        ndt.ty = Some(Primitive::u32.into());
+    });
+
+    assert_ne!(a, b, "different declarations have different identities");
+
+    // In-place edits touch only the targeted entry.
+    types.get_mut(&a).expect("A is registered").docs = "edited".into();
+    assert_eq!(types.get(&a).expect("A is registered").docs, "edited");
+    assert_eq!(types.get(&b).expect("B is registered").docs, "");
+
+    // Replacing the whole value replaces the contents only: there is no
+    // identity in the value to disagree with the key, so nothing needs
+    // repairing and both entries keep resolving.
+    *types.get_mut(&a).expect("A is registered") = types.get(&b).unwrap().clone();
+
+    let edited = types.get(&a).expect("A is still registered");
+    assert_eq!(edited.name, "B", "the assignment replaced the contents");
+    assert_eq!(
+        types.get(&b).map(|ndt| ndt.name.as_ref()),
+        Some("B"),
+        "B is unchanged"
+    );
+    assert_eq!(types.named_len(), 2, "the entries did not merge");
+    assert_ne!(a, b, "the declarations stay distinct");
+}
 
 #[derive(Type)]
 #[specta(collect = false)]
