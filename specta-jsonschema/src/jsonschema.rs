@@ -106,24 +106,16 @@ impl JsonSchema {
 
     /// Export the schema document as a [`serde_json::Value`].
     pub fn export_value(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
-        let roots = types.roots().cloned().collect::<Vec<_>>();
-        let types = format
-            .map_types(types)
+        // Formatting happens once, in the shared traversal, so the roots and
+        // the named declarations come from the same graph.
+        let types = types
+            .format(&format)
             .map_err(|err| Error::format("type graph formatter failed", err))?;
-        let types = types.as_ref();
-        let roots = roots
-            .iter()
-            .map(|root| {
-                format
-                    .map_type(types, root)
-                    .map(Cow::into_owned)
-                    .map_err(|err| Error::format("root type formatter failed", err))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let roots = types.roots().cloned().collect::<Vec<_>>();
 
         let renderer = Renderer::new(
             self.schema_version,
-            types,
+            &types,
             self.allow_additional_properties,
             self.number_formats,
             self.string_formats,
@@ -165,23 +157,13 @@ impl JsonSchema {
     /// still placing named dependencies in the definitions object.
     pub fn export_type_value<T: Type>(&self, format: impl Format) -> Result<Value, Error> {
         let types = Types::default().register::<T>();
-        let roots = types.roots().cloned().collect::<Vec<_>>();
-        let mapped = format
-            .map_types(&types)
+        let types = types
+            .format(&format)
             .map_err(|err| Error::format("type graph formatter failed", err))?;
-        let mapped = mapped.as_ref();
-        let roots = roots
-            .iter()
-            .map(|root| {
-                format
-                    .map_type(mapped, root)
-                    .map(Cow::into_owned)
-                    .map_err(|err| Error::format("root type formatter failed", err))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let roots = types.roots().cloned().collect::<Vec<_>>();
         let renderer = Renderer::new(
             self.schema_version,
-            mapped,
+            &types,
             self.allow_additional_properties,
             self.number_formats,
             self.string_formats,
@@ -255,14 +237,24 @@ impl JsonSchema {
                     definition: definition.to_string(),
                 });
             }
-            root.insert(
-                "$ref".to_string(),
-                Value::String(format!(
-                    "#/{}/{}",
-                    self.schema_version.definitions_key(),
-                    crate::render::encode_ref_token(definition)
-                )),
-            );
+            let reference = Value::String(format!(
+                "#/{}/{}",
+                self.schema_version.definitions_key(),
+                crate::render::encode_ref_token(definition)
+            ));
+            if matches!(self.schema_version, SchemaVersion::Draft7) {
+                // Draft 7 ignores every sibling keyword of a top-level $ref,
+                // including the definitions the reference points at.
+                root.insert(
+                    "allOf".to_string(),
+                    Value::Array(vec![Value::Object(Map::from_iter([(
+                        "$ref".to_string(),
+                        reference,
+                    )]))]),
+                );
+            } else {
+                root.insert("$ref".to_string(), reference);
+            }
         }
 
         Ok(schema)

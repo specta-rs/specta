@@ -993,31 +993,44 @@ fn typescript_errors_use_specific_invalid_shape_messages() {
     ));
 
     let mut types = Types::default();
-    let ndt =
-        specta::datatype::NamedDataType::new("AnonymousVariantContainer", &mut types, |_, ndt| {
+    let ndt = specta::datatype::NamedDataType::new(
+        "AnonymousVariantContainer",
+        &mut types,
+        |_, _, ndt| {
             ndt.ty = Some(DataType::Enum(anonymous_enum));
-        });
+        },
+    );
 
-    let err =
-        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    let err = primitives::export(
+        &Typescript::default(),
+        &types,
+        [types.get(&ndt).expect("registered")].into_iter(),
+        "",
+    )
+    .unwrap_err();
     assert_eq!(
         err.to_string(),
         format!(
             "Attempted to export \"tests::tests::typescript::AnonymousVariantContainer.\" but anonymous named-field enum variants cannot be exported to Typescript. Try giving the variant a name or changing the enum representation.\nRust type: tests::tests::typescript::AnonymousVariantContainer at {}:{}:{}",
             file!(),
-            anonymous_enum_line + 13,
-            9
+            anonymous_enum_line + 12,
+            15
         )
     );
 
     let empty_name_line = line!() + 1;
     let mut types = Types::default();
-    let ndt = specta::datatype::NamedDataType::new("", &mut types, |_, ndt| {
+    let ndt = specta::datatype::NamedDataType::new("", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(specta::datatype::Primitive::str));
     });
 
-    let err =
-        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    let err = primitives::export(
+        &Typescript::default(),
+        &types,
+        [types.get(&ndt).expect("registered")].into_iter(),
+        "",
+    )
+    .unwrap_err();
     assert_eq!(
         err.to_string(),
         format!(
@@ -1036,7 +1049,7 @@ fn typescript_errors_include_unsupported_opaque_path() {
 
     let opaque_line = line!() + 1;
     let mut types = Types::default();
-    let ndt = specta::datatype::NamedDataType::new("OpaqueContainer", &mut types, |_, ndt| {
+    let ndt = specta::datatype::NamedDataType::new("OpaqueContainer", &mut types, |_, _, ndt| {
         ndt.ty = Some(
             specta::datatype::Struct::named()
                 .field(
@@ -1047,8 +1060,13 @@ fn typescript_errors_include_unsupported_opaque_path() {
         );
     });
 
-    let err =
-        primitives::export(&Typescript::default(), &types, [&ndt].into_iter(), "").unwrap_err();
+    let err = primitives::export(
+        &Typescript::default(),
+        &types,
+        [types.get(&ndt).expect("registered")].into_iter(),
+        "",
+    )
+    .unwrap_err();
     assert_eq!(
         err.to_string(),
         format!(
@@ -1141,7 +1159,7 @@ fn typescript_export_to() {
 #[test]
 fn typescript_module_prefixed_root_has_no_empty_prefix() {
     let mut types = Types::default();
-    NamedDataType::new("RootType", &mut types, |_, ndt| {
+    NamedDataType::new("RootType", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -1859,9 +1877,11 @@ fn map_type_is_not_reapplied_inside_its_own_result() {
         !output.contains("value: boolean"),
         "the already-mapped subtree was formatted a second time:\n{output}"
     );
+    // The root reference and the named definition body. Roots are formatted
+    // too, so an anonymous root is never rendered unformatted.
     assert_eq!(
         calls.load(Ordering::Relaxed),
-        1,
-        "each named definition should be formatted exactly once:\n{output}"
+        2,
+        "the root and each named definition should be formatted exactly once:\n{output}"
     );
 }

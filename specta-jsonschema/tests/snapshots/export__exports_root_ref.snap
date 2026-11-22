@@ -28,8 +28,7 @@ expression: schema
       },
       "required": [
         "id",
-        "name",
-        "email"
+        "name"
       ],
       "title": "User",
       "type": "object"

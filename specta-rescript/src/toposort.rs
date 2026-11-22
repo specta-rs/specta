@@ -148,7 +148,7 @@ pub(crate) fn topological_sort(types: &Types) -> Vec<Vec<&NamedDataType>> {
         groups: Vec::new(),
     };
 
-    for ty in types.into_sorted_iter() {
+    for ty in types.iter_sorted() {
         if !tarjan.indices.contains_key(&type_id(ty)) {
             tarjan.visit(ty);
         }
@@ -204,10 +204,10 @@ mod tests {
     #[test]
     fn duplicate_display_names_keep_distinct_identities() {
         let mut types = Types::default();
-        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
             ty.ty = Some(Primitive::str.into());
         });
-        NamedDataType::new("Duplicate", &mut types, |_, ty| {
+        NamedDataType::new("Duplicate", &mut types, |_, _, ty| {
             ty.ty = Some(Primitive::i32.into());
         });
 

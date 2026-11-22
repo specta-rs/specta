@@ -1,9 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, fmt, path::Path};
 
-use specta::{
-    Format, Types,
-    datatype::{DataType, Fields, NamedReferenceType, Reference},
-};
+use specta::{Format, Types};
 
 use crate::{Error, primitives};
 
@@ -94,7 +91,7 @@ impl Go {
 
         validate_package_name(&self.package_name)?;
         let types = format_types(types, &format)?;
-        let body = primitives::export(self, types.as_ref(), types.as_ref().into_sorted_iter())?;
+        let body = primitives::export(self, types.as_ref(), types.as_ref().iter_sorted())?;
         Ok(self.render_file(&body, true))
     }
 
@@ -116,10 +113,7 @@ impl Go {
         match self.layout {
             Layout::FlatFile => write_file(
                 path,
-                &self.render_file(
-                    &primitives::export(self, types, types.into_sorted_iter())?,
-                    true,
-                ),
+                &self.render_file(&primitives::export(self, types, types.iter_sorted())?, true),
             ),
             Layout::Files => {
                 if path.exists() && !path.is_dir() {
@@ -137,10 +131,10 @@ impl Go {
                 })?;
 
                 // Validate package-wide symbol uniqueness before splitting the declarations.
-                let _ = primitives::export(self, types, types.into_sorted_iter())?;
+                let _ = primitives::export(self, types, types.iter_sorted())?;
 
                 let mut files = BTreeMap::new();
-                for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+                for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
                     let file_name = primitives::file_name(ndt)?;
                     let body = primitives::export(self, types, std::iter::once(ndt))?;
                     if files.insert(file_name.clone(), body).is_some() {
@@ -202,196 +196,10 @@ impl AsMut<Go> for Go {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
-        .map_types(types)
-        .map_err(|source| Error::format("type graph", source))?
-    {
-        Cow::Borrowed(_) => Cow::Borrowed(types),
-        Cow::Owned(types) => Cow::Owned(types),
-    };
-    let graph = mapped.as_ref();
-    let mut output = graph.clone();
-    let mut error = None;
-    output.iter_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-        let Some(ty) = ndt.ty.as_ref() else {
-            return;
-        };
-        match map_datatype_format(format, graph, ty, &rust_type_path(ndt)) {
-            Ok(ty) => ndt.ty = Some(ty),
-            Err(err) => error = Some(err),
-        }
-    });
-    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
-}
-
-fn map_datatype_format(
-    format: &dyn Format,
-    types: &Types,
-    dt: &DataType,
-    path: &str,
-) -> Result<DataType, Error> {
-    if matches!(dt, DataType::Generic(_)) {
-        return Ok(dt.clone());
-    }
-
-    let mapped = match format.map_type(types, dt) {
-        Ok(Cow::Borrowed(dt)) => dt.clone(),
-        Ok(Cow::Owned(dt)) => dt,
-        Err(source)
-            if contains_generic_reference(dt)
-                && source.to_string().contains("Unresolved generic reference") =>
-        {
-            dt.clone()
-        }
-        Err(source) => return Err(Error::format(path, source)),
-    };
-    map_datatype_children(format, types, mapped, path)
-}
-
-fn map_datatype_children(
-    format: &dyn Format,
-    types: &Types,
-    mut dt: DataType,
-    path: &str,
-) -> Result<DataType, Error> {
-    match &mut dt {
-        DataType::Primitive(_)
-        | DataType::Generic(_)
-        | DataType::Reference(Reference::Opaque(_)) => {}
-        DataType::List(list) => {
-            *list.ty =
-                map_datatype_format(format, types, &list.ty, &format!("{path}.<list_item>"))?;
-        }
-        DataType::Map(map) => {
-            let key =
-                map_datatype_format(format, types, map.key_ty(), &format!("{path}.<map_key>"))?;
-            let value = map_datatype_format(
-                format,
-                types,
-                map.value_ty(),
-                &format!("{path}.<map_value>"),
-            )?;
-            map.set_key_ty(key);
-            map.set_value_ty(value);
-        }
-        DataType::Nullable(inner) => {
-            **inner = map_datatype_format(format, types, inner, path)?;
-        }
-        DataType::Struct(strct) => {
-            map_fields_format(format, types, &mut strct.fields, path)?;
-        }
-        DataType::Enum(enm) => {
-            for (variant, metadata) in &mut enm.variants {
-                map_fields_format(
-                    format,
-                    types,
-                    &mut metadata.fields,
-                    &format!("{path}.{variant}"),
-                )?;
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for (index, element) in tuple.elements.iter_mut().enumerate() {
-                *element = map_datatype_format(format, types, element, &format!("{path}.{index}"))?;
-            }
-        }
-        DataType::Intersection(elements) => {
-            for element in elements {
-                *element = map_datatype_format(format, types, element, path)?;
-            }
-        }
-        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
-            NamedReferenceType::Inline { dt, .. } => {
-                **dt = map_datatype_format(format, types, dt, path)?;
-            }
-            NamedReferenceType::Reference { generics, .. } => {
-                for (_, generic) in generics {
-                    *generic = map_datatype_format(format, types, generic, path)?;
-                }
-            }
-            NamedReferenceType::Recursive(_) => {}
-        },
-    }
-    Ok(dt)
-}
-
-fn map_fields_format(
-    format: &dyn Format,
-    types: &Types,
-    fields: &mut Fields,
-    path: &str,
-) -> Result<(), Error> {
-    match fields {
-        Fields::Unit => {}
-        Fields::Unnamed(fields) => {
-            for (index, field) in fields.fields.iter_mut().enumerate() {
-                if let Some(ty) = field.ty.as_mut() {
-                    *ty = map_datatype_format(format, types, ty, &format!("{path}.{index}"))?;
-                }
-            }
-        }
-        Fields::Named(fields) => {
-            for (name, field) in &mut fields.fields {
-                if let Some(ty) = field.ty.as_mut() {
-                    *ty = map_datatype_format(format, types, ty, &format!("{path}.{name}"))?;
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn contains_generic_reference(dt: &DataType) -> bool {
-    match dt {
-        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => false,
-        DataType::Generic(_) => true,
-        DataType::List(list) => contains_generic_reference(&list.ty),
-        DataType::Map(map) => {
-            contains_generic_reference(map.key_ty()) || contains_generic_reference(map.value_ty())
-        }
-        DataType::Nullable(inner) => contains_generic_reference(inner),
-        DataType::Struct(strct) => fields_contain_generic(&strct.fields),
-        DataType::Enum(enm) => enm
-            .variants
-            .iter()
-            .any(|(_, variant)| fields_contain_generic(&variant.fields)),
-        DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
-        DataType::Intersection(elements) => elements.iter().any(contains_generic_reference),
-        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-            NamedReferenceType::Inline { dt, .. } => contains_generic_reference(dt),
-            NamedReferenceType::Reference { generics, .. } => generics
-                .iter()
-                .any(|(_, generic)| contains_generic_reference(generic)),
-            NamedReferenceType::Recursive(_) => false,
-        },
-    }
-}
-
-fn fields_contain_generic(fields: &Fields) -> bool {
-    match fields {
-        Fields::Unit => false,
-        Fields::Unnamed(fields) => fields
-            .fields
-            .iter()
-            .filter_map(|field| field.ty.as_ref())
-            .any(contains_generic_reference),
-        Fields::Named(fields) => fields
-            .fields
-            .iter()
-            .filter_map(|(_, field)| field.ty.as_ref())
-            .any(contains_generic_reference),
-    }
-}
-
-fn rust_type_path(ndt: &specta::datatype::NamedDataType) -> String {
-    if ndt.module_path.is_empty() {
-        ndt.name.to_string()
-    } else {
-        format!("{}::{}", ndt.module_path, ndt.name)
-    }
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph", err))
 }
 
 fn validate_package_name(name: &str) -> Result<(), Error> {

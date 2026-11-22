@@ -8,8 +8,8 @@ use std::{
 use crate::{
     Types,
     datatype::{
-        DataType, Generic, NamedReference, NamedReferenceType, RecursiveInlineFrame,
-        RecursiveInlineType, Reference, generic::GenericDefinition, reference::NamedId,
+        Attributes, DataType, Generic, NamedReference, NamedReferenceType, NamedTypeId,
+        RecursiveInlineFrame, RecursiveInlineType, Reference, generic::GenericDefinition,
     },
 };
 
@@ -33,13 +33,13 @@ pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
 ///
 /// # Invariants
 ///
-/// The `id` is the stable identity used by [`Types`] and [`NamedReference`]. The
-/// human-readable `name` alone is not guaranteed to be globally unique.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A declaration's identity is the [`NamedReference`] returned when it is
+/// registered and the key it is stored under in [`Types`]; it is not part of
+/// this value. The human-readable `name` alone is not guaranteed to be
+/// globally unique.
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NamedDataType {
-    /// Stable identity for resolving references to this datatype.
-    pub(crate) id: NamedId,
     /// Exported type name.
     pub name: Cow<'static, str>,
     /// Documentation comments attached to the source type.
@@ -52,6 +52,12 @@ pub struct NamedDataType {
     pub location: Location<'static>,
     /// Generic parameters declared by this named datatype.
     pub generics: Cow<'static, [GenericDefinition]>,
+    /// Metadata attached to the declaration itself rather than to its shape.
+    ///
+    /// Container attributes normally live on the [`Struct`](crate::datatype::Struct)
+    /// or [`Enum`](crate::datatype::Enum) node. They are recorded here only when an
+    /// override such as `#[specta(type = ...)]` replaced that node.
+    pub attributes: Attributes,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
     ///
@@ -60,17 +66,29 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    /// Constructs a new named datatype and register it into the [`Types`] collection.
+    /// Constructs a new named datatype, registers it into the [`Types`]
+    /// collection, and returns its identity.
+    ///
+    /// The returned [`NamedReference`] is how other datatypes refer to this
+    /// one. `build` also receives it so the datatype can point at itself, for
+    /// example to declare a recursive type.
     #[track_caller]
+    // Registration returns the declaration's identity, not the value: the
+    // value is read back through [`Types::get`].
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         types: &mut Types,
-        build: impl FnOnce(&mut Types, &mut NamedDataType),
-    ) -> Self {
+        build: impl FnOnce(&mut Types, &NamedReference, &mut NamedDataType),
+    ) -> NamedReference {
         let location = Location::caller();
-        let id = NamedId::Dynamic(Arc::new(()));
+        let reference = NamedReference {
+            id: NamedTypeId::Dynamic(Arc::new(())),
+            inner: NamedReferenceType::Reference {
+                generics: Vec::new(),
+            },
+        };
         let mut ndt = Self {
-            id: id.clone(),
             name: name.into(),
             docs: Cow::Borrowed(""),
             deprecated: None,
@@ -79,19 +97,16 @@ impl NamedDataType {
                 .unwrap_or(Cow::Borrowed("virtual")),
             location: location.to_owned(),
             generics: Cow::Borrowed(&[]),
+            attributes: Attributes::default(),
             ty: None,
         };
-        build(types, &mut ndt);
-        // The closure receives the whole value, so it can replace it with a
-        // clone of another named type. Restore the identity the closure may
-        // have used for self-references before inserting.
-        ndt.id = id.clone();
-        types.types.insert(id, Some(ndt.clone()));
+        build(types, &reference, &mut ndt);
+        types.types.insert(reference.id.clone(), Some(ndt));
         types.len += 1;
-        ndt
+        reference
     }
 
-    /// Initializes a named type using a static sentinel as its identity.
+    /// Initializes a named type using a stable key as its identity.
     ///
     /// This is used by `#[derive(Type)]` and the built-in `Type` implementation macros and must be used carefully.
     ///
@@ -101,7 +116,7 @@ impl NamedDataType {
     ///
     /// </div>
     ///
-    /// This registers the canonical [`NamedDataType`] for `sentinel` at most once, then returns a
+    /// This registers the canonical [`NamedDataType`] for `id` at most once, then returns a
     /// use-site [`Reference`]. During first registration, `None` is inserted into [`Types`] before
     /// `build_ndt` runs so recursive named lookups can observe that the type is already being
     /// resolved instead of re-entering `build_ndt` (which would stack overflow).
@@ -112,7 +127,7 @@ impl NamedDataType {
     ///   `instantiation_generics` as the concrete generic arguments for this use site.
     /// - When inlining, this calls `build_ty` and returns [`NamedReferenceType::Inline`] containing
     ///   the resulting datatype.
-    /// - If inline expansion recursively reaches the same sentinel, generic arguments, and
+    /// - If inline expansion recursively reaches the same identity, generic arguments, and
     ///   supplemental generic identities, this returns [`NamedReferenceType::Recursive`] so
     ///   exporters can avoid infinite expansion.
     ///
@@ -136,8 +151,8 @@ impl NamedDataType {
     /// traversals in lockstep instead of letting one consume the other's slots.
     #[doc(hidden)]
     #[track_caller]
-    pub fn init_with_sentinel(
-        sentinel: &'static str,
+    pub fn init_with_id(
+        id: NamedTypeId,
         instantiation_generics: &[(Generic, DataType)],
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -148,7 +163,7 @@ impl NamedDataType {
         build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         Self::init(
-            sentinel,
+            id,
             instantiation_generics.to_vec(),
             instantiation_generic_identities,
             has_const_param,
@@ -161,7 +176,7 @@ impl NamedDataType {
         )
     }
 
-    /// The shared body of [`NamedDataType::init_with_sentinel`].
+    /// The shared body of [`NamedDataType::init_with_id`].
     ///
     /// `build_ndt` is a `&dyn Fn` rather than a `fn` pointer so
     /// [`Types::define_named`] can pass a closure that captures the metadata it
@@ -174,7 +189,7 @@ impl NamedDataType {
     /// which `#[track_caller]` cannot see through.
     #[track_caller]
     pub(crate) fn init(
-        sentinel: &'static str,
+        id: NamedTypeId,
         instantiation_generics: Vec<(Generic, DataType)>,
         instantiation_generic_identities: &[&'static str],
         has_const_param: bool,
@@ -186,7 +201,6 @@ impl NamedDataType {
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         types.set_generic_substitution_cursor(generic_substitution_base);
-        let id = NamedId::Static(sentinel);
         let caller_inline = types.should_inline;
         let mut inline = caller_inline || passthrough;
 
@@ -205,10 +219,10 @@ impl NamedDataType {
 
         if vacant {
             let mut ndt = NamedDataType {
-                id: id.clone(),
                 location,
                 // `build_ndt` will just override all of this.
                 generics: Cow::Borrowed(&[]),
+                attributes: Default::default(),
                 ty: None,
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
@@ -228,11 +242,6 @@ impl NamedDataType {
                 }
                 panic::resume_unwind(payload);
             };
-            // `build_ndt` receives the whole value and may have replaced it
-            // with a clone of another type. The key is already registered as
-            // this sentinel's identity, so the stored value must match it.
-            ndt.id = id.clone();
-
             // Patch legacy Tauri channels, but preserve explicit opaque definitions.
             let is_tauri_type = ndt.name == "TAURI_CHANNEL"
                 && ndt.module_path.starts_with("tauri::")
@@ -248,7 +257,7 @@ impl NamedDataType {
             // `build_ndt` may already have completed this entry, for example by
             // merging a collection that contains it through `Types::extend`.
             // Only count the entry when the placeholder we installed is still a
-            // placeholder, otherwise `Types::len` would report more entries than
+            // placeholder, otherwise `Types::named_len` would report more entries than
             // the map holds.
             let already_complete = types
                 .types
@@ -343,15 +352,6 @@ impl NamedDataType {
             })
         }
     }
-
-    /// Constructs a [`Reference`] to this named datatype.
-    /// The reference returned by this will error in the language exporter if `Self.ty` is `None` as the type can't generate a named export.
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
-        Reference::Named(NamedReference {
-            id: self.id.clone(),
-            inner: NamedReferenceType::Reference { generics },
-        })
-    }
 }
 
 /// Runtime representation of Rust's `#[deprecated]` metadata.
@@ -433,14 +433,14 @@ mod tests {
     use crate::datatype::DataType;
 
     #[test]
-    fn duplicate_sentinel_reuses_the_first_definition() {
+    fn duplicate_identity_reuses_the_first_definition() {
         fn first(_: &mut Types, ndt: &mut super::NamedDataType) {
             ndt.name = std::borrow::Cow::Borrowed("Dup");
             ndt.module_path = std::borrow::Cow::Borrowed("test");
         }
 
         fn duplicate(_: &mut Types, _: &mut super::NamedDataType) {
-            panic!("a duplicate sentinel must not rebuild the definition");
+            panic!("a duplicate identity must not rebuild the definition");
         }
 
         fn inline(_: &mut Types) -> DataType {
@@ -448,8 +448,8 @@ mod tests {
         }
 
         let mut types = Types::default();
-        super::NamedDataType::init_with_sentinel(
-            "test::Dup",
+        super::NamedDataType::init_with_id(
+            super::NamedTypeId::label("test::Dup"),
             &[],
             &[],
             false,
@@ -459,11 +459,11 @@ mod tests {
             first,
             inline,
         );
-        // The second registration has the same sentinel but a different builder.
+        // The second registration has the same identity but a different builder.
         // It must reuse the first definition instead of exporting another type
         // with the same name.
-        super::NamedDataType::init_with_sentinel(
-            "test::Dup",
+        super::NamedDataType::init_with_id(
+            super::NamedTypeId::label("test::Dup"),
             &[],
             &[],
             false,
@@ -474,9 +474,9 @@ mod tests {
             inline,
         );
 
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
         let ndt = types
-            .into_sorted_iter()
+            .iter_sorted()
             .next()
             .expect("the definition is registered");
         assert_eq!(ndt.name, "Dup");
@@ -490,7 +490,7 @@ mod tests {
             static OTHER: RefCell<Types> = RefCell::new(Types::default());
         }
 
-        const SENTINEL: &str = "test::ExtendDuringResolution";
+        const LABEL: &str = "test::ExtendDuringResolution";
 
         fn metadata(ndt: &mut super::NamedDataType) {
             ndt.name = std::borrow::Cow::Borrowed("ExtendDuringResolution");
@@ -514,8 +514,8 @@ mod tests {
         }
 
         OTHER.with(|other| {
-            super::NamedDataType::init_with_sentinel(
-                SENTINEL,
+            super::NamedDataType::init_with_id(
+                super::NamedTypeId::label(LABEL),
                 &[],
                 &[],
                 false,
@@ -528,8 +528,8 @@ mod tests {
         });
 
         let mut types = Types::default();
-        super::NamedDataType::init_with_sentinel(
-            SENTINEL,
+        super::NamedDataType::init_with_id(
+            super::NamedTypeId::label(LABEL),
             &[],
             &[],
             false,
@@ -540,9 +540,9 @@ mod tests {
             inline,
         );
 
-        // `Types::len` checks its count against the map, so a double count
+        // `Types::named_len` checks its count against the map, so a double count
         // shows up here rather than as a wrong length in an exporter.
-        assert_eq!(types.len(), 1);
+        assert_eq!(types.named_len(), 1);
     }
 
     #[test]

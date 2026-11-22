@@ -46,7 +46,7 @@ pub(crate) fn render_file(
     match selection {
         Selection::All => {
             let mut names = BTreeMap::new();
-            for ndt in types.into_sorted_iter().filter(|ndt| ndt.ty.is_some()) {
+            for ndt in types.iter_sorted().filter(|ndt| ndt.ty.is_some()) {
                 let name = named_type_identifier(kotlin, ndt, &ndt.name)?;
                 if names.insert(name.clone(), ndt.name.as_ref()).is_some() {
                     return Err(Error::DuplicateTypeName { name });
@@ -267,7 +267,7 @@ fn contains_named_reference_inner(
             let Some(ndt) = types.get(reference) else {
                 return Ok(false);
             };
-            if ndt == target {
+            if std::ptr::eq(ndt, target) {
                 return Ok(true);
             }
             let pointer = ndt as *const NamedDataType;
@@ -825,7 +825,7 @@ fn render_enum(
     // avoid names that would shadow one of them.
     used_names.extend(
         types
-            .into_sorted_iter()
+            .iter_sorted()
             .filter(|ndt| ndt.ty.is_some())
             .map(|ndt| named_type_identifier(kotlin, ndt, &ndt.name))
             .collect::<Result<Vec<_>, _>>()?

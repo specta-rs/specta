@@ -758,30 +758,28 @@ fn dynamic_self_cycle(
     arg: impl Fn(usize) -> specta::datatype::DataType,
 ) -> Types {
     use specta::datatype::{
-        DataType, Enum, Field, GenericDefinition, GenericReference, NamedDataType, Variant,
+        DataType, Enum, Field, Generic, GenericDefinition, NamedDataType, Variant,
     };
 
     let mut types = Types::default();
-    NamedDataType::new(name, &mut types, |_, ndt| {
+    NamedDataType::new(name, &mut types, |_, self_ref, ndt| {
         let t = GenericDefinition::new("T".into(), None);
         ndt.generics = std::borrow::Cow::Owned(vec![t.clone()]);
 
         let mut e = Enum::default();
         for k in 0..edges {
-            let self_ref = ndt.reference(vec![(t.reference(), arg(k))]);
+            let reference = self_ref.reference(vec![(t.reference(), arg(k))]);
             e.variants.push((
                 format!("V{k}").into(),
                 Variant::unnamed()
-                    .field(Field::new(DataType::Reference(self_ref)))
+                    .field(Field::new(DataType::Reference(reference)))
                     .build(),
             ));
         }
         e.variants.push((
             "Terminal".into(),
             Variant::unnamed()
-                .field(Field::new(DataType::Generic(GenericReference::new(
-                    "T".into(),
-                ))))
+                .field(Field::new(DataType::Generic(Generic::new("T".into()))))
                 .build(),
         ));
         ndt.ty = Some(DataType::Enum(e));
@@ -829,12 +827,10 @@ fn large_finite_instantiation_set_reaches_its_fixed_point() {
 /// illegal TS2456 alias.
 #[test]
 fn divergent_instantiation_set_still_fails_honestly() {
-    use specta::datatype::{DataType, GenericReference};
+    use specta::datatype::{DataType, Generic};
 
     let types = dynamic_self_cycle("Diverge", 1, |_| {
-        DataType::Nullable(Box::new(DataType::Generic(GenericReference::new(
-            "T".into(),
-        ))))
+        DataType::Nullable(Box::new(DataType::Generic(Generic::new("T".into()))))
     });
 
     let err = with_timeout(Duration::from_secs(20), move || {
@@ -858,18 +854,18 @@ fn define_cycle(raw: &'static str) -> Types {
     use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("DefP", &mut types, |types, p| {
+    NamedDataType::new("DefP", &mut types, |types, p_ref, p| {
         let t = GenericDefinition::new("T".into(), None);
         p.generics = std::borrow::Cow::Owned(vec![t.clone()]);
 
         let u = GenericDefinition::new("U".into(), None);
-        let q = NamedDataType::new("DefQ", types, |_, q| {
+        let q = NamedDataType::new("DefQ", types, |_, _, q| {
             q.generics = std::borrow::Cow::Owned(vec![u.clone()]);
             let mut e = Enum::default();
             e.variants.push((
                 "X".into(),
                 Variant::unnamed()
-                    .field(Field::new(DataType::Reference(p.reference(vec![(
+                    .field(Field::new(DataType::Reference(p_ref.reference(vec![(
                         t.reference(),
                         DataType::Generic(u.reference()),
                     )]))))
@@ -951,12 +947,12 @@ fn define_in_a_non_generic_cycle_is_untouched() {
     use specta::datatype::{DataType, Enum, Field, NamedDataType, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("DefSelf", &mut types, |_, ndt| {
+    NamedDataType::new("DefSelf", &mut types, |_, self_ref, ndt| {
         let mut e = Enum::default();
         e.variants.push((
             "X".into(),
             Variant::unnamed()
-                .field(Field::new(DataType::Reference(ndt.reference(vec![]))))
+                .field(Field::new(DataType::Reference(self_ref.reference(vec![]))))
                 .build(),
         ));
         e.variants.push((
@@ -988,15 +984,15 @@ fn omitted_args_cycle(default: Option<specta::datatype::DataType>) -> Types {
     use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("OmitRoot", &mut types, |types, root| {
-        let node = NamedDataType::new("OmitNode", types, |_, node| {
+    NamedDataType::new("OmitRoot", &mut types, |types, root_ref, root| {
+        let node = NamedDataType::new("OmitNode", types, |_, _, node| {
             let t = GenericDefinition::new("T".into(), default);
             node.generics = std::borrow::Cow::Owned(vec![t.clone()]);
             let mut e = Enum::default();
             e.variants.push((
                 "X".into(),
                 Variant::unnamed()
-                    .field(Field::new(DataType::Reference(root.reference(vec![]))))
+                    .field(Field::new(DataType::Reference(root_ref.reference(vec![]))))
                     .build(),
             ));
             e.variants.push((
@@ -1075,23 +1071,23 @@ fn omitted_generic_arguments_without_a_default_fall_back_to_unknown() {
 /// back-edge check can see.
 fn revealed_backedge_cycle(
     arg: impl FnOnce(
-        &specta::datatype::NamedDataType,
-        &specta::datatype::NamedDataType,
+        &specta::datatype::NamedReference,
+        &specta::datatype::NamedReference,
         &specta::datatype::GenericDefinition,
     ) -> specta::datatype::DataType,
 ) -> Types {
     use specta::datatype::{DataType, Enum, Field, GenericDefinition, NamedDataType, Variant};
 
     let mut types = Types::default();
-    NamedDataType::new("RevRoot", &mut types, |types, root| {
+    NamedDataType::new("RevRoot", &mut types, |types, root_ref, root| {
         let t = GenericDefinition::new("T".into(), None);
-        let node = NamedDataType::new("RevGen", types, |_, node| {
+        let node = NamedDataType::new("RevGen", types, |_, _, node| {
             node.generics = std::borrow::Cow::Owned(vec![t.clone()]);
             let mut e = Enum::default();
             e.variants.push((
                 "X".into(),
                 Variant::unnamed()
-                    .field(Field::new(DataType::Reference(root.reference(vec![]))))
+                    .field(Field::new(DataType::Reference(root_ref.reference(vec![]))))
                     .build(),
             ));
             e.variants.push((
@@ -1103,7 +1099,7 @@ fn revealed_backedge_cycle(
             node.ty = Some(DataType::Enum(e));
         });
 
-        let instantiation = arg(root, &node, &t);
+        let instantiation = arg(root_ref, &node, &t);
         let mut e = Enum::default();
         e.variants.push((
             "X".into(),

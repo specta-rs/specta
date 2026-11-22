@@ -362,7 +362,7 @@ fn nested_bounded_wrapper_keeps_named_identity_and_generic_argument() {
     let _ = A::<Impl>::definition(&mut types);
 
     let a = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == "A")
         .expect("A declaration should be registered");
     let a = a.ty.as_ref().expect("A is exported as a named type");
@@ -376,7 +376,7 @@ fn nested_bounded_wrapper_keeps_named_identity_and_generic_argument() {
     );
 
     let wrapper = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == "Wrapper")
         .expect("Wrapper declaration should be registered");
     assert!(wrapper.ty.is_some());
@@ -413,7 +413,7 @@ fn recursive_definition_shares_identity() {
     let _ = Recursive::<Impl>::definition(&mut types);
 
     let recursive = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == "Recursive")
         .expect("Recursive declaration should be registered");
     let recursive = recursive.ty.as_ref().expect("Recursive is exported");
@@ -436,7 +436,7 @@ fn multi_parameter_generics_keep_distinct_placeholders() {
     let _ = GenericMap::<Impl, OtherImpl>::definition(&mut types);
 
     let map = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == "GenericMap")
         .expect("GenericMap declaration should be registered");
     let map = map.ty.as_ref().expect("GenericMap is exported");
@@ -664,7 +664,7 @@ fn enclosing_parameters_do_not_leak_into_a_nested_declaration() {
 
 fn assert_concrete_items(types: &specta::Types, context: &str) {
     let page = types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == "Page")
         .and_then(|ndt| ndt.ty.as_ref())
         .unwrap_or_else(|| panic!("{context}: Page not exported"));
@@ -701,7 +701,7 @@ fn concrete_field_is_stable_regardless_of_resolution_order() {
 
 fn find_exported<'a>(types: &'a specta::Types, name: &str) -> &'a DataType {
     types
-        .into_sorted_iter()
+        .iter_sorted()
         .find(|ndt| ndt.name == name)
         .and_then(|ndt| ndt.ty.as_ref())
         .unwrap_or_else(|| panic!("{name} not exported"))

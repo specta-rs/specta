@@ -2,9 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{
-        DataType, Fields, Generic, GenericReference, NamedReferenceType, Primitive, Reference,
-    },
+    datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;
@@ -46,7 +44,7 @@ pub(crate) enum MapKeyShape {
 pub(crate) fn map_key_shape(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> MapKeyShape {
     map_key_shape_inner(key_ty, types, generics, &mut HashSet::new())
 }
@@ -54,7 +52,7 @@ pub(crate) fn map_key_shape(
 fn map_key_shape_inner(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     visiting: &mut HashSet<Reference>,
 ) -> MapKeyShape {
     match key_ty {

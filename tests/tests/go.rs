@@ -591,8 +591,8 @@ fn go_reports_invalid_configuration_and_map_keys() {
     );
 
     let mut dangling_types = Types::default();
-    let missing = NamedDataType::new("Missing", &mut dangling_types, |_, _| {});
-    NamedDataType::new("HasMissing", &mut dangling_types, |_, ndt| {
+    let missing = NamedDataType::new("Missing", &mut dangling_types, |_, _, _| {});
+    NamedDataType::new("HasMissing", &mut dangling_types, |_, _, ndt| {
         ndt.ty = Some(DataType::Reference(missing.reference(Vec::new())));
     });
     let err = Go::default()

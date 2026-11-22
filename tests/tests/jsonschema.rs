@@ -1,6 +1,6 @@
 use serde::Serialize;
 use specta::{Format, Type, Types};
-use specta_jsonschema::JsonSchema;
+use specta_jsonschema::{JsonSchema, SchemaVersion};
 
 #[test]
 fn jsonschema_export() {
@@ -257,7 +257,7 @@ fn jsonschema_deny_unknown_fields_applies_to_enum_payloads_in_both_phases() {
             .expect("split phases"),
     ] {
         assert!(
-            mapped.as_ref().into_sorted_iter().any(|ndt| {
+            mapped.as_ref().iter_sorted().any(|ndt| {
                 matches!(
                     ndt.ty.as_ref(),
                     Some(specta::datatype::DataType::Enum(enm))
@@ -602,4 +602,32 @@ fn jsonschema_newtype_and_inline_payloads_match_serde() {
             );
         }
     }
+}
+
+/// Draft 7 ignores every sibling of a top-level reference, including the
+/// definitions object the reference points at. A root reference must therefore
+/// be expressed through allOf.
+#[test]
+fn draft7_root_reference_does_not_shadow_its_definitions() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Draft7Item {
+        value: bool,
+    }
+
+    let types = Types::default().register::<Draft7Item>();
+    let schema = JsonSchema::default()
+        .schema_version(SchemaVersion::Draft7)
+        .export_ref_value(&types, specta::Identity, "Draft7Item")
+        .expect("draft 7 reference export succeeds");
+
+    assert!(schema.get("$ref").is_none(), "{schema}");
+    assert_eq!(
+        schema["allOf"][0]["$ref"], "#/definitions/Draft7Item",
+        "{schema}"
+    );
+    assert!(schema["definitions"]["Draft7Item"].is_object(), "{schema}");
+
+    let validator = jsonschema::validator_for(&schema).expect("the document is a valid schema");
+    assert!(validator.is_valid(&serde_json::json!({ "value": true })));
 }

@@ -73,7 +73,7 @@ SimpleStruct: {
 	b: string,
 	c: [number, string, number],
 	d: string[],
-	e: string | null,
+	e?: string | null,
 }
 TupleStruct1: number
 TupleStruct3: [number, boolean, string]
@@ -109,7 +109,7 @@ InlineEnumField: { A: {
 	a: string,
 } }
 InlineOptionalType: {
-	optional_field: {
+	optional_field?: {
 	a: string,
 } | null,
 }
@@ -187,7 +187,7 @@ ContainerTypeOverrideToGeneric<i32>: T
 ContainerTypeOverrideTuple: [string, number]
 ContainerTypeOverrideTupleGeneric<i32>: [T, string]
 InvalidToValidType: {
-	cause: null,
+	cause?: null,
 }
 TupleStruct: string
 TupleStructWithRep: string
@@ -225,7 +225,7 @@ OptionalOnTransparentNamedField: {
 	b: string | null,
 }
 OptionalInEnum: ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
-	a: string | null,
+	a?: string | null,
 } }) & { A?: never; C?: never } | ({ C: {
 	a?: string | null,
 } }) & { A?: never; B?: never }

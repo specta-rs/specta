@@ -6,7 +6,7 @@ expression: rendered
 export type SemanticPayload = {
 	site: URL,
 	sites: URL[],
-	optional_site: URL | null,
+	optional_site?: URL | null,
 };
 
 export type Website = URL;

@@ -718,6 +718,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-readme"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "specta-swift",
+ "specta-typescript",
+]
+
+[[package]]
 name = "example-scratchpad"
 version = "0.0.0"
 dependencies = [

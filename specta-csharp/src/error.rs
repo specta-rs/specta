@@ -94,18 +94,6 @@ impl Error {
         }
     }
 
-    pub(crate) fn format_at(
-        message: &'static str,
-        path: impl Into<String>,
-        source: specta::FormatError,
-    ) -> Self {
-        Self::Format {
-            message,
-            path: Some(path.into()),
-            source,
-        }
-    }
-
     pub(crate) fn io(path: impl Into<PathBuf>, source: io::Error) -> Self {
         Self::Io {
             path: path.into(),

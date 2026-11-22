@@ -1018,7 +1018,7 @@ struct HandBuiltSkippedNewtype;
 
 impl Type for HandBuiltSkippedNewtype {
     fn definition(types: &mut Types) -> DataType {
-        let ndt = NamedDataType::new("HandBuiltSkippedNewtype", types, |_, ndt| {
+        let ndt = NamedDataType::new("HandBuiltSkippedNewtype", types, |_, _, ndt| {
             ndt.ty = Some(Struct::unnamed().field(Field::default()).build());
         });
         DataType::Reference(ndt.reference(vec![]))
@@ -2763,7 +2763,7 @@ fn swift_invalid_identifiers_are_rejected() {
 
     // Rename the type to one Swift cannot declare. The field names stay valid.
     let mut types = Types::default().register::<SpaceInTypeName>();
-    types.iter_mut(|ndt| ndt.name = "Has Space".into());
+    types.for_each_named_mut(|ndt| ndt.name = "Has Space".into());
     let type_error = Swift::default()
         .export(&types, specta_serde::Format)
         .expect_err("a Swift type name cannot contain a space");

@@ -165,6 +165,29 @@ fn write(target: &AttributeTarget, entries: Vec<AttributeEntry>) -> TokenStream 
     }
 }
 
+/// Returns the container renames a declaration keeps on itself.
+///
+/// A container-level type override replaces the struct/enum node, so a rename
+/// stored only on that node would be lost. Conversion, tagging and
+/// field-shaping attributes are deliberately not copied: they describe the
+/// replaced shape, not the declaration.
+pub(super) fn container_rename_pairs(
+    raw_attrs: &[Attribute],
+) -> Result<Vec<(&'static str, String)>> {
+    let Some(attrs) = parse_container_attrs(raw_attrs.iter())? else {
+        return Ok(Vec::new());
+    };
+
+    let mut pairs = Vec::new();
+    if let Some(value) = &attrs.rename_serialize {
+        pairs.push(("serde:container:rename_serialize", value.clone()));
+    }
+    if let Some(value) = &attrs.rename_deserialize {
+        pairs.push(("serde:container:rename_deserialize", value.clone()));
+    }
+    Ok(pairs)
+}
+
 fn parse_container_attrs<'a>(
     attrs: impl Iterator<Item = &'a Attribute>,
 ) -> Result<Option<ContainerAttrs>> {

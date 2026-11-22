@@ -461,41 +461,41 @@ fn main() {
                 .register::<UntaggedMatchingField>()
                 .register::<UsesKeywordModule>(),
         );
-    let v_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+    let v_type = NamedDataType::new("PreludeCollision", &mut types, |_, _, ndt| {
         ndt.module_path = "v".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesV", &mut types, |_, ndt| {
+    NamedDataType::new("UsesV", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             v_type.reference(vec![]),
         ));
     });
-    let root_type = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+    let root_type = NamedDataType::new("RootReference", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             root_type.reference(vec![]),
         ));
     });
-    let parent_type = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+    let parent_type = NamedDataType::new("ParentReference", &mut types, |_, _, ndt| {
         ndt.module_path = "parent".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+    NamedDataType::new("UsesParent", &mut types, |_, _, ndt| {
         ndt.module_path = "parent::child".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             parent_type.reference(vec![]),
         ));
     });
-    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, _, ndt| {
         ndt.module_path = "index".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("UsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             index_type.reference(vec![]),
@@ -508,13 +508,18 @@ fn main() {
         .export_to(out.join("bindings.ts"), &types, specta_serde::Format)
         .unwrap();
     let mut low_level_types = Types::default();
-    let low_level_record = NamedDataType::new("LowLevelRecord", &mut low_level_types, |_, ndt| {
-        ndt.ty = Some(Map::new(Primitive::str.into(), Primitive::str.into()).into());
-    });
+    let low_level_record =
+        NamedDataType::new("LowLevelRecord", &mut low_level_types, |_, _, ndt| {
+            ndt.ty = Some(Map::new(Primitive::str.into(), Primitive::str.into()).into());
+        });
     let low_level_export = primitives::export(
         &Valibot::default(),
         &low_level_types,
-        iter::once(&low_level_record),
+        iter::once(
+            low_level_types
+                .get(&low_level_record)
+                .expect("LowLevelRecord is registered"),
+        ),
         "",
     )
     .unwrap();
@@ -546,7 +551,7 @@ fn main() {
     let manual_namespace_type = NamedDataType::new(
         "ManualNamespaceType",
         &mut manual_namespace_types,
-        |_, ndt| {
+        |_, _, ndt| {
             ndt.module_path = "".into();
             ndt.ty = Some(Primitive::str.into());
         },
@@ -554,7 +559,7 @@ fn main() {
     NamedDataType::new(
         "AutomaticNamespaceType",
         &mut manual_namespace_types,
-        |_, ndt| {
+        |_, _, ndt| {
             ndt.module_path = "".into();
             ndt.ty = Some(DataType::Reference(manual_namespace_type.reference(vec![])));
         },
@@ -564,7 +569,7 @@ fn main() {
         .framework_runtime(|exporter| {
             let manual = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ManualNamespaceType");
             Ok(Cow::Owned(format!(
                 "{}\nexport const AdaptedManualNamespaceTypeSchema = ManualNamespaceTypeSchema;",
@@ -579,11 +584,11 @@ fn main() {
         .unwrap();
     let mut module_prefixed_types = Types::default();
     let module_prefixed_root =
-        NamedDataType::new("RootType", &mut module_prefixed_types, |_, ndt| {
+        NamedDataType::new("RootType", &mut module_prefixed_types, |_, _, ndt| {
             ndt.module_path = "".into();
             ndt.ty = Some(Primitive::str.into());
         });
-    NamedDataType::new("UsesRootType", &mut module_prefixed_types, |_, ndt| {
+    NamedDataType::new("UsesRootType", &mut module_prefixed_types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(specta::datatype::DataType::Reference(
             module_prefixed_root.reference(vec![]),
@@ -604,11 +609,11 @@ fn main() {
         .unwrap();
 
     let mut manual_file_types = Types::default();
-    let sibling = NamedDataType::new("Sibling", &mut manual_file_types, |_, ndt| {
+    let sibling = NamedDataType::new("Sibling", &mut manual_file_types, |_, _, ndt| {
         ndt.module_path = "nested".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("ManualNested", &mut manual_file_types, |_, ndt| {
+    NamedDataType::new("ManualNested", &mut manual_file_types, |_, _, ndt| {
         ndt.module_path = "nested".into();
         ndt.ty = Some(DataType::Reference(sibling.reference(vec![])));
     });
@@ -617,7 +622,7 @@ fn main() {
         .framework_runtime(|exporter| {
             let manual = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ManualNested");
             Ok(Cow::Owned(exporter.export(manual, "")?))
         })
@@ -630,7 +635,7 @@ fn main() {
 
     let mut separate_declaration_spaces = Types::default();
     for name in ["Foo", "FooSchema"] {
-        NamedDataType::new(name, &mut separate_declaration_spaces, |_, ndt| {
+        NamedDataType::new(name, &mut separate_declaration_spaces, |_, _, ndt| {
             ndt.module_path = "source".into();
             ndt.ty = Some(Primitive::str.into());
         });

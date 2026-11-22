@@ -40,7 +40,7 @@ macro_rules! types {
 
         // This allows us to end-to-end test primitives.
         // Many types won't be directly added to the `Types`, as they are not named.
-        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, ndt| {
+        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, _, ndt| {
             ndt.ty = Some(s.build());
         });
 
@@ -951,9 +951,11 @@ struct InvalidToValidType {
 #[specta(collect = false, transparent)]
 struct TupleStruct(String);
 
+// repr(transparent) is a layout attribute; the wire shape comes from the
+// explicit specta(transparent).
 #[repr(transparent)]
 #[derive(Type)]
-#[specta(collect = false)]
+#[specta(collect = false, transparent)]
 struct TupleStructWithRep(String);
 
 #[derive(Type)]
@@ -2659,7 +2661,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2673,7 +2675,7 @@ fn struct_collects_all_transparent_field_types() {
     let mut types = Types::default();
     UsesTransparent::definition(&mut types);
     let names = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
@@ -2821,26 +2823,34 @@ fn named_type_mutation_preserves_graph_identity() {
     use specta::datatype::{NamedDataType, Primitive};
 
     let mut types = Types::default();
-    let a = NamedDataType::new("A", &mut types, |_, ndt| {
+    let a = NamedDataType::new("A", &mut types, |_, _, ndt| {
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("B", &mut types, |_, ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    let b = NamedDataType::new("B", &mut types, |_, _, ndt| {
+        ndt.ty = Some(Primitive::u32.into());
+    });
+    assert_eq!(types.named_len(), 2);
 
-    let a_reference = a.reference(Vec::new());
-    let mut types = types.map(|_| a.clone());
+    let mut types = types.map(|mut ndt| {
+        ndt.docs = "mapped".into();
+        ndt
+    });
+    assert_eq!(types.get(&a).map(|ndt| ndt.docs.as_ref()), Some("mapped"));
+
+    // The callback may replace each value wholesale. Identity is the key,
+    // not part of the value, so each entry keeps its own and every
+    // reference still resolves.
+    let a_contents = types.get(&a).expect("A is registered").clone();
+    types.for_each_named_mut(|ndt| *ndt = a_contents.clone());
+    assert_eq!(types.named_len(), 2);
+
+    assert_eq!(types.get(&a).expect("A is registered").name, "A");
     assert_eq!(
-        types
-            .get(match &a_reference {
-                specta::datatype::Reference::Named(reference) => reference,
-                _ => unreachable!(),
-            })
-            .map(|ndt| ndt.name.as_ref()),
-        Some("A")
+        types.get(&b).expect("B is registered").name,
+        "A",
+        "the callback replaced the contents"
     );
-
-    types.iter_mut(|ndt| *ndt = a.clone());
-    assert_eq!(types.len(), 2);
+    assert_ne!(a, b, "the entries did not merge");
 }
 
 #[derive(Type)]
@@ -2942,7 +2952,7 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
     register_local_b(&mut types);
 
     let fields = types
-        .into_sorted_iter()
+        .iter_sorted()
         .filter(|ndt| ndt.name == "Local")
         .map(|ndt| {
             let Some(DataType::Struct(structure)) = &ndt.ty else {
@@ -2955,4 +2965,41 @@ fn same_named_types_in_different_function_scopes_stay_distinct() {
         })
         .collect::<Vec<_>>();
     assert_eq!(fields, ["a", "b"]);
+}
+
+/// named_len counts declarations only; is_empty follows the usual collection
+/// meaning and has_roots answers whether anything was registered for export.
+#[test]
+fn named_len_and_has_roots_describe_different_things() {
+    let types = Types::default();
+    assert_eq!(types.named_len(), 0);
+    assert!(types.is_empty());
+    assert!(!types.has_roots());
+
+    let types = Types::default().register::<bool>();
+    assert_eq!(
+        types.named_len(),
+        0,
+        "an anonymous root adds no named datatype"
+    );
+    assert_eq!(types.roots().len(), 1);
+    assert!(types.is_empty(), "is_empty counts named datatypes only");
+    assert!(types.has_roots());
+
+    // A named declaration without a root is not empty either.
+    let mut types = Types::default();
+    let _ = <SimpleStruct as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
+    assert!(!types.has_roots());
+
+    // A container-inline declaration (Vec resolves to an entry with no body)
+    // counts as an entry and keeps the graph non-empty, even though it has no
+    // standalone declaration.
+    let mut types = Types::default();
+    let _ = <Vec<u8> as Type>::definition(&mut types);
+    assert!(types.named_len() > 0);
+    assert_eq!(types.roots().len(), 0);
+    assert!(!types.is_empty());
 }

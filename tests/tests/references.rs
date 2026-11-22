@@ -93,12 +93,12 @@ fn tauri_channel_reference(types: &mut Types, opaque: bool) -> Reference {
         });
     }
 
-    NamedDataType::init_with_sentinel(
-        if opaque {
+    NamedDataType::init_with_id(
+        specta::datatype::NamedTypeId::label(if opaque {
             "opaque_channel"
         } else {
             "legacy_channel"
-        },
+        }),
         &[],
         &[],
         false,

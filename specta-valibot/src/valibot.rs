@@ -446,7 +446,7 @@ impl Valibot {
         let mut runtime_path = path.join("index");
         runtime_path.set_extension("ts");
 
-        let mut module_graph = build_module_graph(types.into_unsorted_iter());
+        let mut module_graph = build_module_graph(types.iter_unsorted());
         let mut root_types = String::new();
         export(
             &exporter,
@@ -524,7 +524,7 @@ impl Valibot {
                         .collect::<BTreeSet<_>>();
 
                     let existing_import_paths = types
-                        .into_unsorted_iter()
+                        .iter_unsorted()
                         .map(|ndt| ndt.module_path.as_ref())
                         .filter(|module_path| {
                             !module_path.is_empty()
@@ -542,7 +542,7 @@ impl Valibot {
                         .collect::<BTreeSet<_>>();
 
                     let local_type_names = types
-                        .into_unsorted_iter()
+                        .iter_unsorted()
                         .filter(|ndt| {
                             ndt.ty.is_some()
                                 && ((ndt.module_path.is_empty()
@@ -595,45 +595,10 @@ impl Valibot {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped = match format
-        .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?
-    {
-        Cow::Borrowed(_) => types.clone(),
-        Cow::Owned(types) => types,
-    };
-    let source = mapped.clone();
-    let mut output = mapped;
-    let mut error = None;
-
-    output.iter_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-
-        for generic in ndt.generics.to_mut() {
-            let Some(default) = generic.default.clone() else {
-                continue;
-            };
-            match map_datatype_format(Some(format), &source, &default) {
-                Ok(default) => generic.default = Some(default),
-                Err(source) => {
-                    error = Some(source);
-                    return;
-                }
-            }
-        }
-
-        let Some(datatype) = ndt.ty.clone() else {
-            return;
-        };
-        match map_datatype_format(Some(format), &source, &datatype) {
-            Ok(datatype) => ndt.ty = Some(datatype),
-            Err(source) => error = Some(source),
-        }
-    });
-
-    error.map_or_else(|| Ok(Cow::Owned(output)), Err)
+    types
+        .format(format)
+        .map(Cow::Owned)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 fn map_datatype_format(
@@ -859,7 +824,7 @@ impl FrameworkExporter<'_> {
         )?;
         self.manually_exported_user_types.borrow_mut().extend(
             self.types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| {
                     ndt.ty.is_some() && (self.layout != Layout::Files || ndt.module_path.is_empty())
                 })
@@ -1214,11 +1179,11 @@ fn render_types(
                 Ok(())
             }
 
-            let complete_module = build_module_graph(types.into_unsorted_iter());
+            let complete_module = build_module_graph(types.iter_unsorted());
             validate_namespace_scopes(&complete_module)?;
             validate_namespace_reexports(&complete_module)?;
 
-            let mut module = build_module_graph(types.into_unsorted_iter().filter(|ndt| {
+            let mut module = build_module_graph(types.iter_unsorted().filter(|ndt| {
                 !manually_exported_user_types.contains(&manual_export_identity(ndt))
             }));
             let mut reexports = String::new();
@@ -1279,16 +1244,16 @@ fn render_types(
             }
         }
         Layout::FlatFile | Layout::ModulePrefixedName => {
-            validate_flat_type_names(exporter, types.into_sorted_iter())?;
+            validate_flat_type_names(exporter, types.iter_sorted())?;
             let remaining_types = types
-                .into_sorted_iter()
+                .iter_sorted()
                 .filter(|ndt| !manually_exported_user_types.contains(&manual_export_identity(ndt)))
                 .collect::<Vec<_>>();
             render_flat_types(s, exporter, types, remaining_types.into_iter(), "")?;
         }
         Layout::Files => {
             let remaining_types = types
-                .into_sorted_iter()
+                .iter_sorted()
                 .filter(|ndt| {
                     ndt.module_path.is_empty()
                         && !manually_exported_user_types.contains(&manual_export_identity(ndt))

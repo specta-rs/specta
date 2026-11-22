@@ -18,7 +18,10 @@ mod r#type;
 mod types;
 
 #[doc(inline)]
-pub use format::{Format, FormatError};
+pub use format::{
+    Format, FormatError, Identity, UnresolvedGeneric, format_types, is_unresolved_generic,
+    named_datatype,
+};
 #[doc(inline)]
 pub use r#type::Type;
 #[doc(inline)]

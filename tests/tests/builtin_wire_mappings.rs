@@ -199,9 +199,7 @@ fn yaml_tagged_value_matches_serde_single_entry_map() {
         );
     };
     assert_eq!(
-        value
-            .attributes
-            .get_named_as::<bool>("serde:container:untagged"),
+        value.attributes.get_as::<bool>("serde:container:untagged"),
         Some(&true)
     );
 }

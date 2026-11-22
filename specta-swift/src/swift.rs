@@ -218,8 +218,11 @@ impl Swift {
     /// Export types to a Swift string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
+        // The graph is formatted once here; rendering must not apply the
+        // formatter a second time.
         let formatted_types = format_types(types, &format)?.into_owned();
         let raw_types = &formatted_types;
+        let format = specta::Identity;
         validate_type_names(&exporter, raw_types)?;
         validate_member_names(&exporter, raw_types)?;
 
@@ -257,7 +260,7 @@ impl Swift {
         }
 
         // Export types
-        for ndt in raw_types.into_sorted_iter() {
+        for ndt in raw_types.iter_sorted() {
             let exported = export_type(&exporter, Some(&format), raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
@@ -289,7 +292,7 @@ impl Swift {
 fn validate_type_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
     let mut names = HashMap::<String, String>::new();
 
-    for ndt in types.into_sorted_iter() {
+    for ndt in types.iter_sorted() {
         if !matches!(
             ndt.ty,
             Some(DataType::Struct(_) | DataType::Enum(_) | DataType::Tuple(_))
@@ -358,7 +361,7 @@ fn is_valid_swift_identifier(name: &str) -> bool {
 /// duplicate property or enum case, so report the collision rather than emit
 /// source that cannot compile.
 fn validate_member_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
-    for ndt in types.into_sorted_iter() {
+    for ndt in types.iter_sorted() {
         let Some(ty) = &ndt.ty else {
             continue;
         };
@@ -404,9 +407,10 @@ fn validate_member_names(exporter: &Swift, types: &Types) -> Result<(), Error> {
     Ok(())
 }
 
-fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
-    format
-        .map_types(types)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    types
+        .format(format)
+        .map(Cow::Owned)
         .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
@@ -605,7 +609,7 @@ fn escape_swift_keyword(name: &str) -> String {
 
 /// Check if the type collection contains any Duration types that need the helper
 fn needs_duration_helper(types: &Types) -> bool {
-    for ndt in types.into_sorted_iter() {
+    for ndt in types.iter_sorted() {
         if ndt.name == "Duration" {
             return true;
         }

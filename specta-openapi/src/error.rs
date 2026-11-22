@@ -62,6 +62,19 @@ pub enum Error {
         path: String,
     },
 
+    /// Two responses describe the same status and content type.
+    #[error(
+        "operation {path:?} declares response {status} with content type {content_type:?} twice"
+    )]
+    DuplicateResponse {
+        /// Templated path.
+        path: String,
+        /// HTTP status code.
+        status: u16,
+        /// Media type of the duplicated response body.
+        content_type: String,
+    },
+
     /// An operation's types could not be resolved to components.
     ///
     /// Component names are obtained by asking the exporter what it names each referenced type. This

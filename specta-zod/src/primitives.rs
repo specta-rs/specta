@@ -5,7 +5,7 @@ use std::{borrow::Cow, collections::HashSet, fmt::Write as _};
 use specta::{
     Types,
     datatype::{
-        DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
+        DataType, Enum, Fields, Generic, List, Map, NamedDataType, NamedReference,
         NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
 };
@@ -15,7 +15,7 @@ use crate::{Error, Layout, Zod, map_keys, opaque, reserved_names::RESERVED_TYPE_
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
-fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
+fn named_reference_generics(r: &NamedReference) -> Result<&[(Generic, DataType)], Error> {
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
         NamedReferenceType::Inline { .. } => Ok(&[]),
@@ -147,7 +147,7 @@ fn export_single_internal(
                 );
             }
             for module_path in types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .map(|ndt| ndt.module_path.as_ref())
                 .filter(|path| !path.is_empty() && *path != ndt.module_path.as_ref())
                 .collect::<std::collections::BTreeSet<_>>()
@@ -164,7 +164,7 @@ fn export_single_internal(
             }
         } else if exporter.layout == Layout::Namespaces {
             let mut module_paths = types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .map(|ndt| ndt.module_path.as_ref())
                 .filter(|path| !path.is_empty())
                 .collect::<std::collections::BTreeSet<_>>()
@@ -514,7 +514,7 @@ fn typescript_alias_fields(fields: &mut Fields, types: &Types) {
 fn contains_zod_define(
     dt: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     stack: &mut Vec<NamedReference>,
 ) -> bool {
     match dt {
@@ -581,7 +581,7 @@ fn generic_map_key_parameters(dt: &DataType, types: &Types) -> HashSet<String> {
         fields: &Fields,
         types: &Types,
         map_key: bool,
-        generics: &[(GenericReference, DataType)],
+        generics: &[(Generic, DataType)],
         stack: &mut Vec<NamedReference>,
         result: &mut HashSet<String>,
     ) {
@@ -604,7 +604,7 @@ fn generic_map_key_parameters(dt: &DataType, types: &Types) -> HashSet<String> {
         dt: &DataType,
         types: &Types,
         map_key: bool,
-        generics: &[(GenericReference, DataType)],
+        generics: &[(Generic, DataType)],
         stack: &mut Vec<NamedReference>,
         result: &mut HashSet<String>,
     ) {
@@ -743,7 +743,7 @@ fn named_map_key_parameters(ndt: &NamedDataType, types: &Types) -> HashSet<Strin
 fn fields_contain_zod_define(
     fields: &Fields,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     stack: &mut Vec<NamedReference>,
 ) -> bool {
     match fields {
@@ -882,7 +882,7 @@ pub(crate) fn datatype_with_inline_attr(
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     inline: bool,
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
@@ -904,7 +904,7 @@ fn datatype(
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     force_inline_ref: bool,
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
@@ -1087,7 +1087,7 @@ fn list_dt(
     types: &Types,
     l: &List,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let mut dt = String::new();
@@ -1124,7 +1124,7 @@ fn map_dt(
     types: &Types,
     m: &Map,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let mut resolved_key = m.key_ty().clone();
@@ -1166,11 +1166,7 @@ fn map_dt(
     Ok(())
 }
 
-fn map_key_is_finite(
-    dt: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-) -> bool {
+fn map_key_is_finite(dt: &DataType, types: &Types, generics: &[(Generic, DataType)]) -> bool {
     match dt {
         DataType::Primitive(Primitive::bool) => true,
         DataType::Enum(enm) => enm
@@ -1223,7 +1219,7 @@ fn map_key_datatype(
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match dt {
@@ -1407,8 +1403,8 @@ fn map_key_datatype(
 
 fn resolved_reference_generics(
     reference: &NamedReference,
-    outer_generics: &[(GenericReference, DataType)],
-) -> Result<Vec<(GenericReference, DataType)>, Error> {
+    outer_generics: &[(Generic, DataType)],
+) -> Result<Vec<(Generic, DataType)>, Error> {
     named_reference_generics(reference).map(|generics| {
         generics
             .iter()
@@ -1421,7 +1417,7 @@ fn resolved_reference_generics(
     })
 }
 
-fn substitute_generics(dt: &mut DataType, generics: &[(GenericReference, DataType)]) {
+fn substitute_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
     match dt {
         DataType::Generic(generic) => {
             if let Some((_, replacement)) =
@@ -1463,7 +1459,7 @@ fn substitute_generics(dt: &mut DataType, generics: &[(GenericReference, DataTyp
     }
 }
 
-fn substitute_field_generics(fields: &mut Fields, generics: &[(GenericReference, DataType)]) {
+fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType)]) {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(fields) => fields
@@ -1485,7 +1481,7 @@ fn tuple_dt(
     types: &Types,
     t: &Tuple,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match t.elements.as_slice() {
@@ -1520,7 +1516,7 @@ fn struct_dt(
     types: &Types,
     st: &Struct,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match &st.fields {
@@ -1630,7 +1626,7 @@ fn struct_dt(
 fn object_field_keys(
     dt: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     visiting: &mut HashSet<NamedReference>,
 ) -> Option<HashSet<String>> {
     match dt {
@@ -1701,7 +1697,7 @@ fn object_field_keys(
 fn object_field_keys_for_fields(
     fields: &Fields,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     visiting: &mut HashSet<NamedReference>,
 ) -> Option<HashSet<String>> {
     match fields {
@@ -1731,7 +1727,7 @@ fn enum_dt(
     types: &Types,
     e: &Enum,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
     allowed_object_keys: &[&str],
 ) -> Result<(), Error> {
@@ -1824,7 +1820,7 @@ fn enum_variant_dt(
     variant: &specta::datatype::Variant,
     strict_object: bool,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
     allowed_object_keys: &[&str],
 ) -> Result<Option<String>, Error> {
@@ -1958,7 +1954,7 @@ fn reference_dt(
     types: &Types,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     match r {
@@ -1969,7 +1965,7 @@ fn reference_dt(
     }
 }
 
-fn generic_dt(s: &mut String, g: &GenericReference) {
+fn generic_dt(s: &mut String, g: &Generic) {
     s.push_str(g.name());
 }
 
@@ -2000,7 +1996,7 @@ fn reference_named_dt(
     types: &Types,
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     type_render_stack: &mut TypeRenderStack,
 ) -> Result<(), Error> {
     let ndt = types

@@ -642,7 +642,7 @@ fn generic_keys_follow_declaration_order() {
 #[test]
 fn rejects_expanding_recursive_generics() {
     let mut types = Types::default();
-    NamedDataType::new("Grow", &mut types, |_, ndt| {
+    NamedDataType::new("Grow", &mut types, |_, self_ref, ndt| {
         let generic = Generic::new("T".into());
         ndt.generics = vec![GenericDefinition::new(
             "T".into(),
@@ -654,7 +654,7 @@ fn rejects_expanding_recursive_generics() {
             Struct::named()
                 .field(
                     "next",
-                    Field::new(ndt.reference(vec![(generic, nested)]).into()),
+                    Field::new(self_ref.reference(vec![(generic, nested)]).into()),
                 )
                 .build(),
         );
@@ -672,7 +672,7 @@ fn rejects_expanding_recursive_generics() {
 #[test]
 fn allows_finite_recursive_generic_cycles() {
     let mut types = Types::default();
-    NamedDataType::new("Flip", &mut types, |_, ndt| {
+    NamedDataType::new("Flip", &mut types, |_, self_ref, ndt| {
         let a = GenericDefinition::new("A".into(), Some(Primitive::str.into()));
         let b = GenericDefinition::new("B".into(), Some(Primitive::u32.into()));
         ndt.generics = vec![a.clone(), b.clone()].into();
@@ -681,11 +681,12 @@ fn allows_finite_recursive_generic_cycles() {
                 .field(
                     "next",
                     Field::new(
-                        ndt.reference(vec![
-                            (a.reference(), DataType::Generic(b.reference())),
-                            (b.reference(), DataType::Generic(a.reference())),
-                        ])
-                        .into(),
+                        self_ref
+                            .reference(vec![
+                                (a.reference(), DataType::Generic(b.reference())),
+                                (b.reference(), DataType::Generic(a.reference())),
+                            ])
+                            .into(),
                     ),
                 )
                 .build(),
@@ -710,7 +711,7 @@ fn allows_finite_recursive_generic_cycles() {
 #[test]
 fn resolves_dependent_defaults_after_explicit_generics() {
     let mut types = Types::default();
-    let dependent = NamedDataType::new("Dependent", &mut types, |_, ndt| {
+    let dependent = NamedDataType::new("Dependent", &mut types, |_, _, ndt| {
         let t = GenericDefinition::new("T".into(), Some(Primitive::str.into()));
         let u = GenericDefinition::new("U".into(), Some(DataType::Generic(t.reference())));
         ndt.generics = vec![t.clone(), u.clone()].into();
@@ -721,8 +722,12 @@ fn resolves_dependent_defaults_after_explicit_generics() {
                 .build(),
         );
     });
-    let t = dependent.generics[0].reference();
-    NamedDataType::new("UsesDependent", &mut types, move |_, ndt| {
+    let t = types
+        .get(&dependent)
+        .expect("Dependent is registered")
+        .generics[0]
+        .reference();
+    NamedDataType::new("UsesDependent", &mut types, move |_, _, ndt| {
         ndt.ty = Some(
             Struct::named()
                 .field(
@@ -793,7 +798,7 @@ fn variant_untagged_map_keys_use_lexical_schemas() {
 #[test]
 fn empty_inline_enum_map_keys_reject_all_property_names() {
     let mut types = Types::default();
-    NamedDataType::new("EmptyEnumMap", &mut types, |_, ndt| {
+    NamedDataType::new("EmptyEnumMap", &mut types, |_, _, ndt| {
         ndt.ty = Some(SpectaMap::new(Enum::default().into(), Primitive::str.into()).into());
     });
 
@@ -894,7 +899,7 @@ fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
     }
 
     let mut types = Types::default();
-    NamedDataType::new("MixedUntaggedOther", &mut types, |_, ndt| {
+    NamedDataType::new("MixedUntaggedOther", &mut types, |_, _, ndt| {
         let mut enm = Enum::default();
         enm.attributes
             .insert("specta_serde:enum_repr_rewritten", true);
@@ -934,12 +939,12 @@ fn serde_other_exclusions_do_not_constrain_authored_untagged_variants() {
 #[test]
 fn boolean_schemas_preserve_named_and_field_metadata() {
     let mut types = Types::default();
-    NamedDataType::new("Impossible", &mut types, |_, ndt| {
+    NamedDataType::new("Impossible", &mut types, |_, _, ndt| {
         ndt.docs = "No values exist.".into();
         ndt.deprecated = Some(Deprecated::with_note("Use another type".into()));
         ndt.ty = Some(Enum::default().into());
     });
-    NamedDataType::new("ImpossibleField", &mut types, |_, ndt| {
+    NamedDataType::new("ImpossibleField", &mut types, |_, _, ndt| {
         let mut field = Field::new(Enum::default().into());
         field.docs = "Impossible field.".into();
         field.deprecated = Some(Deprecated::with_note("Remove this field".into()));
@@ -1002,7 +1007,7 @@ fn serde_named_enum_map_keys_keep_definition_metadata() {
 #[test]
 fn skipped_single_field_tuple_struct_is_an_empty_sequence() {
     let mut types = Types::default();
-    NamedDataType::new("SkippedSingleTuple", &mut types, |_, ndt| {
+    NamedDataType::new("SkippedSingleTuple", &mut types, |_, _, ndt| {
         ndt.ty = Some(Struct::unnamed().field(Field::default()).build());
     });
     let schema = JsonSchema::default()
@@ -1081,7 +1086,7 @@ fn permissive_objects_allow_present_optional_flatten_fields() {
 #[test]
 fn permissive_objects_allow_unknown_fields_in_intersection_fallbacks() {
     let mut types = Types::default();
-    NamedDataType::new("FallbackIntersection", &mut types, |_, ndt| {
+    NamedDataType::new("FallbackIntersection", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Intersection(vec![
             Struct::named()
                 .field("known", Field::new(Primitive::str.into()))
@@ -1108,7 +1113,7 @@ fn permissive_objects_allow_unknown_fields_in_intersection_fallbacks() {
 #[test]
 fn draft7_closes_finite_intersection_fallbacks() {
     let mut types = Types::default();
-    NamedDataType::new("Draft7Fallback", &mut types, |_, ndt| {
+    NamedDataType::new("Draft7Fallback", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Intersection(vec![
             Struct::named()
                 .field("known", Field::new(Primitive::str.into()))
@@ -1132,7 +1137,7 @@ fn draft7_closes_finite_intersection_fallbacks() {
 #[test]
 fn draft7_rejects_dynamic_intersection_fallbacks_that_cannot_be_closed() {
     let mut types = Types::default();
-    NamedDataType::new("DynamicDraft7Fallback", &mut types, |_, ndt| {
+    NamedDataType::new("DynamicDraft7Fallback", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Intersection(vec![
             Struct::named()
                 .field("known", Field::new(Primitive::str.into()))
@@ -1275,10 +1280,10 @@ fn draft7_wraps_documented_refs_for_annotation_siblings() {
 #[test]
 fn rejects_duplicate_definition_names() {
     let mut types = Types::default();
-    NamedDataType::new("Duplicate", &mut types, |_, ndt| {
+    NamedDataType::new("Duplicate", &mut types, |_, _, ndt| {
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Duplicate", &mut types, |_, ndt| {
+    NamedDataType::new("Duplicate", &mut types, |_, _, ndt| {
         ndt.ty = Some(Primitive::i32.into());
     });
 
@@ -1295,7 +1300,7 @@ fn rejects_duplicate_definition_names() {
 fn rejects_duplicate_definition_names_from_same_callsite() {
     let mut types = Types::default();
     for ty in [DataType::Primitive(Primitive::str), Primitive::i32.into()] {
-        NamedDataType::new("SameCallsite", &mut types, |_, ndt| {
+        NamedDataType::new("SameCallsite", &mut types, |_, _, ndt| {
             ndt.ty = Some(ty);
         });
     }

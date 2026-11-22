@@ -25,12 +25,35 @@ pub enum Reference {
 }
 
 /// Reference to a [`NamedDataType`](crate::datatype::NamedDataType).
+///
+/// This is a declaration's identity: registration returns it, other datatypes
+/// refer to the declaration through it, and equality means the same
+/// declaration. Generic arguments are part of the use site, not the identity.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct NamedReference {
-    pub(crate) id: NamedId,
+    pub(crate) id: NamedTypeId,
     /// How this named type should be referenced at the use site.
     pub inner: NamedReferenceType,
+}
+
+impl NamedReference {
+    /// Constructs a use-site [`Reference`] to this declaration.
+    ///
+    /// The reference will error in the language exporter if the declaration's
+    /// `ty` is `None`, as the type can't generate a named export.
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
+        Reference::Named(self.with_generics(generics))
+    }
+
+    /// Re-mints this reference at the same declaration with different generic
+    /// arguments.
+    pub fn with_generics(&self, generics: Vec<(Generic, DataType)>) -> Self {
+        Self {
+            id: self.id.clone(),
+            inner: NamedReferenceType::Reference { generics },
+        }
+    }
 }
 
 /// Use-site representation for a [`NamedReference`].
@@ -116,28 +139,20 @@ impl RecursiveInlineFrame {
         Self::new_inner(types, named_type_path(ndt), generics)
     }
 
-    pub(crate) fn from_type_path(
-        types: &Types,
-        type_name: Cow<'static, str>,
-        generics: &[(Generic, DataType)],
-    ) -> Self {
-        let type_name = match type_name {
-            Cow::Borrowed(name) => Cow::Owned(display_type_identity(name).to_owned()),
-            Cow::Owned(name) => Cow::Owned(display_type_identity(&name).to_owned()),
-        };
-        Self::new_inner(types, type_name, generics)
-    }
-
     /// Describes the `id` use site with `generics`.
     ///
     /// This is only called when a cycle is actually reported, so the (allocating)
     /// path rendering and generic formatting stay off the common resolution path.
-    pub(crate) fn describe(types: &Types, id: &NamedId, generics: &[(Generic, DataType)]) -> Self {
+    pub(crate) fn describe(
+        types: &Types,
+        id: &NamedTypeId,
+        generics: &[(Generic, DataType)],
+    ) -> Self {
         match types.types.get(id).and_then(|ndt| ndt.as_ref()) {
             Some(ndt) => Self::new(types, ndt, generics),
             // The entry can only disappear if the definition is being rebuilt
             // after a panic; fall back to the identity itself.
-            None => Self::from_type_path(types, id.static_path(), generics),
+            None => Self::new_inner(types, id.static_path(), generics),
         }
     }
 
@@ -390,61 +405,125 @@ impl From<Reference> for DataType {
     }
 }
 
-/// Unique identifier for a [NamedDataType].
+/// Identity of a named declaration within a [`Types`](crate::Types) graph.
 ///
-/// For static types (from derive macros), we use a unique string based on the
-/// type's module path and name. For dynamic types, we use an Arc pointer.
+/// Two declarations are equal only when they are the same declaration in the
+/// same graph; a copy of the graph keeps the same identities. The identity is
+/// process-local and must not be used as a persistence key or as a stable sort
+/// tiebreaker.
+///
+/// Identity is the one fact a declaration's producer cannot misstate by
+/// accident, which differs by producer:
+///
+/// `#[derive(Type)]` expands at sites nobody controls - a user's
+/// `macro_rules!` macro can expand the same derive twice, and the two
+/// declarations then share every path-shaped fact: module path, name,
+/// source span, `type_name`. Only a marker the compiler mints per
+/// expansion tells them apart, so a derived declaration is identified by
+/// [`NamedTypeId::nominal`] and its path stays a readable label.
+///
+/// A hand-written implementation is identified by [`NamedTypeId::label`]:
+/// its canonical path, stringified from the tokens as written. Coherence
+/// allows one `impl Type` per concrete type, so a path can only repeat when
+/// a second dependency is deliberately aliased to the same crate name - and
+/// that repeat is exactly how two majors of one dependency become one
+/// declaration without further action.
+#[doc(hidden)]
 #[derive(Clone)]
-pub(crate) enum NamedId {
-    // A unique string identifying the type (module_path::TypeName).
-    Static(&'static str),
+pub enum NamedTypeId {
+    /// A declaration known at compile time.
+    Named {
+        /// The declaration's path: used in diagnostics and, when no marker
+        /// was minted, compared as identity.
+        label: &'static str,
+        /// The marker a derive minted for its expansion; when present, it
+        /// is the identity and the path is only a label.
+        nominal: Option<TypeId>,
+    },
+    /// A declaration created at runtime, identified by its `Arc` allocation.
     Dynamic(Arc<()>),
 }
 
-impl PartialEq for NamedId {
+impl NamedTypeId {
+    /// Identity of a hand-written implementation: its canonical path,
+    /// stringified from the tokens as written. Aliasing a second major of
+    /// the same dependency to this path makes both implementations
+    /// register as one declaration.
+    pub const fn label(label: &'static str) -> Self {
+        Self::Named {
+            label,
+            nominal: None,
+        }
+    }
+
+    /// Identity of a derived declaration: its path plus the marker's `TypeId`.
+    pub const fn nominal(label: &'static str, id: TypeId) -> Self {
+        Self::Named {
+            label,
+            nominal: Some(id),
+        }
+    }
+
+    /// Human-readable identity used in diagnostics.
+    pub(crate) const fn label_str(&self) -> &'static str {
+        match self {
+            Self::Named { label, .. } => label,
+            Self::Dynamic(_) => "",
+        }
+    }
+}
+
+impl PartialEq for NamedTypeId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (NamedId::Static(a), NamedId::Static(b)) => a == b,
-            (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
+            (
+                NamedTypeId::Named {
+                    label: a_label,
+                    nominal: a,
+                },
+                NamedTypeId::Named {
+                    label: b_label,
+                    nominal: b,
+                },
+            ) => a_label == b_label && a == b,
+            (NamedTypeId::Dynamic(a), NamedTypeId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
 }
-impl Eq for NamedId {}
+impl Eq for NamedTypeId {}
 
-impl NamedId {
+impl NamedTypeId {
     /// Best-effort path for diagnostics when the name itself is unavailable.
     pub(crate) fn static_path(&self) -> Cow<'static, str> {
         match self {
-            NamedId::Static(s) => Cow::Borrowed(s),
-            NamedId::Dynamic(p) => Cow::Owned(format!("d{:p}", Arc::as_ptr(p))),
+            NamedTypeId::Named { label, .. } => Cow::Borrowed(label),
+            NamedTypeId::Dynamic(p) => Cow::Owned(format!("d{:p}", Arc::as_ptr(p))),
         }
     }
 }
 
-impl hash::Hash for NamedId {
+impl hash::Hash for NamedTypeId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            NamedId::Static(s) => s.hash(state),
-            NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
+            NamedTypeId::Named { label, nominal } => {
+                0u8.hash(state);
+                label.hash(state);
+                nominal.hash(state);
+            }
+            NamedTypeId::Dynamic(p) => {
+                1u8.hash(state);
+                std::ptr::hash(Arc::as_ptr(p), state);
+            }
         }
     }
 }
 
-/// Removes the internal `#<hash>` declaration suffix from a type identity.
-///
-/// The suffix only distinguishes declarations that share a module path and
-/// name. Diagnostics and recursive-cycle descriptions should show the stable
-/// Rust path instead.
-fn display_type_identity(identity: &str) -> &str {
-    identity.split_once('#').map_or(identity, |(path, _)| path)
-}
-
-impl fmt::Debug for NamedId {
+impl fmt::Debug for NamedTypeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(s) => write!(f, "s:{}", display_type_identity(s)),
-            NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
+            NamedTypeId::Named { label, .. } => write!(f, "s:{label}"),
+            NamedTypeId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }
 }

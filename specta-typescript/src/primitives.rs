@@ -11,7 +11,7 @@ use std::{
 use specta::{
     Format, Types,
     datatype::{
-        DataType, Deprecated, Enum, Field, Fields, GenericDefinition, GenericReference, List, Map,
+        DataType, Deprecated, Enum, Field, Fields, Generic, GenericDefinition, List, Map,
         NamedDataType, NamedReference, NamedReferenceType, OpaqueReference, Primitive, Reference,
         Struct, Tuple, Variant,
     },
@@ -814,7 +814,7 @@ pub(crate) fn datatype_with_inline_attr(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     shallow_inline: bool,
 ) -> Result<(), Error> {
     if shallow_inline {
@@ -846,14 +846,14 @@ pub(crate) fn datatype_with_inline_attr(
     )
 }
 
-fn write_generic_reference(s: &mut String, generic: &GenericReference) {
+fn write_generic_reference(s: &mut String, generic: &Generic) {
     s.push_str(generic.name());
 }
 
 fn scoped_reference_generics(
-    parent_generics: &[(GenericReference, DataType)],
-    reference_generics: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
+    parent_generics: &[(Generic, DataType)],
+    reference_generics: &[(Generic, DataType)],
+) -> Vec<(Generic, DataType)> {
     parent_generics
         .iter()
         .filter(|(parent_generic, _)| {
@@ -865,7 +865,7 @@ fn scoped_reference_generics(
         .collect()
 }
 
-fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
+fn named_reference_generics(r: &NamedReference) -> Result<&[(Generic, DataType)], Error> {
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
         NamedReferenceType::Inline { .. } => Ok(&[]),
@@ -902,7 +902,7 @@ fn inline_named_datatype<'a>(types: &'a Types, dt: &DataType) -> Option<&'a Name
 
 fn resolve_scoped_generic_default(
     default: &DataType,
-    scoped_generics: &[(GenericReference, DataType)],
+    scoped_generics: &[(Generic, DataType)],
 ) -> DataType {
     match default {
         DataType::Generic(default) => scoped_generics
@@ -916,8 +916,8 @@ fn resolve_scoped_generic_default(
 fn resolved_reference_generics(
     ndt: &specta::datatype::NamedDataType,
     r: &NamedReference,
-    parent_generics: &[(GenericReference, DataType)],
-) -> Option<(Vec<DataType>, bool, Vec<(GenericReference, DataType)>)> {
+    parent_generics: &[(Generic, DataType)],
+) -> Option<(Vec<DataType>, bool, Vec<(Generic, DataType)>)> {
     let reference_generics = named_reference_generics(r).ok()?;
     let mut scoped_generics = scoped_reference_generics(parent_generics, reference_generics);
     let mut all_default = true;
@@ -958,7 +958,7 @@ struct RenderCtx<'a> {
     types: &'a Types,
     parent_name: Option<&'a str>,
     prefix: &'a str,
-    generics: &'a [(GenericReference, DataType)],
+    generics: &'a [(Generic, DataType)],
 }
 
 #[derive(Clone, Copy)]
@@ -1255,11 +1255,7 @@ fn push_nullable(s: &mut String, inner: &str) {
     }
 }
 
-fn is_exhaustive_map_key(
-    dt: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-) -> bool {
+fn is_exhaustive_map_key(dt: &DataType, types: &Types, generics: &[(Generic, DataType)]) -> bool {
     match dt {
         DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
         DataType::Reference(Reference::Named(r)) => named_reference_ty(types, r, &[])
@@ -1312,7 +1308,7 @@ fn render_map(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     value_mode: RenderMode,
 ) -> Result<(), Error> {
     let path = map_key_path(&location);
@@ -1377,7 +1373,7 @@ fn shallow_inline_datatype(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     render_datatype(
         s,
@@ -1434,7 +1430,7 @@ fn inline_datatype(
     parent_name: Option<&str>,
     prefix: &str,
     depth: usize,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // Prevent infinite recursion
     if depth == 25 {
@@ -1561,7 +1557,7 @@ fn inline_struct_with_generics(
     parent_name: Option<&str>,
     prefix: &str,
     depth: usize,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match &st.fields {
         Fields::Unit => s.push_str(NULL),
@@ -1630,7 +1626,7 @@ pub(crate) fn datatype(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     render_datatype(
         s,
@@ -1669,7 +1665,7 @@ fn list_dt(
     types: &Types,
     l: &List,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     let mut dt = String::new();
     datatype(
@@ -1696,7 +1692,7 @@ fn map_key_datatype(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match shape {
         // serde_json writes integer map keys as JSON strings, and a lossless
@@ -1748,7 +1744,7 @@ fn map_key_expression(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match key_ty {
         DataType::Reference(r) => {
@@ -1775,7 +1771,7 @@ fn map_dt(
     types: &Types,
     m: &Map,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     render_map(
         s,
@@ -1828,7 +1824,7 @@ fn unnamed_fields_datatype(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     force_inline: bool,
 ) -> Result<(), Error> {
     match fields {
@@ -1961,7 +1957,7 @@ fn struct_dt(
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match &st.fields {
         Fields::Unit => s.push_str(NULL),
@@ -2043,7 +2039,7 @@ fn object_field_to_ts(
     (field, ty): (&Field, &DataType),
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     prefix: &str,
     force_inline: bool,
     ty_override: Option<&str>,
@@ -2282,7 +2278,7 @@ fn enum_variant_datatype(
     variant: &Variant,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>, Error> {
     match &variant.fields {
@@ -3379,14 +3375,11 @@ fn enum_dt(
     e: &Enum,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
-    let is_finite_number = e.attributes.get_named_as("specta:finite_number") == Some(&true);
+    let is_finite_number = e.attributes.get_as("specta:finite_number") == Some(&true);
 
-    if e.attributes
-        .get_named_as("specta_serde:deferred_alias_union")
-        == Some(&true)
-    {
+    if e.attributes.get_as("specta_serde:deferred_alias_union") == Some(&true) {
         return alias_field_union_dt(s, exporter, types, e, location, prefix, generics);
     }
 
@@ -3484,7 +3477,7 @@ fn alias_field_union_dt(
     e: &Enum,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     let mut fields = Vec::with_capacity(e.variants.len());
     let mut all_optional = true;
@@ -3544,7 +3537,7 @@ fn tuple_dt(
     types: &Types,
     t: &Tuple,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match t.elements.as_slice() {
         [] => s.push_str(NULL),
@@ -3583,7 +3576,7 @@ fn reference_dt(
     r: &Reference,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match r {
         Reference::Named(r) => match &r.inner {
@@ -3712,7 +3705,7 @@ fn reference_named_dt(
     types: &Types,
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // The location is only needed to describe a dangling reference.
     let ndt = types

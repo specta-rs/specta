@@ -560,7 +560,7 @@ fn zod_layout_duplicate_typenames() {
 #[test]
 fn zod_module_prefixed_duplicate_checks_use_rendered_names() {
     fn add_type(types: &mut Types, name: &'static str, module_path: &'static str) {
-        NamedDataType::new(name, types, |_, ndt| {
+        NamedDataType::new(name, types, |_, _, ndt| {
             ndt.module_path = module_path.into();
             ndt.ty = Some(Primitive::str.into());
         });
@@ -577,11 +577,11 @@ fn zod_module_prefixed_duplicate_checks_use_rendered_names() {
     assert!(out.contains("export type foo_Bar = string"));
 
     let mut references = Types::default();
-    let root = NamedDataType::new("RootReference", &mut references, |_, ndt| {
+    let root = NamedDataType::new("RootReference", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut references, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut references, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(DataType::Reference(root.reference(vec![])));
     });
@@ -637,7 +637,7 @@ fn zod_layout_namespaces() {
 #[test]
 fn zod_layout_namespaces_reexports_root_schema() {
     let mut types = Types::default();
-    NamedDataType::new("Root", &mut types, |_, ndt| {
+    NamedDataType::new("Root", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -681,11 +681,11 @@ fn zod_layout_files_sanitises_the_zod_prelude_binding() {
     let temp = temp_dir();
     let path = temp.path().join("zod-prelude-binding");
     let mut types = Types::default();
-    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, ndt| {
+    let z_type = NamedDataType::new("PreludeCollision", &mut types, |_, _, ndt| {
         ndt.module_path = "z".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesZ", &mut types, |_, ndt| {
+    NamedDataType::new("UsesZ", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(z_type.reference(vec![])));
     });
@@ -706,11 +706,11 @@ fn zod_layout_files_qualifies_root_types_from_modules() {
     let temp = temp_dir();
     let path = temp.path().join("zod-root-reference");
     let mut types = Types::default();
-    let root = NamedDataType::new("RootReference", &mut types, |_, ndt| {
+    let root = NamedDataType::new("RootReference", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesRoot", &mut types, |_, ndt| {
+    NamedDataType::new("UsesRoot", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(root.reference(vec![])));
     });
@@ -731,15 +731,15 @@ fn zod_layout_files_preserves_a_top_level_index_module() {
     let temp = temp_dir();
     let path = temp.path().join("zod-index-module");
     let mut types = Types::default();
-    let index_type = NamedDataType::new("IndexType", &mut types, |_, ndt| {
+    let index_type = NamedDataType::new("IndexType", &mut types, |_, _, ndt| {
         ndt.module_path = "index".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("UsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "other".into();
         ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
     });
-    NamedDataType::new("ChildUsesIndex", &mut types, |_, ndt| {
+    NamedDataType::new("ChildUsesIndex", &mut types, |_, _, ndt| {
         ndt.module_path = "index::child".into();
         ndt.ty = Some(DataType::Reference(index_type.reference(vec![])));
     });
@@ -765,11 +765,11 @@ fn zod_layout_files_imports_parent_module_files() {
     let temp = temp_dir();
     let path = temp.path().join("zod-parent-reference");
     let mut types = Types::default();
-    let parent = NamedDataType::new("ParentReference", &mut types, |_, ndt| {
+    let parent = NamedDataType::new("ParentReference", &mut types, |_, _, ndt| {
         ndt.module_path = "parent".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("UsesParent", &mut types, |_, ndt| {
+    NamedDataType::new("UsesParent", &mut types, |_, _, ndt| {
         ndt.module_path = "parent::child".into();
         ndt.ty = Some(DataType::Reference(parent.reference(vec![])));
     });
@@ -802,7 +802,7 @@ fn zod_layout_files_empty_export_allows_a_missing_directory() {
 #[test]
 fn zod_layout_namespaces_rejects_module_type_collisions() {
     let mut types = Types::default().register::<Testing>();
-    NamedDataType::new("test", &mut types, |_, ndt| {
+    NamedDataType::new("test", &mut types, |_, _, ndt| {
         ndt.module_path = "".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -817,11 +817,11 @@ fn zod_layout_namespaces_rejects_module_type_collisions() {
 #[test]
 fn zod_layout_namespaces_rejects_nested_schema_module_collisions() {
     let mut types = Types::default();
-    NamedDataType::new("Foo", &mut types, |_, ndt| {
+    NamedDataType::new("Foo", &mut types, |_, _, ndt| {
         ndt.module_path = "outer".into();
         ndt.ty = Some(Primitive::str.into());
     });
-    NamedDataType::new("Nested", &mut types, |_, ndt| {
+    NamedDataType::new("Nested", &mut types, |_, _, ndt| {
         ndt.module_path = "outer::FooSchema".into();
         ndt.ty = Some(Primitive::str.into());
     });
@@ -1021,7 +1021,7 @@ fn zod_inline_recursive_generics_keep_schema_arguments() {
     let mut types = Types::default();
     let holder = ConcreteHolder::definition(&mut types);
     let ty = types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|ndt| ndt.name == "GenericNode")
         .and_then(|ndt| ndt.ty.as_ref())
         .expect("generic node definition should be registered");
@@ -1072,7 +1072,7 @@ fn zod_map_key_validation_ignores_skipped_variants() {
 #[test]
 fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
-    NamedDataType::new("class", &mut types, |_, ndt| {
+    NamedDataType::new("class", &mut types, |_, _, ndt| {
         ndt.ty = Some(DataType::Primitive(Primitive::i8));
     });
     let err = Zod::default()
@@ -1081,7 +1081,7 @@ fn zod_reserved_type_name_errors() {
     assert!(err.to_string().contains("reserved keyword"));
 
     let mut types = Types::default();
-    NamedDataType::new("GenericZ", &mut types, |_, ndt| {
+    NamedDataType::new("GenericZ", &mut types, |_, _, ndt| {
         let generic = specta::datatype::GenericDefinition::new("z".into(), None);
         ndt.generics = Cow::Owned(vec![generic.clone()]);
         ndt.ty = Some(DataType::Generic(generic.reference()));
@@ -1384,7 +1384,7 @@ fn zod_framework_export_formats_generic_named_datatypes() {
         .framework_runtime(|exporter| {
             let generic_defaults = exporter
                 .types
-                .into_unsorted_iter()
+                .iter_unsorted()
                 .filter(|ndt| ndt.name == "ZodGenericDefaults");
             Ok(Cow::Owned(exporter.export(generic_defaults, "")?))
         })
@@ -1490,7 +1490,7 @@ fn zod_files_framework_runtime_deduplicates_body_imports() {
     }
 
     let mut types = Types::default().register::<FrameworkRoot>();
-    types.iter_mut(|ndt| {
+    types.for_each_named_mut(|ndt| {
         if ndt.name == "FrameworkRoot" {
             ndt.module_path = Cow::Borrowed("");
         }

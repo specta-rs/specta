@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn remaps_named_type_bodies() {
         let mut types = Types::default();
-        NamedDataType::new("User", &mut types, |_, ty| {
+        NamedDataType::new("User", &mut types, |_, _, ty| {
             ty.ty = Some(
                 Struct::named()
                     .field("id", Field::new(Primitive::u32.into()))

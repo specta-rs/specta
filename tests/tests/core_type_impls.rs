@@ -19,7 +19,7 @@ fn named_data_type<T: Type>(name: &str) -> DataType {
     let mut types = Types::default();
     T::definition(&mut types);
     types
-        .into_unsorted_iter()
+        .iter_unsorted()
         .find(|data_type| data_type.name == name)
         .and_then(|data_type| data_type.ty.clone())
         .unwrap_or_else(|| panic!("missing named datatype {name}"))
@@ -32,7 +32,7 @@ fn assert_untagged(data_type: &DataType) {
     assert_eq!(
         data_type
             .attributes
-            .get_named_as::<bool>("serde:container:untagged"),
+            .get_as::<bool>("serde:container:untagged"),
         Some(&true)
     );
 }
@@ -224,7 +224,7 @@ struct IterB;
 #[test]
 fn unsorted_iterator_len_tracks_consumption() {
     let types = Types::default().register::<IterA>().register::<IterB>();
-    let mut iter = types.into_unsorted_iter();
+    let mut iter = types.iter_unsorted();
 
     assert_eq!(iter.len(), 2);
     assert!(iter.next().is_some());

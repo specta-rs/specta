@@ -186,29 +186,9 @@ impl Java {
 }
 
 fn format_types(types: &Types, format: &dyn Format) -> Result<Types, Error> {
-    let types = format
-        .map_types(types)
-        .map_err(|source| Error::format("type graph formatter failed", source))?;
-    map_datatypes(types, format)
-}
-
-fn map_datatypes(types: Cow<'_, Types>, format: &dyn Format) -> Result<Types, Error> {
-    let original = types.as_ref();
-    let mut mapped = original.clone();
-    let mut error = None;
-    mapped.iter_mut(|ndt| {
-        if error.is_some() {
-            return;
-        }
-        let Some(ty) = &ndt.ty else { return };
-        match map_datatype(original, format, ty) {
-            Ok(ty) => ndt.ty = Some(ty),
-            Err(err) => {
-                error = Some(err.with_path(ndt.name.to_string()).with_named_datatype(ndt));
-            }
-        }
-    });
-    error.map_or_else(|| Ok(mapped), Err)
+    types
+        .format(format)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 fn map_datatype(

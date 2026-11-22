@@ -57,16 +57,35 @@ fn lower(operation: &Operation, resolved: &Resolved) -> Result<Value, Error> {
 
     let mut responses = Map::new();
     for response in &operation.responses {
-        let mut object = Map::new();
-        object.insert("description".to_string(), json!(response.description));
-        if let Some(body) = &response.body {
-            let content_type = response.content_type.as_deref().unwrap_or(JSON);
-            object.insert(
-                "content".to_string(),
-                json!({ content_type: { "schema": response_schema_of(body, resolved)? } }),
-            );
+        let entry = responses
+            .entry(response.status.to_string())
+            .or_insert_with(|| {
+                let mut object = Map::new();
+                object.insert("description".to_string(), json!(response.description));
+                Value::Object(object)
+            });
+        let object = entry
+            .as_object_mut()
+            .ok_or(Error::UnresolvedOperationTypes)?;
+
+        let Some(body) = &response.body else {
+            continue;
+        };
+
+        let content_type = response.content_type.as_deref().unwrap_or(JSON);
+        let content = object
+            .entry("content")
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .ok_or(Error::UnresolvedOperationTypes)?;
+        let media = json!({ "schema": response_schema_of(body, resolved)? });
+        if content.insert(content_type.to_string(), media).is_some() {
+            return Err(Error::DuplicateResponse {
+                path: operation.path.to_string(),
+                status: response.status,
+                content_type: content_type.to_string(),
+            });
         }
-        responses.insert(response.status.to_string(), Value::Object(object));
     }
 
     let mut object = Map::new();
