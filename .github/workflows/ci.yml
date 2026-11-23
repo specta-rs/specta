@@ -189,7 +189,7 @@ jobs:
       # `run.sh` downloads the kotlinx-serialization runtime from Maven Central.
       # Cache it so a normal run needs no network and cannot be rate-limited.
       - name: Cache kotlinx-serialization runtime
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: tests/kotlin-typecheck/lib
           key: kotlinx-serialization-1.13.0

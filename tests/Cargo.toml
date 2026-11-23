@@ -36,7 +36,7 @@ insta = "1.48.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", default-features = false }
 url = { version = "2", default-features = false }
-jiff = { version = "0.2", default-features = false }
+jiff = { version = "1.0", default-features = false }
 either = { version = "1.16", default-features = false }
 ulid = { version = "3.0", default-features = false, features = [] }
 glam = { version = "0.34", default-features = false, features = ["std", "all-types"] }
