@@ -45,7 +45,7 @@ jobs:
           # `--all-features` hides missing feature dependencies through
           # unification, so check every adapter separately.
           features=(
-            serde_json1 serde_yaml09 toml1 uuid1 ulid3 chrono04 time03 jiff02
+            serde_json1 serde_yaml09 toml1 uuid1 ulid3 chrono04 time03 jiff1
             bigdecimal04 rust_decimal1 indexmap2 ordered-float heapless semver1
             smol_str03 arrayvec smallvec1 ipnetwork021 mac_address1 bit-vec010
             bson3 bytes1 uhlc09 bytesize2 glam034 tokio1 url2 either1

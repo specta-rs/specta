@@ -2043,6 +2043,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-elm"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "serde_json",
+ "specta",
+ "tempfile",
+]
+
+[[package]]
 name = "specta-go"
 version = "0.0.6"
 dependencies = [
@@ -2112,6 +2122,16 @@ dependencies = [
  "specta-serde",
  "unicode-ident",
  "unicode-normalization",
+]
+
+[[package]]
+name = "specta-rescript"
+version = "0.0.3"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "thiserror",
 ]
 
 [[package]]

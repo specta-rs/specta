@@ -52,8 +52,8 @@ ulid3 = ["dep:ulid"]
 chrono04 = ["dep:chrono"]
 ## [time](https://docs.rs/time) 0.3.x
 time03 = ["dep:time"]
-## [jiff](https://docs.rs/jiff) 0.2.x
-jiff02 = ["dep:jiff"]
+## [jiff](https://docs.rs/jiff) 1.x
+jiff1 = ["dep:jiff"]
 ## [bigdecimal](https://docs.rs/bigdecimal) 0.4.x
 bigdecimal04 = ["dep:bigdecimal"]
 ## [rust_decimal](https://docs.rs/rust_decimal) 1.x
