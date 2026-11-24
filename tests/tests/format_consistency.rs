@@ -45,6 +45,11 @@ fn named_definitions_apply_map_type_consistently_across_exporters() {
         .expect("Zod export should succeed");
     assert!(zod.contains("z.string()"), "{zod}");
 
+    let effect = specta_effect::Effect::default()
+        .export(&types(), U32AsString)
+        .expect("Effect export should succeed");
+    assert!(effect.contains("value: Schema.String"), "{effect}");
+
     let valibot = specta_valibot::Valibot::default()
         .export(&types(), U32AsString)
         .expect("Valibot export should succeed");

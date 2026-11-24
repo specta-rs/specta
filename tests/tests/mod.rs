@@ -17,6 +17,7 @@ mod bound_nested;
 mod builtin_wire_mappings;
 mod core_type_impls;
 mod csharp;
+mod effect;
 mod errors;
 mod format_consistency;
 mod go;

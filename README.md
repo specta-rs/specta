@@ -32,6 +32,7 @@
 | **JSON Schema** | 🧪 **Experimental** | [`specta-jsonschema`](https://crates.io/crates/specta-jsonschema) | Draft 7/2019-09/2020-12, generics, Serde          |
 | **Zod**         | 🧪 **Experimental** | [`specta-zod`](https://crates.io/crates/specta-zod)               | Zod 4 schemas, inferred types, generics, layouts  |
 | **Valibot**     | 🧪 **Experimental** | [`specta-valibot`](https://crates.io/crates/specta-valibot)       | Valibot schemas, inferred types, generics, layouts |
+| **Effect**      | 🧪 **Experimental** | [`specta-effect`](https://crates.io/crates/specta-effect)         | Effect 4.1 Schema values, generics, Serde, layouts  |
 | **Python**      | 🧪 **Experimental** | [`specta-python`](./specta-python)                                | Python 3.13 TypedDicts and type hints             |
 | **C#**          | 🧪 **Experimental** | `specta-csharp`                                                   | Records, enums, generics, namespaces, file layouts |
 | **Java**        | 🧪 **Experimental** | `specta-java`                                                     | Java 17 records, enums, and sealed interfaces     |
@@ -73,6 +74,7 @@ cargo add specta_kotlin       # Kotlin (experimental)
 cargo add specta_jsonschema   # JSON Schema (experimental)
 cargo add specta_zod          # Zod schemas (experimental)
 cargo add specta-valibot      # Valibot schemas (experimental)
+cargo add specta-effect        # Effect Schema values (experimental)
 cargo add specta-csharp       # C# (experimental)
 cargo add specta-elm          # Elm (experimental)
 ```
@@ -131,6 +133,28 @@ export type TypeOne = { a: string; b: GenericType<number>; cccccc: MyEnum };
 }
 
 ```
+
+### Effect Schema Example
+
+```rust
+use specta::{Type, Types};
+use specta_effect::Effect;
+
+#[derive(Type)]
+pub struct User {
+    pub id: u32,
+    pub name: String,
+}
+
+let types = Types::default().register::<User>();
+Effect::default()
+    .export_to("./schemas.ts", &types, specta_serde::Format)
+    .unwrap();
+```
+
+This emits Effect Schema values such as `UserSchema`, without generating a
+separate set of TypeScript type declarations. Infer the TypeScript type with
+`Schema.Schema.Type<typeof UserSchema>` when needed.
 
 ### Multi-Language Export Example
 
@@ -239,11 +263,12 @@ its own trusted publisher: `specta`, `specta-macros`, `specta-serde`,
 `specta-util`, `specta-typescript`, `specta-swift`, `specta-elm`,
 `specta-openapi`, `specta-jsonschema`, `specta-kotlin`, `specta-csharp`,
 `specta-go`, `specta-python`, `specta-java`, `specta-zod`, `specta-valibot`,
+`specta-effect`,
 `specta-rust` and `specta-rescript`.
 
 A trusted publisher can only be configured once a crate exists on crates.io, and
-the initial publish requires an API token. `specta-valibot`, `specta-rust` and
-`specta-rescript` have never been released, so publish each of them once from your
+the initial publish requires an API token. `specta-valibot`, `specta-effect`,
+`specta-rust` and `specta-rescript` have never been released, so publish each of them once from your
 machine before adding its trusted publisher.
 
 `specta-elm` was published as `0.1.0` from its original repository before it

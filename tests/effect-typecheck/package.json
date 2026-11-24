@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "generate": "cargo run -p specta-tests --example effect_typecheck",
+    "typecheck": "bun run generate && tsc -p tsconfig.json",
+    "test": "bun run typecheck && bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "effect": "4.1.0",
+    "typescript": "5.9.3"
+  }
+}

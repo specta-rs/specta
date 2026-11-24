@@ -1,0 +1,33 @@
+[package]
+name = "specta-effect"
+description = "Export your Rust types to Effect Schema for TypeScript"
+version = "0.0.1"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-effect/latest/specta-effect"
+keywords = ["specta", "rspc", "typescript", "typesafe", "effect"]
+categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
+
+[package.metadata."docs.rs"]
+all-features = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+# Implement serde::Serialize and serde::Deserialize for Effect-specific wrapper types.
+serde = ["dep:serde"]
+
+[dependencies]
+specta = { version = "=2.0.0-rc.28", path = "../specta" }
+serde = { version = "1", default-features = false, optional = true }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+specta = { version = "=2.0.0-rc.28", path = "../specta", features = ["derive", "collect"] }
+specta-serde = { version = "=0.0.15", path = "../specta-serde" }
