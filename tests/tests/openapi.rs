@@ -1020,6 +1020,92 @@ fn numeric_formats_and_compact_string_enums() {
     );
 }
 
+/// Internally and adjacently tagged enums give each variant its own component
+/// and add a `discriminator`, so generators emit one type per variant.
+#[test]
+fn tagged_enums_get_a_component_per_variant_and_a_discriminator() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum Shape {
+        Circle { radius: f64 },
+        Labels(HashMap<String, String>),
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    enum ExternallyTagged {
+        Circle { radius: f64 },
+    }
+
+    let types = Types::default()
+        .register::<Shape>()
+        .register::<ApiEvent>()
+        .register::<ExternallyTagged>();
+    for version in [OasVersion::V3_1, OasVersion::V3_0] {
+        let document = OpenApi::default()
+            .oas_version(version)
+            .schema_mode(SchemaMode::Compatible)
+            .export_document(&types, specta_serde::Format)
+            .expect("tagged enums should export");
+        let schemas = &document["components"]["schemas"];
+
+        assert_eq!(
+            schemas["Shape"]["discriminator"],
+            serde_json::json!({
+                "propertyName": "type",
+                "mapping": {
+                    "Circle": "#/components/schemas/Shape_Circle",
+                    "Labels": "#/components/schemas/Shape_Labels",
+                },
+            })
+        );
+        assert_eq!(
+            schemas["Shape"]["oneOf"],
+            serde_json::json!([
+                { "$ref": "#/components/schemas/Shape_Circle" },
+                { "$ref": "#/components/schemas/Shape_Labels" },
+            ])
+        );
+        assert_eq!(
+            schemas["Shape_Circle"]["required"],
+            serde_json::json!(["type", "radius"])
+        );
+        // A tagged map variant keeps its tag inside `allOf`.
+        assert!(schemas["Shape_Labels"]["allOf"].is_array());
+        assert_eq!(schemas["ApiEvent"]["discriminator"]["propertyName"], "kind");
+        assert!(schemas["ExternallyTagged"].get("discriminator").is_none());
+    }
+}
+
+/// A tagged enum keeps its inline arms when a variant's component name is
+/// already taken.
+#[test]
+fn tagged_enum_keeps_inline_arms_when_a_variant_name_is_taken() {
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum Shape {
+        Circle { radius: f64 },
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
+    #[serde(rename = "Shape_Circle")]
+    struct Collider {
+        radius: f64,
+    }
+
+    let types = Types::default().register::<Shape>().register::<Collider>();
+    let document = OpenApi::default()
+        .export_document(&types, specta_serde::Format)
+        .expect("tagged enums should export");
+    let shape = &document["components"]["schemas"]["Shape"];
+
+    assert!(shape.get("discriminator").is_none());
+    assert!(shape["oneOf"][0].get("$ref").is_none());
+}
+
 /// The `Param` builder covers what the bare conveniences cannot: required
 /// query parameters, descriptions, and example values.
 #[test]

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value, json};
 use specta::{Format, Types};
@@ -50,6 +50,7 @@ pub(crate) fn components(
         }
         components.insert(component_name, schema);
     }
+    hoist_tagged_variants(&mut components);
     Ok(components)
 }
 
@@ -88,13 +89,17 @@ fn definition_ref(name: &str) -> String {
     format!("#/$defs/{encoded}")
 }
 
+fn component_ref(name: &str) -> String {
+    format!("#/components/schemas/{name}")
+}
+
 fn rewrite_component_refs(value: &mut Value, references: &BTreeMap<String, String>) {
     match value {
         Value::Object(object) => {
             if let Some(Value::String(reference)) = object.get_mut("$ref")
                 && let Some(component) = references.get(reference)
             {
-                *reference = format!("#/components/schemas/{component}");
+                *reference = component_ref(component);
             }
             object
                 .values_mut()
@@ -431,13 +436,8 @@ fn compact_string_enum(schema: &mut Map<String, Value>) {
         // own transform runs, so both the JSON Schema `const` form and the
         // already-lowered single-value `enum` form appear here - with nothing
         // but an optional description beside it.
-        let value = match (member.get("const"), member.get("enum")) {
-            (Some(Value::String(value)), None) => value,
-            (None, Some(Value::Array(constants))) => match constants.as_slice() {
-                [Value::String(value)] => value,
-                _ => return,
-            },
-            _ => return,
+        let Some(value) = pinned_string(member) else {
+            return;
         };
         if member
             .keys()
@@ -460,4 +460,109 @@ fn compact_string_enum(schema: &mut Map<String, Value>) {
             Value::Object(descriptions),
         );
     }
+}
+
+/// The one string a schema admits: JSON Schema's `const`, or the single-value
+/// `enum` that OpenAPI 3.0 lowers it to.
+fn pinned_string(schema: &Map<String, Value>) -> Option<&String> {
+    match (schema.get("const"), schema.get("enum")) {
+        (Some(Value::String(value)), None) => Some(value),
+        (None, Some(Value::Array(values))) => match values.as_slice() {
+            [Value::String(value)] => Some(value),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Gives each arm of a tagged union its own component and adds a
+/// `discriminator`, so generators emit one type per variant instead of trying
+/// each `oneOf` arm in turn. Internally and adjacently tagged Serde enums export
+/// this way: every arm requires the same property and pins it to a different
+/// string. A union whose arm names would collide with another component keeps
+/// its inline arms.
+fn hoist_tagged_variants(components: &mut BTreeMap<String, Value>) {
+    let unions = components
+        .iter()
+        .filter_map(|(parent, schema)| {
+            let (property, tags) = tagged_union(schema)?;
+            let names = tags
+                .iter()
+                .map(|tag| component_name(&format!("{parent}_{tag}")))
+                .collect::<Vec<_>>();
+            all_distinct(&names).then(|| (parent.clone(), property, tags, names))
+        })
+        .collect::<Vec<_>>();
+
+    for (parent, property, tags, names) in unions {
+        if names.iter().any(|name| components.contains_key(name)) {
+            continue;
+        }
+        let Some(Value::Object(schema)) = components.get_mut(&parent) else {
+            continue;
+        };
+        let Some(Value::Array(arms)) = schema.get_mut("oneOf") else {
+            continue;
+        };
+        let refs = names
+            .iter()
+            .map(|name| json!({ "$ref": component_ref(name) }))
+            .collect();
+        let arms = std::mem::replace(arms, refs);
+        let mapping = tags
+            .into_iter()
+            .zip(&names)
+            .map(|(tag, name)| (tag, Value::String(component_ref(name))))
+            .collect::<Map<_, _>>();
+        schema.insert(
+            "discriminator".to_string(),
+            json!({ "propertyName": property, "mapping": mapping }),
+        );
+        components.extend(names.into_iter().zip(arms));
+    }
+}
+
+/// The property every `oneOf` arm requires and pins to a distinct string,
+/// with each arm's tag in order.
+fn tagged_union(schema: &Value) -> Option<(String, Vec<String>)> {
+    let arms = schema.get("oneOf")?.as_array()?;
+    let pinned = arms.iter().map(pinned_properties).collect::<Vec<_>>();
+    pinned.first()?.keys().find_map(|property| {
+        let tags = pinned
+            .iter()
+            .map(|arm| arm.get(property).map(|tag| tag.to_string()))
+            .collect::<Option<Vec<_>>>()?;
+        all_distinct(&tags).then(|| (property.to_string(), tags))
+    })
+}
+
+fn all_distinct(items: &[String]) -> bool {
+    items.iter().collect::<BTreeSet<_>>().len() == items.len()
+}
+
+/// The required properties an arm pins to one string. It looks through one
+/// level of `allOf`, where a tagged map variant keeps its tag.
+fn pinned_properties(arm: &Value) -> BTreeMap<&str, &String> {
+    let members = arm
+        .get("allOf")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
+    std::iter::once(arm)
+        .chain(members)
+        .filter_map(Value::as_object)
+        .flat_map(|schema| {
+            let properties = schema.get("properties").and_then(Value::as_object);
+            schema
+                .get("required")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .filter_map(move |name| {
+                    let tag = pinned_string(properties?.get(name)?.as_object()?)?;
+                    Some((name, tag))
+                })
+        })
+        .collect()
 }
