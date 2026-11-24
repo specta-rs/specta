@@ -6,63 +6,80 @@ expression: "serde_json::to_string_pretty(&document).expect(\"snapshot value sho
   "components": {
     "schemas": {
       "ApiEvent": {
+        "discriminator": {
+          "mapping": {
+            "Message": "#/components/schemas/ApiEvent_Message",
+            "Progress": "#/components/schemas/ApiEvent_Progress",
+            "Started": "#/components/schemas/ApiEvent_Started"
+          },
+          "propertyName": "kind"
+        },
         "oneOf": [
           {
-            "additionalProperties": false,
-            "properties": {
-              "kind": {
-                "const": "Started"
-              }
-            },
-            "required": [
-              "kind"
-            ],
-            "type": "object"
+            "$ref": "#/components/schemas/ApiEvent_Started"
           },
           {
-            "additionalProperties": false,
-            "properties": {
-              "data": {
-                "additionalProperties": false,
-                "properties": {
-                  "percent": {
-                    "format": "float",
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "percent"
-                ],
-                "type": "object"
-              },
-              "kind": {
-                "const": "Progress"
-              }
-            },
-            "required": [
-              "kind",
-              "data"
-            ],
-            "type": "object"
+            "$ref": "#/components/schemas/ApiEvent_Progress"
           },
           {
-            "additionalProperties": false,
-            "properties": {
-              "data": {
-                "type": "string"
-              },
-              "kind": {
-                "const": "Message"
-              }
-            },
-            "required": [
-              "kind",
-              "data"
-            ],
-            "type": "object"
+            "$ref": "#/components/schemas/ApiEvent_Message"
           }
         ],
         "title": "ApiEvent"
+      },
+      "ApiEvent_Message": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "kind": {
+            "const": "Message"
+          }
+        },
+        "required": [
+          "kind",
+          "data"
+        ],
+        "type": "object"
+      },
+      "ApiEvent_Progress": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "percent": {
+                "format": "float",
+                "type": "number"
+              }
+            },
+            "required": [
+              "percent"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "const": "Progress"
+          }
+        },
+        "required": [
+          "kind",
+          "data"
+        ],
+        "type": "object"
+      },
+      "ApiEvent_Started": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "Started"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
       },
       "ApiModel_String": {
         "additionalProperties": false,

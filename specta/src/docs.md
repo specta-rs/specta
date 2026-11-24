@@ -129,15 +129,33 @@ External types
 [//]: # (FEATURE_FLAGS_END)
 ## Alternatives
 
-#### Why not ts-rs?
+Other Rust crates generate types for other languages, each for a different job:
 
-[ts-rs](https://github.com/Aleph-Alpha/ts-rs) is a great library,
-but it has a few limitations which became a problem when I was building [rspc](https://github.com/specta-rs/rspc).
-Namely it deals with types individually which means it is not possible to export a type and all of the other types it depends on.
+| Crate | Generates | How |
+| --- | --- | --- |
+| [ts-rs](https://github.com/Aleph-Alpha/ts-rs) | TypeScript | `#[derive(TS)]`, with `#[ts(export)]` writing each type to its own file when `cargo test` runs |
+| [Typeshare](https://github.com/1Password/typeshare) | TypeScript, Swift, Kotlin, Scala, Go, and Python | a CLI that parses `#[typeshare]` items from your source files |
+| [utoipa](https://github.com/juhaku/utoipa) | OpenAPI documents for REST APIs | `#[derive(ToSchema)]` and route attributes |
+| [schemars](https://github.com/GREsau/schemars) | JSON Schema | `#[derive(JsonSchema)]` |
+| [Tsify](https://github.com/madonoharu/tsify) | TypeScript declarations for `wasm-bindgen` | `#[derive(Tsify)]` |
 
-#### Why not Typeshare?
+Specta's `#[derive(Type)]` feeds every exporter, so one set of types reaches TypeScript, Swift, OpenAPI, and the experimental targets above. It reads your `#[serde(...)]` attributes, and `specta_serde::PhasesFormat` exports separate serialize and deserialize shapes where they differ. Typeshare also covers several languages, but because it parses source files, it can't see types that macros generate ([1Password/typeshare#74](https://github.com/1Password/typeshare/issues/74)).
 
-[Typeshare](https://github.com/1Password/typeshare) is also great, but its approach is fundamentally different.
-While Specta uses traits and runtime information, Typeshare statically analyzes your Rust
-files.
-This results in a loss of information and lack of compatibility with types from other crates.
+Specta stops with an error instead of exporting a type that misdescribes the data: two types that would export under the same name stop the export, and so does a 64-bit integer that `JSON.parse` would round ([BigInt Forbidden](https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden)).
+
+#### Coming from ts-rs
+
+With `#[ts(export)]`, ts-rs writes each type when `cargo test` runs. Specta writes the types you register when you call an exporter, such as `Typescript::default().export_to("./bindings.ts", &types, specta_serde::Format)`. The attributes map like this:
+
+| ts-rs | Specta |
+| --- | --- |
+| `#[derive(TS)]` | `#[derive(Type)]`, with the `derive` feature |
+| `#[ts(export)]`, `TS_RS_EXPORT_DIR` | [`Types::register`](crate::Types::register), or `specta::collect()` with the `collect` feature, passed to an exporter |
+| `#[ts(rename)]`, `rename_all`, `rename_all_fields`, `tag`, `content`, `untagged`, `flatten` | the matching `#[serde(...)]` attributes, exported with `specta_serde::Format` |
+| `#[ts(type = "...")]`, `#[ts(as = "...")]` | `#[specta(type = T)]`, where `T` is a Rust type |
+| `#[ts(inline)]` | `#[specta(inline)]` |
+| `#[ts(skip)]` | `#[serde(skip)]` or `#[specta(skip)]` |
+| `#[ts(optional = nullable)]` | `#[specta(optional)]`, which emits `field?: T \| null` |
+| `#[ts(bound = "...")]` | `#[specta(bound = "...")]` |
+| `TS_RS_LARGE_INT` | an export error; see [BigInt Forbidden](https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden) |
+| one file per type | `Layout::Files`, one file per module |
