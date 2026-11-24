@@ -150,6 +150,22 @@ jobs:
         working-directory: tests/valibot-typecheck
         run: bun run test
 
+  effect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - uses: oven-sh/setup-bun@v2
+      - name: Install Effect test dependencies
+        working-directory: tests/effect-typecheck
+        run: bun install --frozen-lockfile
+      - name: Typecheck and run generated Effect schemas
+        working-directory: tests/effect-typecheck
+        run: bun run test
+
   # `tests/tests/typescript_precedence.rs` shells out to a TypeScript compiler
   # to assert assignability of the generated types. It skips when no compiler
   # is installed, so this job installs one and pins `SPECTA_TSC` to make a

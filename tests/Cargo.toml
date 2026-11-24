@@ -25,6 +25,7 @@ specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
 specta-zod = { path = "../specta-zod", features = ["serde"] }
 specta-valibot = { path = "../specta-valibot", features = ["serde"] }
+specta-effect = { path = "../specta-effect", features = ["serde"] }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 
 serde = { version = "1.0.228", features = ["std", "derive"] }

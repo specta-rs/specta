@@ -2043,6 +2043,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-effect"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+]
+
+[[package]]
 name = "specta-elm"
 version = "0.1.0"
 dependencies = [
@@ -2190,6 +2199,7 @@ dependencies = [
  "smol_str 0.3.7",
  "specta",
  "specta-csharp",
+ "specta-effect",
  "specta-go",
  "specta-java",
  "specta-jsonschema",

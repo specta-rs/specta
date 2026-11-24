@@ -1,0 +1,410 @@
+use std::fmt::Debug;
+
+use specta::{
+    Type, Types,
+    datatype::{DataType, Reference},
+};
+
+use crate::opaque;
+
+/// Cast a Rust type to an Effect Schema `any` type.
+///
+/// <div class="warning">
+///
+/// **WARNING:** When used with `Option<Any<T>>`, Effect Schema will not prompt you about nullability checks as `any | null` is coalesced to `any` in Effect Schema.
+///
+/// </div>
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Any;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Any)]
+///     pub field: String,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Any;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: Any<String>,
+/// }
+/// # }
+/// ```
+pub struct Any<T = ()>(T);
+
+impl<T> Type for Any<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::Any))
+    }
+}
+
+impl<T: Debug> Debug for Any<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Any").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for Any<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Any<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for Any<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Any<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
+/// Cast a Rust type to an Effect Schema `unknown` type.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Unknown;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Unknown)]
+///     pub field: String,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Unknown;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: Unknown<String>,
+/// }
+/// # }
+/// ```
+pub struct Unknown<T = ()>(T);
+
+impl<T> Type for Unknown<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::Unknown))
+    }
+}
+
+impl<T: Debug> Debug for Unknown<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Any").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for Unknown<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Unknown<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Unknown<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
+/// Cast a Rust type to an Effect Schema `never` type.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Never;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Never)]
+///     pub field: String,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Never;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: Never<String>,
+/// }
+/// # }
+/// ```
+pub struct Never<T = ()>(T);
+
+impl<T> Type for Never<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::Never))
+    }
+}
+
+impl<T: Debug> Debug for Never<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Any").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for Never<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Never<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for Never<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Never<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
+/// Cast a Rust type to an Effect Schema `number` type.
+///
+/// This can be used to opt into exporting BigInt-style Rust integer types as
+/// Effect Schema `number` when precision loss is acceptable.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Number;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Number)]
+///     pub field: i128,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::Number;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: Number<i128>,
+/// }
+/// # }
+/// ```
+pub struct Number<T = ()>(T);
+
+impl<T> Type for Number<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::Number))
+    }
+}
+
+impl<T: Debug> Debug for Number<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Number").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for Number<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Number<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for Number<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Number<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
+/// Cast a Rust type to an Effect Schema `bigint` type.
+///
+/// This can be used to opt into exporting BigInt-style Rust integer types as
+/// Effect Schema `bigint` when your runtime supports lossless bigint transport.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::BigInt;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = BigInt)]
+///     pub field: i128,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_effect::BigInt;
+///
+/// # #[cfg(feature = "serde")] {
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: BigInt<i128>,
+/// }
+/// # }
+/// ```
+pub struct BigInt<T = ()>(T);
+
+impl<T> Type for BigInt<T> {
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Reference(Reference::opaque(opaque::BigInt))
+    }
+}
+
+impl<T: Debug> Debug for BigInt<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BigInt").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for BigInt<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for BigInt<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for BigInt<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for BigInt<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
