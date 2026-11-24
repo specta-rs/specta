@@ -8,7 +8,7 @@ use crate::Layout;
 ///
 /// ## BigInt Forbidden
 ///
-/// Specta refuses to export [usize], [isize], [i64], [u64], [i128], [u128] and [f128] to TypeScript. `JSON.parse` rounds integers past `Number.MAX_SAFE_INTEGER` (2^53 - 1) to the nearest double without an error, so `9007199254740993` reaches JavaScript as `9007199254740992`. The error names the field that holds one; pick the fix that matches its values:
+/// Specta refuses to export [usize], [isize], [i64], [u64], [i128], [u128], and [f128] to TypeScript. `JSON.parse` rounds integers past `Number.MAX_SAFE_INTEGER` (2^53 - 1) to the nearest double without an error, so `9007199254740993` reaches JavaScript as `9007199254740992`. The error names the field that holds one; pick the fix that matches its values:
 ///
 /// | Values | Fix |
 /// | --- | --- |
