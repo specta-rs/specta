@@ -8,37 +8,111 @@ use crate::Layout;
 ///
 /// ## BigInt Forbidden
 ///
-/// Specta Typescript intentionally forbids exporting BigInt-style Rust integer types.
-/// This includes [usize], [isize], [i64], [u64], [u128], [i128] and [f128].
+/// Specta refuses to export [usize], [isize], [i64], [u64], [i128], [u128] and [f128] to TypeScript. `JSON.parse` rounds integers past `Number.MAX_SAFE_INTEGER` (2^53 - 1) to the nearest double without an error, so `9007199254740993` reaches JavaScript as `9007199254740992`. The error names the field that holds one; pick the fix that matches its values:
 ///
-/// This guard exists because `JSON.parse` will truncate large integers to fit into a JavaScript `number` type so we explicitly forbid exporting them.
+/// | Values | Fix |
+/// | --- | --- |
+/// | fit in 32 bits | use `u32` or `i32` |
+/// | must stay exact past 2^53, like snowflake ids or hashes | [send them as strings](#send-the-value-as-a-string) |
+/// | may round past 2^53 in one field | mark that field `#[specta(type = specta_typescript::Number)]`, which records the accepted loss where reviewers see it |
+/// | sit inside a `serde_json::Value` | [type its numbers as `number`](#serde_jsonvalue) |
+/// | cross a Tauri command or event | [use Tauri Specta's builder options](#tauri-specta) |
+/// | may round past 2^53 in any field | [remap every integer](#every-integer-at-once), as a last resort |
 ///
-/// We take the stance that correctness matters more than developer experience as people using Rust generally strive for correctness.
+/// ### Send the value as a string
 ///
-/// If you encounter this error, there are a few common migration paths (in order of preference):
+/// A string carries any integer exactly. Serialize the field with a codec that writes a string, and declare that wire type with `#[specta(type = String)]`:
 ///
-/// 1. Use a Specta-based framework which can handle these types
-///     - None currently exist but it would theoretically be possible refer to [#203](https://github.com/specta-rs/specta/issues/203#issuecomment-4387573925) for more information.
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+/// use specta::Type;
 ///
-/// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
-///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
-///    - This approach forces your application code to handle overflow/underflow values explicitly
-///    - Downside is that it can introduce annoying glue code and doesn't actually work if your need large values.
+/// #[derive(Serialize, Deserialize, Type)]
+/// pub struct Order {
+///     #[serde(with = "string")]
+///     #[specta(type = String)]
+///     pub id: u64,
+/// }
 ///
-/// 3. Serialize the value as a string
-///     - This can be done using `#[specta(type = String)]` for the type combined with a Serde `#[serde(with = "...")]` attribute for runtime.
-///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS but this will support numbers of any size losslessly.
+/// /// Writes a value with `Display` and reads it back with `FromStr`.
+/// mod string {
+///     use std::{fmt::Display, str::FromStr};
 ///
-/// 4. **UNSAFE:** Accept precision loss on per-field basis
-///     - Accept that large numbers may be deserialized differently than they are in Rust and use `#[specta(type = specta_typescript::Number)]` to bypass this warning on a per-field basis.
-///     - Marking each field explicitly encodes the decision similar to an `unsafe` block, ensuring everyone working on your codebase is aware of the risk and where it exists within the codebase.
-///     - This doesn't work for external implementations like `serde_json::Value` which contain `BigInt`'s as you don't control the definition.
+///     use serde::{Deserialize, Deserializer, Serializer, de::Error};
 ///
-/// 5. **UNSAFE:** Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
-///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
-///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
-///     - Refer to discussion around this on [#481](https://github.com/specta-rs/specta/issues/481).
+///     pub fn serialize<T: Display, S: Serializer>(value: &T, serializer: S) -> Result<S::Ok, S::Error> {
+///         serializer.collect_str(value)
+///     }
 ///
+///     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+///     where
+///         T: FromStr<Err: Display>,
+///         D: Deserializer<'de>,
+///     {
+///         String::deserialize(deserializer)?.parse().map_err(D::Error::custom)
+///     }
+/// }
+/// # let types = specta::Types::default().register::<Order>();
+/// # let output = specta_typescript::Typescript::default().export(&types, specta_serde::Format).unwrap();
+/// # assert!(output.contains("id: string"));
+/// ```
+///
+/// The frontend receives `id` as a `string`, and `BigInt(order.id)` restores the exact value.
+///
+/// ### `serde_json::Value`
+///
+/// `serde_json::Number` holds `i64` and `u64`, so any type containing a `serde_json::Value` hits this error at `serde_json::Value`. `JSON.parse` already turns those numbers into JavaScript numbers, so one remap rule can type them as `number` and leave every other integer guarded:
+///
+/// ```rust
+/// use specta::{Type, Types};
+/// use specta_util::Remapper;
+///
+/// #[derive(Type)]
+/// pub struct Event {
+///     pub payload: serde_json::Value,
+/// }
+///
+/// let types = Remapper::new()
+///     .rule(
+///         <serde_json::Number as Type>::definition(&mut Types::default()),
+///         <specta_typescript::Number as Type>::definition(&mut Types::default()),
+///     )
+///     .remap_types(Types::default().register::<Event>());
+/// # let output = specta_typescript::Typescript::default().export(&types, specta_serde::Format).unwrap();
+/// # assert!(output.contains("null | boolean | number | string"));
+/// ```
+///
+/// Integers past 2^53 inside the value can still round. If the frontend treats the value as opaque, mark the field `#[specta(type = specta_typescript::Unknown)]` instead.
+///
+/// ### Tauri Specta
+///
+/// Tauri Specta's `Builder` has two options:
+///
+/// - `dangerously_cast_bigints_to_number()` exports them as `number` in every command and event, accepting the loss.
+/// - `semantic_types` with [`semantic::Configuration::enable_lossless_bigints`](crate::semantic::Configuration::enable_lossless_bigints) types them as `bigint` and wraps values from Rust in `BigInt(value)`. The result is exact only for values that reach JavaScript as strings, because a JSON number past 2^53 may arrive already rounded ([#203](https://github.com/specta-rs/specta/issues/203#issuecomment-4387573925)).
+///
+/// ### Every integer at once
+///
+/// [`Remapper::dangerous_bigints_as_number`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html#method.dangerous_bigints_as_number) exports every one of these integers in a collection as `number`. It accepts the loss for every field, including fields added later, so reach for it last ([#481](https://github.com/specta-rs/specta/issues/481)):
+///
+/// ```rust
+/// # let types = specta::Types::default();
+/// let types = specta_util::Remapper::new()
+///     .dangerous_bigints_as_number()
+///     .remap_types(types);
+/// # let _ = types;
+/// ```
+///
+/// ### Migrating from `BigIntExportBehavior`
+///
+/// Specta 2.0.0-rc.23 and earlier configured this with `Typescript::bigint(BigIntExportBehavior::…)`, which rc.24 removed:
+///
+/// | `BigIntExportBehavior` | Replacement |
+/// | --- | --- |
+/// | `Number` | [remap every integer](#every-integer-at-once), or Tauri Specta's `dangerously_cast_bigints_to_number()` |
+/// | `String` | [send the value as a string](#send-the-value-as-a-string) |
+/// | `BigInt` | `#[specta(type = specta_typescript::BigInt)]` on each field your runtime parses into `bigint`, or Tauri Specta's `semantic_types` |
+/// | `Fail` | nothing: this error is the default |
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,

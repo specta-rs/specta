@@ -88,13 +88,10 @@ impl Remapper {
     /// Specta deliberately does not expose this as a global option. Calling this
     /// is you explicitly asserting — in the spirit of an `unsafe` block — that
     /// you accept that trade-off for these types, and only as a last resort.
-    /// Prefer:
-    ///
-    /// - leaving them as `bigint` (the default), which is lossless;
-    /// - a framework with lossless BigInt support, such as Tauri Specta or
-    ///   TauRPC, if you control the runtime;
-    /// - overriding a single type with `specta_typescript::Number`, rather than
-    ///   every integer at once.
+    /// Prefer the per-field fixes in the
+    /// [BigInt guidance](https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden):
+    /// a narrower integer, a string on the wire, or `specta_typescript::Number`
+    /// on a single field.
     ///
     /// As with any [`rule`](Self::rule), you must ensure Serde applies the same
     /// representation to the runtime data for the type contract to stay sound.
