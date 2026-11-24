@@ -116,6 +116,19 @@ impl Remapper {
     /// original everywhere else.
     ///
     /// </div>
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::Types;
+    /// use specta_util::Remapper;
+    ///
+    /// let types = Types::default();
+    /// let typescript_types = Remapper::new()
+    ///     .dangerous_bigints_as_number()
+    ///     .remap_types(types.clone());
+    /// # let _ = (types, typescript_types);
+    /// ```
     pub fn dangerous_bigints_as_number(mut self) -> Self {
         for signed in [Primitive::i64, Primitive::i128, Primitive::isize] {
             self = self.rule(

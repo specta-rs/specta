@@ -185,6 +185,44 @@ fn serde_json_number_uses_untagged_wire_shape() {
     );
 }
 
+// The `serde_json::Value` recipe in the BigInt Forbidden docs on `specta_typescript::Error`.
+#[test]
+fn serde_json_number_remap_keeps_other_bigints_guarded() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Event {
+        payload: serde_json::Value,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct EventWithId {
+        id: i64,
+        payload: serde_json::Value,
+    }
+
+    let remapper = Remapper::new().rule(
+        <serde_json::Number as Type>::definition(&mut Types::default()),
+        <specta_typescript::Number as Type>::definition(&mut Types::default()),
+    );
+    let export =
+        |types| Typescript::default().export(&remapper.remap_types(types), specta_serde::Format);
+
+    let output = export(Types::default().register::<Event>())
+        .expect("JSON numbers remapped to `number` should export");
+    assert!(
+        output.contains("null | boolean | number | string"),
+        "unexpected output: {output}"
+    );
+
+    let err = export(Types::default().register::<EventWithId>())
+        .expect_err("an `i64` outside the JSON value must stay guarded");
+    assert!(
+        err.to_string().contains("EventWithId.id"),
+        "unexpected error: {err}"
+    );
+}
+
 #[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()

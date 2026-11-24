@@ -63,7 +63,7 @@ use crate::Layout;
 ///
 /// `serde_json::Number` holds `i64` and `u64`, so any type containing a `serde_json::Value` hits this error at `serde_json::Value`. `JSON.parse` already turns those numbers into JavaScript numbers, so one remap rule can type them as `number` and leave every other integer guarded:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use specta::{Type, Types};
 /// use specta_util::Remapper;
 ///
@@ -78,8 +78,6 @@ use crate::Layout;
 ///         <specta_typescript::Number as Type>::definition(&mut Types::default()),
 ///     )
 ///     .remap_types(Types::default().register::<Event>());
-/// # let output = specta_typescript::Typescript::default().export(&types, specta_serde::Format).unwrap();
-/// # assert!(output.contains("null | boolean | number | string"));
 /// ```
 ///
 /// Integers past 2^53 inside the value can still round. If the frontend treats the value as opaque, mark the field `#[specta(type = specta_typescript::Unknown)]` instead.
@@ -93,15 +91,7 @@ use crate::Layout;
 ///
 /// ### Every integer at once
 ///
-/// [`Remapper::dangerous_bigints_as_number`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html#method.dangerous_bigints_as_number) exports every one of these integers in a collection as `number`. It accepts the loss for every field, including fields added later, so reach for it last ([#481](https://github.com/specta-rs/specta/issues/481)):
-///
-/// ```rust
-/// # let types = specta::Types::default();
-/// let types = specta_util::Remapper::new()
-///     .dangerous_bigints_as_number()
-///     .remap_types(types);
-/// # let _ = types;
-/// ```
+/// [`Remapper::dangerous_bigints_as_number`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html#method.dangerous_bigints_as_number) exports every one of these integers in a collection as `number`. It accepts the loss for every field, including fields added later, so reach for it last ([#481](https://github.com/specta-rs/specta/issues/481)).
 ///
 /// ### Migrating from `BigIntExportBehavior`
 ///

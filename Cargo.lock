@@ -2228,10 +2228,8 @@ name = "specta-typescript"
 version = "0.0.15"
 dependencies = [
  "serde",
- "serde_json",
  "specta",
  "specta-serde",
- "specta-util",
 ]
 
 [[package]]
