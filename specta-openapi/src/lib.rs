@@ -55,6 +55,10 @@
 //! extensions, since mainstream generators parse bounds into signed 64-bit
 //! integers and silently wrap anything wider.
 //!
+//! Internally and adjacently tagged enums give each variant its own component,
+//! named `{Enum}_{tag}`, and add a `discriminator` that maps each tag to it, so
+//! generators emit one type per variant.
+//!
 //! # OpenAPI 3.0 compatibility
 //!
 //! OpenAPI 3.1's schema dialect is full JSON Schema, so every Specta shape is
