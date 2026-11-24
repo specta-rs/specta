@@ -441,11 +441,11 @@ impl_ndt!(
     time::Month as str = inline;
 );
 
-#[cfg(feature = "jiff02")]
-#[cfg_attr(docsrs, doc(cfg(feature = "jiff02")))]
+#[cfg(feature = "jiff1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "jiff1")))]
 impl_ndt!(
     jiff::Timestamp as str = inline;
-    jiff::Zoned as str = inline;
+    jiff::ZonedDateTime as str = inline;
     jiff::SignedDuration as str = inline;
     jiff::civil::Date as str = inline;
     jiff::civil::Time as str = inline;

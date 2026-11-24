@@ -98,7 +98,7 @@ External types
 - `ulid3` - [ulid](https://docs.rs/ulid) 3.x
 - `chrono04` - [chrono](https://docs.rs/chrono) 0.4.x
 - `time03` - [time](https://docs.rs/time) 0.3.x
-- `jiff02` - [jiff](https://docs.rs/jiff) 0.2.x
+- `jiff1` - [jiff](https://docs.rs/jiff) 1.x
 - `bigdecimal04` - [bigdecimal](https://docs.rs/bigdecimal) 0.4.x
 - `rust_decimal1` - [rust_decimal](https://docs.rs/rust_decimal) 1.x
 - `indexmap2` - [indexmap](https://docs.rs/indexmap) 2.x
