@@ -17,8 +17,6 @@ static TYPES: OnceLock<Mutex<Vec<fn(&mut Types)>>> = OnceLock::new();
 /// Rust type may not satisfy. Register each instantiation you export with
 /// [`Types::register`](crate::Types::register) instead.
 ///
-/// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`small_ctor`] (which is used internally) is marked unsafe.
-///
 /// # Example
 ///
 /// ```no_run

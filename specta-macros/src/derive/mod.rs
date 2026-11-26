@@ -675,7 +675,7 @@ fn expand_tokens(input: TokenStream, source_suffix: &str) -> syn::Result<TokenSt
 
             quote! {
                 #[doc(hidden)]
-                #[allow(unsafe_code, non_snake_case)]
+                #[allow(non_snake_case)]
                 #[#crate_ref::collect::internal::small_ctor::ctor]
                 unsafe fn #export_fn_name() {
                     #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
