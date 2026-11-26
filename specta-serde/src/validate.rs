@@ -133,10 +133,9 @@ pub(crate) fn validate_datatype_for_mode(
     )
 }
 
-/// [`validate_datatype_for_mode`] for a datatype in a graph that
-/// [`validate_for_mode`] has already validated in `mode`. Closed references
-/// name declarations that are already proven, so only generic instantiations
-/// and inline bodies are followed.
+/// Validates `dt` in a graph that [`validate_for_mode`] has already validated
+/// in `mode`. A closed reference points to a declaration that is already
+/// proven, so only generic instantiations and inline bodies are followed.
 pub(crate) fn validate_datatype_in_validated_graph(
     dt: &DataType,
     types: &Types,
