@@ -213,7 +213,8 @@ impl specta::Format for Format {
             return Ok(Cow::Borrowed(dt));
         }
 
-        validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
+        // `types` comes from `map_types`, which validated every declaration.
+        validate::validate_datatype_in_validated_graph(dt, types, validate::ApplyMode::Unified)?;
 
         let mut dt = dt.clone();
         rewrite_datatype_for_phase(

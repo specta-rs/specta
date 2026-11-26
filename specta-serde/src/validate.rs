@@ -115,6 +115,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn validate_datatype_for_mode(
     dt: &DataType,
     types: &Types,
@@ -124,6 +125,30 @@ pub(crate) fn validate_datatype_for_mode(
         dt,
         types,
         &mut ValidationVisits::default(),
+        &mut ValidationPath::new("<top-level>"),
+        mode,
+        true,
+        None,
+        FlattenDirections::LIVE,
+    )
+}
+
+/// [`validate_datatype_for_mode`] for a datatype in a graph that
+/// [`validate_for_mode`] has already validated in `mode`. Closed references
+/// name declarations that are already proven, so only generic instantiations
+/// and inline bodies are followed.
+pub(crate) fn validate_datatype_in_validated_graph(
+    dt: &DataType,
+    types: &Types,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    inner(
+        dt,
+        types,
+        &mut ValidationVisits {
+            graph_validated: true,
+            ..ValidationVisits::default()
+        },
         &mut ValidationPath::new("<top-level>"),
         mode,
         true,
@@ -161,6 +186,9 @@ struct ValidationVisits {
     // A memo key in this root fell back to its syntactic form, so its cycle
     // guard may have skipped an instantiation it never checked.
     inexact_key: bool,
+    // `validate_for_mode` has already checked every declaration of the graph
+    // under live directions, so a closed reference to one is already proven.
+    graph_validated: bool,
 }
 
 impl ValidationVisits {
@@ -183,6 +211,9 @@ impl ValidationVisits {
         // per-root algorithm, including its bounded substitution fallback.
         let closed = matches!(&reference.inner, NamedReferenceType::Reference { generics, .. } if generics.is_empty())
             && env.is_none_or(|env| !env.has_bindings);
+        if closed && self.graph_validated && directions == FlattenDirections::LIVE {
+            return false;
+        }
         let reusable = self.completed.is_some() && closed;
         let key = match exact_reference_key(reference, env) {
             Some(key) => (key, directions),
