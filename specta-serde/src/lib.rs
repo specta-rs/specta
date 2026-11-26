@@ -203,30 +203,37 @@ impl specta::Format for Format {
         types: &'a Types,
         dt: &'a DataType,
     ) -> Result<Cow<'a, DataType>, FormatError> {
-        if datatype_is_registered_definition(types, dt) {
-            return Ok(Cow::Owned(dt.clone()));
-        }
-
         // A primitive carries no attributes or children, so neither the
         // validation walk nor the phase rewrite can change it.
         if matches!(dt, DataType::Primitive(_)) {
             return Ok(Cow::Borrowed(dt));
         }
 
-        // `types` comes from `map_types`, which validated every declaration.
-        validate::validate_datatype_in_validated_graph(dt, types, validate::ApplyMode::Unified)?;
+        let mapped = || {
+            // `types` comes from `map_types`, which validated every declaration.
+            validate::validate_datatype_in_validated_graph(
+                dt,
+                types,
+                validate::ApplyMode::Unified,
+            )?;
 
-        let mut dt = dt.clone();
-        rewrite_datatype_for_phase(
-            &mut dt,
-            PhaseRewrite::Unified,
+            let mut dt = dt.clone();
+            rewrite_datatype_for_phase(
+                &mut dt,
+                PhaseRewrite::Unified,
+                types,
+                &HashMap::new(),
+                &HashSet::new(),
+                None,
+            )?;
+            Ok(dt)
+        };
+
+        Ok(Cow::Owned(unless_registered_definition(
             types,
-            &HashMap::new(),
-            &HashSet::new(),
-            None,
-        )?;
-
-        Ok(Cow::Owned(dt))
+            dt,
+            mapped(),
+        )?))
     }
 }
 
@@ -537,33 +544,52 @@ impl specta::Format for PhasesFormat {
     }
 
     fn map_type(&'_ self, types: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
-        if datatype_is_registered_definition(types, dt) {
-            return Ok(Cow::Owned(dt.clone()));
-        }
+        let mapped = || {
+            let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
 
-        let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
+            // Only the serialize phase is selected and rewritten here, so
+            // validation must treat deserialize-only shapes (e.g. a
+            // `#[serde(flatten, skip_serializing)]` field, dropped by the
+            // serialize rewrite) as unreachable.
+            validate::validate_datatype_for_mode_shallow(
+                &selected,
+                types,
+                validate::ApplyMode::Phases,
+                Phase::Serialize,
+            )?;
 
-        // Only the serialize phase is selected and rewritten here, so
-        // validation must treat deserialize-only shapes (e.g. a
-        // `#[serde(flatten, skip_serializing)]` field, dropped by the
-        // serialize rewrite) as unreachable.
-        validate::validate_datatype_for_mode_shallow(
-            &selected,
+            rewrite_datatype_for_phase(
+                &mut selected,
+                PhaseRewrite::Serialize,
+                types,
+                &HashMap::new(),
+                &HashSet::new(),
+                None,
+            )?;
+            Ok(selected)
+        };
+
+        Ok(Cow::Owned(unless_registered_definition(
             types,
-            validate::ApplyMode::Phases,
-            Phase::Serialize,
-        )?;
+            dt,
+            mapped(),
+        )?))
+    }
+}
 
-        rewrite_datatype_for_phase(
-            &mut selected,
-            PhaseRewrite::Serialize,
-            types,
-            &HashMap::new(),
-            &HashSet::new(),
-            None,
-        )?;
-
-        Ok(Cow::Owned(selected))
+/// Returns `mapped`, or `dt` unchanged when it is a registered definition,
+/// which `map_types` has already formatted. Finding one compares `dt` with
+/// every declaration, so that only happens when the answer can change the
+/// result: when the mapping failed or changed `dt`.
+fn unless_registered_definition(
+    types: &Types,
+    dt: &DataType,
+    mapped: Result<DataType, Error>,
+) -> Result<DataType, Error> {
+    match mapped {
+        Ok(mapped) if mapped == *dt => Ok(mapped),
+        _ if datatype_is_registered_definition(types, dt) => Ok(dt.clone()),
+        mapped => mapped,
     }
 }
 
