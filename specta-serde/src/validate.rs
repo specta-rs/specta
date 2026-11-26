@@ -158,7 +158,9 @@ struct ValidationVisits {
     active_root: ValidationSet<(Reference, FlattenDirections)>,
     candidates: Vec<(Reference, FlattenDirections)>,
     completed: Option<ValidationSet<(Reference, FlattenDirections)>>,
-    generic_context: bool,
+    // A memo key in this root fell back to its syntactic form, so its cycle
+    // guard may have skipped an instantiation it never checked.
+    inexact_key: bool,
 }
 
 impl ValidationVisits {
@@ -181,9 +183,14 @@ impl ValidationVisits {
         // per-root algorithm, including its bounded substitution fallback.
         let closed = matches!(&reference.inner, NamedReferenceType::Reference { generics, .. } if generics.is_empty())
             && env.is_none_or(|env| !env.has_bindings);
-        self.generic_context |= !closed;
         let reusable = self.completed.is_some() && closed;
-        let key = (resolved_reference_key(reference, env), directions);
+        let key = match exact_reference_key(reference, env) {
+            Some(key) => (key, directions),
+            None => {
+                self.inexact_key = true;
+                (Reference::Named(reference.clone()), directions)
+            }
+        };
         if reusable
             && self
                 .completed
@@ -205,14 +212,15 @@ impl ValidationVisits {
     fn finish_root(&mut self) {
         // A bounded generic-key fallback elsewhere in this root could have
         // influenced its cycle guard. Do not promote any of that root's visits.
-        if !self.generic_context
+        // Exact keys can't: they only dedupe identical instantiations.
+        if !self.inexact_key
             && let Some(completed) = &mut self.completed
         {
             completed.extend(self.candidates.drain(..));
         }
         self.candidates.clear();
         self.active_root.clear();
-        self.generic_context = false;
+        self.inexact_key = false;
     }
 }
 
@@ -1609,6 +1617,15 @@ const RESOLVED_KEY_NODE_BUDGET: usize = 256;
 /// most [`RESOLVED_KEY_NODE_BUDGET`] nodes built from clones of graph nodes -
 /// a finite set either way, so a walk deduped on these keys terminates.
 fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_>>) -> Reference {
+    exact_reference_key(reference, env).unwrap_or_else(|| Reference::Named(reference.clone()))
+}
+
+/// [`resolved_reference_key`] without its fallback: `None` when resolving the
+/// generic arguments would exceed [`RESOLVED_KEY_NODE_BUDGET`].
+fn exact_reference_key(
+    reference: &NamedReference,
+    env: Option<&GenericEnv<'_>>,
+) -> Option<Reference> {
     let mut resolved = reference.clone();
 
     if env.is_some() {
@@ -1627,11 +1644,11 @@ fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_
         };
 
         if !ok {
-            return Reference::Named(reference.clone());
+            return None;
         }
     }
 
-    Reference::Named(resolved)
+    Some(Reference::Named(resolved))
 }
 
 /// Resolves [`DataType::Generic`] placeholders in `dt` (in place) through the
