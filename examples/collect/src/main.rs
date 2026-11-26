@@ -5,6 +5,10 @@
 // a `where` clause; clippy reports that in the consuming crate, where it looks
 // like the user's own struct is at fault. `DisplayValue` below is the guard.
 #![deny(clippy::multiple_bound_locations)]
+// A crate that forbids `unsafe_code` must still be able to derive `Type` with
+// `collect` enabled, so the derive must not emit `#[allow(unsafe_code)]`: under
+// `forbid`, that attribute is error E0453 on every collected type.
+#![forbid(unsafe_code)]
 
 use specta::Type;
 use specta_typescript::Typescript;
