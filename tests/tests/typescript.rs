@@ -329,9 +329,12 @@ fn typescript_export_serde_errors() {
             ("serde", Box::new(specta_serde::Format) as Box<dyn Format>),
             ("serde_phases", Box::new(specta_serde::PhasesFormat)),
         ] {
-            if let Err(err) = format.map_type(&types, &dt) {
+            let result = format
+                .map_types(&types)
+                .and_then(|mapped| format.map_type(&mapped, &dt).map(drop));
+            if let Err(err) = result {
                 failures.push(format!(
-                    "{name} ({mode}) [map_type]: expected export to succeed, got '{err}'"
+                    "{name} ({mode}) [format]: expected export to succeed, got '{err}'"
                 ));
             }
         }
