@@ -115,6 +115,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn validate_datatype_for_mode(
     dt: &DataType,
     types: &Types,
@@ -124,6 +125,28 @@ pub(crate) fn validate_datatype_for_mode(
         dt,
         types,
         &mut ValidationVisits::default(),
+        &mut ValidationPath::new("<top-level>"),
+        mode,
+        true,
+        None,
+        FlattenDirections::LIVE,
+    )
+}
+
+/// Validates `dt` on the assumption that every declaration in `types` already
+/// passed [`validate_for_mode`] in `mode`.
+pub(crate) fn validate_datatype_in_validated_graph(
+    dt: &DataType,
+    types: &Types,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    inner(
+        dt,
+        types,
+        &mut ValidationVisits {
+            graph_validated: true,
+            ..ValidationVisits::default()
+        },
         &mut ValidationPath::new("<top-level>"),
         mode,
         true,
@@ -158,7 +181,11 @@ struct ValidationVisits {
     active_root: ValidationSet<(Reference, FlattenDirections)>,
     candidates: Vec<(Reference, FlattenDirections)>,
     completed: Option<ValidationSet<(Reference, FlattenDirections)>>,
-    generic_context: bool,
+    inexact_key: bool,
+    /// Set when every declaration in `types` already passed
+    /// [`validate_for_mode`], which walks each one with both flatten directions
+    /// live, so a closed reference reached live needs no second walk.
+    graph_validated: bool,
 }
 
 impl ValidationVisits {
@@ -181,9 +208,17 @@ impl ValidationVisits {
         // per-root algorithm, including its bounded substitution fallback.
         let closed = matches!(&reference.inner, NamedReferenceType::Reference { generics, .. } if generics.is_empty())
             && env.is_none_or(|env| !env.has_bindings);
-        self.generic_context |= !closed;
+        if closed && self.graph_validated && directions == FlattenDirections::LIVE {
+            return false;
+        }
         let reusable = self.completed.is_some() && closed;
-        let key = (resolved_reference_key(reference, env), directions);
+        let key = match exact_reference_key(reference, env) {
+            Some(key) => (key, directions),
+            None => {
+                self.inexact_key = true;
+                (Reference::Named(reference.clone()), directions)
+            }
+        };
         if reusable
             && self
                 .completed
@@ -205,14 +240,14 @@ impl ValidationVisits {
     fn finish_root(&mut self) {
         // A bounded generic-key fallback elsewhere in this root could have
         // influenced its cycle guard. Do not promote any of that root's visits.
-        if !self.generic_context
+        if !self.inexact_key
             && let Some(completed) = &mut self.completed
         {
             completed.extend(self.candidates.drain(..));
         }
         self.candidates.clear();
         self.active_root.clear();
-        self.generic_context = false;
+        self.inexact_key = false;
     }
 }
 
@@ -1609,6 +1644,15 @@ const RESOLVED_KEY_NODE_BUDGET: usize = 256;
 /// most [`RESOLVED_KEY_NODE_BUDGET`] nodes built from clones of graph nodes -
 /// a finite set either way, so a walk deduped on these keys terminates.
 fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_>>) -> Reference {
+    exact_reference_key(reference, env).unwrap_or_else(|| Reference::Named(reference.clone()))
+}
+
+/// The memo key for `reference` with its generics resolved through `env`, or
+/// `None` when resolving them would exceed [`RESOLVED_KEY_NODE_BUDGET`].
+fn exact_reference_key(
+    reference: &NamedReference,
+    env: Option<&GenericEnv<'_>>,
+) -> Option<Reference> {
     let mut resolved = reference.clone();
 
     if env.is_some() {
@@ -1627,11 +1671,11 @@ fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_
         };
 
         if !ok {
-            return Reference::Named(reference.clone());
+            return None;
         }
     }
 
-    Reference::Named(resolved)
+    Some(Reference::Named(resolved))
 }
 
 /// Resolves [`DataType::Generic`] placeholders in `dt` (in place) through the

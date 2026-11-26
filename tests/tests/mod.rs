@@ -45,6 +45,7 @@ mod serde_empty_payloads;
 mod serde_enum_rewrite;
 mod serde_enum_variant_flatten;
 mod serde_flatten_option;
+mod serde_format_fragments;
 mod serde_identifiers;
 mod serde_internal_tag_payloads;
 mod serde_other;
