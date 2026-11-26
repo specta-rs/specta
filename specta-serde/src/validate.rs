@@ -133,9 +133,8 @@ pub(crate) fn validate_datatype_for_mode(
     )
 }
 
-/// Validates `dt` in a graph that [`validate_for_mode`] has already validated
-/// in `mode`. A closed reference points to a declaration that is already
-/// proven, so only generic instantiations and inline bodies are followed.
+/// Validates `dt` on the assumption that every declaration in `types` already
+/// passed [`validate_for_mode`] in `mode`.
 pub(crate) fn validate_datatype_in_validated_graph(
     dt: &DataType,
     types: &Types,
@@ -182,11 +181,10 @@ struct ValidationVisits {
     active_root: ValidationSet<(Reference, FlattenDirections)>,
     candidates: Vec<(Reference, FlattenDirections)>,
     completed: Option<ValidationSet<(Reference, FlattenDirections)>>,
-    // A memo key in this root fell back to its syntactic form, so its cycle
-    // guard may have skipped an instantiation it never checked.
     inexact_key: bool,
-    // `validate_for_mode` has already checked every declaration of the graph
-    // under live directions, so a closed reference to one is already proven.
+    /// Set when every declaration in `types` already passed
+    /// [`validate_for_mode`], which walks each one with both flatten directions
+    /// live, so a closed reference reached live needs no second walk.
     graph_validated: bool,
 }
 
@@ -242,7 +240,6 @@ impl ValidationVisits {
     fn finish_root(&mut self) {
         // A bounded generic-key fallback elsewhere in this root could have
         // influenced its cycle guard. Do not promote any of that root's visits.
-        // Exact keys can't: they only dedupe identical instantiations.
         if !self.inexact_key
             && let Some(completed) = &mut self.completed
         {
@@ -1650,8 +1647,8 @@ fn resolved_reference_key(reference: &NamedReference, env: Option<&GenericEnv<'_
     exact_reference_key(reference, env).unwrap_or_else(|| Reference::Named(reference.clone()))
 }
 
-/// [`resolved_reference_key`] without its fallback: `None` when resolving the
-/// generic arguments would exceed [`RESOLVED_KEY_NODE_BUDGET`].
+/// The memo key for `reference` with its generics resolved through `env`, or
+/// `None` when resolving them would exceed [`RESOLVED_KEY_NODE_BUDGET`].
 fn exact_reference_key(
     reference: &NamedReference,
     env: Option<&GenericEnv<'_>>,

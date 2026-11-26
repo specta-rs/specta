@@ -146,6 +146,9 @@ pub enum Phase {
 /// This formatter validates the graph for unified export and applies serde
 /// container, variant, and field behavior that affects the exported shape, such
 /// as renames, tagging, defaults, flattening, and compatible conversion attrs.
+/// [`map_type`](specta::Format::map_type) expects the graph that
+/// [`map_types`](specta::Format::map_types) returned, as Specta's exporters
+/// pass it, and skips the declarations `map_types` already validated.
 ///
 /// When a single safe type can contain both directions, this formatter widens
 /// the shared shape. For example, conditional serialization makes a field
@@ -210,7 +213,6 @@ impl specta::Format for Format {
         }
 
         let mapped = || {
-            // `types` comes from `map_types`, which validated every declaration.
             validate::validate_datatype_in_validated_graph(
                 dt,
                 types,
@@ -577,10 +579,10 @@ impl specta::Format for PhasesFormat {
     }
 }
 
-/// Returns `mapped`, or `dt` unchanged when it is a registered definition,
-/// which `map_types` has already formatted. Finding one compares `dt` with
-/// every declaration, so that only happens when the answer can change the
-/// result: when the mapping failed or changed `dt`.
+/// Returns `mapped`, or `dt` unchanged when it matches a declaration in
+/// `types`, which in a graph from `map_types` is already formatted. Finding one
+/// compares `dt` with every declaration, so that only happens when the answer
+/// can change the result: when the mapping failed or changed `dt`.
 fn unless_registered_definition(
     types: &Types,
     dt: &DataType,

@@ -1,8 +1,6 @@
-// `specta_serde::Format::map_type` on datatypes outside the registered graph.
-//
-// `map_types` validates every declaration and root of the graph, so `map_type`
-// trusts closed references to it. An inline container's body only exists at
-// its use sites, so a fragment that uses one is still checked there.
+// `specta_serde::Format::map_type` relies on `map_types` having validated each
+// declaration, but an inline body exists only at its use sites, so `map_type`
+// must still validate it.
 
 use serde::{Deserialize, Serialize};
 use specta::{Format as _, Type, Types};
